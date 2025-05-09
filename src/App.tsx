@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -12,12 +12,29 @@ import Support from './components/Support';
 import QualityControl from './components/QualityControl';
 import CareerTrack from './components/CareerTrack.tsx';
 import WalletDashboard from './components/WalletDashboard';
+import config from './config';
 
 function App() {
+  useEffect(() => {
+    // Log config information on app startup
+    console.log('🚀 REPS Platform initializing...');
+    console.log(`📋 Run Mode: ${config.runMode} (${config.isStandalone ? 'Standalone' : 'In-App'})`);
+    
+    // Get and log user data
+    const userData = config.getUserData();
+    console.log('👤 User Data:', {
+      userId: userData.userId,
+      agentId: userData.agentId,
+      // Only log that token exists, not the actual token for security
+      tokenExists: !!userData.token
+    });
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
+        {/*
         <nav className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
@@ -35,7 +52,7 @@ function App() {
             </div>
           </div>
         </nav>
-
+        */}
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>

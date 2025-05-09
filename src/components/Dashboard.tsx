@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   UserPlus,
@@ -17,15 +17,28 @@ import {
   ListChecks,
   MapPin
 } from 'lucide-react';
+import config from '../config';
+import progressService, { UserProgress } from '../services/progressService';
 
-const phases = [
+// Define the phase interface
+interface Phase {
+  id: number;
+  name: string;
+  description: string;
+  icon: React.ElementType;
+  path: string;
+  status: 'completed' | 'in-progress' | 'pending';
+  actions: string[];
+}
+
+// Phase template data
+const phaseTemplates = [
   {
     id: 1,
     name: 'Sign Up & Verification',
     description: 'Complete your account setup and verify your identity',
     icon: UserPlus,
     path: '/signup',
-    status: 'completed',
     actions: [
       'Create your REPS account with email',
       'Verify your email address',
@@ -40,7 +53,6 @@ const phases = [
     description: 'Build your professional profile',
     icon: UserCircle,
     path: '/profile',
-    status: 'in-progress',
     actions: [
       'Upload a professional photo',
       'Add your work experience',
@@ -55,7 +67,6 @@ const phases = [
     description: 'Complete tests and get your Bolt Score',
     icon: Award,
     path: '/skills',
-    status: 'pending',
     actions: [
       'Take communication assessment',
       'Complete technical evaluation',
@@ -70,7 +81,6 @@ const phases = [
     description: 'Choose your membership level',
     icon: CreditCard,
     path: '/subscription',
-    status: 'pending',
     actions: [
       'Review available plans',
       'Compare plan features',
@@ -85,7 +95,6 @@ const phases = [
     description: 'Browse and apply for gigs',
     icon: ShoppingBag,
     path: '/marketplace',
-    status: 'pending',
     actions: [
       'Complete marketplace orientation',
       'Set up gig preferences',
@@ -100,7 +109,6 @@ const phases = [
     description: 'Start your first gig',
     icon: PhoneCall,
     path: '/operations',
-    status: 'pending',
     actions: [
       'Review assigned tasks',
       'Set up communication tools',
@@ -115,7 +123,6 @@ const phases = [
     description: 'Access resources and community',
     icon: Headphones,
     path: '/support',
-    status: 'pending',
     actions: [
       'Join REPS community',
       'Complete onboarding training',
@@ -130,7 +137,6 @@ const phases = [
     description: 'Monitor your performance',
     icon: Shield,
     path: '/quality',
-    status: 'pending',
     actions: [
       'Review quality guidelines',
       'Set up performance tracking',
@@ -145,7 +151,6 @@ const phases = [
     description: 'Advance your REPS career',
     icon: TrendingUp,
     path: '/career',
-    status: 'pending',
     actions: [
       'Review career paths',
       'Set career goals',
@@ -160,7 +165,6 @@ const phases = [
     description: 'Manage your earnings',
     icon: Wallet,
     path: '/wallet',
-    status: 'pending',
     actions: [
       'Set up payment account',
       'Configure payout preferences',
@@ -172,11 +176,99 @@ const phases = [
 ];
 
 function Dashboard() {
+  const [phases, setPhases] = useState<Phase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userData, setUserData] = useState<{ userId: string; agentId: string; token: string | null } | null>(null);
+  const [completedPhases, setCompletedPhases] = useState(0);
+
+  useEffect(() => {
+    // Get user data from config
+    const data = config.getUserData();
+    setUserData(data);
+
+    const fetchUserProgress = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch user progress from service
+        const userProgress = await progressService.getUserProgress();
+        
+        // Map the phase templates to include the user's progress
+        const userPhases = phaseTemplates.map(phase => {
+          let status: 'completed' | 'in-progress' | 'pending' = 'pending';
+          
+          if (userProgress.completedPhaseIds.includes(phase.id)) {
+            status = 'completed';
+          } else if (phase.id === userProgress.inProgressPhaseId) {
+            status = 'in-progress';
+          }
+          
+          return {
+            ...phase,
+            status
+          };
+        });
+        
+        setPhases(userPhases);
+        setCompletedPhases(userProgress.completedPhaseIds.length);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching user progress:', err);
+        setError('Failed to load your progress. Please try again later.');
+        setLoading(false);
+      }
+    };
+
+    fetchUserProgress();
+  }, []);
+
+  // Handle phase start or continue
+  const handlePhaseAction = async (phase: Phase) => {
+    try {
+      if (phase.status === 'pending') {
+        // Start a new phase
+        await progressService.updatePhaseStatus(phase.id, 'in-progress');
+      }
+      // Navigate to the phase page
+      window.location.href = phase.path;
+    } catch (err) {
+      console.error(`Error handling phase action for phase ${phase.id}:`, err);
+      setError('Failed to update phase status. Please try again later.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <p>{error}</p>
+        <button 
+          className="mt-2 bg-red-100 text-red-800 px-4 py-2 rounded"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const progressPercentage = (completedPhases / phaseTemplates.length) * 100;
+
   return (
     <div className="space-y-6">
       <div className="border-b border-gray-200 pb-5">
         <h2 className="text-2xl font-bold text-gray-900">REPS Onboarding Progress</h2>
-        <p className="mt-2 text-sm text-gray-600">Complete all phases to become a certified REP</p>
+        <p className="mt-2 text-sm text-gray-600">
+          Complete all phases to become a certified REP
+        </p>
       </div>
 
       <div className="relative">
@@ -184,9 +276,8 @@ function Dashboard() {
         <div className="space-y-8">
           {phases.map((phase, index) => {
             const Icon = phase.icon;
-            const isLast = index === phases.length - 1;
             const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
-              (index > 0 && phases[index - 1].status === 'completed');
+              (index > 0 && phases[index - 1]?.status === 'completed');
 
             return (
               <div key={phase.id} className="relative">
@@ -228,23 +319,26 @@ function Dashboard() {
                             <span className="text-sm font-medium">Completed</span>
                           </div>
                         ) : phase.status === 'in-progress' ? (
-                          <div className="flex items-center text-blue-600">
-                            <Clock className="w-5 h-5 mr-2" />
-                            <span className="text-sm font-medium">In Progress</span>
-                          </div>
-                        ) : (
                           <Link
-                            to={isAvailable ? phase.path : '#'}
+                            to={phase.path}
+                            className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            Continue
+                            <ArrowRight className="ml-2 w-4 h-4" />
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => isAvailable && handlePhaseAction(phase)}
                             className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium ${
                               isAvailable
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             }`}
-                            onClick={(e) => !isAvailable && e.preventDefault()}
+                            disabled={!isAvailable}
                           >
                             Start Step
                             <ArrowRight className="ml-2 w-4 h-4" />
-                          </Link>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -282,9 +376,9 @@ function Dashboard() {
       <div className="mt-8 bg-blue-50 rounded-lg p-6">
         <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
         <div className="mt-2 w-full bg-blue-200 rounded-full h-2.5">
-          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '20%' }}></div>
+          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
         </div>
-        <p className="mt-2 text-sm text-blue-700">2 of 10 phases completed</p>
+        <p className="mt-2 text-sm text-blue-700">{completedPhases} of {phaseTemplates.length} phases completed</p>
       </div>
     </div>
   );
