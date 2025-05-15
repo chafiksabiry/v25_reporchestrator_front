@@ -13,6 +13,7 @@ import QualityControl from './components/QualityControl';
 import CareerTrack from './components/CareerTrack.tsx';
 import WalletDashboard from './components/WalletDashboard';
 import config from './config';
+import { getAgentData } from './services/apiConfig';
 
 function App() {
   useEffect(() => {
@@ -28,13 +29,58 @@ function App() {
       // Only log that token exists, not the actual token for security
       tokenExists: !!userData.token
     });
+
+    // Fetch agent data from API
+    const fetchInitialAgentData = async () => {
+      try {
+        console.log('🔍 Fetching initial agent data from API...');
+        const agentData = await getAgentData();
+        console.log('👤 Agent data retrieved from API:', {
+          id: agentData.id,
+          // Don't log sensitive information
+          hasProfile: !!agentData.name,
+          status: agentData.status,
+          hasOnboardingProgress: !!agentData.onboardingProgress
+        });
+
+        // If we have onboarding progress, log it
+        if (agentData.onboardingProgress) {
+          // Count total completed actions
+          let actionsCompletedCount = 0;
+          
+          if (agentData.onboardingProgress.completedActions) {
+            // Safely count completed actions
+            Object.values(agentData.onboardingProgress.completedActions).forEach(actions => {
+              if (Array.isArray(actions)) {
+                actionsCompletedCount += actions.length;
+              }
+            });
+          }
+          
+          console.log('📋 Agent onboarding progress:', {
+            currentPhase: agentData.onboardingProgress.currentPhase,
+            completedPhases: agentData.onboardingProgress.completedPhases?.length || 0,
+            actionsCompletedCount
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error fetching initial agent data:', error);
+        console.log('⚠️ Will fall back to local progress tracking');
+      }
+    };
+
+    // Run the fetch if we have an agent ID
+    if (userData.agentId) {
+      fetchInitialAgentData();
+    } else {
+      console.warn('⚠️ No agent ID available, skipping agent data fetch');
+    }
   }, []);
 
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
-        {/*
         <nav className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
@@ -52,7 +98,6 @@ function App() {
             </div>
           </div>
         </nav>
-        */}
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
