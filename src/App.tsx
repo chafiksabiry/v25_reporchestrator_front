@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { Wallet } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SignUp from './components/SignUp';
@@ -78,7 +79,8 @@ function App() {
   }, []);
 
   return (
-    <Router>
+    <Router basename={qiankunWindow.__POWERED_BY_QIANKUN__ ? '/reporchestrator' : '/'}>
+
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
         <nav className="bg-white border-b border-gray-200">

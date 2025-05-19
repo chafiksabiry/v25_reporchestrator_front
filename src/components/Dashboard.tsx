@@ -292,7 +292,9 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
   const [agentData, setAgentData] = useState<AgentData | null>(null);
-  const repDashboardUrl = import.meta.env.VITE_REP_DASHBOARD_URL || '';
+  const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
+    ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
+    : import.meta.env.VITE_REP_DASHBOARD_URL || '';
 
   // Fetch agent data from the API
   const fetchAgentData = async () => {
@@ -691,38 +693,6 @@ function Dashboard() {
 
   const progressPercentage = (completedPhases / phaseTemplates.length) * 100;
 
-  // Calculate total actions progress
-  const totalRequiredActions = phases.reduce((total, phase) => total + phase.requiredActions.length, 0);
-  const totalOptionalActions = phases.reduce((total, phase) => total + phase.optionalActions.length, 0);
-  
-  const completedRequiredActions = phases.reduce((total, phase) => {
-    if (!phase.completedActions) return total;
-    
-    let count = 0;
-    for (let i = 0; i < phase.requiredActions.length; i++) {
-      if (phase.completedActions.includes(i)) {
-        count++;
-      }
-    }
-    return total + count;
-  }, 0);
-  
-  const completedOptionalActions = phases.reduce((total, phase) => {
-    if (!phase.completedActions) return total;
-    
-    let count = 0;
-    for (let i = 0; i < phase.optionalActions.length; i++) {
-      const actualIndex = phase.requiredActions.length + i;
-      if (phase.completedActions.includes(actualIndex)) {
-        count++;
-      }
-    }
-    return total + count;
-  }, 0);
-  
-  const requiredActionsPercentage = (completedRequiredActions / totalRequiredActions) * 100;
-  const optionalActionsPercentage = totalOptionalActions > 0 ? (completedOptionalActions / totalOptionalActions) * 100 : 0;
-
   return (
     <div className="space-y-6">
       <div className="border-b border-gray-200 pb-5 flex justify-between items-center">
@@ -922,28 +892,6 @@ function Dashboard() {
               <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
             </div>
           </div>
-          
-          {/* Required actions progress */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm font-medium text-red-700">Required Actions</span>
-              <span className="text-sm font-medium text-red-700">{completedRequiredActions} of {totalRequiredActions}</span>
-            </div>
-            <div className="w-full bg-red-200 rounded-full h-2.5">
-              <div className="bg-red-600 h-2.5 rounded-full" style={{ width: `${requiredActionsPercentage}%` }}></div>
-            </div>
-          </div>
-          
-          {/* Optional actions progress */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm font-medium text-green-700">Optional Actions</span>
-              <span className="text-sm font-medium text-green-700">{completedOptionalActions} of {totalOptionalActions}</span>
-            </div>
-            <div className="w-full bg-green-200 rounded-full h-2.5">
-              <div className="bg-green-600 h-2.5 rounded-full" style={{ width: `${optionalActionsPercentage}%` }}></div>
-            </div>
-          </div>
         </div>
         
         <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
@@ -951,12 +899,6 @@ function Dashboard() {
             <CheckCircle className="w-4 h-4 mr-2" />
             Complete required actions to unlock the next phase
           </p>
-          {repDashboardUrl && (
-            <p className="flex items-center mt-1">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Phases 2 and 3 will redirect to the REP Dashboard
-            </p>
-          )}
           <p className="flex items-center mt-1">
             <AlertCircle className="w-4 h-4 mr-2" />
             Optional actions improve your profile but are not mandatory
