@@ -79,7 +79,7 @@ function App() {
   }, []);
 
   return (
-    <Router basename={qiankunWindow.__POWERED_BY_QIANKUN__ ? '/reporchestrator' : '/'}>
+    <Router>
 
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
