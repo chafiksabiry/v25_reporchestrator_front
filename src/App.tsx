@@ -18,7 +18,7 @@ import { getAgentData } from './services/apiConfig';
 
 function App() {
   // Add basename for qiankun routing
-  const basename = window.__POWERED_BY_QIANKUN__ ? '/reporchestrator' : '/';
+  const basename = config.isStandalone ? '/' : '/reporchestrator';
 
   useEffect(() => {
     // Log config information on app startup
@@ -77,7 +77,7 @@ function App() {
   }, []);
 
   return (
-    <Router basename={"/reporchestrator"}>
+    <Router basename={basename}>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
         <nav className="bg-white border-b border-gray-200">
