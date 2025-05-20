@@ -77,7 +77,7 @@ function App() {
   }, []);
 
   return (
-    <Router basename={basename}>
+    <Router>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
         <nav className="bg-white border-b border-gray-200">
