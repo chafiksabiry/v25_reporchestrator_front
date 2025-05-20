@@ -17,6 +17,9 @@ import config from './config';
 import { getAgentData } from './services/apiConfig';
 
 function App() {
+  // Add basename for qiankun routing
+  const basename = window.__POWERED_BY_QIANKUN__ ? '/reporchestrator' : '/';
+
   useEffect(() => {
     // Log config information on app startup
     console.log('🚀 REPS Platform initializing...');
@@ -27,7 +30,6 @@ function App() {
     console.log('👤 User Data:', {
       userId: userData.userId,
       agentId: userData.agentId,
-      // Only log that token exists, not the actual token for security
       tokenExists: !!userData.token
     });
 
@@ -38,19 +40,15 @@ function App() {
         const agentData = await getAgentData();
         console.log('👤 Agent data retrieved from API:', {
           id: agentData.id,
-          // Don't log sensitive information
           hasProfile: !!agentData.name,
           status: agentData.status,
           hasOnboardingProgress: !!agentData.onboardingProgress
         });
 
-        // If we have onboarding progress, log it
         if (agentData.onboardingProgress) {
-          // Count total completed actions
           let actionsCompletedCount = 0;
           
           if (agentData.onboardingProgress.completedActions) {
-            // Safely count completed actions
             Object.values(agentData.onboardingProgress.completedActions).forEach(actions => {
               if (Array.isArray(actions)) {
                 actionsCompletedCount += actions.length;
@@ -70,7 +68,6 @@ function App() {
       }
     };
 
-    // Run the fetch if we have an agent ID
     if (userData.agentId) {
       fetchInitialAgentData();
     } else {
@@ -79,8 +76,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
-
+    <Router basename={basename}>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
         <nav className="bg-white border-b border-gray-200">

@@ -1,4 +1,3 @@
-
 # Use Node.js LTS version with Alpine for smaller image size
 FROM node:18-alpine
 
@@ -25,8 +24,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the frontend application
-RUN npm run build
+# Build the frontend application in qiankun mode
+RUN npm run build -- --mode qiankun
 
 # Install serve to host the built files
 RUN npm install -g serve
