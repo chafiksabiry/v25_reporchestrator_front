@@ -25,7 +25,7 @@ RUN npm install
 COPY . .
 
 # Build the frontend application in qiankun mode
-RUN npm run build -- --mode qiankun
+RUN npm run build:qiankun
 
 # Install serve to host the built files
 RUN npm install -g serve
