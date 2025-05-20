@@ -22,6 +22,7 @@ function App() {
 
   useEffect(() => {
     // Log config information on app startup
+    console.log('window.__POWERED_BY_QIANKUN__', window.__POWERED_BY_QIANKUN__);
     console.log('🚀 REPS Platform initializing...');
     console.log(`📋 Run Mode: ${config.runMode} (${config.isStandalone ? 'Standalone' : 'In-App'})`);
     
