@@ -18,9 +18,10 @@ const removeReactRefreshScript = () => {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const isQiankun = mode === 'qiankun';
 
   return {
-    base: 'https://rep-orchestrator.harx.ai',
+    base: isQiankun ? '/reporchestrator/' : 'https://rep-orchestrator.harx.ai/',
     plugins: [
       react({
         jsxRuntime: 'classic',
@@ -33,10 +34,14 @@ export default defineConfig(({ mode }) => {
 
     define: {
       'import.meta.env': env,
+      __POWERED_BY_QIANKUN__: isQiankun,
     },
     server: {
       port: 5185,
       cors: true,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
       hmr: false,
       fs: {
         strict: true, // Ensure static assets are correctly resolved
