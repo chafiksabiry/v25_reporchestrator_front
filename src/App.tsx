@@ -25,7 +25,7 @@ function App() {
     console.log('window.__POWERED_BY_QIANKUN__', window.__POWERED_BY_QIANKUN__);
     console.log('🚀 REPS Platform initializing...');
     console.log(`📋 Run Mode: ${config.runMode} (${config.isStandalone ? 'Standalone' : 'In-App'})`);
-    
+
     // Get and log user data
     const userData = config.getUserData();
     console.log('👤 User Data:', {
@@ -48,7 +48,7 @@ function App() {
 
         if (agentData.onboardingProgress) {
           let actionsCompletedCount = 0;
-          
+
           if (agentData.onboardingProgress.completedActions) {
             Object.values(agentData.onboardingProgress.completedActions).forEach(actions => {
               if (Array.isArray(actions)) {
@@ -56,7 +56,7 @@ function App() {
               }
             });
           }
-          
+
           console.log('📋 Agent onboarding progress:', {
             currentPhase: agentData.onboardingProgress.currentPhase,
             completedPhases: agentData.onboardingProgress.completedPhases?.length || 0,
@@ -77,7 +77,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
+    <Router basename={"/reporchestrator"}>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
         <nav className="bg-white border-b border-gray-200">
@@ -100,7 +100,6 @@ function App() {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
-            <Route path="/reporchestrator" element={<Dashboard />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/profile" element={<Profile />} />
