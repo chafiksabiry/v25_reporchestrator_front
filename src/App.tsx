@@ -100,6 +100,7 @@ function App() {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
+            <Route path="/reporchestrator" element={<Dashboard />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/profile" element={<Profile />} />
