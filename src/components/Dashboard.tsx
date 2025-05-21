@@ -569,7 +569,8 @@ function Dashboard() {
     try {
       // For phases 2 and 3, redirect to REP dashboard in a new window
       if (phase.id >= 2 && repDashboardUrl) {
-        window.open(repDashboardUrl, '_blank');
+        // window.open(repDashboardUrl, '_blank');
+        window.location.href = repDashboardUrl;
         return;
       }
       
