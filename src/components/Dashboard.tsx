@@ -745,8 +745,9 @@ function Dashboard() {
         <div className="space-y-8">
           {phases.map((phase, index) => {
             const Icon = phase.icon;
-            const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
-              (index > 0 && (phases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(phases[index - 1])));
+            const isComingSoon = phase.id >= 5;
+            const isAvailable = !isComingSoon && (phase.status === 'completed' || phase.status === 'in-progress' || 
+              (index > 0 && (phases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(phases[index - 1]))));
 
             // For phases 2 and 3, check if we need to show external link icon
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
@@ -754,12 +755,14 @@ function Dashboard() {
             return (
               <div key={phase.id} className="relative">
                 <div className={`absolute left-8 top-8 w-4 h-4 -ml-2 rounded-full border-2 ${
+                  isComingSoon ? 'bg-purple-100 border-purple-300' :
                   phase.status === 'completed' ? 'bg-green-500 border-green-500' :
                   phase.status === 'in-progress' ? 'bg-blue-500 border-blue-500' :
                   'bg-white border-gray-300'
                 }`}></div>
                 <div className="ml-16 relative">
                   <div className={`bg-white rounded-lg shadow-sm p-6 ${
+                    isComingSoon ? 'border-purple-100' :
                     phase.status === 'completed' ? 'border-green-100' :
                     phase.status === 'in-progress' ? 'border-blue-100' :
                     'border-gray-100'
@@ -767,11 +770,13 @@ function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div className={`p-3 rounded-full ${
+                          isComingSoon ? 'bg-purple-100' :
                           phase.status === 'completed' ? 'bg-green-100' :
                           phase.status === 'in-progress' ? 'bg-blue-100' :
                           'bg-gray-100'
                         }`}>
                           <Icon className={`w-6 h-6 ${
+                            isComingSoon ? 'text-purple-600' :
                             phase.status === 'completed' ? 'text-green-600' :
                             phase.status === 'in-progress' ? 'text-blue-600' :
                             'text-gray-600'
@@ -780,7 +785,12 @@ function Dashboard() {
                         <div className="ml-4">
                           <h3 className="text-lg font-medium text-gray-900 flex items-center">
                             Phase {phase.id}: {phase.name}
-                            {!isAvailable && (
+                            {isComingSoon && (
+                              <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
+                                Coming Soon
+                              </span>
+                            )}
+                            {!isAvailable && !isComingSoon && (
                               <Lock className="ml-2 w-4 h-4 text-amber-500" />
                             )}
                           </h3>
@@ -788,7 +798,12 @@ function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        {phase.status === 'completed' ? (
+                        {isComingSoon ? (
+                          <div className="flex items-center text-purple-600">
+                            <Clock className="w-5 h-5 mr-2" />
+                            <span className="text-sm font-medium">Coming Soon</span>
+                          </div>
+                        ) : phase.status === 'completed' ? (
                           <div className="flex items-center text-green-600">
                             <CheckCircle className="w-5 h-5 mr-2" />
                             <span className="text-sm font-medium">Completed</span>
