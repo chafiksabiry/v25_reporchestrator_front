@@ -174,4 +174,62 @@ export const updateAgentPlan = async (agentId: string, planId: string) => {
     console.error('❌ Error in updateAgentPlan:', error);
     throw error;
   }
+};
+
+export const refreshOnboardingStatus = async (agentId: string) => {
+  const userData = config.getUserData();
+  console.log('🔄 Refreshing onboarding status...', {
+    agentId,
+    endpoint: `${API_BASE_URL}/profiles/${agentId}/refresh-onboarding-status`
+  });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profiles/${agentId}/refresh-onboarding-status`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userData.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to refresh onboarding status:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error('Failed to refresh onboarding status');
+    }
+
+    const data = await response.json();
+    
+    // Log detailed information about the refresh response
+    console.log('📊 Onboarding refresh response:', {
+      currentPhase: data.onboardingProgress.currentPhase,
+      lastUpdated: data.onboardingProgress.lastUpdated
+    });
+
+    // Log each phase's status
+    Object.entries(data.onboardingProgress.phases).forEach(([phaseKey, phaseData]: [string, any]) => {
+      console.log(`📋 ${phaseKey.toUpperCase()} Status:`, {
+        status: phaseData.status,
+        requiredActions: phaseData.requiredActions,
+        completedAt: phaseData.completedAt || 'Not completed'
+      });
+    });
+
+    // Log specific Phase 4 information
+    if (data.onboardingProgress.phases.phase4) {
+      console.log('🎯 Phase 4 Detailed Status:', {
+        status: data.onboardingProgress.phases.phase4.status,
+        subscriptionActivated: data.onboardingProgress.phases.phase4.requiredActions.subscriptionActivated,
+        completedAt: data.onboardingProgress.phases.phase4.completedAt || 'Not completed'
+      });
+    }
+
+    console.log('✅ Onboarding status refresh completed');
+    return data;
+  } catch (error) {
+    console.error('❌ Error in refreshOnboardingStatus:', error);
+    throw error;
+  }
 }; 

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import config from '../config';
 import progressService, { UserProgress } from '../services/progressService';
-import { getAgentData } from '../services/apiConfig';
+import { getAgentData, refreshOnboardingStatus } from '../services/apiConfig';
 
 // Define the phase interface
 interface Phase {
@@ -663,59 +663,36 @@ function Dashboard() {
       if (syncing) return; // Prevent multiple syncs at once
       setSyncing(true);
       
-      console.log('Syncing progress with backend...');
+      console.log('🔄 Syncing progress with backend...');
       
-      // Check active phase for progress updates
-      const activePhase = phases.find(p => p.status === 'in-progress');
-      if (activePhase) {
-        // Sync action statuses with backend
-        const actionStatuses = await progressService.syncPhaseProgress(
-          activePhase.id, 
-          activePhase.requiredActions.length, 
-          activePhase.optionalActions.length
-        );
+      const userData = config.getUserData();
+      const refreshedData = await refreshOnboardingStatus(userData.agentId);
+      console.log('📊 Refreshed onboarding data:', refreshedData);
+
+      if (refreshedData && refreshedData.onboardingProgress) {
+        // Map API data to our UI format
+        const mappedPhases = mapApiPhasesToUiPhases({
+          ...refreshedData,
+          id: userData.agentId
+        });
         
-        // Update the phase with new action statuses
-        const updatedCompletedActions = Object.entries(actionStatuses)
-          .filter(([_, completed]) => completed)
-          .map(([index]) => parseInt(index));
+        // Update phases state
+        setPhases(mappedPhases);
         
-        // Update phases with new completed actions
-        setPhases(prevPhases => prevPhases.map(phase => {
-          if (phase.id === activePhase.id) {
-            return {
-              ...phase,
-              completedActions: updatedCompletedActions
-            };
-          }
-          return phase;
-        }));
+        // Calculate completed phases count
+        const completedCount = mappedPhases.filter(p => p.status === 'completed').length;
+        setCompletedPhases(completedCount);
         
-        // Check if all required actions are completed
-        const allRequiredCompleted = activePhase.requiredActions.every((_, index) => 
-          actionStatuses[index] === true
-        );
-        
-        // Auto-advance to next phase if all required actions are completed
-        if (allRequiredCompleted) {
-          const wasAdvanced = await progressService.autoAdvancePhaseIfReady(
-            activePhase.id, 
-            activePhase.requiredActions.length
-          );
-          
-          if (wasAdvanced) {
-            // We don't need to update the API since the backend handles this automatically
-            console.log('✅ Phase advanced automatically. Backend will handle progress updates.');
-            
-            // Reload to show updated progress
-            await fetchUserProgress();
-          }
-        }
+        console.log('✅ Progress sync completed:', {
+          completedPhases: completedCount,
+          currentPhase: refreshedData.onboardingProgress.currentPhase,
+          lastUpdated: refreshedData.onboardingProgress.lastUpdated
+        });
       }
-      
+
       setSyncing(false);
     } catch (err) {
-      console.error('Error syncing progress with backend:', err);
+      console.error('❌ Error syncing progress with backend:', err);
       setSyncing(false);
     }
   };
