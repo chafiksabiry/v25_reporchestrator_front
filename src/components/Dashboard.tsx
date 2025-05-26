@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   UserPlus,
   UserCircle,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import config from '../config';
 import progressService, { UserProgress } from '../services/progressService';
-import { getAgentData } from '../services/apiConfig';
+import { getAgentData, refreshOnboardingStatus } from '../services/apiConfig';
 
 // Define the phase interface
 interface Phase {
@@ -77,6 +77,15 @@ interface ApiPhase3OptionalActions {
   [key: string]: boolean;
 }
 
+interface ApiPhase4RequiredActions {
+  subscriptionActivated: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase4OptionalActions {
+  [key: string]: boolean;
+}
+
 interface ApiPhaseData {
   requiredActions: Record<string, boolean>;
   optionalActions: Record<string, boolean>;
@@ -99,11 +108,17 @@ interface ApiPhase3Data extends ApiPhaseData {
   optionalActions: ApiPhase3OptionalActions;
 }
 
+interface ApiPhase4Data extends ApiPhaseData {
+  requiredActions: ApiPhase4RequiredActions;
+  optionalActions: ApiPhase4OptionalActions;
+}
+
 interface ApiOnboardingProgress {
   phases: {
     phase1?: ApiPhase1Data;
     phase2?: ApiPhase2Data;
     phase3?: ApiPhase3Data;
+    phase4?: ApiPhase4Data;
     [key: string]: ApiPhaseData | undefined;
   };
   currentPhase: number;
@@ -176,14 +191,9 @@ const phaseTemplates = [
     icon: CreditCard,
     path: '/subscription',
     requiredActions: [
-      'Review available plans',
-      'Select subscription tier'
-    ],
-    optionalActions: [
-      'Compare plan features',
-      'Set up payment method',
       'Activate subscription'
-    ]
+    ],
+    optionalActions: []
   },
   {
     id: 5,
@@ -295,6 +305,7 @@ function Dashboard() {
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+  const navigate = useNavigate();
 
   // Fetch agent data from the API
   const fetchAgentData = async () => {
@@ -335,6 +346,15 @@ function Dashboard() {
           });
         }
         
+        // Debugging - log Phase 4 data specifically
+        if (data.onboardingProgress.phases.phase4) {
+          console.log('🔍 Phase 4 data from API:', {
+            required: data.onboardingProgress.phases.phase4.requiredActions,
+            optional: data.onboardingProgress.phases.phase4.optionalActions,
+            status: data.onboardingProgress.phases.phase4.status
+          });
+        }
+        
         return data;
       }
       
@@ -372,6 +392,15 @@ function Dashboard() {
         required: apiOnboarding.phases.phase3.requiredActions,
         optional: apiOnboarding.phases.phase3.optionalActions,
         status: apiOnboarding.phases.phase3.status
+      });
+    }
+
+    // Debugging - log Phase 4 data specifically
+    if (apiOnboarding.phases.phase4) {
+      console.log('🔍 Phase 4 data from API in mapping function:', {
+        required: apiOnboarding.phases.phase4.requiredActions,
+        optional: apiOnboarding.phases.phase4.optionalActions,
+        status: apiOnboarding.phases.phase4.status
       });
     }
     
@@ -421,6 +450,14 @@ function Dashboard() {
             // Log the completed required actions for phase 3
             console.log('🔍 Phase 3 - Mapped required actions:', completedActions);
           }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4Actions = apiPhase.requiredActions as ApiPhase4RequiredActions;
+            if (phase4Actions.subscriptionActivated) completedActions.push(0);
+            
+            // Log the completed required actions for phase 4
+            console.log('🔍 Phase 4 - Mapped required actions:', completedActions);
+          }
           // Generic fallback for other phases - use index-based mapping
           else {
             Object.values(apiPhase.requiredActions).forEach((isCompleted, index) => {
@@ -462,6 +499,14 @@ function Dashboard() {
             
             // Log the completed optional actions for phase 3
             console.log('🔍 Phase 3 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4OptActions = apiPhase.optionalActions as ApiPhase4OptionalActions;
+            // No additional optional actions for phase 4
+            
+            // Log the completed optional actions for phase 4
+            console.log('🔍 Phase 4 - Mapped optional actions:', optionalCompletedActions);
           }
           // Generic fallback for other phases
           else {
@@ -568,9 +613,8 @@ function Dashboard() {
   const handlePhaseAction = async (phase: Phase) => {
     try {
       // For phases 2 and 3, redirect to REP dashboard in a new window
-      if (phase.id >= 2 && repDashboardUrl) {
-        // window.open(repDashboardUrl, '_blank');
-        window.location.href = repDashboardUrl;
+      if ((phase.id === 2 || phase.id === 3) && repDashboardUrl) {
+        window.open(repDashboardUrl, '_blank');
         return;
       }
       
@@ -578,8 +622,14 @@ function Dashboard() {
         // Start a new phase
         await progressService.updatePhaseStatus(phase.id, 'in-progress');
       }
+
       // Navigate to the phase page
-      window.location.href = phase.path;
+      if (phase.id === 4) {
+        // For subscription phase, use React Router navigation
+        navigate('/subscription');
+      } else {
+        navigate(phase.path);
+      }
     } catch (err) {
       console.error(`Error handling phase action for phase ${phase.id}:`, err);
       setError('Failed to update phase status. Please try again later.');
@@ -613,59 +663,36 @@ function Dashboard() {
       if (syncing) return; // Prevent multiple syncs at once
       setSyncing(true);
       
-      console.log('Syncing progress with backend...');
+      console.log('🔄 Syncing progress with backend...');
       
-      // Check active phase for progress updates
-      const activePhase = phases.find(p => p.status === 'in-progress');
-      if (activePhase) {
-        // Sync action statuses with backend
-        const actionStatuses = await progressService.syncPhaseProgress(
-          activePhase.id, 
-          activePhase.requiredActions.length, 
-          activePhase.optionalActions.length
-        );
+      const userData = config.getUserData();
+      const refreshedData = await refreshOnboardingStatus(userData.agentId);
+      console.log('📊 Refreshed onboarding data:', refreshedData);
+
+      if (refreshedData && refreshedData.onboardingProgress) {
+        // Map API data to our UI format
+        const mappedPhases = mapApiPhasesToUiPhases({
+          ...refreshedData,
+          id: userData.agentId
+        });
         
-        // Update the phase with new action statuses
-        const updatedCompletedActions = Object.entries(actionStatuses)
-          .filter(([_, completed]) => completed)
-          .map(([index]) => parseInt(index));
+        // Update phases state
+        setPhases(mappedPhases);
         
-        // Update phases with new completed actions
-        setPhases(prevPhases => prevPhases.map(phase => {
-          if (phase.id === activePhase.id) {
-            return {
-              ...phase,
-              completedActions: updatedCompletedActions
-            };
-          }
-          return phase;
-        }));
+        // Calculate completed phases count
+        const completedCount = mappedPhases.filter(p => p.status === 'completed').length;
+        setCompletedPhases(completedCount);
         
-        // Check if all required actions are completed
-        const allRequiredCompleted = activePhase.requiredActions.every((_, index) => 
-          actionStatuses[index] === true
-        );
-        
-        // Auto-advance to next phase if all required actions are completed
-        if (allRequiredCompleted) {
-          const wasAdvanced = await progressService.autoAdvancePhaseIfReady(
-            activePhase.id, 
-            activePhase.requiredActions.length
-          );
-          
-          if (wasAdvanced) {
-            // We don't need to update the API since the backend handles this automatically
-            console.log('✅ Phase advanced automatically. Backend will handle progress updates.');
-            
-            // Reload to show updated progress
-            await fetchUserProgress();
-          }
-        }
+        console.log('✅ Progress sync completed:', {
+          completedPhases: completedCount,
+          currentPhase: refreshedData.onboardingProgress.currentPhase,
+          lastUpdated: refreshedData.onboardingProgress.lastUpdated
+        });
       }
-      
+
       setSyncing(false);
     } catch (err) {
-      console.error('Error syncing progress with backend:', err);
+      console.error('❌ Error syncing progress with backend:', err);
       setSyncing(false);
     }
   };
@@ -718,8 +745,9 @@ function Dashboard() {
         <div className="space-y-8">
           {phases.map((phase, index) => {
             const Icon = phase.icon;
-            const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
-              (index > 0 && (phases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(phases[index - 1])));
+            const isComingSoon = phase.id >= 5;
+            const isAvailable = !isComingSoon && (phase.status === 'completed' || phase.status === 'in-progress' || 
+              (index > 0 && (phases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(phases[index - 1]))));
 
             // For phases 2 and 3, check if we need to show external link icon
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
@@ -727,12 +755,14 @@ function Dashboard() {
             return (
               <div key={phase.id} className="relative">
                 <div className={`absolute left-8 top-8 w-4 h-4 -ml-2 rounded-full border-2 ${
+                  isComingSoon ? 'bg-purple-100 border-purple-300' :
                   phase.status === 'completed' ? 'bg-green-500 border-green-500' :
                   phase.status === 'in-progress' ? 'bg-blue-500 border-blue-500' :
                   'bg-white border-gray-300'
                 }`}></div>
                 <div className="ml-16 relative">
                   <div className={`bg-white rounded-lg shadow-sm p-6 ${
+                    isComingSoon ? 'border-purple-100' :
                     phase.status === 'completed' ? 'border-green-100' :
                     phase.status === 'in-progress' ? 'border-blue-100' :
                     'border-gray-100'
@@ -740,11 +770,13 @@ function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div className={`p-3 rounded-full ${
+                          isComingSoon ? 'bg-purple-100' :
                           phase.status === 'completed' ? 'bg-green-100' :
                           phase.status === 'in-progress' ? 'bg-blue-100' :
                           'bg-gray-100'
                         }`}>
                           <Icon className={`w-6 h-6 ${
+                            isComingSoon ? 'text-purple-600' :
                             phase.status === 'completed' ? 'text-green-600' :
                             phase.status === 'in-progress' ? 'text-blue-600' :
                             'text-gray-600'
@@ -753,7 +785,12 @@ function Dashboard() {
                         <div className="ml-4">
                           <h3 className="text-lg font-medium text-gray-900 flex items-center">
                             Phase {phase.id}: {phase.name}
-                            {!isAvailable && (
+                            {isComingSoon && (
+                              <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
+                                Coming Soon
+                              </span>
+                            )}
+                            {!isAvailable && !isComingSoon && (
                               <Lock className="ml-2 w-4 h-4 text-amber-500" />
                             )}
                           </h3>
@@ -761,7 +798,12 @@ function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        {phase.status === 'completed' ? (
+                        {isComingSoon ? (
+                          <div className="flex items-center text-purple-600">
+                            <Clock className="w-5 h-5 mr-2" />
+                            <span className="text-sm font-medium">Coming Soon</span>
+                          </div>
+                        ) : phase.status === 'completed' ? (
                           <div className="flex items-center text-green-600">
                             <CheckCircle className="w-5 h-5 mr-2" />
                             <span className="text-sm font-medium">Completed</span>
@@ -846,30 +888,34 @@ function Dashboard() {
                       </ul>
                       
                       {/* Optional Actions */}
-                      <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                        <Clock className="w-4 h-4 mr-2" />
-                        Optional Actions
-                      </h4>
-                      <ul className="space-y-2">
-                        {phase.optionalActions.map((action, actionIndex) => {
-                          // Calculate the actual index in the completedActions array
-                          const actualIndex = phase.requiredActions.length + actionIndex;
-                          const isCompleted = phase.completedActions?.includes(actualIndex);
-                          
-                          return (
-                            <li key={actionIndex} className="flex items-center text-sm text-gray-600">
-                              <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
-                                isCompleted ? 'border-green-500 bg-green-500' : 'border-gray-300'
-                              }`}>
-                                {isCompleted && (
-                                  <CheckCircle className="w-3 h-3 text-white" />
-                                )}
-                              </div>
-                              {action}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      {phase.optionalActions.length > 0 && (
+                        <>
+                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                            <Clock className="w-4 h-4 mr-2" />
+                            Optional Actions
+                          </h4>
+                          <ul className="space-y-2">
+                            {phase.optionalActions.map((action, actionIndex) => {
+                              // Calculate the actual index in the completedActions array
+                              const actualIndex = phase.requiredActions.length + actionIndex;
+                              const isCompleted = phase.completedActions?.includes(actualIndex);
+                              
+                              return (
+                                <li key={actionIndex} className="flex items-center text-sm text-gray-600">
+                                  <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+                                    isCompleted ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                                  }`}>
+                                    {isCompleted && (
+                                      <CheckCircle className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                  {action}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
