@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   UserPlus,
   UserCircle,
@@ -77,6 +77,15 @@ interface ApiPhase3OptionalActions {
   [key: string]: boolean;
 }
 
+interface ApiPhase4RequiredActions {
+  subscriptionActivated: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase4OptionalActions {
+  [key: string]: boolean;
+}
+
 interface ApiPhaseData {
   requiredActions: Record<string, boolean>;
   optionalActions: Record<string, boolean>;
@@ -99,11 +108,17 @@ interface ApiPhase3Data extends ApiPhaseData {
   optionalActions: ApiPhase3OptionalActions;
 }
 
+interface ApiPhase4Data extends ApiPhaseData {
+  requiredActions: ApiPhase4RequiredActions;
+  optionalActions: ApiPhase4OptionalActions;
+}
+
 interface ApiOnboardingProgress {
   phases: {
     phase1?: ApiPhase1Data;
     phase2?: ApiPhase2Data;
     phase3?: ApiPhase3Data;
+    phase4?: ApiPhase4Data;
     [key: string]: ApiPhaseData | undefined;
   };
   currentPhase: number;
@@ -176,14 +191,9 @@ const phaseTemplates = [
     icon: CreditCard,
     path: '/subscription',
     requiredActions: [
-      'Review available plans',
-      'Select subscription tier'
-    ],
-    optionalActions: [
-      'Compare plan features',
-      'Set up payment method',
       'Activate subscription'
-    ]
+    ],
+    optionalActions: []
   },
   {
     id: 5,
@@ -295,6 +305,7 @@ function Dashboard() {
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+  const navigate = useNavigate();
 
   // Fetch agent data from the API
   const fetchAgentData = async () => {
@@ -335,6 +346,15 @@ function Dashboard() {
           });
         }
         
+        // Debugging - log Phase 4 data specifically
+        if (data.onboardingProgress.phases.phase4) {
+          console.log('🔍 Phase 4 data from API:', {
+            required: data.onboardingProgress.phases.phase4.requiredActions,
+            optional: data.onboardingProgress.phases.phase4.optionalActions,
+            status: data.onboardingProgress.phases.phase4.status
+          });
+        }
+        
         return data;
       }
       
@@ -372,6 +392,15 @@ function Dashboard() {
         required: apiOnboarding.phases.phase3.requiredActions,
         optional: apiOnboarding.phases.phase3.optionalActions,
         status: apiOnboarding.phases.phase3.status
+      });
+    }
+
+    // Debugging - log Phase 4 data specifically
+    if (apiOnboarding.phases.phase4) {
+      console.log('🔍 Phase 4 data from API in mapping function:', {
+        required: apiOnboarding.phases.phase4.requiredActions,
+        optional: apiOnboarding.phases.phase4.optionalActions,
+        status: apiOnboarding.phases.phase4.status
       });
     }
     
@@ -421,6 +450,14 @@ function Dashboard() {
             // Log the completed required actions for phase 3
             console.log('🔍 Phase 3 - Mapped required actions:', completedActions);
           }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4Actions = apiPhase.requiredActions as ApiPhase4RequiredActions;
+            if (phase4Actions.subscriptionActivated) completedActions.push(0);
+            
+            // Log the completed required actions for phase 4
+            console.log('🔍 Phase 4 - Mapped required actions:', completedActions);
+          }
           // Generic fallback for other phases - use index-based mapping
           else {
             Object.values(apiPhase.requiredActions).forEach((isCompleted, index) => {
@@ -462,6 +499,14 @@ function Dashboard() {
             
             // Log the completed optional actions for phase 3
             console.log('🔍 Phase 3 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4OptActions = apiPhase.optionalActions as ApiPhase4OptionalActions;
+            // No additional optional actions for phase 4
+            
+            // Log the completed optional actions for phase 4
+            console.log('🔍 Phase 4 - Mapped optional actions:', optionalCompletedActions);
           }
           // Generic fallback for other phases
           else {
@@ -568,9 +613,8 @@ function Dashboard() {
   const handlePhaseAction = async (phase: Phase) => {
     try {
       // For phases 2 and 3, redirect to REP dashboard in a new window
-      if (phase.id >= 2 && repDashboardUrl) {
-        // window.open(repDashboardUrl, '_blank');
-        window.location.href = repDashboardUrl;
+      if ((phase.id === 2 || phase.id === 3) && repDashboardUrl) {
+        window.open(repDashboardUrl, '_blank');
         return;
       }
       
@@ -578,8 +622,14 @@ function Dashboard() {
         // Start a new phase
         await progressService.updatePhaseStatus(phase.id, 'in-progress');
       }
+
       // Navigate to the phase page
-      window.location.href = phase.path;
+      if (phase.id === 4) {
+        // For subscription phase, use React Router navigation
+        navigate('/subscription');
+      } else {
+        navigate(phase.path);
+      }
     } catch (err) {
       console.error(`Error handling phase action for phase ${phase.id}:`, err);
       setError('Failed to update phase status. Please try again later.');
@@ -846,30 +896,34 @@ function Dashboard() {
                       </ul>
                       
                       {/* Optional Actions */}
-                      <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                        <Clock className="w-4 h-4 mr-2" />
-                        Optional Actions
-                      </h4>
-                      <ul className="space-y-2">
-                        {phase.optionalActions.map((action, actionIndex) => {
-                          // Calculate the actual index in the completedActions array
-                          const actualIndex = phase.requiredActions.length + actionIndex;
-                          const isCompleted = phase.completedActions?.includes(actualIndex);
-                          
-                          return (
-                            <li key={actionIndex} className="flex items-center text-sm text-gray-600">
-                              <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
-                                isCompleted ? 'border-green-500 bg-green-500' : 'border-gray-300'
-                              }`}>
-                                {isCompleted && (
-                                  <CheckCircle className="w-3 h-3 text-white" />
-                                )}
-                              </div>
-                              {action}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      {phase.optionalActions.length > 0 && (
+                        <>
+                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                            <Clock className="w-4 h-4 mr-2" />
+                            Optional Actions
+                          </h4>
+                          <ul className="space-y-2">
+                            {phase.optionalActions.map((action, actionIndex) => {
+                              // Calculate the actual index in the completedActions array
+                              const actualIndex = phase.requiredActions.length + actionIndex;
+                              const isCompleted = phase.completedActions?.includes(actualIndex);
+                              
+                              return (
+                                <li key={actionIndex} className="flex items-center text-sm text-gray-600">
+                                  <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+                                    isCompleted ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                                  }`}>
+                                    {isCompleted && (
+                                      <CheckCircle className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                  {action}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
