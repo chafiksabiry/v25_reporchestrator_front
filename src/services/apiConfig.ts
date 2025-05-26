@@ -99,4 +99,79 @@ export const getAgentData = () => {
 
 export const getUserData = () => {
   return fetchWithAuth(API_ENDPOINTS.users.getUser());
+};
+
+export const getAgentPlan = async (agentId: string) => {
+  const userData = config.getUserData();
+  console.log('🔍 Fetching agent plan...', {
+    agentId,
+    endpoint: `${API_BASE_URL}/profiles/${agentId}/plan`
+  });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profiles/${agentId}/plan`, {
+      headers: {
+        'Authorization': `Bearer ${userData.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch agent plan:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error('Failed to fetch agent plan');
+    }
+
+    const data = await response.json();
+    console.log('📄 Complete response data:', data);
+    console.log('✅ Agent plan fetched successfully:', {
+      planId: data.plan?._id || 'No plan',
+      planName: data.plan?.name || 'No plan'
+    });
+    return data;
+  } catch (error) {
+    console.error('❌ Error in getAgentPlan:', error);
+    throw error;
+  }
+};
+
+export const updateAgentPlan = async (agentId: string, planId: string) => {
+  const userData = config.getUserData();
+  console.log('📝 Updating agent plan...', {
+    agentId,
+    planId,
+    endpoint: `${API_BASE_URL}/profiles/${agentId}/plan`
+  });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profiles/${agentId}/plan`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${userData.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ planId })
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to update agent plan:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error('Failed to update agent plan');
+    }
+
+    const data = await response.json();
+    console.log('📄 Complete response data:', data);
+    console.log('✅ Agent plan updated successfully:', {
+      planId: data.plan?._id,
+      planName: data.plan?.name
+    });
+    return data;
+  } catch (error) {
+    console.error('❌ Error in updateAgentPlan:', error);
+    throw error;
+  }
 }; 
