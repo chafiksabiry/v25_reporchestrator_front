@@ -36,7 +36,7 @@ export const getUserData = () => {
 
     return {
       userId: cookies['userId'],
-      agentId: cookies['agentId'],
+      agentId: cookies['agentId'] || localStorage.getItem('agentId'),
       token,
     };
   }
