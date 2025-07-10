@@ -740,6 +740,34 @@ function Dashboard() {
         </button>
       </div>
 
+      <div className="bg-blue-50 rounded-lg p-6">
+        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
+        
+        <div className="mt-4 space-y-4">
+          {/* Phases progress */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
+              <span className="text-sm font-medium text-blue-700">{completedPhases} of {phaseTemplates.length}</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
+          <p className="flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Complete required actions to unlock the next phase
+          </p>
+          <p className="flex items-center mt-1">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Optional actions improve your profile but are not mandatory
+          </p>
+        </div>
+      </div>
+
       <div className="relative">
         <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
         <div className="space-y-8">
@@ -922,34 +950,6 @@ function Dashboard() {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      <div className="mt-8 bg-blue-50 rounded-lg p-6">
-        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
-        
-        <div className="mt-4 space-y-4">
-          {/* Phases progress */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
-              <span className="text-sm font-medium text-blue-700">{completedPhases} of {phaseTemplates.length}</span>
-            </div>
-            <div className="w-full bg-blue-200 rounded-full h-2.5">
-              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
-          <p className="flex items-center">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Complete required actions to unlock the next phase
-          </p>
-          <p className="flex items-center mt-1">
-            <AlertCircle className="w-4 h-4 mr-2" />
-            Optional actions improve your profile but are not mandatory
-          </p>
         </div>
       </div>
     </div>
