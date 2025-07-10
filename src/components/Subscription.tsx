@@ -238,21 +238,23 @@ function Subscription() {
             return (
               <div 
                 key={index} 
-                className={`border rounded-lg p-6 ${
+                className={`border rounded-lg p-6 h-full flex flex-col ${
                   plan.isActive 
                     ? 'bg-blue-50 border-blue-200' 
                     : 'bg-gray-50 border-gray-200 opacity-75'
                 }`}
               >
+                {/* Header section - fixed height for alignment */}
                 <div className="text-center mb-6">
-                  <h3 className="text-xl font-semibold">{plan.name}</h3>
-                  <div className="mt-2">
+                  <h3 className="text-xl font-semibold h-7 flex items-center justify-center">{plan.name}</h3>
+                  <div className="mt-2 h-12 flex items-center justify-center">
                     <span className="text-3xl font-bold text-blue-600">{plan.price}</span>
                     <span className="text-gray-600">/month</span>
                   </div>
                 </div>
 
-                <div className="space-y-3 mb-6">
+                {/* Features section - flexible height */}
+                <div className="space-y-3 mb-6 flex-grow">
                   {plan.features.map((feature, featureIndex) => (
                     <div key={featureIndex} className="flex items-start">
                       <Check className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
@@ -261,35 +263,33 @@ function Subscription() {
                   ))}
                 </div>
 
-                <button 
-                  onClick={() => plan.isActive && !isCurrentPlan && handlePlanSelection(plan.id)}
-                  className={`w-full py-2 px-4 rounded-md transition-colors ${
-                    !plan.isActive
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : isCurrentPlan
-                      ? 'bg-green-600 text-white cursor-default'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                  disabled={!plan.isActive || isCurrentPlan || isActivating}
-                >
-                  {isActivating ? (
-                    <span className="flex items-center justify-center">
-                      <Loader className="w-4 h-4 animate-spin mr-2" />
-                      Activating...
-                    </span>
-                  ) : isCurrentPlan ? (
-                    'Already Activated'
-                  ) : !plan.isActive ? (
-                    'Coming Soon'
-                  ) : (
-                    'Select Plan'
-                  )}
-                </button>
-                {!plan.isActive && (
-                  <p className="text-sm text-gray-500 text-center mt-2">
-                    This plan is currently unavailable
-                  </p>
-                )}
+                {/* Button section - fixed at bottom */}
+                <div className="mt-auto">
+                  <button 
+                    onClick={() => plan.isActive && !isCurrentPlan && handlePlanSelection(plan.id)}
+                    className={`w-full py-2 px-4 rounded-md transition-colors h-10 ${
+                      !plan.isActive
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : isCurrentPlan
+                        ? 'bg-green-600 text-white cursor-default'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                    disabled={!plan.isActive || isCurrentPlan || isActivating}
+                  >
+                    {isActivating ? (
+                      <span className="flex items-center justify-center">
+                        <Loader className="w-4 h-4 animate-spin mr-2" />
+                        Activating...
+                      </span>
+                    ) : isCurrentPlan ? (
+                      'Already Activated'
+                    ) : !plan.isActive ? (
+                      'Coming Soon'
+                    ) : (
+                      'Select Plan'
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
