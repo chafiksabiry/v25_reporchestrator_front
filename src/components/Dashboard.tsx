@@ -777,9 +777,9 @@ function Dashboard() {
         <div className="space-y-8">
           {visiblePhases.map((phase, index) => {
             const Icon = phase.icon;
-            const isComingSoon = phase.id >= 5;
-            const isAvailable = !isComingSoon && (phase.status === 'completed' || phase.status === 'in-progress' || 
-              (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1]))));
+            const isComingSoon = false; // No more coming soon phases since we only show phases 1-5
+            const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
+              (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
 
             // For phases 2 and 3, check if we need to show external link icon
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
