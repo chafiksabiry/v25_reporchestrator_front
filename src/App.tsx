@@ -95,7 +95,6 @@ function App() {
                 </Link>
               </div>
               <div className="flex items-center space-x-4">
-                <Link to="/marketplace" className="text-gray-600 hover:text-gray-900">Marketplace</Link>
                 {repDashboardUrl ? (
                   <a 
                     href={repDashboardUrl} 

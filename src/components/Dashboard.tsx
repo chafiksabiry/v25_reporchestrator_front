@@ -302,6 +302,7 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
   const [agentData, setAgentData] = useState<AgentData | null>(null);
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
@@ -612,9 +613,15 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // For phases 2 and 3, redirect to REP dashboard in a new window
+      // For phases 2 and 3, redirect to REP dashboard in the same window
       if ((phase.id === 2 || phase.id === 3) && repDashboardUrl) {
-        window.open(repDashboardUrl, '_blank');
+        window.location.href = repDashboardUrl;
+        return;
+      }
+      
+      // For phase 5 (marketplace), show coming soon popup
+      if (phase.id === 5) {
+        setShowComingSoonModal(true);
         return;
       }
       
@@ -727,6 +734,35 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Coming Soon Modal */}
+      {showComingSoonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 shadow-xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                <ShoppingBag className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Marketplace Coming Soon!
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
+              </p>
+              <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-medium">Stay tuned for updates!</span>
+              </div>
+              <button
+                onClick={() => setShowComingSoonModal(false)}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Got it, thanks!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="border-b border-gray-200 pb-5 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">REPS Onboarding Progress</h2>
