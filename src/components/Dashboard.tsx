@@ -302,6 +302,7 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
   const [agentData, setAgentData] = useState<AgentData | null>(null);
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
@@ -612,9 +613,15 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // For phases 2 and 3, redirect to REP dashboard in a new window
+      // For phases 2 and 3, redirect to REP dashboard in the same window
       if ((phase.id === 2 || phase.id === 3) && repDashboardUrl) {
-        window.open(repDashboardUrl, '_blank');
+        window.location.href = repDashboardUrl;
+        return;
+      }
+      
+      // For phase 5 (marketplace), show coming soon popup
+      if (phase.id === 5) {
+        setShowComingSoonModal(true);
         return;
       }
       
@@ -719,10 +726,43 @@ function Dashboard() {
     );
   }
 
-  const progressPercentage = (completedPhases / phaseTemplates.length) * 100;
+  // Only show phases 1-5, hide phases 6-10
+  const visiblePhases = phases.filter(phase => phase.id <= 5);
+  const visiblePhaseTemplates = phaseTemplates.filter(phase => phase.id <= 5);
+  const visibleCompletedPhases = visiblePhases.filter(p => p.status === 'completed').length;
+  const progressPercentage = (visibleCompletedPhases / visiblePhaseTemplates.length) * 100;
 
   return (
     <div className="space-y-6">
+      {/* Coming Soon Modal */}
+      {showComingSoonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 shadow-xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                <ShoppingBag className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Marketplace Coming Soon!
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
+              </p>
+              <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-medium">Stay tuned for updates!</span>
+              </div>
+              <button
+                onClick={() => setShowComingSoonModal(false)}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Got it, thanks!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="border-b border-gray-200 pb-5 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">REPS Onboarding Progress</h2>
@@ -740,14 +780,42 @@ function Dashboard() {
         </button>
       </div>
 
+      <div className="bg-blue-50 rounded-lg p-6">
+        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
+        
+        <div className="mt-4 space-y-4">
+          {/* Phases progress */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
+              <span className="text-sm font-medium text-blue-700">{visibleCompletedPhases} of {visiblePhaseTemplates.length}</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
+          <p className="flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Complete required actions to unlock the next phase
+          </p>
+          <p className="flex items-center mt-1">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Optional actions improve your profile but are not mandatory
+          </p>
+        </div>
+      </div>
+
       <div className="relative">
         <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
         <div className="space-y-8">
-          {phases.map((phase, index) => {
+          {visiblePhases.map((phase, index) => {
             const Icon = phase.icon;
-            const isComingSoon = phase.id >= 5;
-            const isAvailable = !isComingSoon && (phase.status === 'completed' || phase.status === 'in-progress' || 
-              (index > 0 && (phases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(phases[index - 1]))));
+            const isComingSoon = false; // No more coming soon phases since we only show phases 1-5
+            const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
+              (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
 
             // For phases 2 and 3, check if we need to show external link icon
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
@@ -855,7 +923,7 @@ function Dashboard() {
                       <div className="mb-4 p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-start">
                         <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
                         <p>
-                          Complete the required actions in Phase {index} to unlock this phase.
+                          Complete the required actions in Phase {visiblePhases[index - 1]?.id} to unlock this phase.
                         </p>
                       </div>
                     )}
@@ -922,34 +990,6 @@ function Dashboard() {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      <div className="mt-8 bg-blue-50 rounded-lg p-6">
-        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
-        
-        <div className="mt-4 space-y-4">
-          {/* Phases progress */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
-              <span className="text-sm font-medium text-blue-700">{completedPhases} of {phaseTemplates.length}</span>
-            </div>
-            <div className="w-full bg-blue-200 rounded-full h-2.5">
-              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
-          <p className="flex items-center">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Complete required actions to unlock the next phase
-          </p>
-          <p className="flex items-center mt-1">
-            <AlertCircle className="w-4 h-4 mr-2" />
-            Optional actions improve your profile but are not mandatory
-          </p>
         </div>
       </div>
     </div>
