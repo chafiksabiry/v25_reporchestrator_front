@@ -19,6 +19,11 @@ import { getAgentData } from './services/apiConfig';
 function App() {
   // Add basename for qiankun routing
   const basename = config.isStandalone ? '/' : '/reporchestrator';
+  
+  // Get REP dashboard URL for profile redirect
+  const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
+    ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
+    : import.meta.env.VITE_REP_DASHBOARD_URL || '';
 
   useEffect(() => {
     // Log config information on app startup
@@ -90,9 +95,16 @@ function App() {
                 </Link>
               </div>
               <div className="flex items-center space-x-4">
-                <Link to="/wallet" className="text-gray-600 hover:text-gray-900">Wallet</Link>
-                <Link to="/marketplace" className="text-gray-600 hover:text-gray-900">Marketplace</Link>
-                <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
+                {repDashboardUrl ? (
+                  <a 
+                    href={repDashboardUrl} 
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Profile
+                  </a>
+                ) : (
+                  <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
+                )}
               </div>
             </div>
           </div>
