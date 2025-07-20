@@ -56,6 +56,7 @@ interface ApiPhase2RequiredActions {
   experienceAdded: boolean;
   skillsAdded: boolean;
   availabilitySet: boolean;
+  videoUploaded: boolean;
   [key: string]: boolean;
 }
 
@@ -162,7 +163,8 @@ const phaseTemplates = [
     requiredActions: [
       'Add your work experience',
       'List your key skills',
-      'Set your availability hours'
+      'Set your availability hours',
+      'Record a 1-minute video introduction'
     ],
     optionalActions: [
       'Upload a professional photo',
@@ -438,6 +440,7 @@ function Dashboard() {
             if (phase2Actions.experienceAdded) completedActions.push(0);
             if (phase2Actions.skillsAdded) completedActions.push(1);
             if (phase2Actions.availabilitySet) completedActions.push(2);
+            if (phase2Actions.videoUploaded) completedActions.push(3);
             
             // Log the completed required actions for phase 2
             console.log('🔍 Phase 2 - Mapped required actions:', completedActions);
