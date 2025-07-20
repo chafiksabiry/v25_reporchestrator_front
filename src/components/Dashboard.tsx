@@ -55,6 +55,8 @@ interface ApiPhase1OptionalActions {
 interface ApiPhase2RequiredActions {
   experienceAdded: boolean;
   skillsAdded: boolean;
+  industriesAdded: boolean;
+  activitiesAdded: boolean;
   availabilitySet: boolean;
   videoUploaded: boolean;
   [key: string]: boolean;
@@ -163,6 +165,8 @@ const phaseTemplates = [
     requiredActions: [
       'Add your work experience',
       'List your key skills',
+      'Select your industries',
+      'Choose your activities',
       'Set your availability hours',
       'Record a 1-minute video introduction'
     ],
@@ -439,8 +443,10 @@ function Dashboard() {
             const phase2Actions = apiPhase.requiredActions as ApiPhase2RequiredActions;
             if (phase2Actions.experienceAdded) completedActions.push(0);
             if (phase2Actions.skillsAdded) completedActions.push(1);
-            if (phase2Actions.availabilitySet) completedActions.push(2);
-            if (phase2Actions.videoUploaded) completedActions.push(3);
+            if (phase2Actions.industriesAdded) completedActions.push(2);
+            if (phase2Actions.activitiesAdded) completedActions.push(3);
+            if (phase2Actions.availabilitySet) completedActions.push(4);
+            if (phase2Actions.videoUploaded) completedActions.push(5);
             
             // Log the completed required actions for phase 2
             console.log('🔍 Phase 2 - Mapped required actions:', completedActions);
