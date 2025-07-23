@@ -178,7 +178,7 @@ const phaseTemplates = [
   {
     id: 3,
     name: 'Skills Assessment',
-    description: 'Complete tests and get your Bolt Score',
+    description: 'Complete tests and get your Performance Score',
     icon: Award,
     path: '/skills',
     requiredActions: [
