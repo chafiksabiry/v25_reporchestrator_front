@@ -18,7 +18,7 @@ ENV VITE_API_URL=https://preprod-api-repcreationwizard.harx.ai/api
 #Rep dahsboard
 ENV VITE_REP_DASHBOARD_URL_STANDALONE=https://preprod-rep-dashboard.harx.ai/profile
 ENV VITE_REP_DASHBOARD_URL=/repdashboard/profile
-ENV VITE_FRONT_URL=https://rep-orchestrator.harx.ai/
+ENV VITE_FRONT_URL=https://preprod-rep-orchestrator.harx.ai/
 # Install dependencies
 RUN npm install
 
