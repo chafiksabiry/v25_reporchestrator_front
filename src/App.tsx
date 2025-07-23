@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
-import { Wallet } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SignUp from './components/SignUp';
 import Profile from './components/Profile';
@@ -24,6 +24,15 @@ function App() {
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+
+  const handleLogout = () => {
+    localStorage.clear();
+    // Clear all cookies using native JavaScript
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+    window.location.replace('/auth');
+  };
 
   useEffect(() => {
     // Log config information on app startup
@@ -90,8 +99,11 @@ function App() {
             <div className="flex justify-between h-16">
               <div className="flex items-center">
                 <Link to="/" className="flex items-center">
-                  <Wallet className="w-8 h-8 text-blue-600" />
-                  <span className="ml-2 text-xl font-semibold text-gray-900">REPS Platform</span>
+                  <img 
+                    src={`${import.meta.env.VITE_FRONT_URL}logo_harx.jpg`}
+                    alt="HARX" 
+                    className="h-8 w-auto"
+                  />
                 </Link>
               </div>
               <div className="flex items-center space-x-4">
@@ -105,6 +117,12 @@ function App() {
                 ) : (
                   <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
                 )}
+                <button 
+                  onClick={handleLogout} 
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <LogOut className="h-6 w-6" />
+                </button>
               </div>
             </div>
           </div>
