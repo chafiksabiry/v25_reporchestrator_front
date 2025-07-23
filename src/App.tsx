@@ -2,6 +2,9 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { LogOut } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import AuthTest from './components/AuthTest';
 import Dashboard from './components/Dashboard';
 import SignUp from './components/SignUp';
 import Profile from './components/Profile';
@@ -11,12 +14,15 @@ import Marketplace from './components/Marketplace';
 import Operations from './components/Operations';
 import Support from './components/Support';
 import QualityControl from './components/QualityControl';
-import CareerTrack from './components/CareerTrack.tsx';
+import CareerTrack from './components/CareerTrack';
 import WalletDashboard from './components/WalletDashboard';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
 
-function App() {
+// Component principal de l'app avec navigation
+const AppContent: React.FC = () => {
+  const { logout } = useAuth();
+  
   // Add basename for qiankun routing
   const basename = config.isStandalone ? '/' : '/reporchestrator';
   
@@ -24,15 +30,6 @@ function App() {
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
-
-  const handleLogout = () => {
-    localStorage.clear();
-    // Clear all cookies using native JavaScript
-    document.cookie.split(";").forEach(function(c) { 
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-    });
-    window.location.replace('/auth');
-  };
 
   useEffect(() => {
     // Log config information on app startup
@@ -118,33 +115,48 @@ function App() {
                   <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
                 )}
                 <button 
-                  onClick={handleLogout} 
-                  className="text-gray-600 hover:text-gray-900"
+                  onClick={logout} 
+                  className="text-gray-600 hover:text-gray-900 flex items-center space-x-1"
+                  title="Logout"
                 >
-                  <LogOut className="h-6 w-6" />
+                  <LogOut className="h-5 w-5" />
+                  <span className="text-sm">Logout</span>
                 </button>
               </div>
             </div>
           </div>
         </nav>
-        {/* Main Content */}
+        
+        {/* Main Content - All routes are protected */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/skills" element={<SkillsAssessment />} />
-            <Route path="/subscription" element={<Subscription />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/operations" element={<Operations />} />
-            <Route path="/support" element={<Support />} />
-            <Route path="/quality" element={<QualityControl />} />
-            <Route path="/career" element={<CareerTrack />} />
-            <Route path="/wallet" element={<WalletDashboard />} />
-          </Routes>
+          <ProtectedRoute>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/skills" element={<SkillsAssessment />} />
+              <Route path="/subscription" element={<Subscription />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/operations" element={<Operations />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/quality" element={<QualityControl />} />
+              <Route path="/career" element={<CareerTrack />} />
+              <Route path="/wallet" element={<WalletDashboard />} />
+              <Route path="/auth-test" element={<AuthTest />} />
+            </Routes>
+          </ProtectedRoute>
         </main>
       </div>
     </Router>
+  );
+};
+
+// Component principal avec AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
