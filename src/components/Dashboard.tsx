@@ -308,10 +308,10 @@ function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
   const [agentData, setAgentData] = useState<AgentData | null>(null);
-  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
     ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
     : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+  const repMarketplaceUrl = import.meta.env.VITE_REP_MARKETPLACE_URL || '';
   const navigate = useNavigate();
 
   // Fetch agent data from the API
@@ -628,9 +628,9 @@ function Dashboard() {
         return;
       }
       
-      // For phase 5 (marketplace), show coming soon popup
-      if (phase.id === 5) {
-        setShowComingSoonModal(true);
+      // For phase 5 (marketplace), redirect to marketplace URL
+      if (phase.id === 5 && repMarketplaceUrl) {
+        window.location.href = repMarketplaceUrl;
         return;
       }
       
@@ -743,35 +743,6 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Coming Soon Modal */}
-      {showComingSoonModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md mx-4 shadow-xl">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
-                <ShoppingBag className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Marketplace Coming Soon!
-              </h3>
-              <p className="text-sm text-gray-600 mb-6">
-                We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
-              </p>
-              <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm font-medium">Stay tuned for updates!</span>
-              </div>
-              <button
-                onClick={() => setShowComingSoonModal(false)}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Got it, thanks!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="border-b border-gray-200 pb-5 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">REPS Onboarding Progress</h2>
@@ -822,24 +793,22 @@ function Dashboard() {
         <div className="space-y-8">
           {visiblePhases.map((phase, index) => {
             const Icon = phase.icon;
-            const isComingSoon = false; // No more coming soon phases since we only show phases 1-5
             const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' || 
               (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
 
             // For phases 2 and 3, check if we need to show external link icon
-            const isExternalLink = phase.id >= 2 && repDashboardUrl;
+            // For phase 5, check if we need to show external link icon for marketplace
+            const isExternalLink = (phase.id >= 2 && phase.id <= 3 && repDashboardUrl) || (phase.id === 5 && repMarketplaceUrl);
 
             return (
               <div key={phase.id} className="relative">
                 <div className={`absolute left-8 top-8 w-4 h-4 -ml-2 rounded-full border-2 ${
-                  isComingSoon ? 'bg-purple-100 border-purple-300' :
                   phase.status === 'completed' ? 'bg-green-500 border-green-500' :
                   phase.status === 'in-progress' ? 'bg-blue-500 border-blue-500' :
                   'bg-white border-gray-300'
                 }`}></div>
                 <div className="ml-16 relative">
                   <div className={`bg-white rounded-lg shadow-sm p-6 ${
-                    isComingSoon ? 'border-purple-100' :
                     phase.status === 'completed' ? 'border-green-100' :
                     phase.status === 'in-progress' ? 'border-blue-100' :
                     'border-gray-100'
@@ -847,13 +816,11 @@ function Dashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div className={`p-3 rounded-full ${
-                          isComingSoon ? 'bg-purple-100' :
                           phase.status === 'completed' ? 'bg-green-100' :
                           phase.status === 'in-progress' ? 'bg-blue-100' :
                           'bg-gray-100'
                         }`}>
                           <Icon className={`w-6 h-6 ${
-                            isComingSoon ? 'text-purple-600' :
                             phase.status === 'completed' ? 'text-green-600' :
                             phase.status === 'in-progress' ? 'text-blue-600' :
                             'text-gray-600'
@@ -862,12 +829,7 @@ function Dashboard() {
                         <div className="ml-4">
                           <h3 className="text-lg font-medium text-gray-900 flex items-center">
                             Phase {phase.id}: {phase.name}
-                            {isComingSoon && (
-                              <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
-                                Coming Soon
-                              </span>
-                            )}
-                            {!isAvailable && !isComingSoon && (
+                            {!isAvailable && (
                               <Lock className="ml-2 w-4 h-4 text-amber-500" />
                             )}
                           </h3>
@@ -875,12 +837,7 @@ function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        {isComingSoon ? (
-                          <div className="flex items-center text-purple-600">
-                            <Clock className="w-5 h-5 mr-2" />
-                            <span className="text-sm font-medium">Coming Soon</span>
-                          </div>
-                        ) : phase.status === 'completed' ? (
+                        {phase.status === 'completed' ? (
                           <div className="flex items-center text-green-600">
                             <CheckCircle className="w-5 h-5 mr-2" />
                             <span className="text-sm font-medium">Completed</span>
