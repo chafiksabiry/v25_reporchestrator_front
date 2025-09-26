@@ -13,13 +13,13 @@ ENV VITE_RUN_MODE=in-app
 ENV VITE_STANDALONE_USER_ID=68233d8b4d60b1ff38096193
 ENV VITE_STANDALONE_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODIzM2Q4YjRkNjBiMWZmMzgwOTYxOTMiLCJpYXQiOjE3NDcxNDAzOTd9.ytQA5H1JiUJtKARMEN_LGL2JqlX-I1cKmuW3aEocnBM
 ENV VITE_STANDALONE_AGENT_ID=6825bd9f0a0fc3b46f7ba5a7
-ENV VITE_API_URL=https://preprod-api-repcreationwizard.harx.ai/api
+ENV VITE_API_URL=https://prod-api-repcreationwizard.harx.ai/api
 
 #Rep dahsboard
-ENV VITE_REP_DASHBOARD_URL_STANDALONE=https://preprod-rep-dashboard.harx.ai/profile
+ENV VITE_REP_DASHBOARD_URL_STANDALONE=https://prod-rep-dashboard.harx.ai/profile
 ENV VITE_REP_DASHBOARD_URL=/repdashboard/profile
 ENV VITE_REP_MARKETPLACE_URL=/repdashboard/gigs-marketplace
-ENV VITE_FRONT_URL=https://preprod-rep-orchestrator.harx.ai/
+ENV VITE_FRONT_URL=https://prod-rep-orchestrator.harx.ai/
 # Install dependencies
 RUN npm install
 
