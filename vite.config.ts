@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
   const isQiankun = mode === 'qiankun';
 
   return {
-    base: 'https://preprod-rep-orchestrator.harx.ai/',
+    base: 'https://prod-rep-orchestrator.harx.ai/',
     plugins: [
       react({
         jsxRuntime: 'classic',
