@@ -795,47 +795,48 @@ function Dashboard() {
         </div>
       )}
 
-      <div className="border-b border-gray-200 pb-5 flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">REPS Onboarding Progress</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Complete required actions to unlock next phases
-          </p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">REPS Onboarding</h2>
+            <p className="mt-2 text-sm text-gray-500 font-medium">
+              Complete required actions to unlock next phases
+            </p>
+          </div>
+          <button
+            className={`flex items-center px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl bg-white/50 text-gray-700 border border-white/50 shadow-sm backdrop-blur-sm hover:bg-white/80 transition-all duration-300 ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={syncProgressWithBackend}
+            disabled={syncing}
+          >
+            <RefreshCw className={`w-3 h-3 mr-2 ${syncing ? 'animate-spin' : ''} text-harx-500`} />
+            {syncing ? 'Syncing...' : 'Refresh Progress'}
+          </button>
         </div>
-        <button
-          className={`flex items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={syncProgressWithBackend}
-          disabled={syncing}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Syncing...' : 'Refresh Progress'}
-        </button>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-6">
-        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
+      <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/40 shadow-xl shadow-harx-500/5 transition-all duration-500 hover:shadow-harx-500/10">
+        <h3 className="text-xs font-black text-harx-600 uppercase tracking-[0.2em] mb-6">Your Progress</h3>
 
-        <div className="mt-4 space-y-4">
+        <div className="space-y-6">
           {/* Phases progress */}
           <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
-              <span className="text-sm font-medium text-blue-700">{visibleCompletedPhases} of {visiblePhaseTemplates.length}</span>
+            <div className="flex justify-between mb-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <span>Phases Completed</span>
+              <span className="text-harx-600 font-black">{visibleCompletedPhases} / {visiblePhaseTemplates.length}</span>
             </div>
-            <div className="w-full bg-blue-200 rounded-full h-2.5">
-              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+            <div className="w-full bg-white/50 rounded-full h-3 p-0.5 border border-white overflow-hidden shadow-inner">
+              <div className="bg-gradient-harx h-full rounded-full transition-all duration-1000 ease-out shadow-sm" style={{ width: `${progressPercentage}%` }}></div>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
-          <p className="flex items-center">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Complete required actions to unlock the next phase
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/30 pt-6">
+          <p className="flex items-center text-xs font-bold text-gray-500 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
+            <CheckCircle className="w-4 h-4 mr-3 text-emerald-500" />
+            REQUIRED ACTIONS UNLOCK PHASES
           </p>
-          <p className="flex items-center mt-1">
-            <AlertCircle className="w-4 h-4 mr-2" />
-            Optional actions improve your profile but are not mandatory
+          <p className="flex items-center text-xs font-bold text-gray-500 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
+            <AlertCircle className="w-4 h-4 mr-3 text-harx-alt-500" />
+            OPTIONAL ACTIONS IMPROVE PROFILE
           </p>
         </div>
       </div>
@@ -853,61 +854,55 @@ function Dashboard() {
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
 
             return (
-              <div key={phase.id} className="relative">
-                <div className={`absolute left-8 top-8 w-4 h-4 -ml-2 rounded-full border-2 ${isComingSoon ? 'bg-purple-100 border-purple-300' :
-                  phase.status === 'completed' ? 'bg-green-500 border-green-500' :
-                    phase.status === 'in-progress' ? 'bg-blue-500 border-blue-500' :
-                      'bg-white border-gray-300'
+            return (
+              <div key={phase.id} className="relative group/phase">
+                <div className={`absolute left-8 top-10 w-5 h-5 -ml-2.5 rounded-full border-4 z-10 transition-all duration-500 ring-8 ${
+                  phase.status === 'completed' ? 'bg-emerald-500 border-emerald-100 ring-emerald-500/5' :
+                    phase.status === 'in-progress' ? 'bg-harx-500 border-harx-50 ring-harx-500/10 animate-pulse-subtle' :
+                      'bg-white border-gray-100 ring-transparent'
                   }`}></div>
                 <div className="ml-16 relative">
-                  <div className={`bg-white rounded-lg shadow-sm p-6 ${isComingSoon ? 'border-purple-100' :
-                    phase.status === 'completed' ? 'border-green-100' :
-                      phase.status === 'in-progress' ? 'border-blue-100' :
-                        'border-gray-100'
+                  <div className={`bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl p-8 transition-all duration-500 group-hover/phase:-translate-y-1 ${
+                    phase.status === 'completed' ? 'border-emerald-100 shadow-emerald-500/5' :
+                      phase.status === 'in-progress' ? 'border-harx-100 shadow-harx-500/10' :
+                        'border-gray-50 opacity-80'
                     } border`}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center">
-                        <div className={`p-3 rounded-full ${isComingSoon ? 'bg-purple-100' :
-                          phase.status === 'completed' ? 'bg-green-100' :
-                            phase.status === 'in-progress' ? 'bg-blue-100' :
-                              'bg-gray-100'
+                        <div className={`p-4 rounded-2xl shadow-sm transition-transform duration-500 group-hover/phase:scale-110 ${
+                          phase.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
+                            phase.status === 'in-progress' ? 'bg-harx-50 text-harx-500' :
+                              'bg-gray-50 text-gray-400'
                           }`}>
-                          <Icon className={`w-6 h-6 ${isComingSoon ? 'text-purple-600' :
-                            phase.status === 'completed' ? 'text-green-600' :
-                              phase.status === 'in-progress' ? 'text-blue-600' :
-                                'text-gray-600'
-                            }`} />
+                          <Icon className="w-6 h-6" />
                         </div>
-                        <div className="ml-4">
-                          <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                            Phase {phase.id}: {phase.name}
-                            {isComingSoon && (
-                              <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
-                                Coming Soon
-                              </span>
-                            )}
+                        <div className="ml-5">
+                          <h3 className="text-xl font-black text-gray-900 flex items-center tracking-tight uppercase">
+                            {phase.name}
                             {!isAvailable && !isComingSoon && (
-                              <Lock className="ml-2 w-4 h-4 text-amber-500" />
+                              <div className="ml-3 p-1.5 bg-amber-50 rounded-lg">
+                                <Lock className="w-3 h-3 text-amber-500" />
+                              </div>
                             )}
                           </h3>
-                          <p className="mt-1 text-sm text-gray-500">{phase.description}</p>
+                          <p className="mt-1 text-xs font-bold text-gray-400 uppercase tracking-widest">Phase {phase.id} • {phase.description}</p>
                         </div>
                       </div>
                       <div className="flex items-center">
                         {isComingSoon ? (
-                          <div className="flex items-center text-purple-600">
-                            <Clock className="w-5 h-5 mr-2" />
-                            <span className="text-sm font-medium">Coming Soon</span>
+                          <div className="flex items-center text-purple-600 bg-purple-50 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
+                            <Clock className="w-4 h-4 mr-2" />
+                            Coming Soon
                           </div>
                         ) : phase.status === 'completed' ? (
-                          <div className="flex items-center text-green-600">
-                            <CheckCircle className="w-5 h-5 mr-2" />
-                            <span className="text-sm font-medium">Completed</span>
+                          <div className="flex items-center text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-100 shadow-sm shadow-emerald-500/5">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Completed
                           </div>
                         ) : phase.status === 'in-progress' ? (
                           <button
                             onClick={() => handlePhaseAction(phase)}
-                            className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                            className="inline-flex items-center px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/30 transition-all hover:-translate-y-0.5"
                           >
                             Continue
                             {isExternalLink ? (
@@ -919,9 +914,9 @@ function Dashboard() {
                         ) : (
                           <button
                             onClick={() => isAvailable && handlePhaseAction(phase)}
-                            className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium ${isAvailable
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            className={`inline-flex items-center px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isAvailable
+                              ? 'bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/30 hover:-translate-y-0.5'
+                              : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed'
                               }`}
                             disabled={!isAvailable}
                             title={!isAvailable ? "Complete required actions in the previous phase first" : ""}
@@ -938,7 +933,7 @@ function Dashboard() {
                             ) : (
                               <>
                                 Locked
-                                <Lock className="ml-2 w-4 h-4" />
+                                <Lock className="ml-2 w-3.5 h-3.5" />
                               </>
                             )}
                           </button>
@@ -955,27 +950,30 @@ function Dashboard() {
                       </div>
                     )}
 
-                    <div className="mt-4 border-t pt-4">
+                    <div className="mt-6 border-t border-white pt-6">
                       {/* Required Actions */}
-                      <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                        <ListChecks className="w-4 h-4 mr-2" />
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center">
+                        <ListChecks className="w-3.5 h-3.5 mr-2" />
                         Required Actions
-                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full">Must Complete</span>
+                        <span className="ml-3 px-3 py-1 bg-harx-50 text-harx-600 rounded-lg border border-harx-100 text-[8px]">MUST COMPLETE</span>
                       </h4>
-                      <ul className="space-y-2 mb-4">
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                         {phase.requiredActions.map((action, actionIndex) => {
                           const isCompleted = phase.completedActions?.includes(actionIndex);
 
                           return (
-                            <li key={actionIndex} className="flex items-center text-sm text-gray-600">
-                              <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${isCompleted ? 'border-green-500 bg-green-500' :
-                                phase.status === 'in-progress' ? 'border-blue-500' : 'border-gray-300'
+                            <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
+                              isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 
+                              phase.status === 'in-progress' ? 'bg-white/50 border-white text-gray-600' : 'bg-gray-50/50 border-gray-100 text-gray-400'
+                            }`}>
+                              <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 rotate-0' :
+                                phase.status === 'in-progress' ? 'bg-white border-2 border-harx-500 rotate-0' : 'bg-gray-100 border-2 border-gray-200 rotate-0'
                                 }`}>
                                 {isCompleted && (
-                                  <CheckCircle className="w-3 h-3 text-white" />
+                                  <CheckCircle className="w-3.5 h-3.5" />
                                 )}
                               </div>
-                              {action}
+                              <span className="text-xs font-bold">{action}</span>
                             </li>
                           );
                         })}
@@ -984,25 +982,27 @@ function Dashboard() {
                       {/* Optional Actions */}
                       {phase.optionalActions.length > 0 && (
                         <>
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Clock className="w-4 h-4 mr-2" />
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center">
+                            <Clock className="w-3.5 h-3.5 mr-2" />
                             Optional Actions
                           </h4>
-                          <ul className="space-y-2">
+                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {phase.optionalActions.map((action, actionIndex) => {
                               // Calculate the actual index in the completedActions array
                               const actualIndex = phase.requiredActions.length + actionIndex;
                               const isCompleted = phase.completedActions?.includes(actualIndex);
 
                               return (
-                                <li key={actionIndex} className="flex items-center text-sm text-gray-600">
-                                  <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${isCompleted ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                                <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
+                                  isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 'bg-white/30 border-white/40 text-gray-500'
+                                }`}>
+                                  <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-2 border-gray-200'
                                     }`}>
                                     {isCompleted && (
-                                      <CheckCircle className="w-3 h-3 text-white" />
+                                      <CheckCircle className="w-3.5 h-3.5" />
                                     )}
                                   </div>
-                                  {action}
+                                  <span className="text-xs font-bold">{action}</span>
                                 </li>
                               );
                             })}

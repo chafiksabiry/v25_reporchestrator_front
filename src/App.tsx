@@ -83,27 +83,29 @@ function App() {
 
   return (
     <Router basename={basename}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-premium-gradient overflow-x-hidden">
         {/* Top Navigation */}
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
+        <nav className="bg-white/40 backdrop-blur-md border-b border-white/20 px-8 py-5 relative z-50 sticky top-0">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center">
               <div className="flex items-center">
-                <Link to="/" className="flex items-center">
-                  <Wallet className="w-8 h-8 text-blue-600" />
-                  <span className="ml-2 text-xl font-semibold text-gray-900">REPS Platform</span>
+                <Link to="/" className="flex items-center group">
+                  <div className="bg-gradient-harx p-2 rounded-xl shadow-lg shadow-harx-500/20 group-hover:scale-110 transition-transform duration-300">
+                    <Wallet className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="ml-4 text-xl font-black text-gray-900 tracking-tight uppercase">REPS Platform</span>
                 </Link>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-6">
                 {repDashboardUrl ? (
                   <a 
                     href={repDashboardUrl} 
-                    className="text-gray-600 hover:text-gray-900"
+                    className="text-gray-600 hover:text-harx-600 font-black uppercase tracking-widest text-[10px] bg-white/50 px-6 py-2.5 rounded-xl border border-white/50 shadow-sm transition-all duration-300"
                   >
                     Profile
                   </a>
                 ) : (
-                  <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
+                  <Link to="/profile" className="text-gray-600 hover:text-harx-600 font-black uppercase tracking-widest text-[10px] bg-white/50 px-6 py-2.5 rounded-xl border border-white/50 shadow-sm transition-all duration-300">Profile</Link>
                 )}
               </div>
             </div>
