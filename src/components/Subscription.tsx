@@ -257,7 +257,7 @@ function Subscription() {
                 <div className="space-y-3 mb-6 flex-grow">
                   {plan.features.map((feature, featureIndex) => (
                     <div key={featureIndex} className="flex items-start">
-                      <Check className="w-5 h-5 text-harx-alt-500 mr-2 flex-shrink-0 mt-0.5" />
+                      <Check className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-gray-700 text-sm">{feature}</span>
                     </div>
                   ))}
@@ -271,7 +271,7 @@ function Subscription() {
                       !plan.isActive
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : isCurrentPlan
-                        ? 'bg-harx-alt-600 text-white cursor-default'
+                        ? 'bg-green-600 text-white cursor-default'
                         : 'bg-harx-600 text-white hover:bg-harx-700'
                     }`}
                     disabled={!plan.isActive || isCurrentPlan || isActivating}

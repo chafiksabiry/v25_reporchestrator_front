@@ -819,7 +819,7 @@ function Dashboard() {
           <div>
             <div className="flex justify-between mb-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
               <span>Phases Completed</span>
-              <span className="text-harx-600 font-black">{visibleCompletedPhases} / {visiblePhaseTemplates.length}</span>
+              <span className="text-emerald-600 font-black">{visibleCompletedPhases} / {visiblePhaseTemplates.length}</span>
             </div>
             <div className="w-full bg-white/50 rounded-full h-3 p-0.5 border border-white overflow-hidden shadow-inner">
               <div className="bg-gradient-harx h-full rounded-full transition-all duration-1000 ease-out shadow-sm" style={{ width: `${progressPercentage}%` }}></div>
@@ -829,7 +829,7 @@ function Dashboard() {
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/30 pt-6">
           <p className="flex items-center text-xs font-bold text-gray-500 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
-            <CheckCircle className="w-4 h-4 mr-3 text-harx-500" />
+            <CheckCircle className="w-4 h-4 mr-3 text-emerald-500" />
             REQUIRED ACTIONS UNLOCK PHASES
           </p>
           <p className="flex items-center text-xs font-bold text-gray-500 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
@@ -854,20 +854,20 @@ function Dashboard() {
             return (
               <div key={phase.id} className="relative group/phase">
                 <div className={`absolute left-8 top-10 w-5 h-5 -ml-2.5 rounded-full border-4 z-10 transition-all duration-500 ring-8 ${
-                  phase.status === 'completed' ? 'bg-harx-500 border-harx-100 ring-harx-500/5' :
+                  phase.status === 'completed' ? 'bg-emerald-500 border-emerald-100 ring-emerald-500/5' :
                     phase.status === 'in-progress' ? 'bg-harx-alt-500 border-harx-alt-50 ring-harx-alt-500/10 animate-pulse-subtle' :
                       'bg-white border-gray-100 ring-transparent'
                   }`}></div>
                 <div className="ml-16 relative">
                   <div className={`bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl p-8 transition-all duration-500 group-hover/phase:-translate-y-1 ${
-                    phase.status === 'completed' ? 'border-harx-100 shadow-harx-500/5' :
+                    phase.status === 'completed' ? 'border-emerald-100 shadow-emerald-500/5' :
                       phase.status === 'in-progress' ? 'border-harx-alt-100 shadow-harx-alt-500/10' :
                         'border-gray-50 opacity-80'
                     } border`}>
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center">
                         <div className={`p-4 rounded-2xl shadow-sm transition-transform duration-500 group-hover/phase:scale-110 ${
-                          phase.status === 'completed' ? 'bg-harx-50 text-harx-500' :
+                          phase.status === 'completed' ? 'bg-emerald-50 text-emerald-500' :
                             phase.status === 'in-progress' ? 'bg-harx-alt-50 text-harx-alt-500' :
                               'bg-gray-50 text-gray-400'
                           }`}>
@@ -892,7 +892,7 @@ function Dashboard() {
                             Coming Soon
                           </div>
                         ) : phase.status === 'completed' ? (
-                          <div className="flex items-center text-harx-500 bg-harx-50 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-harx-100 shadow-sm shadow-harx-500/5">
+                          <div className="flex items-center text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-100 shadow-sm shadow-emerald-500/5">
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Completed
                           </div>
@@ -952,7 +952,7 @@ function Dashboard() {
                       <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center">
                         <ListChecks className="w-3.5 h-3.5 mr-2" />
                         Required Actions
-                        <span className="ml-3 px-3 py-1 bg-harx-50 text-harx-600 rounded-lg border border-harx-100 text-[8px]">MUST COMPLETE</span>
+                        <span className="ml-3 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[8px]">MUST COMPLETE</span>
                       </h4>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                         {phase.requiredActions.map((action, actionIndex) => {
@@ -960,10 +960,10 @@ function Dashboard() {
 
                           return (
                             <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
-                              isCompleted ? 'bg-harx-50/50 border-harx-100 text-harx-800' : 
+                              isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 
                               phase.status === 'in-progress' ? 'bg-white/50 border-white text-gray-600' : 'bg-gray-50/50 border-gray-100 text-gray-400'
                             }`}>
-                              <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-harx-500 text-white shadow-lg shadow-harx-500/20 rotate-0' :
+                              <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 rotate-0' :
                                 phase.status === 'in-progress' ? 'bg-white border-2 border-harx-alt-500 rotate-0' : 'bg-gray-100 border-2 border-gray-200 rotate-0'
                                 }`}>
                                 {isCompleted && (
@@ -991,9 +991,9 @@ function Dashboard() {
 
                               return (
                                 <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
-                                  isCompleted ? 'bg-harx-50/50 border-harx-100 text-harx-800' : 'bg-white/30 border-white/40 text-gray-500'
+                                  isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 'bg-white/30 border-white/40 text-gray-500'
                                 }`}>
-                                  <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-harx-500 text-white shadow-lg shadow-harx-500/20' : 'bg-white border-2 border-gray-200'
+                                  <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-2 border-gray-200'
                                     }`}>
                                     {isCompleted && (
                                       <CheckCircle className="w-3.5 h-3.5" />

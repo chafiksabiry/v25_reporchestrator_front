@@ -54,7 +54,7 @@ function SignUp() {
                 <span className="text-sm font-medium">Verifying...</span>
               </div>
             ) : location.verified ? (
-              <div className="flex items-center text-harx-alt-600">
+              <div className="flex items-center text-green-600">
                 <CheckCircle className="w-5 h-5 mr-1" />
                 <span className="text-sm font-medium">Verified</span>
               </div>
