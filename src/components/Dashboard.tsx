@@ -768,8 +768,8 @@ function Dashboard() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md mx-4 shadow-xl">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
-                <ShoppingBag className="h-6 w-6 text-blue-600" />
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-harx-50 mb-4">
+                <ShoppingBag className="h-6 w-6 text-harx-600" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Marketplace Coming Soon!
@@ -777,7 +777,7 @@ function Dashboard() {
               <p className="text-sm text-gray-800 mb-6 leading-relaxed">
                 We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
               </p>
-              <div className="flex items-center justify-center space-x-2 text-blue-700 mb-6 bg-blue-50 py-2 rounded-xl border border-blue-100">
+              <div className="flex items-center justify-center space-x-2 text-harx-700 mb-6 bg-harx-50/50 py-2 rounded-xl border border-harx-100">
                 <Clock className="h-4 w-4" />
                 <span className="text-sm font-bold">Stay tuned for updates!</span>
               </div>
@@ -786,7 +786,7 @@ function Dashboard() {
                   setShowComingSoonModal(false);
                   window.location.href = '/repdashboard/gigs-marketplace';
                 }}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                className="w-full bg-gradient-harx text-white py-2 px-4 rounded-md hover:shadow-lg hover:shadow-harx-500/30 transition-all font-black uppercase tracking-widest text-xs"
               >
                 Got it, thanks!
               </button>
