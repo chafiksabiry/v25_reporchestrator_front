@@ -93,7 +93,10 @@ function App() {
                   <div className="bg-gradient-harx p-2 rounded-xl shadow-lg shadow-harx-500/20 group-hover:scale-110 transition-transform duration-300">
                     <Wallet className="w-6 h-6 text-white" />
                   </div>
-                  <span className="ml-4 text-xl font-black text-gray-900 tracking-tight uppercase">REPS Platform</span>
+                  <span className="ml-4 text-xl font-black text-gray-900 tracking-tight uppercase flex items-center">
+                    <img src="/logo_harx.png" alt="HARX" className="w-8 h-8 mr-3 rounded-lg shadow-sm" />
+                    REPS Platform
+                  </span>
                 </Link>
               </div>
               <div className="flex items-center space-x-6">
