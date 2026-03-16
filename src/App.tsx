@@ -15,6 +15,7 @@ import CareerTrack from './components/CareerTrack.tsx';
 import WalletDashboard from './components/WalletDashboard';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
+import harxLogo from './assets/logo_harx.png';
 
 function App() {
   // Add basename for qiankun routing
@@ -94,7 +95,7 @@ function App() {
                     <Wallet className="w-6 h-6 text-white" />
                   </div>
                   <span className="ml-4 text-xl font-black text-gray-900 tracking-tight uppercase flex items-center">
-                    <img src="/logo_harx.png" alt="HARX" className="w-8 h-8 mr-3 rounded-lg shadow-sm" />
+                    <img src={harxLogo} alt="HARX" className="w-8 h-8 mr-3 rounded-lg shadow-sm" />
                     REPS Platform
                   </span>
                 </Link>
