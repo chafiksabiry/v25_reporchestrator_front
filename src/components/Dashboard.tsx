@@ -811,8 +811,6 @@ function Dashboard() {
             {syncing ? 'Syncing...' : 'Refresh Progress'}
           </button>
         </div>
-      </div>
-
       <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/40 shadow-xl shadow-harx-500/5 transition-all duration-500 hover:shadow-harx-500/10">
         <h3 className="text-xs font-black text-harx-600 uppercase tracking-[0.2em] mb-6">Your Progress</h3>
 
@@ -853,7 +851,6 @@ function Dashboard() {
             // For phases 2 and 3, check if we need to show external link icon
             const isExternalLink = phase.id >= 2 && repDashboardUrl;
 
-            return (
             return (
               <div key={phase.id} className="relative group/phase">
                 <div className={`absolute left-8 top-10 w-5 h-5 -ml-2.5 rounded-full border-4 z-10 transition-all duration-500 ring-8 ${
