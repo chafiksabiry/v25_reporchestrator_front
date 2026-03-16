@@ -66,7 +66,7 @@ function WalletDashboard() {
             </div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center text-sm text-green-600">
+            <div className="flex items-center text-sm text-harx-alt-600">
               <TrendingUp className="w-4 h-4 mr-1" />
               <span>+12.5% from last week</span>
             </div>
@@ -97,8 +97,8 @@ function WalletDashboard() {
               <p className="text-sm font-medium text-gray-600">Available Balance</p>
               <h3 className="text-2xl font-bold text-gray-900">$428.00</h3>
             </div>
-            <div className="bg-green-50 rounded-full p-3">
-              <ArrowUpRight className="w-6 h-6 text-green-600" />
+            <div className="bg-harx-alt-50 rounded-full p-3">
+              <ArrowUpRight className="w-6 h-6 text-harx-alt-600" />
             </div>
           </div>
           <div className="mt-4">
@@ -142,7 +142,7 @@ function WalletDashboard() {
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         transaction.status === 'completed'
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-harx-alt-100 text-harx-alt-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
