@@ -774,12 +774,12 @@ function Dashboard() {
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Marketplace Coming Soon!
               </h3>
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-gray-800 mb-6 leading-relaxed">
                 We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
               </p>
-              <div className="flex items-center justify-center space-x-2 text-blue-600 mb-6">
+              <div className="flex items-center justify-center space-x-2 text-blue-700 mb-6 bg-blue-50 py-2 rounded-xl border border-blue-100">
                 <Clock className="h-4 w-4" />
-                <span className="text-sm font-medium">Stay tuned for updates!</span>
+                <span className="text-sm font-bold">Stay tuned for updates!</span>
               </div>
               <button
                 onClick={() => {
