@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Check, X, ArrowLeft, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAgentPlan, updateAgentPlan } from '../services/apiConfig';
+import { getAgentPlan, updateAgentPlan, getRepresentativePlans } from '../services/apiConfig';
 import config from '../config';
 import progressService from '../services/progressService';
 import { toast, Toaster } from 'react-hot-toast';
@@ -22,55 +22,7 @@ function Subscription() {
   const [activatingPlanId, setActivatingPlanId] = useState<string | null>(null);
   const [isPhaseCompleted, setIsPhaseCompleted] = useState(false);
 
-  const FREEMIUM_PLAN_ID = '6834527a7363ae062887a4ec';
-  
-  const plans: Plan[] = [
-    {
-      id: FREEMIUM_PLAN_ID,
-      name: 'Freemium',
-      price: '$0',
-      isActive: true,
-      features: [
-        'Access to basic REPS platform features',
-        'Limited marketplace access',
-        'Basic skills assessment',
-        'Standard support',
-        'Personal profile',
-        'Basic wallet functionality'
-      ]
-    },
-    {
-      id: 'growth',
-      name: 'Growth',
-      price: '$29',
-      isActive: false,
-      features: [
-        'Everything in Freemium, plus:',
-        'Full marketplace access',
-        'Advanced skills assessments',
-        'Priority support',
-        'Enhanced wallet features',
-        'Performance analytics',
-        'Custom career tracking'
-      ]
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: '$79',
-      isActive: false,
-      features: [
-        'Everything in Growth, plus:',
-        'Enterprise-level access',
-        'Dedicated account manager',
-        'Custom integrations',
-        'Advanced analytics',
-        'Team collaboration tools',
-        'API access',
-        'White-label options'
-      ]
-    }
-  ];
+  const [plans, setPlans] = useState<Plan[]>([]);
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -95,6 +47,23 @@ function Subscription() {
           hasPlan: !!planData.plan?._id,
           planId: planData.plan?._id || 'No plan'
         });
+
+        // Fetch representative plans
+        const fetchedPlans = await getRepresentativePlans();
+        const formattedPlans = fetchedPlans.map((p: any) => {
+          return {
+            id: p._id,
+            name: p.name,
+            price: `$${p.price}`,
+            isActive: true,
+            features: p.features && p.features.length > 0 ? p.features : [
+              'Access to basic REPS platform features',
+              'Limited marketplace access',
+              'Basic skills assessment'
+            ]
+          };
+        });
+        setPlans(formattedPlans);
 
         // If not completed, mark the "Review plans" action as completed
         if (!isCompleted) {
@@ -172,7 +141,8 @@ function Subscription() {
           });
 
           // Show success message
-          toast.success('Freemium plan activated successfully!');
+          const selectedPlan = plans.find(p => p.id === planId);
+          toast.success(`${selectedPlan?.name || 'Plan'} activated successfully!`);
 
           // Navigate back to dashboard after a short delay
           setTimeout(() => {

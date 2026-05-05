@@ -137,6 +137,37 @@ export const getAgentPlan = async (agentId: string) => {
   }
 };
 
+export const getRepresentativePlans = async () => {
+  const userData = config.getUserData();
+  console.log('🔍 Fetching representative plans...', {
+    endpoint: `${API_BASE_URL}/profiles/plans/representative`
+  });
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/profiles/plans/representative`, {
+      headers: {
+        'Authorization': `Bearer ${userData.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch representative plans:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error('Failed to fetch representative plans');
+    }
+
+    const data = await response.json();
+    console.log('✅ Representative plans fetched successfully:', data.length);
+    return data;
+  } catch (error) {
+    console.error('❌ Error in getRepresentativePlans:', error);
+    throw error;
+  }
+};
+
 export const updateAgentPlan = async (agentId: string, planId: string) => {
   const userData = config.getUserData();
   console.log('📝 Updating agent plan...', {
