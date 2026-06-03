@@ -1,4 +1,5 @@
 import './public-path'; // For proper Qiankun integration
+import React from 'react';
 import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { createRoot } from 'react-dom/client';
 import App from './App';
