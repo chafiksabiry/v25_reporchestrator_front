@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
 import { getRouterBasename } from './utils/routerBasename';
@@ -53,24 +53,6 @@ function App() {
           <Route path="/onboarding/wallet" element={<WalletDashboard />} />
         </Route>
 
-        {/* Rep dashboard (merged from v25_dash_rep_front) */}
-        <Route path="/dashboard/*" element={<DashboardRoutes />} />
-        <Route path="/gigs-marketplace/*" element={<DashboardRoutes />} />
-        <Route path="/gig/*" element={<DashboardRoutes />} />
-        <Route path="/company/*" element={<DashboardRoutes />} />
-        <Route path="/profile/*" element={<DashboardRoutes />} />
-        <Route path="/payouts/*" element={<DashboardRoutes />} />
-        <Route path="/learning/*" element={<DashboardRoutes />} />
-        <Route path="/training/*" element={<DashboardRoutes />} />
-        <Route path="/operations/*" element={<DashboardRoutes />} />
-        <Route path="/workspace/*" element={<DashboardRoutes />} />
-        <Route path="/community/*" element={<DashboardRoutes />} />
-        <Route path="/import-leads/*" element={<DashboardRoutes />} />
-        <Route path="/session-planning/*" element={<DashboardRoutes />} />
-        <Route path="/calls/*" element={<DashboardRoutes />} />
-        <Route path="/call-report/*" element={<DashboardRoutes />} />
-        <Route path="/wallet/*" element={<DashboardRoutes />} />
-
         {/* Assessments */}
         <Route path="/assessment/*" element={<AssessmentRoutes />} />
 
@@ -83,7 +65,11 @@ function App() {
         <Route path="/linkedin-callback" element={<WizardRoutes />} />
         <Route path="/reps-profile/*" element={<WizardRoutes />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Rep dashboard (merged from v25_dash_rep_front).
+            Mounted once via a root splat so its internal <Routes> (absolute
+            paths like /profile, /wallet, /gigs-marketplace) match the full
+            path. Explicit routes above keep priority over this catch-all. */}
+        <Route path="*" element={<DashboardRoutes />} />
       </Routes>
     </Router>
   );
