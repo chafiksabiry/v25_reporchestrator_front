@@ -53,8 +53,7 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: false,
       rollupOptions: {
         output: {
-          format: 'umd',
-          name: 'reporchestrator',
+          format: 'es',
           entryFileNames: 'index.js',
           chunkFileNames: 'chunk-[name].js',
           assetFileNames: (assetInfo) => {
