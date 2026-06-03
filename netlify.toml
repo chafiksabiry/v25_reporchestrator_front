@@ -2,6 +2,10 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # Registration backend — used for IP history / country mismatch (VITE_AUTH_API_URL fallback)
+  VITE_API_URL = "https://v25registrationbackend-production.up.railway.app/api"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
