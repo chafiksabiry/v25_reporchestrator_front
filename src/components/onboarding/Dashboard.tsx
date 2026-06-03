@@ -630,9 +630,22 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // For phases 2 and 3, redirect to REP dashboard in the same window
-      if ((phase.id === 2 || phase.id === 3) && repDashboardUrl) {
-        window.location.href = repDashboardUrl;
+      // Phase 2 (Profile Creation): go to the profile editor (photo upload + video records)
+      if (phase.id === 2) {
+        if (phase.status === 'pending') {
+          await progressService.updatePhaseStatus(phase.id, 'in-progress');
+        }
+        navigate('/profile?edit=true');
+        return;
+      }
+
+      // Phase 3: stay inside the unified app (convert the configured URL to an internal route)
+      if (phase.id === 3 && repDashboardUrl) {
+        const internalPath =
+          repDashboardUrl
+            .replace(/^https?:\/\/[^/]+/, '')
+            .replace(/^\/reporchestrator/, '') || '/';
+        navigate(internalPath);
         return;
       }
 
@@ -784,7 +797,7 @@ function Dashboard() {
               <button
                 onClick={() => {
                   setShowComingSoonModal(false);
-                  window.location.href = '/repdashboard/gigs-marketplace';
+                  navigate('/gigs-marketplace');
                 }}
                 className="w-full bg-gradient-harx text-white py-2 px-4 rounded-md hover:shadow-lg hover:shadow-harx-500/30 transition-all font-black uppercase tracking-widest text-xs"
               >
@@ -848,8 +861,8 @@ function Dashboard() {
             const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' ||
               (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
 
-            // For phases 2 and 3, check if we need to show external link icon
-            const isExternalLink = phase.id >= 2 && repDashboardUrl;
+            // Phase 3 still opens an external page; phase 2 navigates internally
+            const isExternalLink = phase.id === 3 && repDashboardUrl;
 
             return (
               <div key={phase.id} className="relative group/phase">
