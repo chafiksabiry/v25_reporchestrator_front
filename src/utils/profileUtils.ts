@@ -300,6 +300,15 @@ export const updateProfilePlan = async (profileId: string, planId: string) => {
   }
 };
 
+/** Registration auth API base (must end with `/api`, e.g. …/api). */
+const getAuthApiBaseUrl = (): string => {
+  const raw =
+    import.meta.env.VITE_AUTH_API_URL ||
+    import.meta.env.VITE_API_URL ||
+    '';
+  return raw.replace(/\/+$/, '');
+};
+
 // Function to fetch user's IP history
 export const fetchUserIpHistory = async (userId: string): Promise<IpHistoryResponse> => {
   try {
@@ -308,12 +317,26 @@ export const fetchUserIpHistory = async (userId: string): Promise<IpHistoryRespo
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`${import.meta.env.VITE_AUTH_API_URL}/users/${userId}/ip-history`, {
+    const baseUrl = getAuthApiBaseUrl();
+    if (!baseUrl) {
+      throw new Error(
+        'Auth API URL is not configured (set VITE_AUTH_API_URL or VITE_API_URL)'
+      );
+    }
+
+    const response = await fetch(`${baseUrl}/users/${userId}/ip-history`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `Expected JSON from auth API but got "${contentType || 'unknown'}" (status ${response.status})`
+      );
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
