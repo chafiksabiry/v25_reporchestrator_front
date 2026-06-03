@@ -1,0 +1,159 @@
+{
+  "sidebar": {
+    "dashboard": "Tableau de Bord",
+    "profile": "Profil",
+    "marketplace": "Missions",
+    "calls": "Appels",
+    "training": "Formation",
+    "workspace": "Espace de Travail",
+    "leads": "Prospects",
+    "callHistory": "Historique",
+    "copilot": "COCKPIT",
+    "sessionPlanning": "Planification",
+    "operations": "Opérations",
+    "wallet": "Portefeuille & Gains",
+    "logout": "Déconnexion",
+    "activeGuide": "Guide Actif",
+    "interactiveStep": "Étape Interactive"
+  },
+  "topbar": {
+    "changeLanguage": "Changer de langue",
+    "userRole": "Représentant HARX",
+    "defaultUser": "Utilisateur"
+  },
+  "dashboard": {
+    "stats": {
+      "repsScore": "Score REPS",
+      "onboarding": "Intégration",
+      "gigsEnrolled": "Missions inscrites",
+      "callsPassed": "Appels passés",
+      "current": "Actuel",
+      "progress": "Progression",
+      "active": "Actif",
+      "total": "Total"
+    },
+    "performance": {
+      "title": "Activité de Performance",
+      "subtitle": "Votre volume d'appels quotidien",
+      "chartLabel": "Appels"
+    },
+    "expertise": {
+      "title": "Analyse d'Expertise",
+      "professionalism": "Professionnalisme",
+      "effectiveness": "Efficacité",
+      "customerFocus": "Orientation Client",
+      "overallMatch": "Adéquation Globale"
+    }
+  },
+  "calls": {
+    "title": "Mes Appels",
+    "subtitle": "Consultez vos performances et les détails de vos interactions",
+    "recordsTitle": "Enregistrements d'appels",
+    "refresh": "Actualiser",
+    "noCalls": "Aucun appel trouvé",
+    "noCallsDetail": "Commencez à passer des appels depuis votre espace de travail pour voir votre historique et les analyses de performance de l'IA ici.",
+    "transcript": "Transcription",
+    "aiInsights": "Analyses IA",
+    "executiveSummary": "Résumé Exécutif",
+    "detailedAnalysis": "Analyse Détaillée",
+    "closeDetails": "Fermer les détails",
+    "metrics": {
+      "fluency": "Élocution Agent",
+      "sentiment": "Sentiment Client",
+      "fraud": "Détection de Fraude",
+      "coherence": "Cohérence Script",
+      "argumentation": "Qualité Argumentation",
+      "adherence": "Adhérence au Script",
+      "transaction": "Analyse de Vente"
+    }
+  },
+  "workspace": {
+    "title": "Espace de Travail",
+    "savingCall": {
+      "title": "Sauvegarde de l'appel…",
+      "subtitle": "Veuillez patienter quelques secondes — nous finalisons l'enregistrement et préparons l'analyse IA.",
+      "hint": "Ne fermez pas cette page."
+    }
+  },
+  "sessionPlanning": {
+    "title": "Planification de Session"
+  },
+  "operations": {
+    "title": "Panneau des Opérations",
+    "emergencyShutdown": "Arrêt d'urgence"
+  },
+  "gigsMarketplace": {
+    "title": "Place de Marché des Missions",
+    "tabs": {
+      "available": "Disponibles",
+      "enrolled": "Inscrites",
+      "favorite": "Favoris",
+      "invited": "Invitations"
+    }
+  },
+  "profile": {
+    "tabs": {
+      "profile": {
+        "title": "Identité du Représentant",
+        "subtitle": "Gérez votre profil professionnel et vos informations d'identification clés."
+      },
+      "skills": {
+        "title": "Expertise & Compétences",
+        "subtitle": "Mettez en valeur vos compétences techniques et interpersonnelles pour de futures opportunités."
+      },
+      "experience": {
+        "title": "Parcours Professionnel",
+        "subtitle": "Détaillez votre historique de carrière et vos succès passés."
+      },
+      "languages": {
+        "title": "Profil Linguistique",
+        "subtitle": "Présentez vos compétences linguistiques et vos capacités de communication."
+      },
+      "onboarding": {
+        "title": "Progression de l'Intégration",
+        "subtitle": "Suivez votre parcours à travers les étapes d'intégration."
+      },
+      "specialization": {
+        "title": "Secteurs d'Activité",
+        "subtitle": "Passez en revue vos domaines d'expertise sectorielle spécifiques."
+      }
+    }
+  },
+  "wallet": {
+    "title": "Portefeuille & Gains",
+    "downloadStatement": "Télécharger le Relevé",
+    "withdrawFunds": "Retirer des Fonds",
+    "availableBalance": "Solde Disponible",
+    "pendingEarnings": "Gains en Attente",
+    "lifetimeEarnings": "Gains Totaux",
+    "transactionHistory": "Historique des Transactions"
+  },
+  "workspaceGuard": {
+    "selectGigTitle": "Sélectionnez une mission",
+    "selectGigDesc": "Veuillez sélectionner un Gig spécifique dans le menu déroulant ci-dessus pour charger vos prospects (Leads), vérifier vos éligibilités d'appels, vos créneaux et vos formations.",
+    "trainingRequiredTitle": "Formation Requise",
+    "trainingRequiredDesc": "Vous devez terminer 100% de vos modules de formation pour ce Gig avant de pouvoir lancer des appels.",
+    "trainingButton": "S'entraîner",
+    "sessionRequiredTitle": "Réservation Requise",
+    "sessionRequiredDesc": "Vous devez avoir un créneau de temps planifié et réservé en cours pour lancer des appels.",
+    "sessionButton": "Réserver",
+    "connectionErrorTitle": "Erreur de Connexion",
+    "connectionErrorDesc": "Impossible de valider vos conditions d'appel en temps réel (vérification des formations et réservations). Veuillez rafraîchir la page ou réessayer ultérieurement.",
+    "refreshButton": "Actualiser",
+    "modalTitle": "Accès Cockpit Bloqué",
+    "modalSubtitle": "Veuillez remplir toutes les conditions d'éligibilité requises pour lancer des appels.",
+    "checkGigTitle": "Inscription au Projet",
+    "checkGigDesc": "Être officiellement inscrit et affecté à la mission sélectionnée.",
+    "checkTrainingTitle": "Formations Complétées (100%)",
+    "checkTrainingDesc": "Valider toutes les sessions de formation d'IA et simulateurs requis.",
+    "checkSessionTitle": "Créneau de Réservation Actif",
+    "checkSessionDesc": "Planifier et réserver un créneau de temps pour la mission dans l'agenda.",
+    "understandButton": "Compris, je finalise mes étapes",
+    "recentLeads": "Prospects Récents"
+  },
+  "trainingAllGigsGuard": {
+    "modalTitle": "Sélection de projet requise",
+    "modalSubtitle": "Pour accéder au COCKPIT, vous devez sélectionner un projet spécifique dans la liste déroulante de la page de Formation au lieu de \"Tous les projets\".",
+    "understandButton": "Compris"
+  }
+}

@@ -21,9 +21,9 @@ import {
   RefreshCw,
   ExternalLink
 } from 'lucide-react';
-import config from '../config';
-import progressService, { UserProgress } from '../services/progressService';
-import { getAgentData, refreshOnboardingStatus } from '../services/apiConfig';
+import config from '../../config';
+import progressService, { UserProgress } from '../../services/progressService';
+import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
 
 // Define the phase interface
 interface Phase {
@@ -145,7 +145,7 @@ const phaseTemplates = [
     name: 'Sign Up & Verification',
     description: 'Complete your account setup and verify your identity',
     icon: UserPlus,
-    path: '/signup',
+    path: '/onboarding/signup',
     requiredActions: [
       'Create your REPS account with email',
       'Verify your email address'
@@ -161,7 +161,7 @@ const phaseTemplates = [
     name: 'Profile Creation',
     description: 'Build your professional profile',
     icon: UserCircle,
-    path: '/profile',
+    path: '/onboarding/profile',
     requiredActions: [
       'Add your work experience',
       'List your key skills',
@@ -180,7 +180,7 @@ const phaseTemplates = [
     name: 'Skills Assessment',
     description: 'Complete tests and get your Bolt Score',
     icon: Award,
-    path: '/skills',
+    path: '/onboarding/skills',
     requiredActions: [
       'Complete language assessment',
       'Complete contact center assessment'
@@ -195,7 +195,7 @@ const phaseTemplates = [
     name: 'Subscription Plan',
     description: 'Choose your membership level',
     icon: CreditCard,
-    path: '/subscription',
+    path: '/onboarding/subscription',
     requiredActions: [
       'Activate subscription'
     ],
@@ -206,7 +206,7 @@ const phaseTemplates = [
     name: 'Marketplace Access',
     description: 'Browse and apply for gigs',
     icon: ShoppingBag,
-    path: '/marketplace',
+    path: '/onboarding/marketplace',
     requiredActions: [
       'Complete marketplace orientation',
       'Set up gig preferences'
@@ -222,7 +222,7 @@ const phaseTemplates = [
     name: 'Operations Launch',
     description: 'Start your first gig',
     icon: PhoneCall,
-    path: '/operations',
+    path: '/onboarding/operations',
     requiredActions: [
       'Review assigned tasks',
       'Set up communication tools'
@@ -238,7 +238,7 @@ const phaseTemplates = [
     name: 'Support & Training',
     description: 'Access resources and community',
     icon: Headphones,
-    path: '/support',
+    path: '/onboarding/support',
     requiredActions: [
       'Join REPS community',
       'Complete onboarding training'
@@ -254,7 +254,7 @@ const phaseTemplates = [
     name: 'Quality Control',
     description: 'Monitor your performance',
     icon: Shield,
-    path: '/quality',
+    path: '/onboarding/quality',
     requiredActions: [
       'Review quality guidelines',
       'Set up performance tracking'
@@ -270,7 +270,7 @@ const phaseTemplates = [
     name: 'Career Growth',
     description: 'Advance your REPS career',
     icon: TrendingUp,
-    path: '/career',
+    path: '/onboarding/career',
     requiredActions: [
       'Review career paths',
       'Set career goals'
@@ -286,7 +286,7 @@ const phaseTemplates = [
     name: 'Wallet & Payments',
     description: 'Manage your earnings',
     icon: Wallet,
-    path: '/wallet',
+    path: '/onboarding/wallet',
     requiredActions: [
       'Set up payment account',
       'Configure payout preferences'
