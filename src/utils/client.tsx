@@ -3,9 +3,18 @@ import React from 'react';
 import axios from 'axios';
 
 // Use Vite environment variables (instead of process.env)
-const API_URL = import.meta.env.VITE_API_URL;
-const REP_API_URL = import.meta.env.VITE_REP_API_URL;
-const CALLS_API_URL = import.meta.env.VITE_CALLS_API_URL || import.meta.env.VITE_API_URL_CALL;
+// These clients prepend `/api` to every request path, so the base URL must
+// NOT end with `/api` (otherwise requests become `/api/api/...`). Strip a
+// trailing `/api` (and slash) defensively so it works regardless of how the
+// env var is configured.
+const stripApiSuffix = (url?: string) =>
+  (url || '').replace(/\/+$/, '').replace(/\/api$/, '');
+
+const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
+const REP_API_URL = stripApiSuffix(import.meta.env.VITE_REP_API_URL);
+const CALLS_API_URL = stripApiSuffix(
+  import.meta.env.VITE_CALLS_API_URL || import.meta.env.VITE_API_URL_CALL
+);
 const DASHBOARD_COMPANY_API_URL = import.meta.env.VITE_DASHBOARD_COMPANY_API_URL;
 
 // Create axios instances with default config
