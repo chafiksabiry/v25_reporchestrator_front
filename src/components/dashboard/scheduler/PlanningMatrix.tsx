@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { TimeSlot, Gig } from '../../../types/scheduler';
 import { Clock, Calendar, Save, Check, Plus } from 'lucide-react';

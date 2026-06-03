@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { format, startOfWeek, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';
 import { TimeSlot } from '../../../types/scheduler';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Rep, TimeSlot, PerformanceMetric } from '../../../types/scheduler';
 import { calculatePerformanceMetrics } from '../../../services/schedulerAiService';
 import { TrendingUp, BarChart2, Star, Activity, Briefcase } from 'lucide-react';

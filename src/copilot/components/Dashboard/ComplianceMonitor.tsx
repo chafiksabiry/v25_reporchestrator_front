@@ -1,3 +1,4 @@
+import React from 'react';
 import { useAgent } from '../../contexts/AgentContext';
 import { Shield, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
 

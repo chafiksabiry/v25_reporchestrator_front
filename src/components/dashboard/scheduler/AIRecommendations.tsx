@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AIRecommendation, Gig, Rep, TimeSlot } from '../../../types/scheduler';
 import { getGigRecommendations } from '../../../services/schedulerAiService';
 import { Sparkles, Brain, ArrowRight, Target } from 'lucide-react';

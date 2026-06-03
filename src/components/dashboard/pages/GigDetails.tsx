@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Users, Globe, Calendar, Building, MapPin, Target, Phone, Mail, ChevronLeft, ChevronRight, Repeat, Star, FileText, Play, Sparkles } from 'lucide-react';
