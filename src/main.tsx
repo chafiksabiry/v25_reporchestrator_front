@@ -1,5 +1,5 @@
 import './public-path'; // For proper Qiankun integration
-import { renderWithQiankun, qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -24,35 +24,42 @@ function render(props: { container?: HTMLElement } = {}) {
   }
 }
 
-// Register the qiankun lifecycle so the host (process_connections) can
-// bootstrap/mount/unmount this micro-app. Without renderWithQiankun the
-// lifecycle is never registered and single-spa throws timeout #31.
-renderWithQiankun({
-  bootstrap() {
-    console.log('[reporchestrator] Bootstrapping...');
-  },
-  mount(props: any) {
-    console.log('[reporchestrator] Mounting...', props);
-    render(props);
-  },
-  unmount(props: any) {
-    console.log('[reporchestrator] Unmounting...', props);
-    const { container } = props || {};
-    const rootElement = container
-      ? container.querySelector('#root')
-      : document.getElementById('root');
-    if (rootElement && root) {
-      root.unmount();
-      root = null;
-    }
-  },
-  update(props: any) {
-    console.log('[reporchestrator] Updating...', props);
-  },
-});
+export async function bootstrap() {
+  return Promise.resolve();
+}
 
-// Standalone mode: render directly when not powered by qiankun.
+export async function mount(props: any) {
+  render(props);
+  return Promise.resolve();
+}
+
+export async function unmount(props: any) {
+  const { container } = props || {};
+  const rootElement = container
+    ? container.querySelector('#root')
+    : document.getElementById('root');
+
+  if (rootElement && root) {
+    root.unmount();
+    root = null;
+  } else {
+    console.warn('[reporchestrator] Root element not found for unmounting!');
+  }
+  return Promise.resolve();
+}
+
+// Render immediately in both standalone and qiankun modes. The host
+// (process_connections) loads this micro-app as a script and the immediate
+// render guarantees the UI shows; qiankun's deferred lifecycle is used only
+// as a loader, mirroring the working `company` micro-app.
 if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
   console.log('[reporchestrator] Running in standalone mode');
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => render());
+  } else {
+    render();
+  }
+} else {
+  console.log('[reporchestrator] Running inside Qiankun');
   render();
 }
