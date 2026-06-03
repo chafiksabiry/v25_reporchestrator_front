@@ -5,7 +5,7 @@ import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown
 import { useAuth } from '../../contexts/AuthContext';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
-import harxLogo from '../../assets/logo_harx.png';
+import harxLogo from '../../assets/logo-black.png';
 
 // Declare qiankun global variables
 declare global {
@@ -160,8 +160,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           <div className="relative shrink-0 w-full flex justify-center">
             <img
               src={harxLogo}
-              alt="HARX"
-              className="h-10 w-auto object-contain relative z-10"
+              alt="HARX Logo"
+              className="w-full h-auto object-contain relative z-10 scale-110"
             />
           </div>
         </div>
