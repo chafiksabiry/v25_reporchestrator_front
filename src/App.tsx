@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
+import { getRouterBasename } from './utils/routerBasename';
 import harxLogo from './assets/logo_harx.png';
 
 import OnboardingDashboard from './components/onboarding/Dashboard';
@@ -22,10 +23,6 @@ import ProfileRoutes from './routes/ProfileRoutes';
 import WizardRoutes from './routes/WizardRoutes';
 
 function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone'
-    ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || '/dashboard'
-    : import.meta.env.VITE_REP_DASHBOARD_URL || '/dashboard';
-
   return (
     <div className="min-h-screen bg-premium-gradient overflow-x-hidden">
       <nav className="bg-white/40 backdrop-blur-md border-b border-white/20 px-8 py-5 relative z-50 sticky top-0">
@@ -36,12 +33,12 @@ function OnboardingLayout({ children }: { children: React.ReactNode }) {
               REPS Platform
             </span>
           </Link>
-          <a
-            href={repDashboardUrl}
+          <Link
+            to="/dashboard"
             className="text-gray-600 hover:text-harx-600 font-black uppercase tracking-widest text-[10px] bg-white/50 px-6 py-2.5 rounded-xl border border-white/50 shadow-sm transition-all duration-300"
           >
             Dashboard
-          </a>
+          </Link>
         </div>
       </nav>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -65,7 +62,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
+    <Router basename={getRouterBasename()}>
       <Routes>
         {/* Onboarding orchestrator */}
         <Route path="/" element={<OnboardingLayout><OnboardingDashboard /></OnboardingLayout>} />
