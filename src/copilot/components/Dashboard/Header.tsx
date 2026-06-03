@@ -1,3 +1,4 @@
+import React from 'react';
 import { useAgent } from '../../contexts/AgentContext';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
 import { User, Volume2, Mic, MicOff, LayoutDashboard, LogOut, Headphones } from 'lucide-react';

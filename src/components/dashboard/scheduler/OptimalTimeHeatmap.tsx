@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Rep, TimeSlot } from '../../../types/scheduler';
 import { predictOptimalTimes } from '../../../services/schedulerAiService';
 import { Clock, Zap, Target } from 'lucide-react';

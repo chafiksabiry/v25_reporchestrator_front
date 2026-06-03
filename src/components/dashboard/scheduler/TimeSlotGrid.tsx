@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { TimeSlot, Gig } from '../../../types/scheduler';
 import { X, Clock, Check, Calendar, Building } from 'lucide-react';

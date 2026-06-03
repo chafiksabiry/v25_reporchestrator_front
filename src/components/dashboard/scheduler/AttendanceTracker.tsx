@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { TimeSlot, Rep } from '../../../types/scheduler';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, Clock, AlertTriangle, Users, FileText, ChevronRight } from 'lucide-react';

@@ -25,9 +25,7 @@ export default defineConfig(({ mode }) => {
     // micro-app's own Netlify origin.
     base: 'https://harxv25reporchestratorfront.netlify.app/',
     plugins: [
-      react({
-        jsxRuntime: 'classic',
-      }),
+      react(),
       qiankun('reporchestrator', {
         useDevMode: true,
       }),

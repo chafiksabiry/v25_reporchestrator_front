@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TimeSlot, WorkloadPrediction } from '../../../types/scheduler';
 import { predictWorkload } from '../../../services/schedulerAiService';
 import { LineChart, Calendar, TrendingUp, Info } from 'lucide-react';

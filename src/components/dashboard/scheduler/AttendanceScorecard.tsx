@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Rep, TimeSlot } from '../../../types/scheduler';
 import { startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Award, AlertCircle, CheckCircle, XCircle, TrendingUp, Target } from 'lucide-react';

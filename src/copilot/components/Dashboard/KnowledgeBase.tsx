@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { BookOpen, Search, FileText, HelpCircle, Copy, ExternalLink } from 'lucide-react';
 
 export function KnowledgeBase() {

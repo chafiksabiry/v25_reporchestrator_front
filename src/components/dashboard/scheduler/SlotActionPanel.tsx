@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { TimeSlot, Gig } from '../../../types/scheduler';
 import { Edit2, Trash2, Layout, FileText, Check, X } from 'lucide-react';
 

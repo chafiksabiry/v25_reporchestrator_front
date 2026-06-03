@@ -1,3 +1,4 @@
+import React from 'react';
 // frontend/src/utils/client.tsx
 import axios from 'axios';
 
