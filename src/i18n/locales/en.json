@@ -1,0 +1,159 @@
+{
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "marketplace": "Marketplace",
+    "calls": "Calls",
+    "training": "Training",
+    "workspace": "Workspace",
+    "leads": "Leads",
+    "callHistory": "Call History",
+    "copilot": "COCKPIT",
+    "sessionPlanning": "Session Planning",
+    "operations": "Operations",
+    "wallet": "Wallet & Payouts",
+    "logout": "Logout",
+    "activeGuide": "Active Guide",
+    "interactiveStep": "Interactive Step"
+  },
+  "topbar": {
+    "changeLanguage": "Change Language",
+    "userRole": "HARX Rep",
+    "defaultUser": "User"
+  },
+  "dashboard": {
+    "stats": {
+      "repsScore": "REPS Score",
+      "onboarding": "Onboarding",
+      "gigsEnrolled": "Gigs Enrolled",
+      "callsPassed": "Calls Passed",
+      "current": "Current",
+      "progress": "Progress",
+      "active": "Active",
+      "total": "Total"
+    },
+    "performance": {
+      "title": "Performance Activity",
+      "subtitle": "Your daily call volume",
+      "chartLabel": "Calls"
+    },
+    "expertise": {
+      "title": "Expertise Analysis",
+      "professionalism": "Professionalism",
+      "effectiveness": "Effectiveness",
+      "customerFocus": "Customer Focus",
+      "overallMatch": "Overall Match"
+    }
+  },
+  "calls": {
+    "title": "My Calls",
+    "subtitle": "Review your performance and interaction details",
+    "recordsTitle": "Call Records",
+    "refresh": "Refresh",
+    "noCalls": "No calls found",
+    "noCallsDetail": "Start making calls from your workspace to see your history and AI performance insights here.",
+    "transcript": "Transcript",
+    "aiInsights": "AI Insights",
+    "executiveSummary": "Executive Summary",
+    "detailedAnalysis": "Detailed Analysis",
+    "closeDetails": "Close Details",
+    "metrics": {
+      "fluency": "Agent Fluency",
+      "sentiment": "Sentiment Analysis",
+      "fraud": "Fraud Detection",
+      "coherence": "Script Coherence",
+      "argumentation": "Argumentation Quality",
+      "adherence": "Script Adherence",
+      "transaction": "Transaction Analysis"
+    }
+  },
+  "workspace": {
+    "title": "Workspace",
+    "savingCall": {
+      "title": "Saving the call…",
+      "subtitle": "Hang on a few seconds — we're finalising the recording and preparing the AI analysis.",
+      "hint": "Please don't close this page."
+    }
+  },
+  "sessionPlanning": {
+    "title": "Session Planning"
+  },
+  "operations": {
+    "title": "Operations Panel",
+    "emergencyShutdown": "Emergency Shutdown"
+  },
+  "gigsMarketplace": {
+    "title": "Gigs Marketplace",
+    "tabs": {
+      "available": "Available",
+      "enrolled": "Enrolled",
+      "favorite": "Favorite",
+      "invited": "Invited"
+    }
+  },
+  "profile": {
+    "tabs": {
+      "profile": {
+        "title": "Representative Identity",
+        "subtitle": "Manage your professional persona and core identification properties."
+      },
+      "skills": {
+        "title": "Expertise & Competencies",
+        "subtitle": "Highlight your technical strengths and soft skills for placement opportunities."
+      },
+      "experience": {
+        "title": "Professional Milestones",
+        "subtitle": "Detail your career history and previous representative successes."
+      },
+      "languages": {
+        "title": "Linguistic Profile",
+        "subtitle": "Showcase your language proficiency and communication capabilities."
+      },
+      "onboarding": {
+        "title": "Evolution Progress",
+        "subtitle": "Track your journey through the representation onboarding phases."
+      },
+      "specialization": {
+        "title": "Industry Verticals",
+        "subtitle": "Review your specific sector focus and professional domain expertise."
+      }
+    }
+  },
+  "wallet": {
+    "title": "Wallet & Earnings",
+    "downloadStatement": "Download Statement",
+    "withdrawFunds": "Withdraw Funds",
+    "availableBalance": "Available Balance",
+    "pendingEarnings": "Pending Earnings",
+    "lifetimeEarnings": "Lifetime Earnings",
+    "transactionHistory": "Transaction History"
+  },
+  "workspaceGuard": {
+    "selectGigTitle": "Select a Gig",
+    "selectGigDesc": "Please select a specific Gig from the dropdown menu above to load your Leads, verify call eligibility, slots, and training progress.",
+    "trainingRequiredTitle": "Training Required",
+    "trainingRequiredDesc": "You must complete 100% of your training modules for this Gig before placing calls.",
+    "trainingButton": "Train Now",
+    "sessionRequiredTitle": "Reservation Required",
+    "sessionRequiredDesc": "You must have a scheduled active slot reserved to start placing calls.",
+    "sessionButton": "Reserve Slot",
+    "connectionErrorTitle": "Connection Error",
+    "connectionErrorDesc": "Unable to validate call conditions. Please check your network or refresh the page to try again.",
+    "refreshButton": "Refresh",
+    "modalTitle": "COCKPIT Access Locked",
+    "modalSubtitle": "Please fulfill all required eligibility conditions to start placing calls.",
+    "checkGigTitle": "Project Enrollment",
+    "checkGigDesc": "Be officially enrolled and assigned to the selected gig.",
+    "checkTrainingTitle": "Trainings Completed (100%)",
+    "checkTrainingDesc": "Validate all required AI training sessions and simulator steps.",
+    "checkSessionTitle": "Active Reservation Slot",
+    "checkSessionDesc": "Plan and reserve a time slot for the gig in the schedule.",
+    "understandButton": "Understood, I'll complete my steps",
+    "recentLeads": "Recent Leads"
+  },
+  "trainingAllGigsGuard": {
+    "modalTitle": "Project Selection Required",
+    "modalSubtitle": "To access the COCKPIT, you must select a specific gig from the dropdown on the Training page instead of \"All enrolled gigs\".",
+    "understandButton": "Understood"
+  }
+}

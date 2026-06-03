@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Check, X, ArrowLeft, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAgentPlan, updateAgentPlan, getRepresentativePlans } from '../services/apiConfig';
-import config from '../config';
-import progressService from '../services/progressService';
+import { getAgentPlan, updateAgentPlan, getRepresentativePlans } from '../../services/apiConfig';
+import config from '../../config';
+import progressService from '../../services/progressService';
 import { toast, Toaster } from 'react-hot-toast';
 
 interface Plan {
