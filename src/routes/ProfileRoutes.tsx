@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ImportDialogV2 from '../components/profile/ImportDialogV2';
 import SummaryEditorV2 from '../components/profile/SummaryEditorV2';
@@ -33,7 +33,7 @@ function ProfileImportPage() {
 }
 
 function ProfileEditorPage() {
-  const [profileData, setProfileData] = useState(null);
+  const [profileData, setProfileData] = useState<Record<string, unknown> | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
 
   return (
@@ -45,7 +45,7 @@ function ProfileEditorPage() {
             profileData={profileData}
             generatedSummary={generatedSummary}
             setGeneratedSummary={setGeneratedSummary}
-            onProfileUpdate={(data) => {
+            onProfileUpdate={(data: Record<string, unknown> & { generatedSummary?: string }) => {
               const { generatedSummary: summary, ...profileInfo } = data;
               setProfileData(profileInfo);
               setGeneratedSummary(summary || '');

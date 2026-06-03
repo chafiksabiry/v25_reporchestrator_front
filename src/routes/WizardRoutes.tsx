@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ImportDialog from '../components/wizard/ImportDialog';
 import SummaryEditor from '../components/wizard/SummaryEditor';
@@ -7,15 +7,17 @@ import RepsProfile from '../components/wizard/REPSProfile';
 import api from '../lib/api/client';
 import Cookies from 'js-cookie';
 
+const emptyProfileData = {
+  personalInfo: { name: '', location: '', languages: [] as string[], email: '', phone: '', linkedin: '', website: '' },
+  professionalSummary: { yearsOfExperience: '', currentRole: '', industries: [] as string[], keyExpertise: [] as string[], notableCompanies: [] as string[] },
+  skills: { technical: [] as string[], professional: [] as string[], soft: [] as string[] },
+  experience: [] as unknown[],
+  achievements: [] as unknown[],
+};
+
 function WizardHomePage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    personalInfo: { name: '', location: '', languages: [], email: '', phone: '', linkedin: '', website: '' },
-    professionalSummary: { yearsOfExperience: '', currentRole: '', industries: [], keyExpertise: [], notableCompanies: [] },
-    skills: { technical: [], professional: [], soft: [] },
-    experience: [],
-    achievements: [],
-  });
+  const [profileData, setProfileData] = useState(emptyProfileData);
   const [generatedSummary, setGeneratedSummary] = useState('');
 
   useEffect(() => {
@@ -37,9 +39,9 @@ function WizardHomePage() {
     initializeToken();
   }, []);
 
-  const handleProfileData = (data) => {
+  const handleProfileData = (data: Record<string, unknown> & { generatedSummary?: string }) => {
     const { generatedSummary: summary, ...profileInfo } = data;
-    setProfileData(profileInfo);
+    setProfileData({ ...emptyProfileData, ...profileInfo } as typeof emptyProfileData);
     setGeneratedSummary(summary || '');
   };
 
