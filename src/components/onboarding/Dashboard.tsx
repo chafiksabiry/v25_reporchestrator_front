@@ -630,12 +630,12 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // Phase 2 (Profile Creation): go to the profile editor (photo upload + video records)
+      // Phase 2 (Profile Creation): show the profile page (keeps sidebar + header)
       if (phase.id === 2) {
         if (phase.status === 'pending') {
           await progressService.updatePhaseStatus(phase.id, 'in-progress');
         }
-        navigate('/profile?edit=true');
+        navigate('/profile');
         return;
       }
 
