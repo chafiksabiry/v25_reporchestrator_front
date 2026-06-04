@@ -11,6 +11,8 @@ import 'react-image-crop/dist/ReactCrop.css';
 
 // Components
 import { ProfileNavbar } from './profile/ProfileNavbar';
+import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
+import { AssessmentProvider } from '../../contexts/AssessmentContext';
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -91,6 +93,7 @@ export const ProfileView: React.FC<{
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
+  const [inlineAssessment, setInlineAssessment] = useState<{ skillId: string; category: string; skillName: string } | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
@@ -429,9 +432,24 @@ export const ProfileView: React.FC<{
 
   const takeContactCenterSkillAssessment = (skillName: string, categoryName?: string) => {
     const formattedSkill = skillName.toLowerCase().replace(/\s+/g, '-');
-    let url = `/assessment/contact-center/${formattedSkill}`;
-    if (categoryName) url += `?cat=${encodeURIComponent(categoryName)}`;
-    navigate(url);
+    setInlineAssessment({
+      skillId: formattedSkill,
+      category: categoryName || 'Unknown',
+      skillName,
+    });
+  };
+
+  const closeInlineAssessment = () => setInlineAssessment(null);
+
+  const handleInlineAssessmentComplete = async () => {
+    try {
+      const updated = await fetchProfileFromAPI();
+      if (onProfileUpdate && updated) onProfileUpdate(updated);
+    } catch (e) {
+      console.error('Error refreshing profile after assessment:', e);
+    } finally {
+      setInlineAssessment(null);
+    }
   };
 
   const handlePublish = async () => {
@@ -842,6 +860,42 @@ export const ProfileView: React.FC<{
     )
     .sort((a, b) => String(a.countryName || '').localeCompare(String(b.countryName || '')))
     .slice(0, 120);
+
+  if (inlineAssessment) {
+    return (
+      <div className="min-h-full bg-[#f8fafc]">
+        <div className="max-w-5xl mx-auto px-6 py-4 lg:px-10 lg:py-6 space-y-6">
+          <button
+            type="button"
+            onClick={closeInlineAssessment}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
+          >
+            <ArrowRight size={16} className="rotate-180" />
+            Back to Profile
+          </button>
+          <div className="glass-card rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div className="bg-gradient-harx px-10 py-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+              <h1 className="text-2xl lg:text-3xl font-black text-white tracking-widest uppercase relative z-10">
+                {inlineAssessment.category}: {inlineAssessment.skillName} Assessment
+              </h1>
+            </div>
+            <div className="p-6">
+              <AssessmentProvider>
+                <ContactCenterAssessment
+                  skillId={inlineAssessment.skillId}
+                  category={inlineAssessment.category}
+                  skillName={inlineAssessment.skillName}
+                  onComplete={handleInlineAssessmentComplete}
+                  onExit={closeInlineAssessment}
+                />
+              </AssessmentProvider>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
