@@ -984,15 +984,6 @@ export const ProfileView: React.FC<{
                         {isPublishing ? 'Publishing...' : 'Publish'}
                       </button>
                     )}
-                    {profile.onboardingProgress?.phases?.phase2?.status === 'completed' && (
-                      <button
-                        onClick={() => navigate('/')}
-                        className="px-6 py-2.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                      >
-                        Continue Onboarding
-                        <ArrowRight size={16} />
-                      </button>
-                    )}
                   </div>
                 </div>
 
