@@ -303,6 +303,9 @@ export function Profile() {
 
     try {
       await updateSkills(profile._id, payload);
+      // Refresh with populated data so the new skill resolves its name immediately
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
     } catch (error) {
       console.error('Error adding skill:', error);
       // Rollback if API fails
