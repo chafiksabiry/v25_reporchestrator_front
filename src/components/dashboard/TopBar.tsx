@@ -1,9 +1,42 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar } from 'lucide-react';
+import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
+
+const PHASE_NAMES: Record<number, string> = {
+  1: 'Sign Up & Verification',
+  2: 'Profile Creation',
+  3: 'Skills Assessment',
+  4: 'Subscription Plan',
+};
+
+interface NextPhaseInfo {
+  number: number;
+  name: string;
+}
+
+/** Read onboarding progress from cache and return the first incomplete phase. */
+const computeNextPhase = (): NextPhaseInfo | null => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (!raw) return null;
+    const profile = JSON.parse(raw);
+    const phases = profile?.onboardingProgress?.phases;
+    if (!phases) return null;
+
+    for (let i = 1; i <= 4; i++) {
+      const phase = phases[`phase${i}`];
+      if (!phase || phase.status !== 'completed') {
+        return { number: i, name: PHASE_NAMES[i] || `Phase ${i}` };
+      }
+    }
+    return null; // all phases completed
+  } catch {
+    return null;
+  }
+};
 
 interface TopBarProps {
   isSidebarOpen: boolean;
@@ -41,6 +74,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     const saved = localStorage.getItem('rep_available_balance');
     return saved ? parseFloat(saved) : 0.00;
   });
+  const [nextPhase, setNextPhase] = useState<NextPhaseInfo | null>(() => computeNextPhase());
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -98,6 +132,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     const handleProfileUpdate = () => {
       console.log('🔄 TopBar: Detected profile update, refreshing data');
       loadProfileData();
+      setNextPhase(computeNextPhase());
     };
 
     window.addEventListener(PROFILE_UPDATE_EVENT, handleProfileUpdate);
@@ -180,8 +215,25 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
       </div>
 
-      {/* ── Col 3: Right — Language + Avatar ── */}
+      {/* ── Col 3: Right — Continue Onboarding + Language + Avatar ── */}
       <div className="flex items-center justify-end gap-4">
+        {nextPhase && (
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2.5 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
+            title={`Continue onboarding: ${nextPhase.name}`}
+          >
+            <div className="text-left leading-none">
+              <span className="text-[9px] text-emerald-100 font-black uppercase tracking-wider block">
+                Continue Onboarding
+              </span>
+              <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
+                Phase {nextPhase.number} · {nextPhase.name}
+              </span>
+            </div>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
         <LanguageSwitcher />
         <div className="relative" ref={dropdownRef}>
           <div
