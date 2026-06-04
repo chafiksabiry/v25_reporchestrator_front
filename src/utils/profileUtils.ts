@@ -302,10 +302,7 @@ export const updateProfilePlan = async (profileId: string, planId: string) => {
 
 /** Registration auth API base (must end with `/api`, e.g. …/api). */
 const getAuthApiBaseUrl = (): string => {
-  const raw =
-    import.meta.env.VITE_AUTH_API_URL ||
-    import.meta.env.VITE_API_URL ||
-    '';
+  const raw = import.meta.env.VITE_AUTH_API_URL || '';
   return raw.replace(/\/+$/, '');
 };
 
@@ -320,7 +317,7 @@ export const fetchUserIpHistory = async (userId: string): Promise<IpHistoryRespo
     const baseUrl = getAuthApiBaseUrl();
     if (!baseUrl) {
       throw new Error(
-        'Auth API URL is not configured (set VITE_AUTH_API_URL or VITE_API_URL)'
+        'Auth API URL is not configured (set VITE_AUTH_API_URL)'
       );
     }
 
