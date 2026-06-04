@@ -659,13 +659,8 @@ function Dashboard() {
         await progressService.updatePhaseStatus(phase.id, 'in-progress');
       }
 
-      // Navigate to the phase page
-      if (phase.id === 4) {
-        // For subscription phase, use React Router navigation
-        navigate('/subscription');
-      } else {
-        navigate(phase.path);
-      }
+      // Navigate to the phase page (internal route, keeps sidebar + header)
+      navigate(phase.path);
     } catch (err) {
       console.error(`Error handling phase action for phase ${phase.id}:`, err);
       setError('Failed to update phase status. Please try again later.');
