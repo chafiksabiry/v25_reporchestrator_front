@@ -28,9 +28,10 @@ const ProtectedRoute = ({ children, fallback }) => {
   useEffect(() => {
     // Nettoyer l'historique du navigateur pour les pages protégées
     if (isAuthenticated) {
-      // Construire l'URL complète avec le basename pour préserver le contexte React Router
+      // Construire l'URL complète avec le basename pour préserver le contexte React Router.
+      // Unified app: assessment lives under /reporchestrator (Qiankun mount prefix).
       const isStandalone = import.meta.env.VITE_RUN_MODE === 'standalone';
-      const basename = isStandalone ? '' : '/repassessments';
+      const basename = isStandalone ? '' : '/reporchestrator';
       const fullPath = basename + location.pathname + location.search;
       
       // Remplacer l'entrée actuelle de l'historique pour empêcher le retour
