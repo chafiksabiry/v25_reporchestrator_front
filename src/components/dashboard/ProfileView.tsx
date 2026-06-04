@@ -92,7 +92,18 @@ export const ProfileView: React.FC<{
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const getInitialTab = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      const allowed = ['profile', 'experience', 'languages', 'skills', 'specialization', 'availability', 'onboarding'];
+      if (tab && allowed.includes(tab)) return tab;
+    } catch {
+      // ignore
+    }
+    return 'profile';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [inlineAssessment, setInlineAssessment] = useState<{ skillId: string; category: string; skillName: string } | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);

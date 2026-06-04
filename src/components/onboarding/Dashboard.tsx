@@ -639,13 +639,12 @@ function Dashboard() {
         return;
       }
 
-      // Phase 3: stay inside the unified app (convert the configured URL to an internal route)
-      if (phase.id === 3 && repDashboardUrl) {
-        const internalPath =
-          repDashboardUrl
-            .replace(/^https?:\/\/[^/]+/, '')
-            .replace(/^\/reporchestrator/, '') || '/';
-        navigate(internalPath);
+      // Phase 3 (Skills Assessment): open the profile on the Skills tab
+      if (phase.id === 3) {
+        if (phase.status === 'pending') {
+          await progressService.updatePhaseStatus(phase.id, 'in-progress');
+        }
+        navigate('/profile?tab=skills');
         return;
       }
 
@@ -861,8 +860,8 @@ function Dashboard() {
             const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' ||
               (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
 
-            // Phase 3 still opens an external page; phase 2 navigates internally
-            const isExternalLink = phase.id === 3 && repDashboardUrl;
+            // All phases now navigate internally
+            const isExternalLink = false;
 
             return (
               <div key={phase.id} className="relative group/phase">
