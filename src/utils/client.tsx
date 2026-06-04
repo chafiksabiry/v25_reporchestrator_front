@@ -7,11 +7,10 @@ import axios from 'axios';
 // NOT end with `/api` (otherwise requests become `/api/api/...`). Strip a
 // trailing `/api` (and slash) defensively so it works regardless of how the
 // env var is configured.
-const stripApiSuffix = (url?: string) =>
-  (url || '').replace(/\/+$/, '').replace(/\/api$/, '');
+import { stripApiSuffix, getRepApiHost } from './repApiUrl';
 
 const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
-const REP_API_URL = stripApiSuffix(import.meta.env.VITE_REP_API_URL);
+const REP_API_URL = getRepApiHost();
 const CALLS_API_URL = stripApiSuffix(
   import.meta.env.VITE_CALLS_API_URL || import.meta.env.VITE_API_URL_CALL
 );

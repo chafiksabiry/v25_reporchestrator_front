@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
+import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
@@ -549,9 +550,7 @@ export function GigsMarketplace() {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/favorites`,
-        {
+      const response = await fetch(repApiUrl(`/profiles/${agentId}/favorites`), {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -591,12 +590,10 @@ export function GigsMarketplace() {
 
     console.log('🔄 Adding to favorites:', gigId);
     console.log('📋 Current favoriteGigs:', favoriteGigs);
-    console.log('🔗 API URL:', `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/favorites/${gigId}`);
+    console.log('🔗 API URL:', repApiUrl(`/profiles/${agentId}/favorites/${gigId}`));
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/favorites/${gigId}`,
-        {
+      const response = await fetch(repApiUrl(`/profiles/${agentId}/favorites/${gigId}`), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -632,12 +629,10 @@ export function GigsMarketplace() {
 
     console.log('🗑️ Removing from favorites:', gigId);
     console.log('📋 Current favoriteGigs:', favoriteGigs);
-    console.log('🔗 API URL:', `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/favorites/${gigId}`);
+    console.log('🔗 API URL:', repApiUrl(`/profiles/${agentId}/favorites/${gigId}`));
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/favorites/${gigId}`,
-        {
+      const response = await fetch(repApiUrl(`/profiles/${agentId}/favorites/${gigId}`), {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,

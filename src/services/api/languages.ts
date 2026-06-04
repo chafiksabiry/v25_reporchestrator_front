@@ -1,3 +1,5 @@
+import { repApiUrl } from '../../utils/repApiUrl';
+
 // API service for language-related operations
 
 interface Language {
@@ -19,7 +21,7 @@ interface LanguagesResponse {
 
 export const fetchAllLanguages = async (): Promise<Language[]> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/languages`);
+    const response = await fetch(repApiUrl('/languages'));
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

@@ -5,6 +5,7 @@ import {
   X, Save, RefreshCw, Trash2, ChevronLeft
 } from 'lucide-react';
 import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch } from '../../utils/profileUtils';
+import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, SkillsByCategory, Skill } from '../../services/api/skills';
 import { fetchAllLanguages, Language } from '../../services/api/languages';
@@ -136,7 +137,7 @@ const uploadPhoto = async (agentId: string, photoFile: Blob): Promise<PhotoUploa
   formData.append('photo', photoFile);
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/photo`, {
+    const response = await fetch(repApiUrl(`/profiles/${agentId}/photo`), {
       method: 'PUT',
       body: formData,
       headers: {
@@ -223,7 +224,7 @@ const uploadPresentationVideo = async (
       reject(new Error('Network error occurred'));
     });
 
-    xhr.open('PUT', `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}/video`);
+    xhr.open('PUT', repApiUrl(`/profiles/${agentId}/video`));
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.send(formData);
   });
@@ -536,7 +537,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
       try {
         setLoadingIndustries(true);
         console.log('🏭 Loading industries...');
-        const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/industries`);
+        const response = await fetch(repApiUrl('/industries'));
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -564,7 +565,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
       try {
         setLoadingActivities(true);
         console.log('🎯 Loading activities...');
-        const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/activities`);
+        const response = await fetch(repApiUrl('/activities'));
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -805,7 +806,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${profile._id}`, {
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -850,7 +851,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
         }
 
         console.log('🔗 Deleting photo for profile:', profile._id);
-        const deleteResponse = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${profile._id}/photo`, {
+        const deleteResponse = await fetch(repApiUrl(`/profiles/${profile._id}/photo`), {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1649,7 +1650,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${profile._id}/video`, {
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}/video`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
