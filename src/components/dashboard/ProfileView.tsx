@@ -12,7 +12,50 @@ import 'react-image-crop/dist/ReactCrop.css';
 // Components
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
-import { AssessmentProvider } from '../../contexts/AssessmentContext';
+import LanguageAssessment from '../assessments/LanguageAssessment';
+import { AssessmentProvider, useAssessment } from '../../contexts/AssessmentContext';
+import { getLanguageIsoCode } from '../../utils/assessmentAuthUtils';
+
+const mapScoreToCEFR = (score: number): string => {
+  if (score >= 95) return 'C2';
+  if (score >= 80) return 'C1';
+  if (score >= 65) return 'B2';
+  if (score >= 50) return 'B1';
+  if (score >= 35) return 'A2';
+  return 'A1';
+};
+
+// Wraps LanguageAssessment so it can persist results via the assessment context
+// (mirrors LanguageAssessmentPage.handleComplete) when rendered inline.
+const InlineLanguageAssessment: React.FC<{
+  language: string;
+  code: string;
+  onDone: () => void;
+  onExit: () => void;
+}> = ({ language, code, onDone, onExit }) => {
+  const { saveLanguageAssessment } = useAssessment() as any;
+
+  const handleComplete = async (results: any) => {
+    try {
+      const isoCode = code || getLanguageIsoCode(language) || results?.language_code;
+      const proficiency = mapScoreToCEFR(results?.overall?.score ?? 0);
+      await saveLanguageAssessment(language, proficiency, results, isoCode);
+    } catch (e) {
+      console.error('Error saving language assessment:', e);
+    } finally {
+      onDone();
+    }
+  };
+
+  return (
+    <LanguageAssessment
+      language={language}
+      displayName={language}
+      onComplete={handleComplete}
+      onExit={onExit}
+    />
+  );
+};
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -104,7 +147,11 @@ export const ProfileView: React.FC<{
     return 'profile';
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [inlineAssessment, setInlineAssessment] = useState<{ skillId: string; category: string; skillName: string } | null>(null);
+  const [inlineAssessment, setInlineAssessment] = useState<
+    | { type: 'contact-center'; skillId: string; category: string; skillName: string }
+    | { type: 'language'; language: string; code: string }
+    | null
+  >(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
@@ -437,13 +484,17 @@ export const ProfileView: React.FC<{
   }, [profile?.skills, skillNameById]);
 
   const takeLanguageAssessment = (language: string, iso639_1Code?: string) => {
-    // Stay inside the unified app: navigate to the internal assessment route.
-    navigate(`/assessment/language?lang=${encodeURIComponent(language)}&code=${encodeURIComponent(iso639_1Code || '')}`);
+    setInlineAssessment({
+      type: 'language',
+      language,
+      code: iso639_1Code || '',
+    });
   };
 
   const takeContactCenterSkillAssessment = (skillName: string, categoryName?: string) => {
     const formattedSkill = skillName.toLowerCase().replace(/\s+/g, '-');
     setInlineAssessment({
+      type: 'contact-center',
       skillId: formattedSkill,
       category: categoryName || 'Unknown',
       skillName,
@@ -888,18 +939,29 @@ export const ProfileView: React.FC<{
             <div className="bg-gradient-harx px-10 py-8 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
               <h1 className="text-2xl lg:text-3xl font-black text-white tracking-widest uppercase relative z-10">
-                {inlineAssessment.category}: {inlineAssessment.skillName} Assessment
+                {inlineAssessment.type === 'language'
+                  ? `${inlineAssessment.language} Assessment`
+                  : `${inlineAssessment.category}: ${inlineAssessment.skillName} Assessment`}
               </h1>
             </div>
             <div className="p-6">
               <AssessmentProvider>
-                <ContactCenterAssessment
-                  skillId={inlineAssessment.skillId}
-                  category={inlineAssessment.category}
-                  skillName={inlineAssessment.skillName}
-                  onComplete={handleInlineAssessmentComplete}
-                  onExit={closeInlineAssessment}
-                />
+                {inlineAssessment.type === 'language' ? (
+                  <InlineLanguageAssessment
+                    language={inlineAssessment.language}
+                    code={inlineAssessment.code}
+                    onDone={handleInlineAssessmentComplete}
+                    onExit={closeInlineAssessment}
+                  />
+                ) : (
+                  <ContactCenterAssessment
+                    skillId={inlineAssessment.skillId}
+                    category={inlineAssessment.category}
+                    skillName={inlineAssessment.skillName}
+                    onComplete={handleInlineAssessmentComplete}
+                    onExit={closeInlineAssessment}
+                  />
+                )}
               </AssessmentProvider>
             </div>
           </div>
