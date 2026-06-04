@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
@@ -88,6 +89,7 @@ export const ProfileView: React.FC<{
   onProfileUpdate?: (updatedProfile: any) => void
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
@@ -421,18 +423,15 @@ export const ProfileView: React.FC<{
   }, [profile?.skills, skillNameById]);
 
   const takeLanguageAssessment = (language: string, iso639_1Code?: string) => {
-    const isStandalone = import.meta.env.VITE_RUN_MODE === 'standalone';
-    const baseUrl = isStandalone ? import.meta.env.VITE_ASSESSMENT_APP_STANDALONE : import.meta.env.VITE_ASSESSMENT_APP;
-    window.location.href = `${baseUrl}/language?lang=${language}&code=${iso639_1Code}`;
+    // Stay inside the unified app: navigate to the internal assessment route.
+    navigate(`/assessment/language?lang=${encodeURIComponent(language)}&code=${encodeURIComponent(iso639_1Code || '')}`);
   };
 
   const takeContactCenterSkillAssessment = (skillName: string, categoryName?: string) => {
     const formattedSkill = skillName.toLowerCase().replace(/\s+/g, '-');
-    const isStandalone = import.meta.env.VITE_RUN_MODE === 'standalone';
-    const baseUrl = isStandalone ? import.meta.env.VITE_ASSESSMENT_APP_STANDALONE : import.meta.env.VITE_ASSESSMENT_APP;
-    let url = `${baseUrl}/contact-center/${formattedSkill}`;
+    let url = `/assessment/contact-center/${formattedSkill}`;
     if (categoryName) url += `?cat=${encodeURIComponent(categoryName)}`;
-    window.location.href = url;
+    navigate(url);
   };
 
   const handlePublish = async () => {
