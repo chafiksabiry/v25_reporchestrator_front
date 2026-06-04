@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getUserInfo } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
@@ -69,7 +69,13 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuth();
+
+  const isOnOnboardingPage =
+    location.pathname === '/' ||
+    location.pathname === '' ||
+    location.pathname.startsWith('/onboarding');
   const [balance, setBalance] = useState(() => {
     const saved = localStorage.getItem('rep_available_balance');
     return saved ? parseFloat(saved) : 0.00;
@@ -217,7 +223,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
       {/* ── Col 3: Right — Continue Onboarding + Language + Avatar ── */}
       <div className="flex items-center justify-end gap-4">
-        {nextPhase && (
+        {nextPhase && !isOnOnboardingPage && (
           <button
             onClick={() => navigate('/')}
             className="flex items-center gap-2.5 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
