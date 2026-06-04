@@ -196,14 +196,18 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
                 <button
                   key={skill._id}
                   type="button"
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    // Fire before the input's onBlur closes the dropdown, and
+                    // keep focus so the whole row is reliably clickable.
+                    e.preventDefault();
                     onAddSkill(type, skill._id);
+                    setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
                     setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
                   }}
-                  className="w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors"
+                  className="block w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors cursor-pointer"
                 >
-                  <div className="text-sm font-bold text-harx-900">{skill.name}</div>
-                  <div className="text-xs text-slate-500 truncate">{skill.description}</div>
+                  <div className="text-sm font-bold text-harx-900 pointer-events-none">{skill.name}</div>
+                  <div className="text-xs text-slate-500 truncate pointer-events-none">{skill.description}</div>
                 </button>
               ))
             ) : (
