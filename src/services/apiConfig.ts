@@ -4,8 +4,12 @@
  */
 import config from '../config';
 
-// Base API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+// Rep profiles/onboarding live on the reps wizard backend (not registration).
+const stripApiSuffix = (url?: string) =>
+  (url || '').replace(/\/+$/, '').replace(/\/api$/, '');
+
+const REP_API_BASE = stripApiSuffix(import.meta.env.VITE_REP_API_URL);
+const API_BASE_URL = REP_API_BASE ? `${REP_API_BASE}/api` : '';
 
 // Token storage key
 const TOKEN_KEY = 'token';
