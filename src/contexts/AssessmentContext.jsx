@@ -1,6 +1,32 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { getAgentId, initializeAuth, returnToParentApp } from '../utils/assessmentAuthUtils';
+import { repApiUrl } from '../utils/repApiUrl';
+
+const resolveAgentProfileId = () => {
+  const fromStorage = getAgentId();
+  if (fromStorage) return fromStorage;
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?._id || null;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+};
+
+const postToRepProfilesApi = async (path, body) => {
+  const token = localStorage.getItem('token');
+  return axios.post(repApiUrl(path), body, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+};
 
 const AssessmentContext = createContext();
 
@@ -87,8 +113,7 @@ export const AssessmentProvider = ({ children }) => {
 
   // Save a language assessment result
   const saveLanguageAssessment = async (language, proficiency, results, iso639_1) => {
-    // Get the agent ID from localStorage/auth utils - this is critical for saving
-    const agentId = getAgentId();
+    const agentId = resolveAgentProfileId();
 
     if (!agentId) {
       console.error('Cannot save assessment: No agent ID provided');
@@ -111,8 +136,7 @@ export const AssessmentProvider = ({ children }) => {
         }
       }));
 
-      // Attempt to save to backend API if URL is configured
-      if (import.meta.env.VITE_API_URL) {
+      if (import.meta.env.VITE_REP_API_URL) {
         try {
           // Check if we're in demo/development mode
           const isDemoMode = import.meta.env.VITE_RUN_MODE === 'standalone' ||
@@ -132,45 +156,35 @@ export const AssessmentProvider = ({ children }) => {
 
             // Try the API call anyway, but don't fail if it's not available
             try {
-              // Use the correct endpoint: /:id/language-assessment
-              const response = await axios.post(`${import.meta.env.VITE_API_URL}/profiles/${agentId}/language-assessment`, {
-                languageCode: iso639_1,
-                proficiency,
-                results: resultsToSend
-              });
+              const response = await postToRepProfilesApi(
+                `/profiles/${agentId}/language-assessment`,
+                { languageCode: iso639_1, proficiency, results: resultsToSend }
+              );
               console.log('Assessment saved to backend:', response.data);
             } catch (apiError) {
               console.warn('API endpoint not available (expected in demo mode):', apiError.message);
-              // Continue execution - we've already updated local state
             }
           } else {
-            // In production mode, make the API call and handle errors normally
-            // Use the correct endpoint: /:id/language-assessment
-            const response = await axios.post(`${import.meta.env.VITE_API_URL}/profiles/${agentId}/language-assessment`, {
-              languageCode: iso639_1,
-              proficiency,
-              results: resultsToSend
-            });
+            const response = await postToRepProfilesApi(
+              `/profiles/${agentId}/language-assessment`,
+              { languageCode: iso639_1, proficiency, results: resultsToSend }
+            );
             console.log('Assessment saved to backend:', response.data);
           }
         } catch (apiError) {
           console.error('Error communicating with backend API:', apiError);
-          // Check if this is the specific error about language not found by ISO code
-          if (apiError.response && apiError.response.data &&
-            apiError.response.data.message &&
-            apiError.response.data.message.includes('not found in user\'s profile')) {
+          if (apiError.response?.data?.message?.includes('not found in user\'s profile')) {
             setError(`The language with code ${iso639_1} needs to be added to your profile first.`);
           } else {
-            // Generic error
-            setError('Warning: Results saved locally but could not be sent to server');
+            setError('Could not save assessment to server');
           }
+          return false;
         }
       } else {
-        console.warn('No API URL configured. Assessment results saved only locally.');
+        console.warn('No REP API URL configured. Assessment results saved only locally.');
       }
 
-      // Show success message or notification here if needed
-      return true; // Indicate success
+      return true;
     } catch (err) {
       console.error('Error saving language assessment:', err);
       setError('Failed to save assessment results');
@@ -182,12 +196,17 @@ export const AssessmentProvider = ({ children }) => {
 
   // Save a contact center skill assessment result
   const saveContactCenterAssessment = async (skillId, category, assessmentData) => {
-    // Get the agent ID from localStorage/auth utils
-    const agentId = getAgentId();
+    const agentId = resolveAgentProfileId();
 
     if (!agentId) {
-      console.error('Cannot save assessment: No agent ID provided');
+      console.error('Cannot save assessment: No agent profile ID');
       setError('Missing agent ID - cannot save assessment');
+      return false;
+    }
+
+    if (!import.meta.env.VITE_REP_API_URL) {
+      console.error('Cannot save assessment: VITE_REP_API_URL is not configured');
+      setError('Server URL not configured - cannot save assessment');
       return false;
     }
 
@@ -195,47 +214,27 @@ export const AssessmentProvider = ({ children }) => {
     setError(null);
 
     try {
-      // For local state, we'll check if this skill already exists
-      setAssessmentResults(prev => {
-        // Create a new copy of the contactCenter state
+      const response = await postToRepProfilesApi(
+        `/profiles/${agentId}/contact-center-assessment`,
+        { assessment: assessmentData }
+      );
+
+      console.log('Contact center assessment saved to backend:', response.data);
+
+      setAssessmentResults((prev) => {
         const newContactCenterState = { ...prev.contactCenter };
-
-        // Update or add the assessment for this skill
-        newContactCenterState[skillId] = {
-          category,
-          ...assessmentData
-        };
-
-        // Return the updated state
-        return {
-          ...prev,
-          contactCenter: newContactCenterState
-        };
+        newContactCenterState[skillId] = { category, ...assessmentData };
+        return { ...prev, contactCenter: newContactCenterState };
       });
 
-      // Call API to save results to backend using the new format
-      if (import.meta.env.VITE_API_URL) {
-        try {
-          // Use the profiles endpoint with the format expected by the backend
-          const response = await axios.post(`${import.meta.env.VITE_API_URL}/profiles/${agentId}/contact-center-assessment`, {
-            assessment: assessmentData
-          });
-
-          console.log('Contact center assessment saved to backend:', response.data);
-          return true;
-        } catch (apiError) {
-          console.error('Error communicating with backend API:', apiError);
-          setError('Warning: Results saved locally but could not be sent to server');
-          // Continue since we've already updated local state
-          return true;
-        }
-      } else {
-        console.warn('No API URL configured. Assessment results saved only locally.');
-        return true;
-      }
-    } catch (err) {
-      console.error('Error saving contact center assessment:', err);
-      setError('Failed to save assessment results');
+      return true;
+    } catch (apiError) {
+      console.error('Error saving contact center assessment:', apiError);
+      const serverMsg =
+        apiError.response?.data?.message ||
+        apiError.response?.data?.error ||
+        apiError.message;
+      setError(`Failed to save assessment: ${serverMsg}`);
       return false;
     } finally {
       setLoading(false);
