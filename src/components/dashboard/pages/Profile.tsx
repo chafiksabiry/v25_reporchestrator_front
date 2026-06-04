@@ -302,12 +302,18 @@ export function Profile() {
     });
 
     try {
+      console.log(`[handleAddSkill] type=${type} skillId=${skillId} payload=`, payload);
       await updateSkills(profile._id, payload);
       // Refresh with populated data so the new skill resolves its name immediately
       const refreshed = await getProfileData();
       updateProfileStateAndStorage(refreshed);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding skill:', error);
+      const serverMessage =
+        error?.message ||
+        error?.error ||
+        (typeof error === 'string' ? error : JSON.stringify(error));
+      alert(`Could not add ${type} skill: ${serverMessage}`);
       // Rollback if API fails
       try {
         const refreshed = await getProfileData();
