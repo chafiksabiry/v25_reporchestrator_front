@@ -13,6 +13,7 @@ import CopilotApp from '../../../copilot/App';
 import { AgentProvider, useAgent } from '../../../copilot/contexts/AgentContext';
 import { IframeWorkspace } from '../../../copilot/components/Dashboard/IframeWorkspace';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
+import { repApiUrl } from '../../../utils/repApiUrl';
 import { slotApi } from '../../../services/api/slotApi';
 
 interface Lead {
@@ -374,7 +375,7 @@ export function WorkspaceContent() {
     if (!agentId || !token) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}`, {
+      const response = await fetch(repApiUrl(`/profiles/${agentId}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {

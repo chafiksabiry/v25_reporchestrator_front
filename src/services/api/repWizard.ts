@@ -1,5 +1,6 @@
+import { repApiUrl } from '../../utils/repApiUrl';
+
 // REP Wizard API service
-const REP_WIZARD_API_BASE = import.meta.env.VITE_REP_API_URL;
 
 export interface Timezone {
   _id: string;
@@ -18,15 +19,9 @@ export interface TimezoneResponse {
 }
 
 class RepWizardApiService {
-  private baseURL: string;
-
-  constructor() {
-    this.baseURL = REP_WIZARD_API_BASE;
-  }
-
   private async apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
     try {
-      const url = `${this.baseURL}${endpoint}`;
+      const url = repApiUrl(endpoint);
 
       const response = await fetch(url, {
         headers: {
