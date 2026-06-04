@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+// Assessment endpoints (auth token, contact-center, vertex, speechToText,
+// language-assessment) all live on the reps wizard backend, so prefer
+// VITE_REP_API_URL. VITE_REP_API_URL already ends with /api.
+const API_URL =
+  import.meta.env.VITE_REP_API_URL ||
+  import.meta.env.VITE_API_URL ||
+  '/api';
 
 const api = axios.create({
   baseURL: API_URL,
