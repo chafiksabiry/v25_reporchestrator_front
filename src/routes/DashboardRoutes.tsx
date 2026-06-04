@@ -60,18 +60,11 @@ function DashboardAppContent() {
     initializeProfileData();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-premium-gradient flex justify-center items-center">
-        <div className="text-lg text-gray-600">Loading dashboard...</div>
-      </div>
-    );
-  }
-
   return (
     <RepTrainingNavProvider>
       <DashboardRoutingWrapper
         userProfile={userProfile}
+        loading={loading}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
@@ -79,7 +72,7 @@ function DashboardAppContent() {
   );
 }
 
-function DashboardRoutingWrapper({ userProfile, isSidebarOpen, setIsSidebarOpen }: any) {
+function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
 
@@ -102,6 +95,11 @@ function DashboardRoutingWrapper({ userProfile, isSidebarOpen, setIsSidebarOpen 
           />
         )}
         <main className={`flex-1 overflow-y-auto bg-white rounded-tl-[24px] ${location.pathname.includes('/profile') ? 'p-0' : 'px-4 py-3'}`}>
+          {loading ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
+            </div>
+          ) : (
           <Routes>
             <Route path="/" element={<Dashboard profile={userProfile} />} />
             <Route path="/dashboard" element={<Dashboard profile={userProfile} />} />
@@ -150,6 +148,7 @@ function DashboardRoutingWrapper({ userProfile, isSidebarOpen, setIsSidebarOpen 
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          )}
         </main>
       </div>
     </div>
