@@ -93,7 +93,7 @@ export const fetchPendingRequests = async (): Promise<string[]> => {
                        gigRequest.gigId?.$oid || 
                        gigRequest.gigId;
               })
-              .filter(id => id);
+              .filter((id: any) => id);
           } else if (Array.isArray(data)) {
             pendingGigIds = data
               .filter((request: any) => {
