@@ -509,18 +509,23 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   useEffect(() => {
     const initializeSummary = async () => {
+      if (!profileData) return;
+
       // If we have a generated summary from props but no profile description in the database
       if (generatedSummary && (!profileData?.professionalSummary?.profileDescription || profileData.professionalSummary.profileDescription === '')) {
         try {
           // Update local state
           setEditedSummary(generatedSummary);
-          setEditedProfile(prev => ({
-            ...prev,
-            professionalSummary: {
-              ...prev.professionalSummary,
-              profileDescription: generatedSummary
-            }
-          }));
+          setEditedProfile(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              professionalSummary: {
+                ...prev.professionalSummary,
+                profileDescription: generatedSummary
+              }
+            };
+          });
 
           // Save to database
           await updateProfileData(profileData._id, {
@@ -2255,6 +2260,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     console.log('🔍 Edit canceled, profile reset');
   };
+
+  if (!editedProfile?.personalInfo) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl shadow-xl border border-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-harx-500" />
+        <p className="mt-4 text-gray-600">Loading your profile...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
