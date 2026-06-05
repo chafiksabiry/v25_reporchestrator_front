@@ -5,6 +5,7 @@ import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
+import { HARX_NAVBAR_GRADIENT } from '../../utils/harxBrand';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -193,8 +194,8 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
   return (
     <header
-      style={{ backgroundImage: 'linear-gradient(160deg, #F7941E 0%, #ED1C24 52%, #D6219B 100%)' }}
-      className="h-20 grid grid-cols-3 items-center px-8 shrink-0 z-20"
+      style={{ backgroundImage: HARX_NAVBAR_GRADIENT }}
+      className="h-[72px] grid grid-cols-3 items-center px-8 shrink-0 z-20"
     >
 
       {/* ── Col 1: Left — hamburger (mobile) ── */}

@@ -44,7 +44,7 @@ function OnboardingShellContent() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-black overflow-hidden">
+    <div className="flex h-screen bg-[#4A0A32] overflow-hidden">
       <Sidebar
         phases={userProfile?.onboardingProgress?.phases}
         isSidebarOpen={isSidebarOpen}
@@ -52,7 +52,7 @@ function OnboardingShellContent() {
         isCollapsed={false}
         setIsCollapsed={() => {}}
       />
-      <div className="flex-1 flex flex-col overflow-hidden bg-black">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
         <main className="flex-1 overflow-y-auto bg-premium-gradient rounded-tl-[24px]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

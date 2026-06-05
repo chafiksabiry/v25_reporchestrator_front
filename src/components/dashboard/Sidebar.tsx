@@ -7,9 +7,7 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-pink.png';
 import mascotte from '../../assets/mascotte2.png';
-
-// HARX brand gradient (orange → red → magenta) shared by navbar & sidebar.
-const HARX_GRADIENT = 'linear-gradient(160deg, #F7941E 0%, #ED1C24 52%, #D6219B 100%)';
+import { HARX_SIDEBAR_BODY_GRADIENT } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -164,34 +162,33 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      style={{ backgroundImage: HARX_GRADIENT }}
       className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative shadow-2xl flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
-        } w-60`}
+        } w-52`}
     >
-
-      <div className={`h-[90px] flex items-center justify-between transition-all duration-300 shrink-0 px-6`}>
-        <div className="flex items-center space-x-3.5">
-          <div className="relative shrink-0 w-full flex justify-center">
-            <img
-              src={harxLogo}
-              alt="HARX Logo"
-              className="w-full h-auto object-contain relative z-10 scale-110"
-            />
-          </div>
-        </div>
-        {!isCollapsed && (
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="md:hidden p-2 hover:bg-white/10 rounded-xl transition-colors shrink-0"
-          >
-            <X className="h-5 w-5 text-gray-400" />
-          </button>
-        )}
+      {/* Logo strip — uses logo-pink.png as-is (already has brand gradient) */}
+      <div className="relative h-[72px] shrink-0 overflow-hidden">
+        <img
+          src={harxLogo}
+          alt="HARX"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+        <button
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden absolute top-2 right-2 p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+          aria-label="Close menu"
+        >
+          <X className="h-4 w-4 text-white" />
+        </button>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-5">
+      {/* Sidebar body — deep magenta below the logo */}
+      <div
+        style={{ backgroundImage: HARX_SIDEBAR_BODY_GRADIENT }}
+        className="relative flex flex-1 min-h-0 flex-col overflow-hidden"
+      >
+      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
         {/* ── Mascotte (shown on the CV import / editor pages) ── */}
         {isProfileCreationPage && !isCollapsed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
@@ -204,7 +201,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               />
             </div>
 
-            <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-gray-400">
+            <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-white/75">
               {t(
                 'cvGuide.mascotte',
                 "Salut ! Je suis votre assistant HARX. Importez votre CV et je crée un profil percutant en quelques secondes."
@@ -604,8 +601,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           </div>
         )}
       </nav>
-
-
+      </div>
 
       {/* Warning Modal */}
       {showWarningModal && createPortal(
