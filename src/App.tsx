@@ -51,14 +51,15 @@ function App() {
           <Route path="/onboarding/quality" element={<QualityControl />} />
           <Route path="/onboarding/career" element={<CareerTrack />} />
           <Route path="/onboarding/wallet" element={<WalletDashboard />} />
+
+          {/* Profile creation v2 — inside the shared shell so it keeps the
+              global Sidebar + TopBar. */}
+          <Route path="/profile-import" element={<ProfileRoutes />} />
+          <Route path="/profile-editor" element={<ProfileRoutes />} />
         </Route>
 
         {/* Assessments */}
         <Route path="/assessment/*" element={<AssessmentRoutes />} />
-
-        {/* Profile creation v2 */}
-        <Route path="/profile-import" element={<ProfileRoutes />} />
-        <Route path="/profile-editor" element={<ProfileRoutes />} />
 
         {/* Wizard v1 */}
         <Route path="/profile-wizard/*" element={<WizardRoutes />} />
