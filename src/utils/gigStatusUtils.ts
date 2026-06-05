@@ -1,4 +1,5 @@
 import { getAgentId, getAuthToken } from './authUtils';
+import { repApiUrl } from './repApiUrl';
 
 // Types pour les statuts de gigs
 export type GigStatus = 'enrolled' | 'invited' | 'pending' | 'none';
@@ -26,7 +27,7 @@ export const fetchPendingRequests = async (): Promise<string[]> => {
     try {
       console.log('🔄 Trying to fetch agent profile...');
       const profileResponse = await fetch(
-        `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}`,
+        repApiUrl(`/profiles/${agentId}`),
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -138,7 +139,7 @@ export const fetchEnrolledGigsFromProfile = async (): Promise<string[]> => {
     console.log('🔍 Fetching enrolled gigs from agent profile:', agentId);
     
     const profileResponse = await fetch(
-      `${import.meta.env.VITE_REP_API_URL}/api/profiles/${agentId}`,
+      repApiUrl(`/profiles/${agentId}`),
       {
         headers: {
           'Authorization': `Bearer ${token}`,
