@@ -110,14 +110,16 @@ export const fetchProfileFromAPI = async () => {
   try {
     const response = await profileApi.getById(userId);
 
-    // Handle different response structures
-    const profileData = response.data.data || response.data;
-
-    console.log('✅ [Profile API] Agent profile data (populated):', profileData);
+    // Handle different response structures. The backend returns
+    // `{ data: null }` (HTTP 200) when the rep hasn't created a profile yet.
+    const profileData = response?.data?.data ?? response?.data ?? null;
 
     if (!profileData) {
-      throw new Error('No profile data found in response');
+      console.info('ℹ️ [Profile API] No agent profile yet (it will be created during onboarding).');
+      return null;
     }
+
+    console.log('✅ [Profile API] Agent profile data (populated):', profileData);
 
     if (profileData._id) {
       localStorage.setItem('agentId', profileData._id);
