@@ -12,3 +12,9 @@ export const HARX_NAVBAR_GRADIENT = `linear-gradient(90deg, ${HARX_BRAND.orange}
 
 /** Vertical gradient — sidebar body below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.magenta} 0%, ${HARX_BRAND.magentaDark} 55%, ${HARX_BRAND.magentaDeeper} 100%)`;
+
+/** Soft drop shadow used under the navbar / logo strip for depth. */
+export const HARX_BAR_SHADOW = '0 8px 24px -8px rgba(74, 10, 50, 0.55)';
+
+/** Subtle text shadow to keep white labels crisp over the gradient. */
+export const HARX_TEXT_SHADOW = '0 1px 2px rgba(74, 10, 50, 0.45)';
