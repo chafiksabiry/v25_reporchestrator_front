@@ -128,7 +128,18 @@ export const fetchProfileFromAPI = async () => {
     localStorage.setItem('profileDataTimestamp', Date.now().toString());
 
     return profileData;
-  } catch (idError) {
+  } catch (idError: any) {
+    // A rep who hasn't created their profile yet will get a "Profile not found"
+    // (404, or 500 with that message). This is expected during onboarding —
+    // return null quietly instead of spamming the console with errors.
+    const status = idError?.response?.status;
+    const serverMsg = idError?.response?.data?.message || idError?.message || '';
+    const isNotFound = status === 404 || /not\s*found/i.test(serverMsg);
+    if (isNotFound) {
+      console.info('ℹ️ [Profile API] No agent profile yet (it will be created during onboarding).');
+      return null;
+    }
+
     console.error('❌ Error fetching by ID:', idError);
 
     try {
@@ -144,7 +155,13 @@ export const fetchProfileFromAPI = async () => {
       localStorage.setItem('profileDataTimestamp', Date.now().toString());
 
       return profileData;
-    } catch (fallbackError) {
+    } catch (fallbackError: any) {
+      const fbStatus = fallbackError?.response?.status;
+      const fbMsg = fallbackError?.response?.data?.message || fallbackError?.message || '';
+      if (fbStatus === 404 || /not\s*found/i.test(fbMsg)) {
+        console.info('ℹ️ [Profile API] No agent profile yet (fallback).');
+        return null;
+      }
       console.error('❌ Error fetching from fallback endpoint:', fallbackError);
       throw fallbackError;
     }

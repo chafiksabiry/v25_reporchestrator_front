@@ -1,6 +1,5 @@
 import './public-path'; // For proper Qiankun integration
-import React from 'react';
-import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
+import { renderWithQiankun, qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -25,17 +24,8 @@ function render(props: { container?: HTMLElement } = {}) {
   }
 }
 
-export async function bootstrap() {
-  return Promise.resolve();
-}
-
-export async function mount(props: any) {
-  render(props);
-  return Promise.resolve();
-}
-
-export async function unmount(props: any) {
-  const { container } = props || {};
+function destroy(props: { container?: HTMLElement } = {}) {
+  const { container } = props;
   const rootElement = container
     ? container.querySelector('#root')
     : document.getElementById('root');
@@ -46,13 +36,34 @@ export async function unmount(props: any) {
   } else {
     console.warn('[reporchestrator] Root element not found for unmounting!');
   }
-  return Promise.resolve();
 }
+
+// Register the lifecycles with qiankun via the plugin helper. This is what
+// actually exposes bootstrap/mount/unmount to qiankun's single-spa wrapper;
+// bare `export function bootstrap` are NOT picked up with the `es` build
+// format, which left the bootstrap promise unresolved forever (single-spa
+// "#31 bootstrap timeout" warnings looping in the host console).
+renderWithQiankun({
+  bootstrap() {
+    return Promise.resolve();
+  },
+  mount(props: any) {
+    render(props);
+    return Promise.resolve();
+  },
+  unmount(props: any) {
+    destroy(props || {});
+    return Promise.resolve();
+  },
+  update() {
+    return Promise.resolve();
+  },
+});
 
 // Render immediately in both standalone and qiankun modes. The host
 // (process_connections) loads this micro-app as a script and the immediate
-// render guarantees the UI shows; qiankun's deferred lifecycle is used only
-// as a loader, mirroring the working `company` micro-app.
+// render guarantees the UI shows; qiankun's lifecycles above resolve the
+// bootstrap/mount promises so single-spa stops warning.
 if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
   console.log('[reporchestrator] Running in standalone mode');
   if (document.readyState === 'loading') {
