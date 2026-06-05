@@ -6,6 +6,7 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
+import { HARX_NAVBAR_GRADIENT } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -160,17 +161,18 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-30 bg-[#C2186F] text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
+      style={{ backgroundImage: HARX_NAVBAR_GRADIENT }}
+      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
         } w-64`}
     >
       {/* Logo strip */}
-      <div className="relative h-16 shrink-0 flex items-center justify-center px-5 z-10">
+      <div className="relative shrink-0 flex items-center justify-center w-full overflow-hidden px-4 py-4 z-10">
         <img
           src={harxLogo}
           alt="HARX"
-          className="h-9 w-auto object-contain"
+          className="w-full scale-110 object-contain"
         />
         <button
           onClick={() => setIsSidebarOpen(false)}
