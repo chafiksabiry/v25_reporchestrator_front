@@ -5,6 +5,7 @@ import ImportDialogV2 from '../components/profile/ImportDialogV2.jsx';
 import SummaryEditorV2 from '../components/profile/SummaryEditorV2.jsx';
 import ProtectedRoute from '../components/profile/ProtectedRoute.jsx';
 import { fetchProfileFromAPI } from '../utils/profileUtils';
+import harxLogo from '../assets/logo_harx.png';
 
 type ProfileRecord = Record<string, unknown> & {
   _id?: string;
@@ -70,9 +71,28 @@ function ProfileImportPage({
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   return (
-    <div className="max-w-3xl mx-auto px-4">
-      <div className="flex flex-col items-center text-center py-4">
-        <span className="inline-flex items-center gap-2 mb-3 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
+    <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-harx-50/40 to-harx-alt-50/40 shadow-sm">
+      {/* ── HARX branded background ── */}
+      <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-harx-300/30 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-28 -left-24 w-96 h-96 rounded-full bg-harx-alt-300/25 blur-3xl pointer-events-none" />
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, #111 1px, transparent 0)',
+          backgroundSize: '26px 26px',
+        }}
+      />
+      <img
+        src={harxLogo}
+        alt=""
+        aria-hidden="true"
+        className="absolute -bottom-10 -right-6 w-72 opacity-[0.05] rotate-[-8deg] pointer-events-none select-none"
+      />
+
+      <div className="relative max-w-3xl mx-auto px-4">
+        <div className="flex flex-col items-center text-center py-10">
+          <span className="inline-flex items-center gap-2 mb-3 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
           <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
           Step 1 · Create your profile
         </span>
@@ -131,14 +151,15 @@ function ProfileImportPage({
               )}
             </div>
           ))}
+          </div>
         </div>
-      </div>
 
-      <ImportDialogV2
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImport={onImport}
-      />
+        <ImportDialogV2
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onImport={onImport}
+        />
+      </div>
     </div>
   );
 }
