@@ -190,7 +190,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-5">
         {/* ── Mascotte (shown on the CV import / editor pages) ── */}
         {isProfileCreationPage && !isCollapsed && (
-          <div className="relative flex min-h-full flex-col items-center justify-center py-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 m-auto h-28 w-28 rounded-full bg-harx-500/20 blur-2xl animate-pulse" />
               <img
