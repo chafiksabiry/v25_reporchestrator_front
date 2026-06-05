@@ -192,7 +192,10 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const initials = getInitials(userName);
 
   return (
-    <header className="h-20 bg-black grid grid-cols-3 items-center px-8 shrink-0 z-20">
+    <header
+      style={{ backgroundImage: 'linear-gradient(160deg, #F7941E 0%, #ED1C24 52%, #D6219B 100%)' }}
+      className="h-20 grid grid-cols-3 items-center px-8 shrink-0 z-20"
+    >
 
       {/* ── Col 1: Left — hamburger (mobile) ── */}
       <div className="flex items-center">
