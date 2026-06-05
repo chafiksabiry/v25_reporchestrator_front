@@ -70,84 +70,67 @@ function ProfileImportPage({
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-gray-100">
-        <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
-        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-harx-100/50 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-harx-alt-100/50 blur-3xl pointer-events-none" />
+    <div className="max-w-3xl mx-auto px-4">
+      <div className="flex flex-col items-center text-center pt-6 pb-12">
+        <span className="inline-flex items-center gap-2 mb-6 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
+          Step 1 · Create your profile
+        </span>
 
-        <div className="relative px-6 sm:px-12 py-12 text-center">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-harx-100 to-harx-alt-100 shadow-inner">
-            <svg className="h-10 w-10 text-harx-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-4 rounded-full bg-harx-50 text-harx-700 text-xs font-semibold tracking-wide uppercase">
-            <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
-            Step 1 · Create your profile
+        <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
+          Turn your CV into a{' '}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-harx-600 to-harx-alt-600">
+            standout profile
           </span>
+        </h2>
+        <p className="text-gray-500 text-lg max-w-lg mb-10">
+          Upload your CV and let our AI build your professional story, extract
+          your skills and languages — all in a few seconds.
+        </p>
 
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
-            Turn your CV into a{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-harx-600 to-harx-alt-600">
-              standout profile
-            </span>
-          </h2>
-          <p className="text-gray-500 max-w-md mx-auto mb-8">
-            Upload your CV and let our AI build your professional story, extract
-            your skills and languages — all in a few seconds.
-          </p>
+        <button
+          onClick={() => setIsImportOpen(true)}
+          className="group inline-flex items-center gap-2 px-9 py-4 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          Import my CV
+          <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
 
-          <button
-            onClick={() => setIsImportOpen(true)}
-            className="group inline-flex items-center gap-2 px-8 py-3.5 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Import my CV
-            <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </button>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-3 text-left">
-            {IMPORT_FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="flex items-start gap-3 p-4 rounded-2xl bg-gray-50/80 border border-gray-100 hover:border-harx-200 hover:bg-white hover:shadow-sm transition-all duration-200"
-              >
-                <span className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-gray-100 text-harx-600">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {f.icon}
-                  </svg>
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{f.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Feature highlights — borderless */}
+        <div className="mt-16 grid gap-x-10 gap-y-8 sm:grid-cols-3 w-full">
+          {IMPORT_FEATURES.map((f) => (
+            <div key={f.title} className="flex flex-col items-center text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-harx-50 text-harx-600 mb-3">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {f.icon}
+                </svg>
+              </span>
+              <p className="text-sm font-semibold text-gray-900">{f.title}</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-[14rem]">{f.desc}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="relative border-t border-gray-100 bg-gray-50/60 px-6 sm:px-12 py-5">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
-            {IMPORT_STEPS.map((s, i) => (
-              <div key={s.n} className="flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white border border-harx-200 text-harx-600 text-xs font-bold">
-                  {s.n}
-                </span>
-                <span className="text-sm text-gray-600">{s.label}</span>
-                {i < IMPORT_STEPS.length - 1 && (
-                  <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                )}
-              </div>
-            ))}
-          </div>
+        {/* Steps */}
+        <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-7">
+          {IMPORT_STEPS.map((s, i) => (
+            <div key={s.n} className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
+                {s.n}
+              </span>
+              <span className="text-sm font-medium text-gray-600">{s.label}</span>
+              {i < IMPORT_STEPS.length - 1 && (
+                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
