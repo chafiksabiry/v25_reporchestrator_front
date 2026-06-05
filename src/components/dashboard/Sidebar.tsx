@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock, FileText, Upload, Sparkles, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +63,31 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const isOnboardingComplete = (): boolean =>
     isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
   const onboardingComplete = isOnboardingComplete();
+
+  // On the CV import / editor pages we replace the generic onboarding guide
+  // with a step-by-step "import & analyze your CV" guide (and no "continue
+  // onboarding" button, since the user is already in that step).
+  const isProfileCreationPage =
+    location.pathname.includes('/profile-import') ||
+    location.pathname.includes('/profile-editor');
+
+  const cvGuideSteps = [
+    {
+      icon: Upload,
+      label: t('cvGuide.step1', 'Importez votre CV'),
+      tip: t('cvGuide.step1Tip', "Cliquez sur « Let's Get Started » puis téléchargez votre CV (PDF, DOCX) ou collez son contenu."),
+    },
+    {
+      icon: Sparkles,
+      label: t('cvGuide.step2', "Analysez-le avec l'IA"),
+      tip: t('cvGuide.step2Tip', "Notre IA extrait automatiquement vos infos, compétences et expériences depuis le CV."),
+    },
+    {
+      icon: CheckCircle,
+      label: t('cvGuide.step3', 'Vérifiez et enregistrez'),
+      tip: t('cvGuide.step3Tip', 'Relisez le résumé généré, ajustez si besoin, puis enregistrez pour créer votre profil.'),
+    },
+  ];
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
@@ -183,30 +208,66 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-5">
-        {/* ── Onboarding guide (shown until the agent profile is created) ── */}
+        {/* ── Guide (shown until the agent profile is created) ── */}
         {!onboardingComplete && !isCollapsed && (
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
-                <Lock className="h-4 w-4" />
+          isProfileCreationPage ? (
+            /* CV import / analyze step-by-step guide (with hover tooltips) */
+            <div className="rounded-2xl border border-harx-500/25 bg-harx-500/[0.06] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 bg-harx-500/15 text-harx-400 rounded-lg shrink-0">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <p className="text-[11px] font-black text-harx-200 uppercase tracking-wide leading-tight">
+                  {t('cvGuide.title', 'Créez votre profil')}
+                </p>
               </div>
-              <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
-                {t('onboardingGuide.title', 'Finalisez votre onboarding')}
-              </p>
+              <ol className="space-y-2.5">
+                {cvGuideSteps.map((step, i) => (
+                  <li key={i} className="group/step relative flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-harx-500/20 text-harx-300 text-[10px] font-black tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-300 leading-snug">
+                      <step.icon className="h-3.5 w-3.5 text-harx-400 shrink-0" />
+                      {step.label}
+                    </span>
+                    {/* Hover tooltip popup (below the step, within card bounds) */}
+                    <div className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-[11px] font-medium leading-relaxed text-gray-200 opacity-0 shadow-2xl transition-opacity duration-200 group-hover/step:opacity-100">
+                      {step.tip}
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
-              {t(
-                'onboardingGuide.description',
-                'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
-              )}
-            </p>
-            <button
-              onClick={() => navigate('/')}
-              className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
-            >
-              {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
-            </button>
-          </div>
+          ) : (
+            /* Generic onboarding guide with "continue onboarding" CTA */
+            <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
+                  {t('onboardingGuide.title', 'Finalisez votre onboarding')}
+                </p>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
+                {t(
+                  'onboardingGuide.description',
+                  'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
+                )}
+              </p>
+              <button
+                onClick={() => navigate('/')}
+                className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
+              >
+                {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
+              </button>
+              {/* Hover tooltip popup (below the card, within sidebar bounds) */}
+              <div className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-[11px] font-medium leading-relaxed text-gray-200 opacity-0 shadow-2xl transition-opacity duration-200 group-hover/guide:opacity-100">
+                {t('onboardingGuide.tooltip', 'Terminez les 4 phases (inscription, profil, évaluations, abonnement) pour débloquer toutes les fonctionnalités.')}
+              </div>
+            </div>
+          )
         )}
 
         {/* ── Group 1: Main ── */}
