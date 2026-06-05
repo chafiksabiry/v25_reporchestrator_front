@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoadingScreen = () => (
@@ -12,8 +11,7 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute = ({ children, fallback }) => {
-  const { isAuthenticated, isLoading, checkAuthStatus } = useAuth();
-  const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
   
   // Construire l'URL complète pour l'app principale
   const getMainAppUrl = () => {
@@ -22,24 +20,11 @@ const ProtectedRoute = ({ children, fallback }) => {
   };
 
   // Plus besoin de vérifier à chaque changement de route
-  // L'AuthContext gère déjà la vérification initiale
-
-  useEffect(() => {
-    // Nettoyer l'historique du navigateur pour les pages protégées
-    if (isAuthenticated) {
-      // Construire l'URL complète avec le basename pour préserver le contexte React Router
-      const isStandalone = import.meta.env.VITE_RUN_MODE === 'standalone';
-      const basename = isStandalone ? '' : '/repcreationprofile';
-      const fullPath = basename + location.pathname + location.search;
-      
-      // Remplacer l'entrée actuelle de l'historique pour empêcher le retour
-      window.history.replaceState(
-        { protected: true, timestamp: Date.now() },
-        '',
-        fullPath
-      );
-    }
-  }, [isAuthenticated, location.pathname, location.search]);
+  // L'AuthContext gère déjà la vérification initiale.
+  // NOTE: l'ancien micro-app réécrivait window.history avec le basename
+  // `/repcreationprofile`. Dans l'app unifiée, le basename `/reporchestrator`
+  // est déjà géré par <Router basename>, donc toute réécriture ici casse le
+  // routeur (page blanche). On s'appuie donc uniquement sur React Router.
 
   // Écouter les événements de navigation (bouton retour)
   useEffect(() => {

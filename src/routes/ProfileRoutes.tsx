@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ImportDialogV2 from '../components/profile/ImportDialogV2';
 import SummaryEditorV2 from '../components/profile/SummaryEditorV2';
 import TopBar from '../components/profile/TopBar';
@@ -8,9 +8,10 @@ import { AuthProvider } from '../contexts/AuthContext';
 
 function ProfileImportPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleProfileData = () => {
-    window.location.href = '/profile-editor';
+    navigate('/profile-editor');
   };
 
   return (
@@ -58,13 +59,18 @@ function ProfileEditorPage() {
 }
 
 export default function ProfileRoutes() {
+  // Mounted from App.tsx at both `/profile-import` and `/profile-editor`.
+  // We avoid a nested <Routes> here: the parent route has no trailing `*`, so a
+  // descendant <Routes> with absolute paths would never match (blank page).
+  // Instead we pick the page from the current pathname.
+  const location = useLocation();
+  const isEditor = location.pathname.includes('/profile-editor');
+
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/profile-import" element={<ProtectedRoute><ProfileImportPage /></ProtectedRoute>} />
-        <Route path="/profile-editor" element={<ProtectedRoute><ProfileEditorPage /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/profile-import" replace />} />
-      </Routes>
+      <ProtectedRoute>
+        {isEditor ? <ProfileEditorPage /> : <ProfileImportPage />}
+      </ProtectedRoute>
     </AuthProvider>
   );
 }
