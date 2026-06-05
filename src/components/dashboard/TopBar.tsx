@@ -5,6 +5,7 @@ import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
+import mascotte from '../../assets/mascotte2.png';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -204,8 +205,20 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
         </button>
       </div>
 
-      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ── */}
+      {/* ── Col 2: Center — Wallet + Planning (done) / HARX brand (onboarding) ── */}
       <div className="flex items-center justify-center gap-3">
+
+        {!onboardingComplete && (
+          <div className="hidden md:flex items-center gap-3 select-none px-5 py-2 rounded-2xl bg-gradient-to-r from-white/[0.04] to-transparent">
+            <img src={mascotte} alt="HARX" className="h-11 w-auto drop-shadow-lg" />
+            <div className="text-left leading-tight">
+              <p className="text-base font-black tracking-[0.25em] text-white">HARX</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] bg-clip-text text-transparent bg-gradient-to-r from-harx-400 to-harx-alt-400">
+                We inspire growth
+              </p>
+            </div>
+          </div>
+        )}
 
         {onboardingComplete && (
           <>
