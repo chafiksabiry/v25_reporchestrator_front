@@ -5,8 +5,11 @@ import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown
 import { useAuth } from '../../contexts/AuthContext';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
-import harxLogo from '../../assets/logo-black.png';
+import harxLogo from '../../assets/logo-pink.png';
 import mascotte from '../../assets/mascotte2.png';
+
+// HARX brand gradient (orange → red → magenta) shared by navbar & sidebar.
+const HARX_GRADIENT = 'linear-gradient(160deg, #F7941E 0%, #ED1C24 52%, #D6219B 100%)';
 
 // Declare qiankun global variables
 declare global {
@@ -161,13 +164,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-30 bg-black text-white transition-all duration-300 ease-in-out md:relative shadow-2xl flex flex-col overflow-hidden ${!isSidebarOpen
+      style={{ backgroundImage: HARX_GRADIENT }}
+      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative shadow-2xl flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
         } w-60`}
     >
 
-      <div className={`h-[90px] flex items-center justify-between bg-black transition-all duration-300 shrink-0 px-6`}>
+      <div className={`h-[90px] flex items-center justify-between transition-all duration-300 shrink-0 px-6`}>
         <div className="flex items-center space-x-3.5">
           <div className="relative shrink-0 w-full flex justify-center">
             <img
