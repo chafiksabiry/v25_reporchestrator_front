@@ -115,6 +115,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       // Extract and categorize skills
       const skills = await analyzeSkills(contentToProcess);
       console.log("languages extracted :", skills.languages);
+      console.log("🔍 analyzeSkills result:", skills);
+      console.log("🔍 analyzeExperience result:", experience);
       if (skills.languages.length === 0) {
         throw new Error('Languages section is required to generate your profile. Please ensure your CV includes the languages you speak.');
       }
@@ -173,6 +175,19 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         flexibility: []
       };
 
+      // Resolve a categorized skill list from whichever source/naming the AI
+      // returned. Prefer the dedicated skills analyzer over experience.
+      const pickSkillList = (key) => {
+        const candidates = [
+          skills?.[key],
+          skills?.[`${key}Skills`],
+          experience?.[`${key}Skills`],
+          experience?.[key],
+        ];
+        const found = candidates.find((c) => Array.isArray(c) && c.length > 0);
+        return found || [];
+      };
+
       // Combine all data with proper error handling and defaults
       const combinedData = {
         personalInfo: {
@@ -191,10 +206,13 @@ function ImportDialog({ isOpen, onClose, onImport }) {
           notableCompanies: experience.notableCompanies || defaultArrays.notableCompanies
         },
         availability: defaultAvailability,
+        // Categorized skills come from analyzeSkills (the dedicated skills
+        // analyzer); fall back to analyzeExperience for backwards-compat. Both
+        // naming conventions (`technical` / `technicalSkills`) are supported.
         skills: {
-          technical: experience.technicalSkills || defaultArrays.technicalSkills,
-          professional: experience.professionalSkills || defaultArrays.professionalSkills,
-          soft: experience.softSkills || defaultArrays.softSkills
+          technical: pickSkillList('technical'),
+          professional: pickSkillList('professional'),
+          soft: pickSkillList('soft')
         },
         experience: (experience.roles || defaultArrays.roles).map(role => {
           const startDate = new Date(role.startDate);
