@@ -2313,7 +2313,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
-      <div className="p-6 sm:p-8 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+      <div className="p-6 sm:p-8">
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
             <div>
