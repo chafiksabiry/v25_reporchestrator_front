@@ -167,8 +167,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           : 'translate-x-0'
         } w-64`}
     >
-      {/* Logo strip */}
-      <div className="relative shrink-0 flex items-center justify-center w-full overflow-hidden border-b border-white/10 px-4 py-4 z-10">
+      {/* Logo strip — same height as navbar (h-16) for a seamless top row */}
+      <div className="relative h-16 shrink-0 flex items-center justify-center w-full overflow-hidden px-4 z-10">
         <img
           src={harxLogo}
           alt="HARX"
