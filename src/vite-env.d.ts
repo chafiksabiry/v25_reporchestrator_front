@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+declare module '*.jsx' {
+  import type { ComponentType } from 'react';
+  const component: ComponentType<Record<string, unknown>>;
+  export default component;
+}
+
 interface ImportMetaEnv {
   readonly VITE_RUN_MODE: string;
   readonly VITE_API_URL: string;
