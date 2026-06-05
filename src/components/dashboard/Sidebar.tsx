@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +57,13 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     return phases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
   };
 
+  // Onboarding is considered complete (agent profile created) only when the
+  // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
+  // Planning and Wallet and show an onboarding guide instead.
+  const isOnboardingComplete = (): boolean =>
+    isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
+  const onboardingComplete = isOnboardingComplete();
+
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
   const [showWarningModal, setShowWarningModal] = React.useState(false);
@@ -88,7 +95,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: LayoutDashboard,
       label: t('sidebar.dashboard'),
       path: '/',
-      isAccessible: () => true
+      isAccessible: () => onboardingComplete
     },
     {
       icon: Briefcase,
@@ -130,7 +137,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Calendar,
       label: t('sidebar.sessionPlanning'),
       path: '/session-planning',
-      isAccessible: () => true
+      isAccessible: () => onboardingComplete
     },
   ];
 
@@ -176,7 +183,34 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-5">
+        {/* ── Onboarding guide (shown until the agent profile is created) ── */}
+        {!onboardingComplete && !isCollapsed && (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
+                <Lock className="h-4 w-4" />
+              </div>
+              <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
+                {t('onboardingGuide.title', 'Finalisez votre onboarding')}
+              </p>
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
+              {t(
+                'onboardingGuide.description',
+                'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
+              )}
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
+            >
+              {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
+            </button>
+          </div>
+        )}
+
         {/* ── Group 1: Main ── */}
+        {group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
             <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-600 select-none">Main</p>
@@ -382,6 +416,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             </div>
           ))}
         </div>
+        )}
 
         {/* ── Divider ── */}
         {group2.length > 0 && (

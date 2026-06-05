@@ -38,6 +38,29 @@ const computeNextPhase = (): NextPhaseInfo | null => {
   }
 };
 
+/**
+ * Onboarding is complete (agent profile created) only when phases 1-4 are all
+ * completed. Returns false when there is no progress data yet, so Wallet and
+ * Planning stay hidden by default until we know the rep is onboarded.
+ */
+const computeOnboardingComplete = (): boolean => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (!raw) return false;
+    const profile = JSON.parse(raw);
+    const phases = profile?.onboardingProgress?.phases;
+    if (!phases) return false;
+
+    for (let i = 1; i <= 4; i++) {
+      const phase = phases[`phase${i}`];
+      if (!phase || phase.status !== 'completed') return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 interface TopBarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (isOpen: boolean) => void;
@@ -81,6 +104,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     return saved ? parseFloat(saved) : 0.00;
   });
   const [nextPhase, setNextPhase] = useState<NextPhaseInfo | null>(() => computeNextPhase());
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -139,6 +163,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       console.log('🔄 TopBar: Detected profile update, refreshing data');
       loadProfileData();
       setNextPhase(computeNextPhase());
+      setOnboardingComplete(computeOnboardingComplete());
     };
 
     window.addEventListener(PROFILE_UPDATE_EVENT, handleProfileUpdate);
@@ -181,43 +206,47 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
         </button>
       </div>
 
-      {/* ── Col 2: Center — Wallet + Planning ── */}
+      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ── */}
       <div className="flex items-center justify-center gap-3">
 
-        {/* Wallet */}
-        <button
-          onClick={() => navigate('/wallet')}
-          className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
-          title="Mon Portefeuille"
-        >
-          <div className="p-1.5 bg-blue-500/15 text-blue-400 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all duration-200">
-            <Wallet className="w-4 h-4" />
-          </div>
-          <div className="text-left leading-none">
-            <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Mon Portefeuille</span>
-            <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
-              {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
-            </span>
-          </div>
-        </button>
+        {onboardingComplete && (
+          <>
+            {/* Wallet */}
+            <button
+              onClick={() => navigate('/wallet')}
+              className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
+              title="Mon Portefeuille"
+            >
+              <div className="p-1.5 bg-blue-500/15 text-blue-400 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all duration-200">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <div className="text-left leading-none">
+                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Mon Portefeuille</span>
+                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
+                  {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                </span>
+              </div>
+            </button>
 
-        {/* Divider */}
-        <div className="w-px h-6 bg-white/10 shrink-0" />
+            {/* Divider */}
+            <div className="w-px h-6 bg-white/10 shrink-0" />
 
-        {/* Session Planning */}
-        <button
-          onClick={() => navigate('/session-planning')}
-          className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-violet-500/40 hover:bg-violet-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
-          title="Session Planning"
-        >
-          <div className="p-1.5 bg-violet-500/15 text-violet-400 rounded-xl group-hover:bg-violet-500 group-hover:text-white transition-all duration-200">
-            <Calendar className="w-4 h-4" />
-          </div>
-          <div className="text-left leading-none">
-            <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Planning</span>
-            <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
-          </div>
-        </button>
+            {/* Session Planning */}
+            <button
+              onClick={() => navigate('/session-planning')}
+              className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-violet-500/40 hover:bg-violet-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
+              title="Session Planning"
+            >
+              <div className="p-1.5 bg-violet-500/15 text-violet-400 rounded-xl group-hover:bg-violet-500 group-hover:text-white transition-all duration-200">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="text-left leading-none">
+                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Planning</span>
+                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
+              </div>
+            </button>
+          </>
+        )}
 
       </div>
 
