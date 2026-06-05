@@ -8,11 +8,10 @@ export const HARX_BRAND = {
 } as const;
 
 /**
- * Top→bottom vertical gradient used across navbar + sidebar so the whole
- * frame flows as one continuous brand gradient (orange at the top, magenta
- * at the bottom), matching the logo colors.
+ * Diagonal red→pink gradient matching the "Import my CV" CTA button.
+ * Used as one unified background across navbar + sidebar.
  */
-export const HARX_NAVBAR_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.orange} 0%, ${HARX_BRAND.red} 60%, ${HARX_BRAND.magenta} 100%)`;
+export const HARX_NAVBAR_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D 100%)';
 
 /** Sidebar body continues the same vertical flow below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.red} 0%, ${HARX_BRAND.magenta} 45%, ${HARX_BRAND.magentaDeep} 75%, ${HARX_BRAND.magentaDarker} 100%)`;
