@@ -421,14 +421,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   className={({ isActive }) =>
                     `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                     } ${isActive
-                      ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                      ? 'bg-white text-[#C2186F] shadow-xl shadow-black/20'
                       : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#C2186F]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                         <item.icon className="h-5 w-5" />
                       </div>
                       {!isCollapsed && (
@@ -543,14 +543,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     className={({ isActive }) =>
                       `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                       } ${isActive
-                        ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                        ? 'bg-white text-[#C2186F] shadow-xl shadow-black/20'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                        <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#C2186F]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                           <item.icon className="h-5 w-5" />
                         </div>
                         {!isCollapsed && <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>}
@@ -581,14 +581,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                   } ${isActive
-                    ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                    ? 'bg-white text-[#C2186F] shadow-xl shadow-black/20'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#C2186F]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     {!isCollapsed && <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>}
