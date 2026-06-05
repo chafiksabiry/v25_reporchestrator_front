@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
+import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
 import { fetchAllLanguages, Language as LanguageOption } from '../../services/api/languages';
@@ -676,7 +677,7 @@ export const ProfileView: React.FC<{
       const formData = new FormData();
       formData.append('video', file);
 
-      const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${profile._id}/video`, {
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}/video`), {
         method: 'PUT',
         body: formData,
         headers: {
@@ -784,7 +785,7 @@ export const ProfileView: React.FC<{
       const formData = new FormData();
       formData.append('photo', croppedBlob, 'profile.jpg');
 
-      const response = await fetch(`${import.meta.env.VITE_REP_API_URL}/api/profiles/${profile._id}/photo`, {
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}/photo`), {
         method: 'PUT',
         body: formData,
         headers: {
