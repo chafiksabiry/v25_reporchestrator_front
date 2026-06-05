@@ -6,6 +6,7 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
+import { HARX_BAR_GRADIENT } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -160,7 +161,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-30 bg-[#ED1C24] text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
+      style={{ backgroundImage: HARX_BAR_GRADIENT }}
+      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
         } w-64`}
@@ -413,7 +415,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   className={({ isActive }) =>
                     `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                     } ${isActive
-                      ? 'bg-gradient-to-br from-[#F9484A] to-[#E6188D] text-white shadow-lg shadow-black/30 ring-1 ring-white/30'
+                      ? 'bg-gradient-to-r from-[#FB5B56] to-[#EC268A] text-white shadow-lg shadow-[#EC268A]/50'
                       : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`
                   }
@@ -535,7 +537,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     className={({ isActive }) =>
                       `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                       } ${isActive
-                        ? 'bg-gradient-to-br from-[#F9484A] to-[#E6188D] text-white shadow-lg shadow-black/30 ring-1 ring-white/30'
+                        ? 'bg-gradient-to-r from-[#FB5B56] to-[#EC268A] text-white shadow-lg shadow-[#EC268A]/50'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`
                     }
@@ -573,7 +575,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                   } ${isActive
-                    ? 'bg-gradient-to-br from-[#F9484A] to-[#E6188D] text-white shadow-lg shadow-black/30 ring-1 ring-white/30'
+                    ? 'bg-gradient-to-r from-[#FB5B56] to-[#EC268A] text-white shadow-lg shadow-[#EC268A]/50'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`
                 }
