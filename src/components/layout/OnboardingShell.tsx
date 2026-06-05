@@ -7,6 +7,7 @@ import { TopBar } from '../dashboard/TopBar';
 import { fetchProfileFromAPI } from '../../utils/profileUtils';
 import { getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
+import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
 
 /**
  * Shared shell (Sidebar + TopBar) for the onboarding orchestrator pages.
@@ -52,9 +53,12 @@ function OnboardingShellContent() {
         isCollapsed={false}
         setIsCollapsed={() => {}}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div
+        className="flex flex-1 flex-col overflow-hidden"
+        style={{ backgroundImage: HARX_NAVBAR_BG }}
+      >
         <TopBar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-        <main className="flex-1 overflow-y-auto bg-premium-gradient rounded-tl-[24px]">
+        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] rounded-tl-[24px]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Outlet />
           </div>

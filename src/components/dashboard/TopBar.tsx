@@ -5,7 +5,6 @@ import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
-import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -193,10 +192,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const initials = getInitials(userName);
 
   return (
-    <header
-      style={{ backgroundImage: HARX_NAVBAR_BG }}
-      className="relative h-16 grid grid-cols-3 items-center px-8 shrink-0 z-20"
-    >
+    <header className="relative h-16 grid grid-cols-3 items-center px-8 shrink-0 z-20 bg-transparent">
 
       {/* ── Col 1: Left — hamburger (mobile) ── */}
       <div className="flex items-center">
