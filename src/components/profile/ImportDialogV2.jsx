@@ -28,9 +28,30 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [analysisSteps, setAnalysisSteps] = useState([]);
+  // Flag used to abort the in-flight analysis flow when the user cancels.
+  const cancelledRef = useRef(false);
 
   const addAnalysisStep = (text, error = false) => {
     setAnalysisSteps(prev => [...prev, { text, error, timestamp: new Date().toISOString() }]);
+  };
+
+  const resetState = () => {
+    setText('');
+    setLoading(false);
+    setError('');
+    setProgress(0);
+    setShowGuidance(false);
+    setCurrentStep(1);
+    setUploadSuccess(false);
+    setAnalysisSteps([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Close the modal: abort any running analysis and reset the form.
+  const handleClose = () => {
+    cancelledRef.current = true;
+    resetState();
+    onClose();
   };
 
   const steps = [
@@ -88,11 +109,17 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   };
 
   const parseProfile = async (contentToProcess = text) => {
+    cancelledRef.current = false;
     setLoading(true);
     setError('');
     setProgress(0);
     setCurrentStep(3);
     setAnalysisSteps([]);
+
+    // Bail out early if the user clicked Cancel mid-analysis.
+    const ensureNotCancelled = () => {
+      if (cancelledRef.current) throw new Error('__CANCELLED__');
+    };
 
     try {
       console.log("contentToProcess :", contentToProcess);
@@ -104,16 +131,19 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Initial analysis to extract basic information
       const basicInfo = await extractBasicInfo(contentToProcess);
+      ensureNotCancelled();
       addAnalysisStep("Basic information extracted");
       setProgress(20);
 
       // Analyze work experience
       const experience = await analyzeExperience(contentToProcess);
+      ensureNotCancelled();
       addAnalysisStep("Work experience analyzed");
       setProgress(40);
 
       // Extract and categorize skills
       const skills = await analyzeSkills(contentToProcess);
+      ensureNotCancelled();
       console.log("languages extracted :", skills.languages);
       console.log("🔍 analyzeSkills result:", skills);
       console.log("🔍 analyzeExperience result:", experience);
@@ -148,11 +178,13 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Extract achievements and projects
       const achievements = await analyzeAchievements(contentToProcess);
+      ensureNotCancelled();
       addAnalysisStep("Achievements extracted");
       setProgress(80);
 
       // Extract availability information
       const availability = await analyzeAvailability(contentToProcess);
+      ensureNotCancelled();
       addAnalysisStep("Availability preferences analyzed");
       setProgress(85);
 
@@ -238,6 +270,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Generate optimized summary
       const summary = await generateProfileSummary(combinedData);
+      ensureNotCancelled();
       console.log("Generated summary:", summary);
 
       // Ensure we have a valid summary
@@ -254,6 +287,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       // Create profile in database and get MongoDB document
       console.log('Data to store in DB : ', combinedData);
       const createdProfile = await createProfile(combinedData);
+      ensureNotCancelled();
       Cookies.set('agentId', createdProfile._id);
       onImport({ ...createdProfile, generatedSummary: summary });
 
@@ -262,16 +296,20 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       onClose();
     } catch (err) {
+      // Silent exit when the user cancelled — modal is already closed.
+      if (err.message === '__CANCELLED__' || cancelledRef.current) {
+        return;
+      }
       console.error('Profile parsing error:', err);
       setError(err.message || 'Failed to parse profile. Please try again or use a different file.');
       addAnalysisStep(`Error: ${err.message}`, true);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+    <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] relative flex flex-col shadow-2xl overflow-hidden">
@@ -293,9 +331,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                 </div>
               </div>
               <button
-                onClick={onClose}
-                disabled={loading}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-40"
+                onClick={handleClose}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                 aria-label="Close"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -436,10 +473,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
           <div className="px-7 py-5 flex justify-end gap-3 flex-shrink-0 bg-white">
             <button
               className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-              onClick={onClose}
-              disabled={loading}
+              onClick={handleClose}
             >
-              Cancel
+              {loading ? 'Cancel & close' : 'Cancel'}
             </button>
             {text && (
               <button
