@@ -1,11 +1,14 @@
 import axios from 'axios';
+import { repApiUrl } from '../../utils/repApiUrl';
 
-const API_URL = import.meta.env.VITE_API_URL;
+// The languages collection (GET /api/languages, /api/languages/:code) lives on
+// the reps wizard backend, so we must target VITE_REP_API_URL — not
+// VITE_API_URL (registration backend), which 404s.
 
 // Get all languages
 export const getAllLanguages = async () => {
   try {
-    const response = await axios.get(`${API_URL}/languages`);
+    const response = await axios.get(repApiUrl('/languages'));
     return response.data.data; // Return the languages array
   } catch (error) {
     console.error('Error fetching languages:', error);
@@ -16,7 +19,7 @@ export const getAllLanguages = async () => {
 // Get language by code
 export const getLanguageByCode = async (code) => {
   try {
-    const response = await axios.get(`${API_URL}/languages/${code}`);
+    const response = await axios.get(repApiUrl(`/languages/${code}`));
     return response.data.data; // Return the language object
   } catch (error) {
     console.error('Error fetching language by code:', error);
