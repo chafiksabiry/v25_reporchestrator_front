@@ -6,6 +6,17 @@ import SummaryEditorV2 from '../components/profile/SummaryEditorV2.jsx';
 import ProtectedRoute from '../components/profile/ProtectedRoute.jsx';
 import { fetchProfileFromAPI } from '../utils/profileUtils';
 import harxLogo from '../assets/logo_harx.png';
+import harxLogoDark from '../assets/logo-black.png';
+import mascotte from '../assets/mascotte2.png';
+
+const POWERED_BY_BRANDS = [
+  { name: 'Google Cloud', color: '#4285F4' },
+  { name: 'Vertex AI', color: '#9333EA' },
+  { name: 'Twilio', color: '#F22F46' },
+  { name: 'MongoDB', color: '#00A35C' },
+  { name: 'Cloudinary', color: '#3448C5' },
+  { name: 'Stripe', color: '#635BFF' },
+];
 
 type ProfileRecord = Record<string, unknown> & {
   _id?: string;
@@ -89,6 +100,24 @@ function ProfileImportPage({
         aria-hidden="true"
         className="absolute -bottom-10 -right-6 w-72 opacity-[0.05] rotate-[-8deg] pointer-events-none select-none"
       />
+      <img
+        src={harxLogoDark}
+        alt=""
+        aria-hidden="true"
+        className="absolute top-8 left-6 w-40 opacity-[0.04] pointer-events-none select-none"
+      />
+      <img
+        src={mascotte}
+        alt=""
+        aria-hidden="true"
+        className="absolute top-16 -left-8 w-44 opacity-[0.04] rotate-12 pointer-events-none select-none"
+      />
+      <p
+        aria-hidden="true"
+        className="absolute bottom-24 left-8 text-[10px] font-black uppercase tracking-[0.35em] text-harx-600/10 pointer-events-none select-none -rotate-90 origin-left"
+      >
+        We inspire growth
+      </p>
 
       <div className="relative w-full max-w-3xl mx-auto px-4">
         <div className="flex flex-col items-center text-center py-10">
@@ -151,7 +180,29 @@ function ProfileImportPage({
               )}
             </div>
           ))}
+        </div>
+
+        {/* Powered by — partner brands */}
+        <div className="mt-10 w-full">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">
+            Powered by
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+            {POWERED_BY_BRANDS.map((brand) => (
+              <span
+                key={brand.name}
+                className="text-sm font-semibold text-gray-400/90 transition-colors hover:text-gray-600"
+                style={{ ['--brand-accent' as string]: brand.color }}
+              >
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full mr-1.5 align-middle"
+                  style={{ backgroundColor: brand.color, opacity: 0.7 }}
+                />
+                {brand.name}
+              </span>
+            ))}
           </div>
+        </div>
         </div>
 
         <ImportDialogV2
