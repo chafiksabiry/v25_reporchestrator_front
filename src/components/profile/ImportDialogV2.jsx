@@ -348,8 +348,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             <div className="space-y-5">
               <div
                 className={`rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
-                    ? 'bg-green-50 ring-2 ring-green-400'
-                    : 'bg-gray-50 hover:bg-harx-50 ring-2 ring-dashed ring-gray-200 hover:ring-harx-300'
+                    ? 'bg-green-50'
+                    : 'bg-gray-50 hover:bg-harx-50'
                   }`}
                 onClick={() => fileInputRef.current?.click()}
               >
