@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
-import { HARX_NAVBAR_GRADIENT } from '../../utils/harxBrand';
+import { HARX_NAVBAR_GRADIENT, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -194,8 +194,8 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
   return (
     <header
-      style={{ backgroundImage: HARX_NAVBAR_GRADIENT }}
-      className="h-[72px] grid grid-cols-3 items-center px-8 shrink-0 z-20"
+      style={{ backgroundImage: HARX_NAVBAR_GRADIENT, boxShadow: HARX_BAR_SHADOW, textShadow: HARX_TEXT_SHADOW }}
+      className="relative h-[72px] grid grid-cols-3 items-center px-8 shrink-0 z-20"
     >
 
       {/* ── Col 1: Left — hamburger (mobile) ── */}

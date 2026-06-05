@@ -7,7 +7,7 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-pink.png';
 import mascotte from '../../assets/mascotte2.png';
-import { HARX_SIDEBAR_BODY_GRADIENT } from '../../utils/harxBrand';
+import { HARX_SIDEBAR_BODY_GRADIENT, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -168,7 +168,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         } w-52`}
     >
       {/* Logo strip — uses logo-pink.png as-is (already has brand gradient) */}
-      <div className="relative h-[72px] shrink-0 overflow-hidden">
+      <div
+        className="relative h-[72px] shrink-0 overflow-hidden z-10"
+        style={{ boxShadow: HARX_BAR_SHADOW }}
+      >
         <img
           src={harxLogo}
           alt="HARX"
@@ -185,7 +188,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
       {/* Sidebar body — deep magenta below the logo */}
       <div
-        style={{ backgroundImage: HARX_SIDEBAR_BODY_GRADIENT }}
+        style={{ backgroundImage: HARX_SIDEBAR_BODY_GRADIENT, textShadow: HARX_TEXT_SHADOW }}
         className="relative flex flex-1 min-h-0 flex-col overflow-hidden"
       >
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
@@ -243,7 +246,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
-            <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-600 select-none">Main</p>
+            <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50 select-none">Main</p>
           )}
           {group1.map((item) => (
             <div key={item.path} className="space-y-1">
@@ -256,10 +259,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     }}
                     className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                         ? 'bg-white/5 text-white'
-                        : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -367,10 +370,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
                     className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isWorkspaceOpen || window.location.pathname.includes(item.path)
                         ? 'bg-white/5 text-white'
-                        : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -399,7 +402,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                             }}
                             className={`flex w-full items-center rounded-xl transition-all duration-300 group relative space-x-3 py-2.5 px-4 ${isSubActive
                                 ? 'bg-gradient-to-r from-harx-500/20 to-transparent text-white border-l-2 border-harx-500'
-                                : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                                : 'text-white/70 hover:bg-white/10 hover:text-white'
                               }`}
                           >
                             <sub.icon className={`h-3.5 w-3.5 transition-colors ${isSubActive ? 'text-harx-400' : 'text-current'}`} />
@@ -418,14 +421,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   className={({ isActive }) =>
                     `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                     } ${isActive
-                      ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-xl shadow-pink-500/30 ring-1 ring-white/10'
-                      : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                      ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-white/20' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                         <item.icon className="h-5 w-5" />
                       </div>
                       {!isCollapsed && (
@@ -457,7 +460,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group2.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-600 select-none">Training</p>
+              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50 select-none">Training</p>
             )}
             {group2.map((item) => (
               <div key={item.path} className="space-y-1">
@@ -470,10 +473,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                       }}
                       className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                           ? 'bg-white/5 text-white'
-                          : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                          : 'text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                     >
-                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
                         <item.icon className="h-5 w-5" />
                       </div>
                       <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -540,14 +543,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     className={({ isActive }) =>
                       `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                       } ${isActive
-                        ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-xl shadow-pink-500/30 ring-1 ring-white/10'
-                        : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                        ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-white/20' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                        <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                           <item.icon className="h-5 w-5" />
                         </div>
                         {!isCollapsed && <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>}
@@ -569,7 +572,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group3.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-gray-600 select-none">Planning</p>
+              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50 select-none">Planning</p>
             )}
             {group3.map((item) => (
               <NavLink
@@ -578,14 +581,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                   } ${isActive
-                    ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-xl shadow-pink-500/30 ring-1 ring-white/10'
-                    : 'text-gray-500 hover:bg-white/5 hover:text-gray-200'
+                    ? 'bg-white text-[#9B1A6E] shadow-xl shadow-black/20'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-white/20' : 'bg-gray-800/40 group-hover:bg-gray-800'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isActive ? 'bg-[#9B1A6E]/10' : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     {!isCollapsed && <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>}
