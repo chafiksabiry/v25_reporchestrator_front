@@ -6,7 +6,6 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
-import { HARX_NAVBAR_GRADIENT } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -161,8 +160,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      style={{ backgroundImage: HARX_NAVBAR_GRADIENT }}
-      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
+      className={`fixed inset-y-0 left-0 z-30 bg-[#ED1C24] text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
         } w-64`}
