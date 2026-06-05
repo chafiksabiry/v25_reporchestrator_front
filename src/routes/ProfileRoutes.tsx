@@ -71,7 +71,7 @@ function ProfileImportPage({
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-harx-50/40 to-harx-alt-50/40 shadow-sm">
+    <div className="relative flex min-h-[calc(100vh-9.5rem)] flex-col justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-harx-50/40 to-harx-alt-50/40 shadow-sm">
       {/* ── HARX branded background ── */}
       <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-harx-300/30 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-28 -left-24 w-96 h-96 rounded-full bg-harx-alt-300/25 blur-3xl pointer-events-none" />
@@ -90,7 +90,7 @@ function ProfileImportPage({
         className="absolute -bottom-10 -right-6 w-72 opacity-[0.05] rotate-[-8deg] pointer-events-none select-none"
       />
 
-      <div className="relative max-w-3xl mx-auto px-4">
+      <div className="relative w-full max-w-3xl mx-auto px-4">
         <div className="flex flex-col items-center text-center py-10">
           <span className="inline-flex items-center gap-2 mb-3 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
           <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
