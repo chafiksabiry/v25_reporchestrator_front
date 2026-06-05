@@ -43,19 +43,16 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
     [profile.availability?.schedule]
   );
   const [editingSchedule, setEditingSchedule] = useState(defaultSchedule);
+  // NB: typeof null === 'object' in JS, so check the value is truthy first.
+  const timeZoneToId = (tz: any) =>
+    tz && typeof tz === 'object' ? String(tz._id || '') : String(tz || '');
   const [editingTimezoneId, setEditingTimezoneId] = useState(
-    typeof profile.availability?.timeZone === 'object'
-      ? String(profile.availability?.timeZone?._id || '')
-      : String(profile.availability?.timeZone || '')
+    timeZoneToId(profile.availability?.timeZone)
   );
 
   const resetAvailabilityDraft = () => {
     setEditingSchedule(defaultSchedule);
-    setEditingTimezoneId(
-      typeof profile.availability?.timeZone === 'object'
-        ? String(profile.availability?.timeZone?._id || '')
-        : String(profile.availability?.timeZone || '')
-    );
+    setEditingTimezoneId(timeZoneToId(profile.availability?.timeZone));
   };
 
   const saveAvailability = async () => {
@@ -154,7 +151,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-harx-200"
                 >
                   <option value="">Select timezone...</option>
-                  {(allTimezones || []).map((tz: any) => (
+                  {(allTimezones || []).filter(Boolean).map((tz: any) => (
                     <option key={tz._id} value={tz._id}>
                       {repWizardApi.formatTimezone(tz)}
                     </option>
