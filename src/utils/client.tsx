@@ -91,12 +91,27 @@ const addAuthInterceptor = (axiosInstance: any) => {
       return response;
     },
     (error: any) => {
-      console.error("❌ API Response error:", {
-        url: error.config?.url,
-        status: error.response?.status,
-        message: error.response?.data?.message || error.message,
-        data: error.response?.data
-      });
+      const status = error.response?.status;
+      const msg = error.response?.data?.message || error.message || "";
+      const isExpectedNotFound =
+        (status === 404 || status === 500) && /not\s*found/i.test(msg);
+
+      // A missing profile is expected for reps who haven't onboarded yet —
+      // don't pollute the console with a red error for it.
+      if (isExpectedNotFound) {
+        console.info("ℹ️ API resource not found (expected):", {
+          url: error.config?.url,
+          status,
+          message: msg
+        });
+      } else {
+        console.error("❌ API Response error:", {
+          url: error.config?.url,
+          status,
+          message: msg,
+          data: error.response?.data
+        });
+      }
 
       if (error.response?.status === 401) {
         console.warn("🔐 Unauthorized - token may be expired or invalid");
