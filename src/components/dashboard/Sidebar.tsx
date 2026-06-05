@@ -190,25 +190,17 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-5">
         {/* ── Mascotte (shown on the CV import / editor pages) ── */}
         {isProfileCreationPage && !isCollapsed && (
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-black p-5">
-            <div className="absolute -top-12 -left-12 w-40 h-40 rounded-full bg-harx-500/25 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-14 -right-10 w-44 h-44 rounded-full bg-harx-alt-500/20 blur-3xl pointer-events-none" />
-
-            <span className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 mb-4 rounded-full bg-white/10 text-white text-[10px] font-semibold tracking-wide uppercase backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-harx-400 animate-pulse" />
-              Step 1 · Profile
-            </span>
-
-            <div className="relative z-10 flex items-center justify-center">
-              <div className="absolute inset-0 m-auto h-36 w-36 rounded-full bg-harx-500/20 blur-2xl animate-pulse" />
+          <div className="relative flex flex-col items-center pt-1 pb-2">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 m-auto h-28 w-28 rounded-full bg-harx-500/20 blur-2xl animate-pulse" />
               <img
                 src={mascotte}
                 alt="HARX assistant"
-                className="relative w-32 h-auto drop-shadow-2xl animate-float"
+                className="relative w-28 h-auto drop-shadow-2xl animate-float"
               />
             </div>
 
-            <p className="relative z-10 mt-4 text-center text-[11px] leading-relaxed text-gray-300">
+            <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-gray-400">
               {t(
                 'cvGuide.mascotte',
                 "Salut ! Je suis votre assistant HARX. Importez votre CV et je crée un profil percutant en quelques secondes."
