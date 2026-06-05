@@ -168,7 +168,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         } w-64`}
     >
       {/* Logo strip */}
-      <div className="relative shrink-0 flex items-center justify-center w-full overflow-hidden px-4 py-4 z-10">
+      <div className="relative shrink-0 flex items-center justify-center w-full overflow-hidden border-b border-white/10 px-4 py-4 z-10">
         <img
           src={harxLogo}
           alt="HARX"

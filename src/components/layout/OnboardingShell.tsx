@@ -44,7 +44,7 @@ function OnboardingShellContent() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-[#E84393] overflow-hidden">
+    <div className="flex h-screen bg-[#E52D27] overflow-hidden">
       <Sidebar
         phases={userProfile?.onboardingProgress?.phases}
         isSidebarOpen={isSidebarOpen}

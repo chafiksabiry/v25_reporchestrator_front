@@ -14,7 +14,7 @@ export const HARX_BRAND = {
 export const HARX_BUTTON_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D 100%)';
 
 /** Main background gradient shared by the navbar + sidebar. */
-export const HARX_BAR_GRADIENT = 'linear-gradient(135deg, #D63031 0%, #E84393 50%, #FF6B81 100%)';
+export const HARX_BAR_GRADIENT = 'linear-gradient(135deg, #B31217 0%, #E52D27 35%, #FF6B81 70%, #FFB347 100%)';
 
 /** Sidebar body continues the same vertical flow below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.red} 0%, ${HARX_BRAND.magenta} 45%, ${HARX_BRAND.magentaDeep} 75%, ${HARX_BRAND.magentaDarker} 100%)`;
