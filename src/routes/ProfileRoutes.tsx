@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import ImportDialogV2 from '../components/profile/ImportDialogV2';
-import SummaryEditorV2 from '../components/profile/SummaryEditorV2';
-import TopBar from '../components/profile/TopBar';
-import ProtectedRoute from '../components/profile/ProtectedRoute';
+import ImportDialogV2 from '../components/profile/ImportDialogV2.jsx';
+import SummaryEditorV2 from '../components/profile/SummaryEditorV2.jsx';
+import TopBar from '../components/profile/TopBar.jsx';
+import ProtectedRoute from '../components/profile/ProtectedRoute.jsx';
 import { AuthProvider } from '../contexts/AuthContext';
 
 function ProfileImportPage() {
