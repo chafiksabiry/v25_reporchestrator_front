@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary } from '../../lib/api/profiles';
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
@@ -360,7 +361,29 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
   );
 };
 
+const PROFICIENCY_CHIP_STYLES = {
+  A1: 'bg-gray-100 text-gray-700 ring-gray-200',
+  A2: 'bg-slate-100 text-slate-700 ring-slate-200',
+  B1: 'bg-sky-50 text-sky-800 ring-sky-200',
+  B2: 'bg-indigo-50 text-indigo-800 ring-indigo-200',
+  C1: 'bg-harx-50 text-harx-800 ring-harx-200',
+  C2: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+};
+
+function ProfileReadField({ label, value, icon, className = '' }) {
+  return (
+    <div className={`rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md hover:border-harx-100 transition-all duration-200 ${className}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-harx-50 text-harx-600">{icon}</span>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</h3>
+      </div>
+      <p className="text-lg font-semibold text-gray-900 break-words">{value || '—'}</p>
+    </div>
+  );
+}
+
 function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onProfileUpdate }) {
+  const navigate = useNavigate();
   const { profile, loading: profileLoading, error: profileError, updateBasicInfo, updateExperience, updateSkills, updateProfileData } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
   console.log("generatedSummary : ", generatedSummary);
@@ -1397,19 +1420,23 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       // Update the isBasicProfileCompleted field to true
       updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
         .then(() => {
-          // Redirect to external website after successful update
-          const profileUrl = import.meta.env.VITE_RUN_MODE === 'standalone'
-            ? import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
-            : import.meta.env.VITE_REP_ORCHESTRATOR_URL;
-          window.location.href = profileUrl;
+          if (import.meta.env.VITE_RUN_MODE === 'standalone') {
+            const profileUrl = import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
+              || import.meta.env.VITE_REP_ORCHESTRATOR_URL;
+            if (profileUrl) window.location.href = profileUrl;
+          } else {
+            navigate('/profile');
+          }
         })
         .catch(error => {
           console.error('Error updating isBasicProfileCompleted:', error);
-          // Redirect anyway even if the update fails
-          const profileUrl = import.meta.env.VITE_RUN_MODE === 'standalone'
-            ? import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
-            : import.meta.env.VITE_REP_ORCHESTRATOR_URL;
-          window.location.href = profileUrl;
+          if (import.meta.env.VITE_RUN_MODE === 'standalone') {
+            const profileUrl = import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
+              || import.meta.env.VITE_REP_ORCHESTRATOR_URL;
+            if (profileUrl) window.location.href = profileUrl;
+          } else {
+            navigate('/profile');
+          }
         });
     } else {
       // Update validation errors state
@@ -2263,61 +2290,84 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   if (!editedProfile?.personalInfo) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl shadow-xl border border-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-harx-500" />
-        <p className="mt-4 text-gray-600">Loading your profile...</p>
+      <div className="flex flex-col items-center justify-center py-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
+        <span className="relative flex h-14 w-14">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-harx-400 opacity-30" />
+          <span className="relative inline-flex rounded-full h-14 w-14 items-center justify-center bg-gradient-to-br from-harx-500 to-harx-alt-500">
+            <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </span>
+        </span>
+        <p className="mt-5 text-gray-700 font-medium">Loading your profile…</p>
       </div>
     );
   }
 
+  const countryDisplay =
+    typeof editedProfile.personalInfo.country === 'object'
+      ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
+      : editedProfile.personalInfo.country || '—';
+
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-      <div className="h-2 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600"></div>
-      <div className="p-8 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
+      <div className="p-6 sm:p-8 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-bold text-gray-900">Your Professional Story ✨</h2>
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-harx-50 text-harx-700 text-xs font-semibold tracking-wide uppercase">
+                <span className="h-1.5 w-1.5 rounded-full bg-harx-500" />
+                Step 3 · Verify &amp; save
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
+                Your professional story
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 max-w-lg">
+                Review the information extracted from your CV. Edit anything that needs a correction, then continue.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               {editingProfile ? (
-                <div className="flex items-center gap-2">
+                <>
                   <button
                     onClick={cancelEdit}
                     disabled={isSaving}
-                    className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 text-gray-600 bg-gray-50 hover:bg-gray-100 disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
                   >
-                    🚫 Unsave
+                    Cancel
                   </button>
                   <button
                     onClick={saveProfile}
                     disabled={isSaving}
-                    className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
                   >
-                    {isSaving ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Saving...
-                      </>
-                    ) : (
-                      '💾 Save'
+                    {isSaving && (
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
                     )}
+                    {isSaving ? 'Saving…' : 'Save changes'}
                   </button>
-                </div>
+                </>
               ) : (
                 <button
                   onClick={() => setEditingProfile(true)}
-                  className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 text-harx-600 bg-harx-50 hover:bg-harx-100"
+                  className="px-4 py-2 text-sm font-semibold rounded-xl text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-2"
                 >
-                  ✏️ Edit Profile
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit profile
                 </button>
               )}
             </div>
           </div>
 
           {/* Profile Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {editingProfile ? (
               <>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
@@ -2623,62 +2673,84 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </>
             ) : (
               <>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">👤 Name</h3>
-                  <p className="text-xl font-semibold text-gray-800">{editedProfile.personalInfo.name || 'Not specified'}</p>
-                  {renderError(validationErrors.name, 'name')}
-                </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 Country</h3>
-                  <p className="text-xl font-semibold text-gray-800">
-                    {typeof editedProfile.personalInfo.country === 'object'
-                      ? `${editedProfile.personalInfo.country?.countryName} (${editedProfile.personalInfo.country?.countryCode})`
-                      : editedProfile.personalInfo.country || 'Not specified'}
-                  </p>
+                <ProfileReadField
+                  label="Name"
+                  value={editedProfile.personalInfo.name}
+                  icon={
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  }
+                />
+                <div>
+                  <ProfileReadField
+                    label="Country"
+                    value={countryDisplay}
+                    icon={
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    }
+                  />
                   {renderError(validationErrors.country, 'country')}
                   <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
                 </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">📧 Email</h3>
-                  <p className="text-xl font-semibold text-gray-800">{editedProfile.personalInfo.email || 'Not specified'}</p>
-                  {renderError(validationErrors.email, 'email')}
-                </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">📱 Phone</h3>
-                  <p className="text-xl font-semibold text-gray-800">{editedProfile.personalInfo.phone || 'Not specified'}</p>
-                  {renderError(validationErrors.phone, 'phone')}
-                </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl col-span-1">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 Languages</h3>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      {editedProfile.personalInfo.languages.map((lang, index) => {
-                        // Handle both old and new data structures
-                        const languageName = typeof lang.language === 'object' ? lang.language.name : lang.language;
-                        const languageCode = typeof lang.language === 'object' ? lang.language.code : (lang.iso639_1 || '');
-
-                        return (
-                          <span
-                            key={index}
-                            className="px-3 py-1 bg-white/50 text-gray-700 rounded-full text-sm font-medium group relative"
-                          >
-                            <span>{languageName}</span>
-                            <span className="text-harx-600 ml-1">({lang.proficiency})</span>
-                            {languageCode && <span className="text-gray-500 text-xs ml-1">[{languageCode}]</span>}
-                            <div className="absolute hidden group-hover:block bg-black text-white text-xs rounded p-2 z-10 bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-48">
-                              {proficiencyLevels.find(level => level.value === lang.proficiency)?.description}
-                            </div>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {renderError(validationErrors.languages, 'languages')}
+                <ProfileReadField
+                  label="Email"
+                  value={editedProfile.personalInfo.email}
+                  icon={
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  }
+                />
+                <ProfileReadField
+                  label="Phone"
+                  value={editedProfile.personalInfo.phone}
+                  icon={
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  }
+                />
+                <ProfileReadField
+                  label="Experience"
+                  value={`${editedProfile.professionalSummary?.yearsOfExperience || 0} years`}
+                  icon={
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  }
+                />
+                <div className="md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-harx-50 text-harx-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                      </svg>
+                    </span>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Languages</h3>
                   </div>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">⭐ Experience</h3>
-                  <p className="text-xl font-semibold text-gray-800">{editedProfile.professionalSummary.yearsOfExperience || 0} years</p>
-                  {renderError(validationErrors.yearsExperience, 'yearsExperience')}
+                  <div className="flex flex-wrap gap-2">
+                    {editedProfile.personalInfo.languages.map((lang, index) => {
+                      const languageName = typeof lang.language === 'object' ? lang.language.name : lang.language;
+                      const languageCode = typeof lang.language === 'object' ? lang.language.code : (lang.iso639_1 || '');
+                      const chipStyle = PROFICIENCY_CHIP_STYLES[lang.proficiency] || PROFICIENCY_CHIP_STYLES.B1;
+
+                      return (
+                        <span
+                          key={index}
+                          title={proficiencyLevels.find((level) => level.value === lang.proficiency)?.description}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ${chipStyle}`}
+                        >
+                          <span className="text-gray-900">{languageName}</span>
+                          {languageCode && <span className="text-xs text-gray-500">{languageCode}</span>}
+                          <span className="text-xs font-bold opacity-80">{lang.proficiency}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {renderError(validationErrors.languages, 'languages')}
                 </div>
               </>
             )}
@@ -3055,16 +3127,22 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Summary Section */}
-          <div className="mt-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-2xl font-bold text-gray-900">Professional Summary</h3>
+          <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Professional summary</h3>
+                <p className="text-sm text-gray-500 mt-0.5">AI-generated from your CV — edit or regenerate anytime.</p>
+              </div>
               {editingProfile && (
                 <button
                   onClick={regenerateSummary}
                   disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 disabled:opacity-50 transition-colors duration-200"
+                  className="px-4 py-2 text-sm font-medium text-harx-700 bg-white border border-harx-100 rounded-xl hover:bg-harx-50 disabled:opacity-50 transition-colors inline-flex items-center gap-2 self-start"
                 >
-                  {loading ? '✨ Working Magic...' : '🔄 Regenerate Summary'}
+                  <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {loading ? 'Generating…' : 'Regenerate'}
                 </button>
               )}
             </div>
@@ -3105,15 +3183,17 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             ) : (
               <div className="relative">
-                <div className="bg-gradient-to-br from-harx-50 to-harx-alt-50 p-6 rounded-xl">
-                  <p className="text-gray-800 whitespace-pre-line text-lg leading-relaxed">
-                    {editedProfile.professionalSummary?.profileDescription || 'No professional summary yet. Click "Regenerate Summary" to create one, or "Edit" to write your own.'}
+                <div className="bg-white/80 backdrop-blur-sm border border-white p-6 rounded-2xl shadow-inner">
+                  <p className="text-gray-800 whitespace-pre-line text-base sm:text-lg leading-relaxed">
+                    {editedProfile.professionalSummary?.profileDescription ||
+                      'No summary yet. Click Edit profile, then Regenerate to create one from your CV.'}
                   </p>
                 </div>
                 {editingProfile && (
                   <button
                     onClick={() => setIsEditing(true)}
                     className="absolute top-4 right-4 p-2 text-gray-500 hover:text-harx-600 bg-white rounded-full shadow-sm hover:shadow-md transition-all duration-200"
+                    aria-label="Edit summary"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3126,12 +3206,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
           {/* Action Buttons */}
           {!editingProfile && (
-            <div className="mt-8 flex justify-end">
+            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
+              <p className="text-sm text-gray-600">
+                Everything looks good? Continue to your full REPS profile.
+              </p>
               <button
                 onClick={pushToRepsProfile}
-                className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-lg hover:from-harx-700 hover:to-harx-alt-700 transition-colors duration-200 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-xl shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center justify-center gap-2"
               >
-                <span>🚀 View Your REPS Profile</span>
+                Continue to my profile
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
