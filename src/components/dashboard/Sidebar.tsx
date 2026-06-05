@@ -5,9 +5,9 @@ import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown
 import { useAuth } from '../../contexts/AuthContext';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
-import harxLogo from '../../assets/logo-pink.png';
+import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
-import { HARX_SIDEBAR_BODY_GRADIENT, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
+import { HARX_NAVBAR_GRADIENT, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
 
 // Declare qiankun global variables
 declare global {
@@ -162,20 +162,21 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
+      style={{ backgroundImage: HARX_NAVBAR_GRADIENT, textShadow: HARX_TEXT_SHADOW }}
       className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative shadow-2xl flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full md:translate-x-0'
           : 'translate-x-0'
         } w-52`}
     >
-      {/* Logo strip — uses logo-pink.png as-is (already has brand gradient) */}
+      {/* Logo strip — white transparent logo over the brand gradient */}
       <div
-        className="relative h-[72px] shrink-0 overflow-hidden z-10"
+        className="relative h-[72px] shrink-0 flex items-center justify-center px-5 z-10"
         style={{ boxShadow: HARX_BAR_SHADOW }}
       >
         <img
           src={harxLogo}
           alt="HARX"
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          className="h-9 w-auto object-contain"
         />
         <button
           onClick={() => setIsSidebarOpen(false)}
@@ -186,11 +187,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         </button>
       </div>
 
-      {/* Sidebar body — deep magenta below the logo */}
-      <div
-        style={{ backgroundImage: HARX_SIDEBAR_BODY_GRADIENT, textShadow: HARX_TEXT_SHADOW }}
-        className="relative flex flex-1 min-h-0 flex-col overflow-hidden"
-      >
+      {/* Sidebar body */}
+      <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
         {/* ── Mascotte (shown on the CV import / editor pages) ── */}
         {isProfileCreationPage && !isCollapsed && (
