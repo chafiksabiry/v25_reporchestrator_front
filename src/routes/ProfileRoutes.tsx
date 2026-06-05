@@ -71,26 +71,26 @@ function ProfileImportPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4">
-      <div className="flex flex-col items-center text-center pt-6 pb-12">
-        <span className="inline-flex items-center gap-2 mb-6 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
+      <div className="flex flex-col items-center text-center py-4">
+        <span className="inline-flex items-center gap-2 mb-3 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
           <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
           Step 1 · Create your profile
         </span>
 
-        <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2 leading-tight">
           Turn your CV into a{' '}
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-harx-600 to-harx-alt-600">
             standout profile
           </span>
         </h2>
-        <p className="text-gray-500 text-lg max-w-lg mb-10">
+        <p className="text-gray-500 max-w-lg mb-6">
           Upload your CV and let our AI build your professional story, extract
           your skills and languages — all in a few seconds.
         </p>
 
         <button
           onClick={() => setIsImportOpen(true)}
-          className="group inline-flex items-center gap-2 px-9 py-4 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
+          className="group inline-flex items-center gap-2 px-8 py-3 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -102,25 +102,25 @@ function ProfileImportPage({
         </button>
 
         {/* Feature highlights — borderless */}
-        <div className="mt-16 grid gap-x-10 gap-y-8 sm:grid-cols-3 w-full">
+        <div className="mt-8 grid gap-x-8 gap-y-5 sm:grid-cols-3 w-full">
           {IMPORT_FEATURES.map((f) => (
             <div key={f.title} className="flex flex-col items-center text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-harx-50 text-harx-600 mb-3">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-harx-50 text-harx-600 mb-2">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {f.icon}
                 </svg>
               </span>
               <p className="text-sm font-semibold text-gray-900">{f.title}</p>
-              <p className="text-xs text-gray-500 mt-1 max-w-[14rem]">{f.desc}</p>
+              <p className="text-xs text-gray-500 mt-0.5 max-w-[14rem]">{f.desc}</p>
             </div>
           ))}
         </div>
 
         {/* Steps */}
-        <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-7">
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
           {IMPORT_STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
+            <div key={s.n} className="flex items-center gap-2.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
                 {s.n}
               </span>
               <span className="text-sm font-medium text-gray-600">{s.label}</span>
