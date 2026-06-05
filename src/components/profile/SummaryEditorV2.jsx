@@ -1430,23 +1430,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       // Update the isBasicProfileCompleted field to true
       updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
         .then(() => {
-          if (import.meta.env.VITE_RUN_MODE === 'standalone') {
-            const profileUrl = import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
-              || import.meta.env.VITE_REP_ORCHESTRATOR_URL;
-            if (profileUrl) window.location.href = profileUrl;
-          } else {
-            navigate('/profile');
-          }
+          // Always stay inside the unified app — internal SPA navigation only.
+          navigate('/profile');
         })
         .catch(error => {
           console.error('Error updating isBasicProfileCompleted:', error);
-          if (import.meta.env.VITE_RUN_MODE === 'standalone') {
-            const profileUrl = import.meta.env.VITE_REP_ORCHESTRATOR_URL_STANDALONE
-              || import.meta.env.VITE_REP_ORCHESTRATOR_URL;
-            if (profileUrl) window.location.href = profileUrl;
-          } else {
-            navigate('/profile');
-          }
+          // Navigate anyway so the user is not stuck on the editor.
+          navigate('/profile');
         });
     } else {
       // Update validation errors state
