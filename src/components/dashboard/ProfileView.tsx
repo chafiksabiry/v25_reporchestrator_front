@@ -412,8 +412,10 @@ export const ProfileView: React.FC<{
   };
 
   const getTimezoneMismatchInfo = () => {
-    const currentTimezoneId = typeof profile.availability?.timeZone === 'object' ? profile.availability.timeZone._id : profile.availability?.timeZone;
-    const selectedTimezoneData = allTimezones.find(tz => tz._id === currentTimezoneId);
+    const tz = profile.availability?.timeZone;
+    // NB: typeof null === 'object', so guard against null before reading _id.
+    const currentTimezoneId = tz && typeof tz === 'object' ? tz._id : tz;
+    const selectedTimezoneData = allTimezones.find(t => t && t._id === currentTimezoneId);
     if (!countryData || !selectedTimezoneData || !currentTimezoneId) return null;
     if (selectedTimezoneData.countryCode !== countryData.countryCode) {
       const timezoneCountryData = countries.find(c => c.countryCode === selectedTimezoneData.countryCode);
