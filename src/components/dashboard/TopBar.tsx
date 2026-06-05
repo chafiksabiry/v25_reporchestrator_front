@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, ArrowRight } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getUserInfo } from '../../utils/authUtils';
+import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
+import config from '../../config';
 
 const PHASE_NAMES: Record<number, string> = {
   1: 'Sign Up & Verification',
@@ -105,6 +106,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   });
   const [nextPhase, setNextPhase] = useState<NextPhaseInfo | null>(() => computeNextPhase());
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
+  const [displayName, setDisplayName] = useState<string>('User');
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -154,14 +156,50 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     }
   };
 
+  // Resolve the best display name: the agent profile name if it exists,
+  // otherwise (profile not created yet) fall back to the registration user's
+  // fullName fetched from the auth backend.
+  const resolveDisplayName = async () => {
+    const agentName = (getProfileData()?.personalInfo?.name || '').trim();
+    if (agentName) {
+      setDisplayName(agentName);
+      return;
+    }
+    try {
+      const { userId, token } = config.getUserData();
+      const base = import.meta.env.VITE_AUTH_API_URL;
+      if (userId && base) {
+        const res = await fetch(`${base}/users/${userId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const fullName = (json?.data?.fullName || json?.fullName || '').trim();
+          if (fullName) {
+            setDisplayName(fullName);
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('TopBar: could not resolve user fullName from auth backend', error);
+    }
+    setDisplayName('User');
+  };
+
   useEffect(() => {
     // Initial load
     loadProfileData();
+    resolveDisplayName();
 
     // Listen for profile updates
     const handleProfileUpdate = () => {
       console.log('🔄 TopBar: Detected profile update, refreshing data');
       loadProfileData();
+      resolveDisplayName();
       setNextPhase(computeNextPhase());
       setOnboardingComplete(computeOnboardingComplete());
     };
@@ -173,8 +211,8 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     };
   }, []);
 
-  // Get user's name or default to "User"
-  const userName = profileData?.personalInfo?.name || 'User';
+  // Get user's name: agent profile name, else registration fullName, else "User"
+  const userName = displayName;
 
   // Get user's role or default to "HARX Rep"
   const userRole = profileData?.professionalSummary?.currentRole || 'HARX Rep';
