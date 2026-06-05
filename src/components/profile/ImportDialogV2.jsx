@@ -24,7 +24,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   const [importType, setImportType] = useState('cv');
   const fileInputRef = useRef(null);
   const [progress, setProgress] = useState(0);
-  const [showGuidance, setShowGuidance] = useState(true);
+  const [showGuidance, setShowGuidance] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [analysisSteps, setAnalysisSteps] = useState([]);
@@ -272,92 +272,127 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] relative flex flex-col">
-          {/* Fixed Header */}
-          <div className="p-6 border-b border-gray-200 flex-shrink-0">
-            <Dialog.Title className="text-2xl font-bold text-gray-900">Import Your Professional Profile</Dialog.Title>
+        <Dialog.Panel className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] relative flex flex-col shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="relative px-7 pt-7 pb-5 flex-shrink-0">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-harx-500 to-harx-alt-500 text-white shadow-lg shadow-harx-500/25">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </span>
+                <div>
+                  <Dialog.Title className="text-xl font-extrabold text-gray-900 leading-tight">
+                    Import your professional profile
+                  </Dialog.Title>
+                  <p className="text-sm text-gray-400 mt-0.5">PDF, DOC, DOCX or TXT — up to 5MB</p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-40"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* How it works toggle */}
+            <button
+              onClick={() => setShowGuidance((v) => !v)}
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-harx-600 hover:text-harx-700 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {showGuidance ? 'Hide how it works' : 'How it works'}
+              <svg
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${showGuidance ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
 
           {/* Scrollable Content */}
-          <div className="p-6 overflow-y-auto flex-grow">
+          <div className="px-7 pb-2 overflow-y-auto flex-grow">
             {showGuidance && (
-              <div className="mb-8">
-                <div className="bg-harx-50 p-6 rounded-xl mb-6">
-                  <h3 className="text-lg font-semibold text-harx-900 mb-3">Welcome to the Profile Import Wizard! 🚀</h3>
-                  <p className="text-harx-800 mb-4">
-                    We'll guide you through the process of creating your professional profile. Here's what to expect:
-                  </p>
-                  <div className="space-y-4">
-                    {steps.map((step, index) => (
-                      <div key={index} className="flex items-start">
-                        <div className="flex-shrink-0 h-6 w-6 rounded-full bg-harx-200 flex items-center justify-center text-harx-800 text-sm font-medium">
-                          {index + 1}
-                        </div>
-                        <div className="ml-3">
-                          <h4 className="text-harx-900 font-medium">{step.title}</h4>
-                          <p className="text-harx-700 text-sm">{step.description}</p>
-                        </div>
+              <div className="mb-6 rounded-2xl bg-harx-50/70 p-5">
+                <p className="text-sm text-gray-600 mb-4">
+                  We'll guide you through creating your professional profile. Here's what to expect:
+                </p>
+                <div className="space-y-3.5">
+                  {steps.map((step, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 h-6 w-6 rounded-full bg-harx-600 flex items-center justify-center text-white text-xs font-bold">
+                        {index + 1}
                       </div>
-                    ))}
-                  </div>
+                      <div>
+                        <h4 className="text-gray-900 font-semibold text-sm">{step.title}</h4>
+                        <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{step.description}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            <div className="space-y-6">
-              <div className="flex flex-col space-y-4">
-                <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${uploadSuccess ? 'border-green-500 bg-green-50' : 'hover:border-harx-500 hover:bg-harx-50'
-                    }`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".txt,.pdf,.doc,.docx"
-                    onChange={handleFileUpload}
-                  />
-                  {uploadSuccess ? (
-                    <div className="text-green-600">
-                      <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="space-y-5">
+              <div
+                className={`rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
+                    ? 'bg-green-50 ring-2 ring-green-400'
+                    : 'bg-gray-50 hover:bg-harx-50 ring-2 ring-dashed ring-gray-200 hover:ring-harx-300'
+                  }`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept=".txt,.pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                />
+                {uploadSuccess ? (
+                  <div className="text-green-600">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      <p className="mt-2 text-lg font-medium">CV Successfully Uploaded!</p>
-                      <p className="text-sm text-green-500">Click to upload a different file</p>
-                    </div>
-                  ) : (
-                    <>
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </span>
+                    <p className="mt-3 text-lg font-semibold">CV successfully uploaded!</p>
+                    <p className="text-sm text-green-500 mt-0.5">Click to upload a different file</p>
+                  </div>
+                ) : (
+                  <>
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-sm">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      <p className="mt-4 text-lg font-medium text-gray-900">
-                        Drop your CV here
-                      </p>
-                      <p className="mt-2 text-sm text-gray-500">
-                        or click to browse your files
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Supports PDF, DOC, DOCX, TXT (max 5MB)
-                      </p>
-                    </>
-                  )}
-                </div>
+                    </span>
+                    <p className="mt-4 text-lg font-semibold text-gray-900">Drop your CV here</p>
+                    <p className="mt-1 text-sm text-gray-500">or click to browse your files</p>
+                    <p className="text-xs text-gray-400 mt-2">Supports PDF, DOC, DOCX, TXT (max 5MB)</p>
+                  </>
+                )}
               </div>
 
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">Error</h3>
-                      <p className="text-sm text-red-700 mt-1">{error}</p>
+                <div className="p-4 bg-red-50 rounded-2xl">
+                  <div className="flex items-start gap-3">
+                    <svg className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-800">Error</h3>
+                      <p className="text-sm text-red-700 mt-0.5">{error}</p>
                     </div>
                   </div>
                 </div>
@@ -381,7 +416,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                     </span>
                   </div>
                   {analysisSteps.length > 0 && (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-3 space-y-1.5 rounded-2xl bg-gray-50 p-4">
                       {analysisSteps.map((step, index) => (
                         <div
                           key={index}
@@ -397,10 +432,10 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             </div>
           </div>
 
-          {/* Fixed Footer */}
-          <div className="p-6 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0 bg-white">
+          {/* Footer */}
+          <div className="px-7 py-5 flex justify-end gap-3 flex-shrink-0 bg-white">
             <button
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
               onClick={onClose}
               disabled={loading}
             >
@@ -408,7 +443,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             </button>
             {text && (
               <button
-                className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-lg hover:from-harx-700 hover:to-harx-alt-700 disabled:opacity-50 transition-all duration-200 transform hover:scale-105"
+                className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 transition-all duration-200"
                 onClick={() => parseProfile()}
                 disabled={loading || !text}
               >
