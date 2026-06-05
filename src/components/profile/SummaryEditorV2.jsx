@@ -49,6 +49,16 @@ const styles = `
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+
+  .profile-form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 1rem center;
+    background-size: 1.25em 1.25em;
+    background-repeat: no-repeat;
+  }
 `;
 
 // Add styles to document
@@ -1767,8 +1777,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         e.target.value = "";
                       }
                     }}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm form-select appearance-none"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 1rem center`, backgroundSize: `1.5em 1.5em` }}
+                    className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
                     <option value="" disabled className="text-gray-400 bg-white">Select {title.toLowerCase().replace(' skills', '')} skills...</option>
@@ -1814,8 +1823,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         e.target.value = "";
                       }
                     }}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm form-select appearance-none"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 1rem center`, backgroundSize: `1.5em 1.5em` }}
+                    className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
                     <option value="" disabled className="text-gray-400 bg-white">Select industries...</option>
@@ -1853,8 +1861,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         e.target.value = "";
                       }
                     }}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm form-select appearance-none"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 1rem center`, backgroundSize: `1.5em 1.5em` }}
+                    className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
                     <option value="" disabled className="text-gray-400 bg-white">Select activities...</option>
