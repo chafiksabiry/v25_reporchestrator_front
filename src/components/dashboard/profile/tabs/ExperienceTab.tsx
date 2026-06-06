@@ -256,7 +256,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                         className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50 transition-all text-xs font-black uppercase tracking-widest"
                       >
                         <Video className="w-4 h-4" />
-                        Record &amp; Analyze with Gemini AI
+                        Record &amp; Analyze with AI
                       </button>
                     </>
                   )}
