@@ -35,7 +35,7 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
   startEditingExperience,
   saveEditedExperience
 }) => {
-  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string } | null>(null);
+  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string; index: number } | null>(null);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -271,7 +271,7 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
 
                 {/* Gemini video analysis button — always visible */}
                 <button
-                  onClick={() => setVideoModalExp({ title: exp.title, company: exp.company })}
+                  onClick={() => setVideoModalExp({ title: exp.title, company: exp.company, index })}
                   className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50 transition-all text-xs font-black uppercase tracking-widest"
                 >
                   <Video className="w-4 h-4" />
@@ -292,7 +292,8 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
         <ExperienceVideoModal
           isOpen={!!videoModalExp}
           onClose={() => setVideoModalExp(null)}
-          experience={videoModalExp}
+          experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+          experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
         />
       )}
