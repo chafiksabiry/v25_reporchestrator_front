@@ -204,10 +204,10 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                             type="button"
                             onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || '') })}
                             className="flex items-center gap-1 p-1.5 rounded-lg bg-harx-50 border border-harx-200 text-harx-600 hover:bg-harx-100 transition-colors"
-                            title="Record & Analyze with AI"
+                            title="Record & Analyze with Gemini"
                           >
                             <Video className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-wide pr-0.5">AI</span>
+                            <span className="text-[10px] font-black uppercase tracking-wide pr-0.5">Gemini</span>
                           </button>
                           <button
                             type="button"

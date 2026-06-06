@@ -317,7 +317,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white">AI Experience Analysis</h2>
+              <h2 className="text-base font-black text-white">Gemini Experience Analysis</h2>
               <p className="text-xs text-slate-400 font-medium truncate max-w-xs">
                 {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
               </p>
@@ -425,7 +425,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-default text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
                   >
                     <Sparkles className="w-4 h-4" />
-                    {result ? 'Analysis Complete' : 'Analyze with AI'}
+                    {result ? 'Analysis Complete' : 'Analyze with Gemini'}
                   </button>
                   {!result && (
                     <button
@@ -443,8 +443,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 <div className="flex flex-col items-center gap-3 py-2">
                   <Loader2 className="w-8 h-8 text-harx-400 animate-spin" />
                   <div className="text-center">
-                    <p className="text-sm font-black text-white">Analyzing...</p>
-                    <p className="text-xs text-slate-400 mt-1">Transcribing → Extracting skills</p>
+                    <p className="text-sm font-black text-white">Gemini is analyzing...</p>
+                    <p className="text-xs text-slate-400 mt-1">Uploading → Processing video → Extracting skills</p>
                   </div>
                 </div>
               )}
@@ -484,8 +484,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </div>
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-base font-black text-slate-800">AI is analyzing your video</p>
-                  <p className="text-sm text-slate-500">Transcribing speech → Detecting skills → Scoring...</p>
+                  <p className="text-base font-black text-slate-800">Gemini is analyzing your video</p>
+                  <p className="text-sm text-slate-500">Uploading → Processing video → Detecting skills → Scoring...</p>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-center max-w-xs">
                   {['Technical Skills', 'Languages', 'Industries', 'Activities', 'Contact Center Skills'].map((step, i) => (
