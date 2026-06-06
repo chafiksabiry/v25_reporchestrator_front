@@ -1,5 +1,6 @@
-import React from 'react';
-import { Plus, Trash2, Edit, Calendar, Briefcase, RefreshCw, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, Edit, Calendar, Briefcase, RefreshCw, X, Video } from 'lucide-react';
+import { ExperienceVideoModal } from '../../ExperienceVideoModal';
 
 interface EditExperienceTabProps {
   profile: any;
@@ -34,6 +35,8 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
   startEditingExperience,
   saveEditedExperience
 }) => {
+  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string } | null>(null);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Experience Summary */}
@@ -241,6 +244,14 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                     </div>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => setVideoModalExp({ title: exp.title, company: exp.company })}
+                      className="flex items-center gap-1 p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-harx-100 hover:bg-harx-50"
+                      title="Record & Analyze with AI"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span className="text-[9px] font-black uppercase tracking-wide">AI</span>
+                    </button>
                     <button onClick={() => startEditingExperience(index)} className="p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-gray-100 hover:bg-harx-50">
                       <Edit className="w-4 h-4" />
                     </button>
@@ -275,6 +286,15 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
           )}
         </div>
       </div>
+
+      {videoModalExp && (
+        <ExperienceVideoModal
+          isOpen={!!videoModalExp}
+          onClose={() => setVideoModalExp(null)}
+          experience={videoModalExp}
+          profileId={profile._id || profile.id || ''}
+        />
+      )}
     </div>
   );
 };
