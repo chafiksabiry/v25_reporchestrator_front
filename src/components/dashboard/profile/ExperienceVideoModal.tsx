@@ -21,6 +21,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { repApiClient } from '../../../utils/client';
+import { fetchSkillsByType, flattenSkills } from '../../../services/api/skills';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,8 @@ interface AnalysisResult {
   transcription: string;
   analysis: {
     technicalSkills: SkillScore[];
+    professionalSkills?: SkillScore[];
+    softSkills?: SkillScore[];
     spokenLanguages: LanguageScore[];
     industries: { name: string; score: number }[];
     activities: { name: string; score: number }[];
@@ -173,6 +177,40 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
 
+  // Database vocabularies — the AI is constrained to ONLY these names.
+  const vocabRef = useRef<{
+    technicalSkills: string[];
+    professionalSkills: string[];
+    softSkills: string[];
+    industries: string[];
+    activities: string[];
+  }>({ technicalSkills: [], professionalSkills: [], softSkills: [], industries: [], activities: [] });
+
+  const loadVocabularies = useCallback(async () => {
+    try {
+      const [technical, professional, soft, industriesRes, activitiesRes] = await Promise.all([
+        fetchSkillsByType('technical').catch(() => ({})),
+        fetchSkillsByType('professional').catch(() => ({})),
+        fetchSkillsByType('soft').catch(() => ({})),
+        repApiClient.get('/api/industries').catch(() => ({ data: { data: [] } })),
+        repApiClient.get('/api/activities').catch(() => ({ data: { data: [] } })),
+      ]);
+
+      const toNames = (arr: any[]) =>
+        (arr || []).map((x) => (typeof x === 'string' ? x : x?.name)).filter(Boolean);
+
+      vocabRef.current = {
+        technicalSkills: flattenSkills(technical as any).map((s) => s.name),
+        professionalSkills: flattenSkills(professional as any).map((s) => s.name),
+        softSkills: flattenSkills(soft as any).map((s) => s.name),
+        industries: toNames(industriesRes?.data?.data || []),
+        activities: toNames(activitiesRes?.data?.data || []),
+      };
+    } catch (err) {
+      console.error('Failed to load skill/industry/activity vocabularies:', err);
+    }
+  }, []);
+
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     try {
@@ -206,6 +244,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       setAnalyzeError(null);
       setElapsed(0);
       startCamera();
+      loadVocabularies();
     } else {
       stopCamera();
       if (timerRef.current) clearInterval(timerRef.current);
@@ -280,6 +319,14 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       formData.append('video', new File([recordedBlob], 'experience-video.webm', { type: 'video/webm' }));
       formData.append('title', experience.title);
       formData.append('company', experience.company);
+
+      // Constrain the AI to the platform's database vocabularies.
+      const vocab = vocabRef.current;
+      formData.append('allowedTechnicalSkills', JSON.stringify(vocab.technicalSkills));
+      formData.append('allowedProfessionalSkills', JSON.stringify(vocab.professionalSkills));
+      formData.append('allowedSoftSkills', JSON.stringify(vocab.softSkills));
+      formData.append('allowedIndustries', JSON.stringify(vocab.industries));
+      formData.append('allowedActivities', JSON.stringify(vocab.activities));
 
       const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
         method: 'POST',
@@ -538,6 +585,32 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.technicalSkills.length}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
+                    ))}
+                  </Section>
+                )}
+
+                {/* Professional Skills */}
+                {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Briefcase className="w-4 h-4" />}
+                    title="Professional Skills"
+                    count={result.analysis.professionalSkills!.length}
+                  >
+                    {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
+                    ))}
+                  </Section>
+                )}
+
+                {/* Soft Skills */}
+                {(result.analysis.softSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Sparkles className="w-4 h-4" />}
+                    title="Soft Skills"
+                    count={result.analysis.softSkills!.length}
+                  >
+                    {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
                       <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
                     ))}
                   </Section>
