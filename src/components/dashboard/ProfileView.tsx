@@ -132,8 +132,9 @@ export const ProfileView: React.FC<{
   }) => void,
   onDeleteSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', index: number) => void,
   onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
-  onProfileUpdate?: (updatedProfile: any) => void
-}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate }) => {
+  onProfileUpdate?: (updatedProfile: any) => void,
+  onVideoAnalysisComplete?: () => void
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const getInitialTab = () => {
@@ -832,6 +833,7 @@ export const ProfileView: React.FC<{
       case 'experience': return (
         <ExperienceTab
           profile={profile}
+          onVideoAnalysisComplete={onVideoAnalysisComplete}
           onAddItemClick={(item) => onAddExperience?.(item)}
           onUpdateItemClick={(index, item) => onUpdateExperience?.(index, item)}
           onDeleteItemClick={(index) => onDeleteExperience?.(index)}

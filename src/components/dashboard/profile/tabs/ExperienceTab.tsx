@@ -4,6 +4,7 @@ import { ExperienceVideoModal } from '../ExperienceVideoModal';
 
 interface ExperienceTabProps {
   profile: any;
+  onVideoAnalysisComplete?: () => void;
   onAddItemClick: (item: {
     title: string;
     company: string;
@@ -21,7 +22,7 @@ interface ExperienceTabProps {
   onDeleteItemClick: (index: number) => void;
 }
 
-export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItemClick, onUpdateItemClick, onDeleteItemClick }) => {
+export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAnalysisComplete, onAddItemClick, onUpdateItemClick, onDeleteItemClick }) => {
   const [draft, setDraft] = useState({
     title: '',
     company: '',
@@ -249,14 +250,17 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                         </div>
                       )}
 
-                      {/* Gemini video analysis button — always visible */}
                       <button
                         type="button"
                         onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || ''), index })}
-                        className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50 transition-all text-xs font-black uppercase tracking-widest"
+                        className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
+                          exp.videoUrl || exp.videoAnalysis
+                            ? 'border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50'
+                            : 'border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50'
+                        }`}
                       >
                         <Video className="w-4 h-4" />
-                        Record &amp; Analyze with AI
+                        {exp.videoUrl || exp.videoAnalysis ? 'View AI Analysis' : 'Record & Analyze with AI'}
                       </button>
                     </>
                   )}
@@ -278,6 +282,13 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
           experience={{ title: videoModalExp.title, company: videoModalExp.company }}
           experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
+          savedData={profile.experience?.[videoModalExp.index] ? {
+            videoUrl: profile.experience[videoModalExp.index].videoUrl,
+            videoTranscription: profile.experience[videoModalExp.index].videoTranscription,
+            videoAnalysis: profile.experience[videoModalExp.index].videoAnalysis,
+            videoAnalyzedAt: profile.experience[videoModalExp.index].videoAnalyzedAt,
+          } : null}
+          onAnalysisComplete={onVideoAnalysisComplete}
         />
       )}
     </div>

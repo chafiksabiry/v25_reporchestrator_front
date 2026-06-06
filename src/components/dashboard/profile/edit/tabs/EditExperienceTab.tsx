@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit, Calendar, Briefcase, RefreshCw, X, Video } from 'lucide-react';
 import { ExperienceVideoModal } from '../../ExperienceVideoModal';
+import { fetchProfileFromAPI } from '../../../../../utils/profileUtils';
 
 interface EditExperienceTabProps {
   profile: any;
@@ -269,13 +270,16 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                   </div>
                 )}
 
-                {/* Gemini video analysis button — always visible */}
                 <button
                   onClick={() => setVideoModalExp({ title: exp.title, company: exp.company, index })}
-                  className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50 transition-all text-xs font-black uppercase tracking-widest"
+                  className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
+                    exp.videoUrl || exp.videoAnalysis
+                      ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                      : 'border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50'
+                  }`}
                 >
                   <Video className="w-4 h-4" />
-                  Record &amp; Analyze with AI
+                  {exp.videoUrl || exp.videoAnalysis ? 'View AI Analysis' : 'Record & Analyze with AI'}
                 </button>
               </div>
             ))
@@ -295,6 +299,16 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
           experience={{ title: videoModalExp.title, company: videoModalExp.company }}
           experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
+          savedData={profile.experience?.[videoModalExp.index] ? {
+            videoUrl: profile.experience[videoModalExp.index].videoUrl,
+            videoTranscription: profile.experience[videoModalExp.index].videoTranscription,
+            videoAnalysis: profile.experience[videoModalExp.index].videoAnalysis,
+            videoAnalyzedAt: profile.experience[videoModalExp.index].videoAnalyzedAt,
+          } : null}
+          onAnalysisComplete={async () => {
+            const fresh = await fetchProfileFromAPI();
+            if (fresh) setProfile(fresh);
+          }}
         />
       )}
     </div>
