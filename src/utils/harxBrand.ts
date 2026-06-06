@@ -8,19 +8,19 @@ export const HARX_BRAND = {
 } as const;
 
 /**
- * Diagonal red→pink gradient matching the "Import my CV" CTA button.
+ * Diagonal red→magenta gradient matching the "Import my CV" CTA button.
  * Used for accents (active menu items, badges) over the bars.
  */
 export const HARX_BUTTON_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D 100%)';
 
-/** Base red used as the gradients' starting color (was var(--red)). */
+/** Base red used as the gradients' starting color. */
 const RED = '#ED1C24';
 
-/** Navbar background. */
-export const HARX_NAVBAR_BG = `linear-gradient(to right, ${RED} 0%, #e70053 50%, #e26783 100%)`;
+/** Navbar background — horizontal red → magenta band. */
+export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${RED} 0%, #E6188D 60%, #C2186F 100%)`;
 
-/** Sidebar background. */
-export const HARX_SIDEBAR_BG = `linear-gradient(to right, ${RED} 0%, #E7007A 125%, #E42FD7 14%)`;
+/** Sidebar background — vertical flow: red → magenta → deep magenta → darkest. */
+export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${RED} 0%, #E6188D 45%, #C2186F 75%, #8A1250 100%)`;
 
 /** Sidebar body continues the same vertical flow below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.red} 0%, ${HARX_BRAND.magenta} 45%, ${HARX_BRAND.magentaDeep} 75%, ${HARX_BRAND.magentaDarker} 100%)`;
