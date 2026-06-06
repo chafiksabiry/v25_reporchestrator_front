@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Skeleton } from '../ui/Skeleton';
 import { ProfileView } from '../ProfileView';
 import { ProfileEditView } from '../ProfileEditView';
-import { getProfileData, updateProfileData, updateSkills, updateBasicInfo, updateExperience } from '../../../utils/profileUtils';
+import { getProfileData, updateProfileData, updateSkills, updateBasicInfo, updateExperience, fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { setProfileData } from '../../../utils/authUtils';
 
 // Import Timezone type from repWizard service
@@ -122,6 +122,10 @@ interface ProfileData {
     endDate?: string;
     responsibilities?: string[];
     achievements?: string[];
+    videoUrl?: string;
+    videoTranscription?: string;
+    videoAnalysis?: Record<string, unknown>;
+    videoAnalyzedAt?: string;
   }>;
   // Updated: availability with timezone as ObjectId or string
   availability?: {
@@ -201,6 +205,15 @@ export function Profile() {
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating profile state:', error);
+    }
+  };
+
+  const handleVideoAnalysisComplete = async () => {
+    try {
+      const fresh = await fetchProfileFromAPI();
+      if (fresh) updateProfileStateAndStorage(fresh);
+    } catch (error) {
+      console.error('Error refreshing profile after video analysis:', error);
     }
   };
 
@@ -647,6 +660,7 @@ export function Profile() {
             onDeleteSpecializationItem={handleDeleteSpecializationItem}
             onAddSpecializationItem={handleAddSpecializationItem}
             onProfileUpdate={handleProfileUpdate}
+            onVideoAnalysisComplete={handleVideoAnalysisComplete}
           />
         )}
       </div>

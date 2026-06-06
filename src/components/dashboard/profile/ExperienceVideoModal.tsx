@@ -68,17 +68,38 @@ interface AnalysisResult {
   };
 }
 
+interface SavedVideoData {
+  videoUrl?: string;
+  videoTranscription?: string;
+  videoAnalysis?: AnalysisResult['analysis'];
+  videoAnalyzedAt?: string;
+}
+
 interface ExperienceVideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   experience: { title: string; company: string };
   profileId: string;
   experienceIndex?: number;
+  savedData?: SavedVideoData | null;
+  onAnalysisComplete?: () => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const MAX_DURATION = 120; // 2 minutes in seconds
+
+const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
+  if (!saved?.videoAnalysis) return null;
+  return {
+    videoUrl: saved.videoUrl,
+    transcription: saved.videoTranscription || '',
+    analysis: saved.videoAnalysis,
+  };
+};
+
+const hasSavedAnalysis = (saved?: SavedVideoData | null) =>
+  Boolean(saved?.videoUrl || saved?.videoAnalysis);
 
 const formatTime = (secs: number) => {
   const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -159,7 +180,7 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
-  isOpen, onClose, experience, profileId, experienceIndex,
+  isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -175,6 +196,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [viewMode, setViewMode] = useState<'saved' | 'record'>('record');
+  const [savedFlag, setSavedFlag] = useState(false);
 
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -201,22 +224,59 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     if (videoRef.current) videoRef.current.srcObject = null;
   }, [stream]);
 
+  const showSavedVideo = (url: string) => {
+    if (!videoRef.current) return;
+    videoRef.current.srcObject = null;
+    videoRef.current.src = url;
+    videoRef.current.muted = false;
+    videoRef.current.loop = false;
+    videoRef.current.controls = true;
+    videoRef.current.play().catch(() => {});
+  };
+
+  const enterRecordMode = useCallback(() => {
+    setViewMode('record');
+    setRecordedBlob(null);
+    setResult(null);
+    setAnalyzeError(null);
+    setSavedFlag(false);
+    setElapsed(0);
+    if (videoRef.current) {
+      videoRef.current.src = '';
+      videoRef.current.controls = false;
+      videoRef.current.srcObject = null;
+    }
+    startCamera();
+  }, [startCamera]);
+
   // ── Open/close lifecycle ───────────────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
-      setRecordedBlob(null);
-      setResult(null);
       setAnalyzeError(null);
       setElapsed(0);
-      startCamera();
+      setSavedFlag(false);
+
+      if (hasSavedAnalysis(savedData)) {
+        setViewMode('saved');
+        setRecordedBlob(null);
+        const savedResult = buildResultFromSaved(savedData!);
+        setResult(savedResult);
+        stopCamera();
+        if (savedData?.videoUrl) {
+          setTimeout(() => showSavedVideo(savedData.videoUrl!), 50);
+        }
+      } else {
+        enterRecordMode();
+      }
     } else {
       stopCamera();
       if (timerRef.current) clearInterval(timerRef.current);
+      setViewMode('record');
     }
     return () => {
       if (!isOpen) stopCamera();
     };
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, savedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Recording ──────────────────────────────────────────────────────────────
   const startRecording = () => {
@@ -261,15 +321,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   };
 
   const retake = () => {
-    setRecordedBlob(null);
-    setResult(null);
-    setAnalyzeError(null);
-    setElapsed(0);
-    if (videoRef.current) {
-      videoRef.current.src = '';
-      videoRef.current.srcObject = null;
-    }
-    startCamera();
+    enterRecordMode();
   };
 
   // ── Analysis ───────────────────────────────────────────────────────────────
@@ -299,7 +351,15 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       }
 
       const json = await response.json();
-      setResult(json.data);
+      const data = json.data;
+      setResult(data);
+      if (data?.saved) {
+        setSavedFlag(true);
+        onAnalysisComplete?.();
+      }
+      if (data?.videoUrl) {
+        showSavedVideo(data.videoUrl);
+      }
     } catch (err: any) {
       setAnalyzeError(err.message || 'Analysis failed. Please try again.');
     } finally {
@@ -342,7 +402,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
           <div className="md:w-96 flex-shrink-0 bg-slate-900 flex flex-col">
             {/* Video preview */}
             <div className="relative flex-1 bg-black min-h-[240px]">
-              {cameraError ? (
+              {cameraError && viewMode === 'record' && !result?.videoUrl ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                   <VideoOff className="w-12 h-12 text-slate-500" />
                   <p className="text-sm text-slate-400">{cameraError}</p>
@@ -358,7 +418,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   ref={videoRef}
                   className="w-full h-full object-cover"
                   playsInline
-                  autoPlay
+                  autoPlay={viewMode === 'record'}
+                  controls={viewMode === 'saved' || !!result?.videoUrl}
                 />
               )}
 
@@ -377,8 +438,14 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 </div>
               )}
 
-              {/* Recorded badge */}
-              {recordedBlob && !isRecording && (
+              {/* Saved / recorded badge */}
+              {viewMode === 'saved' && result && !isRecording && (
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-indigo-500/80 px-3 py-1.5 rounded-full">
+                  <CheckCircle className="w-3 h-3 text-white" />
+                  <span className="text-xs font-black text-white">Saved</span>
+                </div>
+              )}
+              {recordedBlob && !isRecording && viewMode === 'record' && (
                 <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-emerald-500/80 px-3 py-1.5 rounded-full">
                   <CheckCircle className="w-3 h-3 text-white" />
                   <span className="text-xs font-black text-white">Recorded</span>
@@ -398,7 +465,17 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
             {/* Controls */}
             <div className="px-4 py-4 space-y-3">
-              {!recordedBlob && !isRecording && (
+              {viewMode === 'saved' && !isRecording && !recordedBlob && (
+                <button
+                  onClick={enterRecordMode}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Record New Video
+                </button>
+              )}
+
+              {viewMode === 'record' && !recordedBlob && !isRecording && (
                 <div className="text-center">
                   <p className="text-xs text-slate-400 mb-3">
                     Record up to <span className="text-white font-black">2 minutes</span> describing your experience, skills, and achievements.
@@ -518,6 +595,12 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
             {result && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {savedFlag && (
+                  <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                    Analysis saved to your profile
+                  </div>
+                )}
                 {/* Summary banner */}
                 <div className="p-4 bg-gradient-to-r from-harx-50 to-indigo-50 border border-harx-100 rounded-2xl">
                   <div className="flex items-center justify-between mb-2">
