@@ -247,10 +247,10 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                     <button
                       onClick={() => setVideoModalExp({ title: exp.title, company: exp.company })}
                       className="flex items-center gap-1 p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-harx-100 hover:bg-harx-50"
-                      title="Record & Analyze with AI"
+                      title="Record & Analyze with Gemini"
                     >
                       <Video className="w-4 h-4" />
-                      <span className="text-[9px] font-black uppercase tracking-wide">AI</span>
+                      <span className="text-[9px] font-black uppercase tracking-wide">Gemini</span>
                     </button>
                     <button onClick={() => startEditingExperience(index)} className="p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-gray-100 hover:bg-harx-50">
                       <Edit className="w-4 h-4" />
