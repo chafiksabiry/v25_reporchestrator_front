@@ -31,7 +31,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
-  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string } | null>(null);
+  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string; index: number } | null>(null);
 
   const resetDraft = () => {
     setDraft({ title: '', company: '', startDate: '', endDate: '', description: '' });
@@ -252,7 +252,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                       {/* Gemini video analysis button — always visible */}
                       <button
                         type="button"
-                        onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || '') })}
+                        onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || ''), index })}
                         className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50 transition-all text-xs font-black uppercase tracking-widest"
                       >
                         <Video className="w-4 h-4" />
@@ -275,7 +275,8 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
         <ExperienceVideoModal
           isOpen={!!videoModalExp}
           onClose={() => setVideoModalExp(null)}
-          experience={videoModalExp}
+          experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+          experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
         />
       )}

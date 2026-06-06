@@ -21,8 +21,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
-import { repApiClient } from '../../../utils/client';
-import { fetchSkillsByType, flattenSkills } from '../../../services/api/skills';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +73,7 @@ interface ExperienceVideoModalProps {
   onClose: () => void;
   experience: { title: string; company: string };
   profileId: string;
+  experienceIndex?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -160,7 +159,7 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
-  isOpen, onClose, experience, profileId,
+  isOpen, onClose, experience, profileId, experienceIndex,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -176,40 +175,6 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
-
-  // Database vocabularies — the AI is constrained to ONLY these names.
-  const vocabRef = useRef<{
-    technicalSkills: string[];
-    professionalSkills: string[];
-    softSkills: string[];
-    industries: string[];
-    activities: string[];
-  }>({ technicalSkills: [], professionalSkills: [], softSkills: [], industries: [], activities: [] });
-
-  const loadVocabularies = useCallback(async () => {
-    try {
-      const [technical, professional, soft, industriesRes, activitiesRes] = await Promise.all([
-        fetchSkillsByType('technical').catch(() => ({})),
-        fetchSkillsByType('professional').catch(() => ({})),
-        fetchSkillsByType('soft').catch(() => ({})),
-        repApiClient.get('/api/industries').catch(() => ({ data: { data: [] } })),
-        repApiClient.get('/api/activities').catch(() => ({ data: { data: [] } })),
-      ]);
-
-      const toNames = (arr: any[]) =>
-        (arr || []).map((x) => (typeof x === 'string' ? x : x?.name)).filter(Boolean);
-
-      vocabRef.current = {
-        technicalSkills: flattenSkills(technical as any).map((s) => s.name),
-        professionalSkills: flattenSkills(professional as any).map((s) => s.name),
-        softSkills: flattenSkills(soft as any).map((s) => s.name),
-        industries: toNames(industriesRes?.data?.data || []),
-        activities: toNames(activitiesRes?.data?.data || []),
-      };
-    } catch (err) {
-      console.error('Failed to load skill/industry/activity vocabularies:', err);
-    }
-  }, []);
 
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -244,7 +209,6 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       setAnalyzeError(null);
       setElapsed(0);
       startCamera();
-      loadVocabularies();
     } else {
       stopCamera();
       if (timerRef.current) clearInterval(timerRef.current);
@@ -319,14 +283,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       formData.append('video', new File([recordedBlob], 'experience-video.webm', { type: 'video/webm' }));
       formData.append('title', experience.title);
       formData.append('company', experience.company);
-
-      // Constrain the AI to the platform's database vocabularies.
-      const vocab = vocabRef.current;
-      formData.append('allowedTechnicalSkills', JSON.stringify(vocab.technicalSkills));
-      formData.append('allowedProfessionalSkills', JSON.stringify(vocab.professionalSkills));
-      formData.append('allowedSoftSkills', JSON.stringify(vocab.softSkills));
-      formData.append('allowedIndustries', JSON.stringify(vocab.industries));
-      formData.append('allowedActivities', JSON.stringify(vocab.activities));
+      if (experienceIndex !== undefined && experienceIndex >= 0) {
+        formData.append('experienceIndex', String(experienceIndex));
+      }
 
       const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
         method: 'POST',
