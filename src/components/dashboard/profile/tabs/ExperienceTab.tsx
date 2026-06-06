@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Briefcase, Calendar, Plus, X, Pencil } from 'lucide-react';
+import { Briefcase, Calendar, Plus, X, Pencil, Video } from 'lucide-react';
+import { ExperienceVideoModal } from '../ExperienceVideoModal';
 
 interface ExperienceTabProps {
   profile: any;
@@ -30,6 +31,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string } | null>(null);
 
   const resetDraft = () => {
     setDraft({ title: '', company: '', startDate: '', endDate: '', description: '' });
@@ -200,6 +202,15 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                           </div>
                           <button
                             type="button"
+                            onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || '') })}
+                            className="flex items-center gap-1 p-1.5 rounded-lg bg-harx-50 border border-harx-200 text-harx-600 hover:bg-harx-100 transition-colors"
+                            title="Record & Analyze with AI"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-black uppercase tracking-wide pr-0.5">AI</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               setIsAddFormOpen(false);
                               setEditingIndex(index);
@@ -258,6 +269,15 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
           </div>
         )}
       </div>
+
+      {videoModalExp && (
+        <ExperienceVideoModal
+          isOpen={!!videoModalExp}
+          onClose={() => setVideoModalExp(null)}
+          experience={videoModalExp}
+          profileId={profile._id || profile.id || ''}
+        />
+      )}
     </div>
   );
 };
