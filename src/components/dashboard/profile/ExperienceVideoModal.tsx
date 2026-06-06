@@ -20,7 +20,7 @@ import {
   Headphones,
   Loader2,
 } from 'lucide-react';
-import { repApiUrl } from '../../../utils/repApiUrl';
+import { dashRepApiUrl } from '../../../utils/repApiUrl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -280,7 +280,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       formData.append('title', experience.title);
       formData.append('company', experience.company);
 
-      const response = await fetch(repApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
+      const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,

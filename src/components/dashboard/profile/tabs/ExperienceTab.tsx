@@ -202,15 +202,6 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                           </div>
                           <button
                             type="button"
-                            onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || '') })}
-                            className="flex items-center gap-1 p-1.5 rounded-lg bg-harx-50 border border-harx-200 text-harx-600 hover:bg-harx-100 transition-colors"
-                            title="Record & Analyze with Gemini"
-                          >
-                            <Video className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-wide pr-0.5">Gemini</span>
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => {
                               setIsAddFormOpen(false);
                               setEditingIndex(index);
@@ -257,6 +248,16 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onAddItem
                           </ul>
                         </div>
                       )}
+
+                      {/* Gemini video analysis button — always visible */}
+                      <button
+                        type="button"
+                        onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || '') })}
+                        className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50 transition-all text-xs font-black uppercase tracking-widest"
+                      >
+                        <Video className="w-4 h-4" />
+                        Record &amp; Analyze with Gemini AI
+                      </button>
                     </>
                   )}
                 </div>
