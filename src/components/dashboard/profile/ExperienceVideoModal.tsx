@@ -43,6 +43,7 @@ interface ContactCenterSkill {
 }
 
 interface AnalysisResult {
+  videoUrl?: string | null;
   transcription: string;
   analysis: {
     technicalSkills: SkillScore[];
