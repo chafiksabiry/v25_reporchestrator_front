@@ -8,6 +8,8 @@
   VITE_API_URL = "https://v25registrationbackend-production.up.railway.app/api"
   # Reps wizard backend — profiles, onboarding, plans
   VITE_REP_API_URL = "https://v25repscreationwizardbackend-production-bdd2.up.railway.app/api"
+  # Rep dashboard backend — profile video analysis (Gemini), /api/profiles/*
+  VITE_REP_DASH_API_URL = "https://v25dashrepback-production.up.railway.app/api"
   # Gigs backend — active gigs, gig details (/api/gigs/*)
   VITE_BACKEND_URL_GIGS = "https://v25gigsmanualcreationbackend-production.up.railway.app/api"
   VITE_API_URL_GIGS = "https://v25gigsmanualcreationbackend-production.up.railway.app/api"

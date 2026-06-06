@@ -233,7 +233,7 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
         <div className="space-y-6">
           {profile.experience?.length > 0 ? (
             profile.experience.map((exp: any, index: number) => (
-              <div key={index} className="group relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-indigo-50 hover:before:bg-harx-500 transition-all p-5 rounded-3xl hover:bg-gray-50/50">
+              <div key={index} className="group relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-indigo-50 hover:before:bg-harx-500 transition-all p-5 rounded-3xl hover:bg-gray-50/50 border border-transparent hover:border-gray-100">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-lg font-black text-gray-900">{exp.title}</h3>
@@ -243,15 +243,7 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                       {exp.startDate ? formatDate(exp.startDate) : '---'} — {exp.endDate === 'present' ? 'Present' : exp.endDate ? formatDate(exp.endDate) : 'Present'}
                     </div>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => setVideoModalExp({ title: exp.title, company: exp.company })}
-                      className="flex items-center gap-1 p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-harx-100 hover:bg-harx-50"
-                      title="Record & Analyze with Gemini"
-                    >
-                      <Video className="w-4 h-4" />
-                      <span className="text-[9px] font-black uppercase tracking-wide">Gemini</span>
-                    </button>
+                  <div className="flex gap-2">
                     <button onClick={() => startEditingExperience(index)} className="p-2 bg-white text-harx-600 rounded-xl shadow-sm border border-gray-100 hover:bg-harx-50">
                       <Edit className="w-4 h-4" />
                     </button>
@@ -265,9 +257,9 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                     </button>
                   </div>
                 </div>
-                
+
                 {exp.responsibilities?.length > 0 && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
                     {exp.responsibilities.map((r: string, idx: number) => (
                       <div key={idx} className="flex items-start gap-2 bg-white p-2.5 rounded-xl border border-gray-50 text-[11px] font-bold text-gray-600 italic">
                         <div className="w-1.5 h-1.5 bg-gray-200 rounded-full mt-1.5 flex-shrink-0"></div>
@@ -276,6 +268,15 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                     ))}
                   </div>
                 )}
+
+                {/* Gemini video analysis button — always visible */}
+                <button
+                  onClick={() => setVideoModalExp({ title: exp.title, company: exp.company })}
+                  className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50 transition-all text-xs font-black uppercase tracking-widest"
+                >
+                  <Video className="w-4 h-4" />
+                  Record &amp; Analyze with Gemini AI
+                </button>
               </div>
             ))
           ) : (

@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_RUN_MODE: string;
   readonly VITE_API_URL: string;
   readonly VITE_REP_API_URL: string;
+  readonly VITE_REP_DASH_API_URL: string;
   readonly VITE_AUTH_API_URL: string;
   readonly VITE_API_URL_CALL: string;
   readonly VITE_MATCHING_API_URL: string;
