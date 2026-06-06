@@ -16,11 +16,11 @@ export const HARX_BUTTON_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D
 /** Base red used as the gradients' starting color. */
 const RED = '#ED1C24';
 
-/** Navbar background — horizontal red → magenta band. */
-export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${RED} 0%, #E6188D 60%, #C2186F 100%)`;
+/** Navbar background — dark diagonal: red → deep magenta → bordeaux. */
+export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${RED} 0%, #C2186F 55%, #8A1250 100%)`;
 
-/** Sidebar background — vertical flow: red → magenta → deep magenta → darkest. */
-export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${RED} 0%, #E6188D 45%, #C2186F 75%, #8A1250 100%)`;
+/** Sidebar background — dark vertical flow: red → deep magenta → bordeaux. */
+export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${RED} 0%, #C2186F 50%, #8A1250 100%)`;
 
 /** Sidebar body continues the same vertical flow below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.red} 0%, ${HARX_BRAND.magenta} 45%, ${HARX_BRAND.magentaDeep} 75%, ${HARX_BRAND.magentaDarker} 100%)`;
