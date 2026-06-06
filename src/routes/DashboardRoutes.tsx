@@ -24,6 +24,7 @@ import { fetchProfileFromAPI } from '../utils/profileUtils';
 import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
 import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
+import { HARX_NAVBAR_BG } from '../utils/harxBrand';
 
 function DashboardAppContent() {
   useAuth();
@@ -77,7 +78,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
 
   return (
-    <div className="flex h-screen bg-black overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
       {!isProfileEdit && (
         <Sidebar
           phases={userProfile?.onboardingProgress?.phases}
@@ -87,14 +88,14 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
           setIsCollapsed={() => {}}
         />
       )}
-      <div className="flex-1 flex flex-col overflow-hidden bg-black">
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
         {!isProfileEdit && (
           <TopBar
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         )}
-        <main className={`flex-1 overflow-y-auto bg-white rounded-tl-[24px] ${location.pathname.includes('/profile') ? 'p-0' : 'px-4 py-3'}`}>
+        <main className={`flex-1 overflow-y-auto bg-white ${location.pathname.includes('/profile') ? 'p-0' : 'px-4 py-3'}`}>
           {loading ? (
             <div className="flex justify-center items-center h-full">
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
