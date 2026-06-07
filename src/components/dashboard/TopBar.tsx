@@ -281,12 +281,12 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
 
               {/* ── Header: Photo + Name + Role ── */}
-              <div className="px-4 py-4 flex items-center gap-3 border-b border-white/10 bg-white/[0.03]">
+              <div className="relative px-4 py-4 flex items-center gap-3 border-b border-white/10 bg-gradient-to-br from-[#ED1C24]/15 via-[#E6188D]/10 to-transparent">
                 {profileData?.personalInfo?.photo?.url ? (
                   <img
                     src={profileData.personalInfo.photo.url}
                     alt={userName}
-                    className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-white/10 shrink-0"
+                    className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-[#E6188D]/40 shrink-0"
                   />
                 ) : (
                   <div style={{ backgroundImage: HARX_BUTTON_GRADIENT }} className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
@@ -300,12 +300,12 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               </div>
 
               {/* ── Menu Items ── */}
-              <div className="py-2">
+              <div className="py-2 px-1.5">
                 <button
                   onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-[#E6188D]/10 transition-colors group"
                 >
-                  <div className="p-1.5 bg-harx-500/15 text-harx-400 rounded-lg">
+                  <div className="p-1.5 bg-[#E6188D]/15 text-[#F36] rounded-lg group-hover:bg-[#E6188D] group-hover:text-white transition-all duration-200">
                     <UserCircle className="h-4 w-4" />
                   </div>
                   <span>Mon Profil</span>
