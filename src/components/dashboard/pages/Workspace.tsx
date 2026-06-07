@@ -1101,7 +1101,7 @@ export function WorkspaceContent() {
                 onClick={() => {
                   setShowWarningModal(false);
                   if (!selectedGigId || !copilotGuard.isEnrolledInGig) {
-                    navigate('/gigs-marketplace');
+                    navigate('/marketplace');
                   } else if (!copilotGuard.isTrainingComplete) {
                     navigate(`/training?gigId=${selectedGigId}`);
                   } else if (!copilotGuard.hasActiveReservationNow) {

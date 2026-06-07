@@ -124,7 +124,7 @@ export function CompanyProfile() {
 
   const handleBack = useCallback(() => {
     if (!companyId) {
-      navigate('/gigs-marketplace');
+      navigate('/marketplace');
       return;
     }
     const state = location.state as CompanyLocationState | null;
@@ -141,7 +141,7 @@ export function CompanyProfile() {
       navigate(-1);
       return;
     }
-    navigate('/gigs-marketplace');
+    navigate('/marketplace');
   }, [companyId, location.state, navigate, searchParams]);
 
   const mapsHref = useMemo(() => {
@@ -181,7 +181,7 @@ export function CompanyProfile() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/gigs-marketplace')}
+            onClick={() => navigate('/marketplace')}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black text-sm uppercase tracking-wider hover:opacity-95 transition-opacity"
           >
             Retour au marketplace

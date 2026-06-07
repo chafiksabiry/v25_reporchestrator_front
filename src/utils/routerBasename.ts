@@ -5,10 +5,11 @@ import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
  *
  * The whole unified app (onboarding orchestrator + dashboard + profile
  * creation + wizard + assessments) is mounted by the qiankun host under the
- * single `/reporchestrator` prefix. The basename must match how the app is
- * mounted, otherwise no routes match and the catch-all redirect fires.
+ * single `/reps` prefix. The basename must match how the app is
+ * mounted (host `activeRule`), otherwise no routes match and the catch-all
+ * redirect fires.
  */
-const MOUNT_PREFIX = '/reporchestrator';
+const MOUNT_PREFIX = '/reps';
 
 export function getRouterBasename(): string {
   if (typeof window === 'undefined') {

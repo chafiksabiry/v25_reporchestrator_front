@@ -145,7 +145,7 @@ const phaseTemplates = [
     name: 'Sign Up & Verification',
     description: 'Complete your account setup and verify your identity',
     icon: UserPlus,
-    path: '/onboarding/signup',
+    path: '/orchestrator/signup',
     requiredActions: [
       'Create your REPS account with email',
       'Verify your email address'
@@ -161,7 +161,7 @@ const phaseTemplates = [
     name: 'Profile Creation',
     description: 'Build your professional profile',
     icon: UserCircle,
-    path: '/onboarding/profile',
+    path: '/orchestrator/profile',
     requiredActions: [
       'Add your work experience',
       'List your key skills',
@@ -180,7 +180,7 @@ const phaseTemplates = [
     name: 'Skills Assessment',
     description: 'Complete tests and get your Bolt Score',
     icon: Award,
-    path: '/onboarding/skills',
+    path: '/orchestrator/skills',
     requiredActions: [
       'Complete language assessment',
       'Complete contact center assessment'
@@ -195,7 +195,7 @@ const phaseTemplates = [
     name: 'Subscription Plan',
     description: 'Choose your membership level',
     icon: CreditCard,
-    path: '/onboarding/subscription',
+    path: '/orchestrator/subscription',
     requiredActions: [
       'Activate subscription'
     ],
@@ -206,7 +206,7 @@ const phaseTemplates = [
     name: 'Marketplace Access',
     description: 'Browse and apply for gigs',
     icon: ShoppingBag,
-    path: '/onboarding/marketplace',
+    path: '/orchestrator/marketplace',
     requiredActions: [
       'Complete marketplace orientation',
       'Set up gig preferences'
@@ -222,7 +222,7 @@ const phaseTemplates = [
     name: 'Operations Launch',
     description: 'Start your first gig',
     icon: PhoneCall,
-    path: '/onboarding/operations',
+    path: '/orchestrator/operations',
     requiredActions: [
       'Review assigned tasks',
       'Set up communication tools'
@@ -238,7 +238,7 @@ const phaseTemplates = [
     name: 'Support & Training',
     description: 'Access resources and community',
     icon: Headphones,
-    path: '/onboarding/support',
+    path: '/orchestrator/support',
     requiredActions: [
       'Join REPS community',
       'Complete onboarding training'
@@ -254,7 +254,7 @@ const phaseTemplates = [
     name: 'Quality Control',
     description: 'Monitor your performance',
     icon: Shield,
-    path: '/onboarding/quality',
+    path: '/orchestrator/quality',
     requiredActions: [
       'Review quality guidelines',
       'Set up performance tracking'
@@ -270,7 +270,7 @@ const phaseTemplates = [
     name: 'Career Growth',
     description: 'Advance your REPS career',
     icon: TrendingUp,
-    path: '/onboarding/career',
+    path: '/orchestrator/career',
     requiredActions: [
       'Review career paths',
       'Set career goals'
@@ -286,7 +286,7 @@ const phaseTemplates = [
     name: 'Wallet & Payments',
     description: 'Manage your earnings',
     icon: Wallet,
-    path: '/onboarding/wallet',
+    path: '/orchestrator/wallet',
     requiredActions: [
       'Set up payment account',
       'Configure payout preferences'
@@ -791,7 +791,7 @@ function Dashboard() {
               <button
                 onClick={() => {
                   setShowComingSoonModal(false);
-                  navigate('/gigs-marketplace');
+                  navigate('/marketplace');
                 }}
                 className="w-full bg-gradient-harx text-white py-2 px-4 rounded-md hover:shadow-lg hover:shadow-harx-500/30 transition-all font-black uppercase tracking-widest text-xs"
               >
