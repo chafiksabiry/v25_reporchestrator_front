@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  Award,
   X
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
@@ -683,6 +684,8 @@ export function Training() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [formationViewerSlideIndex, setFormationViewerSlideIndex] = useState(0);
   const [showCertification, setShowCertification] = useState(false);
+  /** Formation pour laquelle on affiche le certificat (découplé du viewer de formation). */
+  const [certJourney, setCertJourney] = useState<JourneyRow | null>(null);
   const [traineeProfile, setTraineeProfile] = useState<any>(null);
   type QuizQuestionState = {
     selected: number | null;
@@ -834,11 +837,29 @@ export function Training() {
     if (selectedJourneyId && structuredProgressByJourney[selectedJourneyId]?.status === 'completed') {
       // Small delay to ensure everything is saved before showing the "wow" screen
       const timer = setTimeout(() => {
+        const j = displayJourneys.find((x) => journeyKey(x) === selectedJourneyId) || null;
+        setCertJourney(j);
         setShowCertification(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [selectedJourneyId, structuredProgressByJourney]);
+  }, [selectedJourneyId, structuredProgressByJourney, displayJourneys]);
+
+  /** Formations terminées (= certifiées) pour la section Certifications. */
+  const completedJourneys = useMemo(() => {
+    return displayJourneys.filter((j) => {
+      const id = journeyKey(j);
+      if (!id) return false;
+      if (structuredProgressByJourney[id]?.status === 'completed') return true;
+      const pct = Number(progressByJourney[id]?.progressPercentage);
+      return Number.isFinite(pct) && pct >= 100;
+    });
+  }, [displayJourneys, structuredProgressByJourney, progressByJourney]);
+
+  const openCertificate = useCallback((j: JourneyRow) => {
+    setCertJourney(j);
+    setShowCertification(true);
+  }, []);
 
   // When user picks a gig, refetch trainings for that gig so the list updates even if the initial bulk load failed
   useEffect(() => {
@@ -2181,6 +2202,10 @@ export function Training() {
               slidePercent = engagementPercent;
             }
             const showProgressFigure = progressTotal > 0 || slidePercent > 0 || engagementPercent > 0;
+            const isCompleted =
+              slidePercent >= 100 ||
+              (id ? structuredProgressByJourney[id]?.status === 'completed' : false) ||
+              Number(progress?.progressPercentage) >= 100;
             return (
               <li
                 key={id || journeyTitle(j)}
@@ -2257,11 +2282,76 @@ export function Training() {
                   >
                     Continue
                   </button>
+                  {isCompleted && (
+                    <button
+                      type="button"
+                      onClick={() => openCertificate(j)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-harx-200 bg-harx-50 text-harx-700 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-colors"
+                    >
+                      <Award className="w-4 h-4" />
+                      Certificat
+                    </button>
+                  )}
                 </div>
               </li>
             );
           })}
         </ul>
+      )}
+
+      {!listLoading && !error && completedJourneys.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Award className="w-5 h-5 text-harx-600" />
+            <h2 className="text-lg font-black text-gray-900 tracking-tight">Mes Certifications</h2>
+            <span className="ml-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-harx-500/10 text-harx-700">
+              {completedJourneys.length}
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Formations complétées à 100&nbsp;%. Consultez ou téléchargez vos certificats.
+          </p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {completedJourneys.map((j) => {
+              const id = journeyKey(j);
+              const gig = gigLabel(j);
+              return (
+                <li
+                  key={`cert-${id || journeyTitle(j)}`}
+                  className="group relative overflow-hidden rounded-2xl border border-harx-100 bg-gradient-to-br from-harx-50/80 to-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-harx-500/10 blur-2xl" />
+                  <div className="relative flex items-start gap-3">
+                    <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-tr from-harx-500 to-harx-alt-500 flex items-center justify-center shadow-sm">
+                      <Award className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-black text-gray-900 leading-tight line-clamp-2">{journeyTitle(j)}</h3>
+                      {gig ? (
+                        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-harx-700 max-w-full">
+                          <Briefcase className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{gig}</span>
+                        </span>
+                      ) : null}
+                      <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Validé · 100%
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openCertificate(j)}
+                    className="relative mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-alt-600 text-white px-4 py-2.5 text-xs font-black uppercase tracking-widest hover:-translate-y-0.5 transition-transform shadow-sm"
+                  >
+                    <Award className="w-4 h-4" />
+                    Voir le certificat
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
         </>
       )}
@@ -3012,10 +3102,10 @@ export function Training() {
           </div>
         </div>
       )}
-      {showCertification && selectedJourney && (
+      {showCertification && (certJourney || selectedJourney) && (
         <CertificationView
           traineeName={traineeProfile?.basicInfo?.firstName ? `${traineeProfile.basicInfo.firstName} ${traineeProfile.basicInfo.lastName || ''}` : 'Trainee'}
-          trainingTitle={journeyTitle(selectedJourney)}
+          trainingTitle={journeyTitle((certJourney || selectedJourney)!)}
           completionDate={new Date().toLocaleDateString('fr-FR')}
           onClose={() => setShowCertification(false)}
         />
