@@ -228,7 +228,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               )}
             </p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/onboarding')}
               className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
             >
               {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
