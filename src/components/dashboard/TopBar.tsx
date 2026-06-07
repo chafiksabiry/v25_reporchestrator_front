@@ -5,7 +5,7 @@ import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
-import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
+import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW, HARX_BUTTON_GRADIENT } from '../../utils/harxBrand';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -289,7 +289,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                     className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-white/10 shrink-0"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-pink-600 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
+                  <div style={{ backgroundImage: HARX_BUTTON_GRADIENT }} className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
                     {initials}
                   </div>
                 )}
