@@ -216,14 +216,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             {/* Wallet */}
             <button
               onClick={() => navigate('/wallet')}
-              className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
+              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title="Mon Portefeuille"
             >
-              <div className="p-1.5 bg-blue-500/15 text-blue-400 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all duration-200">
+              <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Wallet className="w-4 h-4" />
               </div>
               <div className="text-left leading-none">
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Mon Portefeuille</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider block">Mon Portefeuille</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
                   {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                 </span>
@@ -231,19 +231,19 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             </button>
 
             {/* Divider */}
-            <div className="w-px h-6 bg-white/10 shrink-0" />
+            <div className="w-px h-6 bg-white/20 shrink-0" />
 
             {/* Session Planning */}
             <button
               onClick={() => navigate('/session-planning')}
-              className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-violet-500/40 hover:bg-violet-500/10 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-md group active:scale-95"
+              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title="Session Planning"
             >
-              <div className="p-1.5 bg-violet-500/15 text-violet-400 rounded-xl group-hover:bg-violet-500 group-hover:text-white transition-all duration-200">
+              <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Calendar className="w-4 h-4" />
               </div>
               <div className="text-left leading-none">
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Planning</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider block">Planning</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
               </div>
             </button>
