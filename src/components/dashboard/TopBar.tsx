@@ -5,7 +5,7 @@ import { getUserInfo, getProfileData } from '../../utils/authUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
-import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW, HARX_BUTTON_GRADIENT } from '../../utils/harxBrand';
+import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -278,24 +278,27 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
           </div>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div
+              style={{ backgroundImage: HARX_NAVBAR_BG }}
+              className="absolute right-0 mt-2 w-64 border border-white/20 rounded-2xl shadow-2xl shadow-[#8A1250]/40 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+            >
 
               {/* ── Header: Photo + Name + Role ── */}
-              <div className="relative px-4 py-4 flex items-center gap-3 border-b border-white/10 bg-gradient-to-br from-[#ED1C24]/15 via-[#E6188D]/10 to-transparent">
+              <div className="relative px-4 py-4 flex items-center gap-3 border-b border-white/20 bg-white/10 backdrop-blur-sm">
                 {profileData?.personalInfo?.photo?.url ? (
                   <img
                     src={profileData.personalInfo.photo.url}
                     alt={userName}
-                    className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-[#E6188D]/40 shrink-0"
+                    className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-white/40 shrink-0"
                   />
                 ) : (
-                  <div style={{ backgroundImage: HARX_BUTTON_GRADIENT }} className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ring-1 ring-white/30">
                     {initials}
                   </div>
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-black text-white truncate">{userName}</p>
-                  <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{userRole}</p>
+                  <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">{userRole}</p>
                 </div>
               </div>
 
@@ -303,9 +306,9 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               <div className="py-2 px-1.5">
                 <button
                   onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-[#E6188D]/10 transition-colors group"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-white/15 transition-colors group"
                 >
-                  <div className="p-1.5 bg-[#E6188D]/15 text-[#F36] rounded-lg group-hover:bg-[#E6188D] group-hover:text-white transition-all duration-200">
+                  <div className="p-1.5 bg-white/20 text-white rounded-lg group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200">
                     <UserCircle className="h-4 w-4" />
                   </div>
                   <span>Mon Profil</span>
@@ -313,12 +316,12 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               </div>
 
               {/* ── Logout ── */}
-              <div className="border-t border-white/10 px-3 py-3">
+              <div className="border-t border-white/20 px-3 py-3">
                 <button
                   onClick={() => { setIsDropdownOpen(false); logout(); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition-colors group"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-white hover:bg-black/20 rounded-xl transition-colors group"
                 >
-                  <div className="p-1.5 bg-red-500/10 text-red-400 rounded-lg group-hover:bg-red-500/20 transition-colors">
+                  <div className="p-1.5 bg-white/20 text-white rounded-lg group-hover:bg-white group-hover:text-[#ED1C24] transition-all duration-200">
                     <LogOut className="h-4 w-4" />
                   </div>
                   <span>Déconnexion</span>
