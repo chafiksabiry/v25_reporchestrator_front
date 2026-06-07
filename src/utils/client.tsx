@@ -12,7 +12,9 @@ import { stripApiSuffix, getRepApiHost } from './repApiUrl';
 const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
 const REP_API_URL = getRepApiHost();
 const CALLS_API_URL = stripApiSuffix(
-  import.meta.env.VITE_CALLS_API_URL || import.meta.env.VITE_API_URL_CALL
+  import.meta.env.VITE_CALLS_API_URL ||
+    import.meta.env.VITE_API_URL_CALL ||
+    'https://v25dashcallsbackend-production.up.railway.app/api'
 );
 const DASHBOARD_COMPANY_API_URL = import.meta.env.VITE_DASHBOARD_COMPANY_API_URL;
 
