@@ -268,6 +268,17 @@ export function CallRecords({
     try {
       setAnalyzingCallId(callId);
       const response = await api.calls.analyze(callId);
+
+      // Auto-analysis may already be running after hangup — poll, don't error.
+      if (response.inProgress) {
+        console.info('ℹ️ AI analysis already in progress — waiting for results…');
+        if (selectedCall && (selectedCall._id === callId || (selectedCall as any).$oid === callId)) {
+          setSelectedCall({ ...selectedCall, ai_call_status: 'processing' });
+        }
+        await fetchCallRecords(true);
+        return;
+      }
+
       if (response.success) {
         if (selectedCall && (selectedCall._id === callId || (selectedCall as any).$oid === callId)) {
           const isFullDoc =
@@ -394,6 +405,10 @@ export function CallRecords({
 
     return true;
   });
+
+  const selectedCallAnalyzing = selectedCall
+    ? analyzingCallId === selectedCall._id || isAnalysisPending(selectedCall)
+    : false;
 
   return (
     <div className="space-y-6 relative">
@@ -822,11 +837,11 @@ export function CallRecords({
                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">Transcript not available</p>
                       <button
                         onClick={() => handleAnalyzeCall(selectedCall._id)}
-                        disabled={analyzingCallId === selectedCall._id}
+                        disabled={selectedCallAnalyzing}
                         className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Brain className={`w-4 h-4 ${analyzingCallId === selectedCall._id ? 'animate-spin' : ''}`} />
-                        {analyzingCallId === selectedCall._id ? 'Analyse...' : 'Analyze & Transcribe'}
+                        <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
+                        {selectedCallAnalyzing ? 'Analyse...' : 'Analyze & Transcribe'}
                       </button>
                     </div>
                   )}
@@ -840,11 +855,11 @@ export function CallRecords({
                       </p>
                       <button
                         onClick={() => handleAnalyzeCall(selectedCall._id)}
-                        disabled={analyzingCallId === selectedCall._id}
+                        disabled={selectedCallAnalyzing}
                         className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Brain className={`w-4 h-4 ${analyzingCallId === selectedCall._id ? 'animate-spin' : ''}`} />
-                        {analyzingCallId === selectedCall._id ? 'Analyse...' : 'Lancer l\'analyse IA'}
+                        <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
+                        {selectedCallAnalyzing ? 'Analyse...' : 'Lancer l\'analyse IA'}
                       </button>
                     </div>
                   ) : (

@@ -97,10 +97,13 @@ const addAuthInterceptor = (axiosInstance: any) => {
       const msg = error.response?.data?.message || error.message || "";
       const isExpectedNotFound =
         (status === 404 || status === 500) && /not\s*found/i.test(msg);
+      const isAnalysisInProgress =
+        (status === 409 || status === 202) &&
+        /analysis already in progress/i.test(msg);
 
       // A missing profile is expected for reps who haven't onboarded yet —
       // don't pollute the console with a red error for it.
-      if (isExpectedNotFound) {
+      if (isExpectedNotFound || isAnalysisInProgress) {
         console.info("ℹ️ API resource not found (expected):", {
           url: error.config?.url,
           status,
@@ -294,8 +297,23 @@ export const callsApi = {
     return response.data;
   },
   analyze: async (id: string) => {
-    const response = await callsApiClient.post(`/api/calls/${id}/analyze`);
-    return response.data;
+    try {
+      const response = await callsApiClient.post(`/api/calls/${id}/analyze`);
+      return response.data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const data = error.response?.data;
+      // Legacy 409 from older backend builds; 202 = accepted, work in progress.
+      if (status === 409 || status === 202) {
+        return {
+          success: true,
+          inProgress: true,
+          message: data?.message || 'Analysis already in progress for this call.',
+          ai_call_status: 'processing' as const,
+        };
+      }
+      throw error;
+    }
   }
 };
 
