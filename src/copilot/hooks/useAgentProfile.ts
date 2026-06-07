@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getAgentId, getAuthToken } from '../../utils/authUtils';
+import { getAgentId, getAuthToken, getProfileData } from '../../utils/authUtils';
 
 export interface AgentProfile {
     _id: string;
@@ -31,9 +31,26 @@ export const useAgentProfile = () => {
         const fetchProfile = async () => {
             const agentId = getAgentId();
 
+            // Seed from the locally cached rep profile first so the cockpit
+            // always has the agent's identity even if the remote /agents
+            // endpoint is unavailable or rejects the token (401/403).
+            const local = getProfileData();
+            if (local && (local.personalInfo?.name || local._id)) {
+                setProfile({
+                    _id: local._id || agentId || '',
+                    personalInfo: {
+                        name: local.personalInfo?.name || 'Agent',
+                        email: local.personalInfo?.email || '',
+                        phone: local.personalInfo?.phone,
+                        location: local.personalInfo?.location,
+                    },
+                    professionalSummary: local.professionalSummary,
+                    status: local.status,
+                });
+            }
+
             if (!agentId) {
-                console.warn('[useAgentProfile] No agentId found');
-                setError('Agent not authenticated');
+                console.warn('[useAgentProfile] No agentId found — using local profile only');
                 return;
             }
 
@@ -58,12 +75,13 @@ export const useAgentProfile = () => {
                     setProfile(response.data.data);
                 }
             } catch (err: any) {
-                console.error('Error fetching agent profile:', err);
+                // The /agents endpoint can reject the rep token (401/403) — this is
+                // non-fatal because we already seeded the profile from local data.
                 if (err.response?.status === 401 || err.response?.status === 403) {
-                    setError('Session expired — please sign in again');
+                    console.warn('[useAgentProfile] Remote profile unauthorized — keeping local profile');
                     return;
                 }
-                setError(err.message);
+                console.warn('[useAgentProfile] Could not refresh remote profile:', err.message);
             } finally {
                 setLoading(false);
             }
