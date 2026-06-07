@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getAuthToken } from '../../utils/authUtils';
 
 // Local interfaces for the API response
 export interface ApiLead {
@@ -51,10 +52,9 @@ export const useLead = (leadId: string | null): UseLeadResult => {
     setError(null);
 
     try {
-      // Try to get token from localStorage
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (!token) {
-        window.location.href = '/auth';
+        setError('Not authenticated — please sign in again');
         return;
       }
       
@@ -92,7 +92,8 @@ export const useLead = (leadId: string | null): UseLeadResult => {
     } catch (err: any) {
       console.error('Error fetching lead:', err);
       if (err.response?.status === 401 || err.response?.status === 403 || err.response?.data?.error === 'Not authorized to access this route') {
-        window.location.href = '/auth';
+        setError('Not authorized to access this lead');
+        setLead(null);
         return;
       }
       setError(err.response?.data?.error || err.message || 'Failed to fetch lead');
