@@ -158,7 +158,7 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 
                 {isCurrent && (
                   <button 
-                    onClick={() => window.location.href = '/reporchestrator'}
+                    onClick={() => window.location.href = '/reps'}
                     className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200"
                   >
                     <ChevronRight className="w-5 h-5" />
