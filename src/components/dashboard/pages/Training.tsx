@@ -841,7 +841,9 @@ export function Training() {
       const timer = setTimeout(() => {
         const j = displayJourneys.find((x) => journeyKey(x) === selectedJourneyId) || null;
         setCertJourney(j);
+        setIssuedCert(null);
         setShowCertification(true);
+        void issueCertification(selectedJourneyId);
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -858,10 +860,33 @@ export function Training() {
     });
   }, [displayJourneys, structuredProgressByJourney, progressByJourney]);
 
+  /** Certificat émis côté backend (certificateId + date réelle), persiste dans la collection `certifications`. */
+  const [issuedCert, setIssuedCert] = useState<{ certificateId?: string; issuedAt?: string } | null>(null);
+
+  /** Émet (ou récupère) le certificat côté backend → persiste le document en base. */
+  const issueCertification = useCallback(async (journeyId: string) => {
+    const base = trainingApiBase();
+    if (!base || !repId || !journeyId) return;
+    const token = getAuthToken() || '';
+    try {
+      const res = await axios.get<{ success?: boolean; certification?: { certificateId?: string; issuedAt?: string } }>(
+        `${base}/training_journeys/certification/${encodeURIComponent(repId)}/${encodeURIComponent(journeyId)}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      const cert = res.data?.certification;
+      if (cert) setIssuedCert({ certificateId: cert.certificateId, issuedAt: cert.issuedAt });
+    } catch (e) {
+      console.warn('[Training] issueCertification failed', e);
+    }
+  }, [repId]);
+
   const openCertificate = useCallback((j: JourneyRow) => {
     setCertJourney(j);
+    setIssuedCert(null);
     setShowCertification(true);
-  }, []);
+    const id = journeyKey(j);
+    if (id) void issueCertification(id);
+  }, [issueCertification]);
 
   // When user picks a gig, refetch trainings for that gig so the list updates even if the initial bulk load failed
   useEffect(() => {
@@ -3175,7 +3200,8 @@ export function Training() {
         <CertificationView
           traineeName={traineeProfile?.basicInfo?.firstName ? `${traineeProfile.basicInfo.firstName} ${traineeProfile.basicInfo.lastName || ''}` : 'Trainee'}
           trainingTitle={journeyTitle((certJourney || selectedJourney)!)}
-          completionDate={new Date().toLocaleDateString('fr-FR')}
+          completionDate={(issuedCert?.issuedAt ? new Date(issuedCert.issuedAt) : new Date()).toLocaleDateString('fr-FR')}
+          certificateId={issuedCert?.certificateId}
           onClose={() => setShowCertification(false)}
         />
       )}

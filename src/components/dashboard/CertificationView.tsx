@@ -5,6 +5,8 @@ interface CertificationViewProps {
   traineeName: string;
   trainingTitle: string;
   completionDate: string;
+  /** Identifiant officiel du certificat (issu de la base). À défaut, un id local est généré. */
+  certificateId?: string;
   onClose: () => void;
   visualTheme?: {
     primaryColor?: string;
@@ -28,12 +30,16 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
   traineeName,
   trainingTitle,
   completionDate,
+  certificateId,
   onClose,
 }) => {
   const [showContent, setShowContent] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
-  const certId = useMemo(() => buildCertId(`${traineeName}|${trainingTitle}|${completionDate}`), [traineeName, trainingTitle, completionDate]);
+  const certId = useMemo(
+    () => certificateId || buildCertId(`${traineeName}|${trainingTitle}|${completionDate}`),
+    [certificateId, traineeName, trainingTitle, completionDate]
+  );
 
   // Confettis générés une seule fois.
   const confetti = useMemo(
