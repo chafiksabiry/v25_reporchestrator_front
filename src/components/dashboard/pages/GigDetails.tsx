@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Users, Globe, Calendar, Building, MapPin, Target, Phone, Mail, ChevronLeft, ChevronRight, Repeat, Star, FileText, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, DollarSign, Users, Globe, Calendar, Building, MapPin, Target, Phone, Mail, ChevronLeft, ChevronRight, Repeat, Star, FileText, Play, Sparkles, Check, X } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { fetchEnrolledGigsFromProfile, fetchPendingRequests, refreshGigStatuses } from '../../../utils/gigStatusUtils';
@@ -389,6 +389,11 @@ export function GigDetails() {
       return 'pending';
     }
 
+    if (invitedGigIds.includes(gigId!)) {
+      console.log(`📨 Agent is INVITED to gig ${gigId} (from invitations API)`);
+      return 'invited';
+    }
+
     // 2. Vérifier les données du gig (fallback)
     if (gig.agents && Array.isArray(gig.agents)) {
       const agentStatus = gig.agents.find((agent: any) => agent.agentId === agentId);
@@ -418,6 +423,11 @@ export function GigDetails() {
   // États pour les statuts depuis le profil
   const [pendingGigIds, setPendingGigIds] = useState<string[]>([]);
   const [enrolledGigIds, setEnrolledGigIds] = useState<string[]>([]);
+
+  // États pour les invitations (accepter / refuser)
+  const [invitedGigIds, setInvitedGigIds] = useState<string[]>([]);
+  const [invitationId, setInvitationId] = useState<string | null>(null);
+  const [respondingInvitation, setRespondingInvitation] = useState<'accept' | 'reject' | null>(null);
 
   const handleSmartStart = () => {
     if (!gigId) return;
@@ -572,14 +582,14 @@ export function GigDetails() {
 
           if (invitedResponse.ok) {
             const invitedData = await invitedResponse.json();
-            const isInvited = invitedData.some((invitation: any) =>
-              invitation.gigId === gigId || invitation.gigId?._id === gigId
+            const invitation = invitedData.find((inv: any) =>
+              inv.gigId === gigId || inv.gigId?._id === gigId
             );
 
-            if (isInvited) {
-              console.log('📨 Agent is invited to this gig');
-              // On pourrait ajouter un state invitedGigIds si besoin, 
-              // mais pour l'instant on se base sur les props ou getAgentStatus
+            if (invitation) {
+              console.log('📨 Agent is invited to this gig', invitation._id);
+              setInvitationId(invitation._id || null);
+              setInvitedGigIds(prev => (prev.includes(gigId!) ? prev : [...prev, gigId!]));
             }
           }
         } catch (invitedErr) {
@@ -1023,6 +1033,116 @@ export function GigDetails() {
     }
   };
 
+  // Accepter une invitation reçue
+  const handleAcceptInvitation = async () => {
+    const token = getAuthToken();
+
+    if (!invitationId) {
+      setApplicationStatus('error');
+      setApplicationMessage('Invitation introuvable. Veuillez rafraîchir la page.');
+      return;
+    }
+    if (!token) {
+      setApplicationStatus('error');
+      setApplicationMessage('Vous devez être connecté pour répondre à l\'invitation');
+      return;
+    }
+
+    setRespondingInvitation('accept');
+    setApplicationStatus('idle');
+    setApplicationMessage('');
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/invitations/${invitationId}/accept`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Échec de l'acceptation: ${response.status}`);
+      }
+
+      console.log('✅ Invitation acceptée');
+
+      // Mise à jour optimiste : l'agent est désormais enrôlé
+      setInvitedGigIds(prev => prev.filter(id => id !== gigId));
+      setEnrolledGigIds(prev => (prev.includes(gigId!) ? prev : [...prev, gigId!]));
+      setApplicationStatus('success');
+      setApplicationMessage('Invitation acceptée ! Vous êtes maintenant inscrit à ce gig.');
+
+      await refreshGigStatuses();
+    } catch (err) {
+      console.error('❌ Error accepting invitation:', err);
+      setApplicationStatus('error');
+      setApplicationMessage(err instanceof Error ? err.message : 'Erreur lors de l\'acceptation');
+    } finally {
+      setRespondingInvitation(null);
+    }
+  };
+
+  // Refuser une invitation reçue
+  const handleRejectInvitation = async () => {
+    const token = getAuthToken();
+
+    if (!invitationId) {
+      setApplicationStatus('error');
+      setApplicationMessage('Invitation introuvable. Veuillez rafraîchir la page.');
+      return;
+    }
+    if (!token) {
+      setApplicationStatus('error');
+      setApplicationMessage('Vous devez être connecté pour répondre à l\'invitation');
+      return;
+    }
+
+    setRespondingInvitation('reject');
+    setApplicationStatus('idle');
+    setApplicationMessage('');
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/invitations/${invitationId}/reject`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Échec du refus: ${response.status}`);
+      }
+
+      console.log('✅ Invitation refusée');
+
+      // Mise à jour optimiste : l'invitation est supprimée
+      setInvitedGigIds(prev => prev.filter(id => id !== gigId));
+      setInvitationId(null);
+      setApplicationStatus('success');
+      setApplicationMessage('Invitation refusée.');
+
+      await refreshGigStatuses();
+    } catch (err) {
+      console.error('❌ Error rejecting invitation:', err);
+      setApplicationStatus('error');
+      setApplicationMessage(err instanceof Error ? err.message : 'Erreur lors du refus');
+    } finally {
+      setRespondingInvitation(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen py-8">
@@ -1174,6 +1294,13 @@ export function GigDetails() {
                     </p>
                   </div>
                 )}
+                {applicationStatus === 'success' && applicationMessage && (
+                  <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-sm text-emerald-800 font-medium">
+                      ✅ {applicationMessage}
+                    </p>
+                  </div>
+                )}
 
                 {/* Bouton selon le statut d'enrollment */}
                 {getAgentStatus() === 'enrolled' ? (
@@ -1192,9 +1319,55 @@ export function GigDetails() {
                     ⌛ Pending Review
                   </span>
                 ) : getAgentStatus() === 'invited' ? (
-                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white font-black text-xs uppercase tracking-widest border border-indigo-400 shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)]">
-                    ✉ Invited
-                  </span>
+                  <div className="flex flex-col items-stretch gap-2 min-w-[220px]">
+                    <span className="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest border border-indigo-100">
+                      ✉ You're invited
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAcceptInvitation}
+                        disabled={respondingInvitation !== null}
+                        className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 ${
+                          respondingInvitation !== null
+                            ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed shadow-none'
+                            : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_25px_-4px_rgba(16,185,129,0.55)]'
+                        }`}
+                      >
+                        {respondingInvitation === 'accept' ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
+                            <span>...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" strokeWidth={3} />
+                            <span>Accept</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleRejectInvitation}
+                        disabled={respondingInvitation !== null}
+                        className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 border ${
+                          respondingInvitation !== null
+                            ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                            : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+                        }`}
+                      >
+                        {respondingInvitation === 'reject' ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+                            <span>...</span>
+                          </>
+                        ) : (
+                          <>
+                            <X className="w-4 h-4" strokeWidth={3} />
+                            <span>Decline</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <button
                     onClick={handleApply}
