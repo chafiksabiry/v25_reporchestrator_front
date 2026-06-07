@@ -38,9 +38,11 @@ function App() {
   return (
     <Router basename={getRouterBasename()}>
       <Routes>
-        {/* Onboarding orchestrator (shared Sidebar + TopBar shell) */}
+        {/* Onboarding orchestrator (shared Sidebar + TopBar shell).
+            The orchestrator home now lives at `/onboarding` so the root `/`
+            falls through to the dashboard catch-all below. */}
         <Route element={<OnboardingShell />}>
-          <Route path="/" element={<OnboardingDashboard />} />
+          <Route path="/onboarding" element={<OnboardingDashboard />} />
           <Route path="/onboarding/signup" element={<SignUp />} />
           <Route path="/onboarding/profile" element={<OnboardingProfile />} />
           <Route path="/onboarding/skills" element={<SkillsAssessment />} />
