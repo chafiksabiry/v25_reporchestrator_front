@@ -3,7 +3,7 @@ import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigate } from 'react-router-dom';
-import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play } from 'lucide-react';
+import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play, Check, X } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
@@ -446,6 +446,7 @@ export function GigsMarketplace() {
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
+  const [respondingInvitation, setRespondingInvitation] = useState<{ gigId: string; action: 'accept' | 'reject' } | null>(null);
   const [applicationMessage, setApplicationMessage] = useState<{ gigId: string; message: string; type: 'success' | 'error' } | null>(null);
   const [expandedActivities, setExpandedActivities] = useState<Record<string, boolean>>({});
   const [expandedIndustries, setExpandedIndustries] = useState<Record<string, boolean>>({});
@@ -766,6 +767,42 @@ export function GigsMarketplace() {
       if (error instanceof Error) {
         console.error('Error details:', error.message);
       }
+    }
+  };
+
+  // Retrouve l'ID de l'invitation (enrollment) à partir de l'ID du gig
+  const getEnrollmentIdForGig = (gigId: string): string | null => {
+    const match = invitedEnrollments.find(ie => ie.gig?._id === gigId);
+    return match?.id || null;
+  };
+
+  // Accepter une invitation directement depuis une carte (onglet "available")
+  const handleAcceptFromCard = async (gigId: string) => {
+    const enrollmentId = getEnrollmentIdForGig(gigId);
+    if (!enrollmentId) {
+      console.error('❌ Enrollment introuvable pour le gig', gigId);
+      return;
+    }
+    setRespondingInvitation({ gigId, action: 'accept' });
+    try {
+      await acceptInvitation(enrollmentId);
+    } finally {
+      setRespondingInvitation(null);
+    }
+  };
+
+  // Refuser une invitation directement depuis une carte (onglet "available")
+  const handleRejectFromCard = async (gigId: string) => {
+    const enrollmentId = getEnrollmentIdForGig(gigId);
+    if (!enrollmentId) {
+      console.error('❌ Enrollment introuvable pour le gig', gigId);
+      return;
+    }
+    setRespondingInvitation({ gigId, action: 'reject' });
+    try {
+      await rejectInvitation(enrollmentId);
+    } finally {
+      setRespondingInvitation(null);
     }
   };
 
@@ -1672,6 +1709,59 @@ export function GigsMarketplace() {
                           className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
                           DETAILS
+                        </button>
+                      </div>
+                    ) : gigStatus === 'invited' ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAcceptFromCard(gig._id);
+                            }}
+                            disabled={respondingInvitation?.gigId === gig._id}
+                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === gig._id
+                              ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
+                              }`}
+                          >
+                            {respondingInvitation?.gigId === gig._id && respondingInvitation.action === 'accept' ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" strokeWidth={3} />
+                                <span>Accept</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRejectFromCard(gig._id);
+                            }}
+                            disabled={respondingInvitation?.gigId === gig._id}
+                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === gig._id
+                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                              : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+                              }`}
+                          >
+                            {respondingInvitation?.gigId === gig._id && respondingInvitation.action === 'reject' ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+                            ) : (
+                              <>
+                                <X className="w-4 h-4" strokeWidth={3} />
+                                <span>Decline</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/gig/${gig._id}`)}
+                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                        >
+                          View Details
                         </button>
                       </div>
                     ) : (
