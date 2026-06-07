@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAgent } from '../../contexts/AgentContext';
 import { Device } from '@twilio/voice-sdk';
-import axios from 'axios';
+import { callsApiClient } from '../../../utils/client';
 import { useCallStorage } from '../../hooks/useCallStorage';
 import { useTranscription } from '../../contexts/TranscriptionContext';
 import { useLead } from '../../hooks/useLead';
@@ -227,12 +227,12 @@ export function ContactInfo() {
     console.log("Starting Twilio call to:", phoneNumber);
 
     try {
-      // Get Twilio token
-      const apiUrl = import.meta.env.VITE_API_URL_CALL || 'http://localhost:3000';
-      const tokenUrl = `${apiUrl}/api/calls/token`;
-      console.log("Fetching token from:", tokenUrl);
+      // Get Twilio token from the calls backend. Use the shared callsApiClient
+      // (correct base URL + auth headers) instead of a hardcoded localhost
+      // fallback so the token is fetched from production, not localhost:3000.
+      console.log("Fetching Twilio token from calls backend...");
 
-      const response = await axios.get<TokenResponse>(tokenUrl);
+      const response = await callsApiClient.get<TokenResponse>('/api/calls/token');
       const token = response.data.token;
       console.log("Token received:", token ? "Token exists" : "No token");
 
