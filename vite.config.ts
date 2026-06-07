@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
     base: 'https://harxv25reporchestratorfront.netlify.app/',
     plugins: [
       react(),
-      qiankun('reporchestrator', {
+      qiankun('reps', {
         useDevMode: true,
       }),
       removeReactRefreshScript(),
