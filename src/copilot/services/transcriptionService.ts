@@ -67,6 +67,23 @@ export class TranscriptionService {
     this.handleWebSocketMessage = this.handleWebSocketMessage.bind(this);
   }
 
+  /**
+   * Build the speech-to-text WebSocket URL. The backend exposes the socket at
+   * the host root (`/speech-to-text`), NOT under `/api`, so we strip a trailing
+   * `/api` from VITE_API_URL_CALL before swapping http→ws. An explicit
+   * VITE_WS_URL always wins when provided.
+   */
+  private getSpeechSocketUrl(): string {
+    const explicit = import.meta.env.VITE_WS_URL;
+    if (explicit) return explicit;
+
+    const callApi: string =
+      import.meta.env.VITE_API_URL_CALL ||
+      'https://v25dashcallsbackend-production.up.railway.app/api';
+    const host = callApi.replace(/\/+$/, '').replace(/\/api$/, '');
+    return `${host.replace(/^http/, 'ws')}/speech-to-text`;
+  }
+
   // Restore stopTranscription (was likely stop() before or I missed it)
   stopTranscription() {
     this.isSimulationActive = false;
@@ -410,7 +427,8 @@ export class TranscriptionService {
       // Connect merger to analyzer (mixed visualization)
       currentMerger.connect(currentAnalyzer);
 
-      const wsUrl = import.meta.env.VITE_WS_URL || `${import.meta.env.VITE_API_URL_CALL.replace('http', 'ws')}/speech-to-text`;
+      const wsUrl = this.getSpeechSocketUrl();
+      console.log('🔌 [TranscriptionService] Connecting speech socket:', wsUrl);
       const currentWs = new WebSocket(wsUrl);
       this.ws = currentWs;
 
@@ -710,7 +728,7 @@ export class TranscriptionService {
 
   private reconnectWebSocket() {
     if (this.isCallActive && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
-      const wsUrl = import.meta.env.VITE_WS_URL || `${import.meta.env.VITE_API_URL_CALL.replace('http', 'ws')}/speech-to-text`;
+      const wsUrl = this.getSpeechSocketUrl();
       this.ws = new WebSocket(wsUrl);
       this.ws.onmessage = this.handleWebSocketMessage.bind(this);
     }
