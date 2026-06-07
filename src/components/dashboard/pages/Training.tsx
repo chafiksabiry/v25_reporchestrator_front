@@ -686,6 +686,8 @@ export function Training() {
   const [showCertification, setShowCertification] = useState(false);
   /** Formation pour laquelle on affiche le certificat (découplé du viewer de formation). */
   const [certJourney, setCertJourney] = useState<JourneyRow | null>(null);
+  /** Onglet actif de la page : formations en cours / certifications obtenues. */
+  const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications'>('trainings');
   const [traineeProfile, setTraineeProfile] = useState<any>(null);
   type QuizQuestionState = {
     selected: number | null;
@@ -2066,6 +2068,52 @@ export function Training() {
         </div>
       </div>
 
+      {/* Barre d'onglets : Formations / Certifications */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setTrainingTab('trainings')}
+          className={`relative flex items-center gap-2 px-4 py-3 text-sm font-black tracking-tight transition-colors ${
+            trainingTab === 'trainings' ? 'text-harx-700' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Formations
+          {displayJourneys.length > 0 && (
+            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+              trainingTab === 'trainings' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {displayJourneys.length}
+            </span>
+          )}
+          {trainingTab === 'trainings' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTrainingTab('certifications')}
+          className={`relative flex items-center gap-2 px-4 py-3 text-sm font-black tracking-tight transition-colors ${
+            trainingTab === 'certifications' ? 'text-harx-700' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          Certifications
+          {completedJourneys.length > 0 && (
+            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+              trainingTab === 'certifications' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {completedJourneys.length}
+            </span>
+          )}
+          {trainingTab === 'certifications' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
+          )}
+        </button>
+      </div>
+
+      {trainingTab === 'trainings' && (
+      <>
       {!selectedJourney &&
         gigFilter !== '__all__' &&
         slideProgressSummary &&
@@ -2299,15 +2347,34 @@ export function Training() {
         </ul>
       )}
 
-      {!listLoading && !error && completedJourneys.length > 0 && (
-        <section className="mt-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Award className="w-5 h-5 text-harx-600" />
-            <h2 className="text-lg font-black text-gray-900 tracking-tight">Mes Certifications</h2>
-            <span className="ml-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-harx-500/10 text-harx-700">
-              {completedJourneys.length}
-            </span>
+      </>
+      )}
+
+      {trainingTab === 'certifications' && (
+      <>
+      {!listLoading && !error && completedJourneys.length === 0 && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-10 shadow-sm text-center">
+          <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-harx-500/10 flex items-center justify-center">
+            <Award className="w-7 h-7 text-harx-500" />
           </div>
+          <h3 className="text-lg font-black text-gray-900">Aucune certification pour le moment</h3>
+          <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+            Terminez une formation à 100&nbsp;% pour débloquer votre certificat. Vos certifications
+            apparaîtront ici.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTrainingTab('trainings')}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-harx-600 text-white px-5 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors"
+          >
+            <BookOpen className="w-4 h-4" />
+            Voir mes formations
+          </button>
+        </div>
+      )}
+
+      {!listLoading && !error && completedJourneys.length > 0 && (
+        <section>
           <p className="text-sm text-gray-500 mb-4">
             Formations complétées à 100&nbsp;%. Consultez ou téléchargez vos certificats.
           </p>
@@ -2352,6 +2419,8 @@ export function Training() {
             })}
           </ul>
         </section>
+      )}
+      </>
       )}
         </>
       )}
