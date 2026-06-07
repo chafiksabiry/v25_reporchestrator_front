@@ -230,14 +230,18 @@ export function ContactInfo() {
       // Get Twilio token from the calls backend. Use the shared callsApiClient
       // (correct base URL + auth headers) instead of a hardcoded localhost
       // fallback so the token is fetched from production, not localhost:3000.
-      console.log("Fetching Twilio token from calls backend...");
+      const tokenPath = '/api/calls/token';
+      console.log("Fetching Twilio token from calls backend...", callsApiClient.defaults.baseURL, tokenPath);
 
-      const response = await callsApiClient.get<TokenResponse>('/api/calls/token');
-      const token = response.data.token;
+      const response = await callsApiClient.get<TokenResponse | { data?: TokenResponse }>(tokenPath);
+      const payload = response.data as TokenResponse & { data?: TokenResponse };
+      const token = payload?.token ?? payload?.data?.token;
       console.log("Token received:", token ? "Token exists" : "No token");
 
       if (!token) {
-        throw new Error("No token received from server");
+        throw new Error(
+          `No token received from server (${callsApiClient.defaults.baseURL || 'relative'}${tokenPath})`
+        );
       }
 
       // Create Twilio Device
