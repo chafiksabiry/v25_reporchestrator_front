@@ -448,6 +448,13 @@ export function GigsMarketplace() {
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
   const [respondingInvitation, setRespondingInvitation] = useState<{ gigId: string; action: 'accept' | 'reject' } | null>(null);
   const [applicationMessage, setApplicationMessage] = useState<{ gigId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Affiche un message flottant (toast) qui disparaît automatiquement.
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 3500);
+  };
   const [expandedActivities, setExpandedActivities] = useState<Record<string, boolean>>({});
   const [expandedIndustries, setExpandedIndustries] = useState<Record<string, boolean>>({});
 
@@ -662,9 +669,12 @@ export function GigsMarketplace() {
     const token = getAuthToken();
     if (!token) {
       console.error('❌ Token not found');
-      alert('Authentication required. Please log in again.');
+      showToast('Authentification requise. Veuillez vous reconnecter.', 'error');
       return;
     }
+
+    // Récupérer l'ID du gig avant de retirer l'invitation, pour la MAJ optimiste.
+    const acceptedGigId = invitedEnrollments.find(e => e.id === enrollmentId)?.gig?._id || null;
 
     console.log('🔄 Accepting invitation:', enrollmentId);
     console.log('🔗 API URL:', `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/invitations/${enrollmentId}/accept`);
@@ -686,16 +696,20 @@ export function GigsMarketplace() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Failed to accept invitation:', errorText);
-        alert(`Failed to accept invitation: ${response.status} ${response.statusText}`);
+        showToast('Échec de l\'acceptation de l\'invitation.', 'error');
         throw new Error(`Failed to accept invitation: ${errorText}`);
       }
 
       const result = await response.json();
       console.log('✅ Invitation accepted successfully:', result);
-      alert('Invitation accepted successfully!');
 
-      // Retirer immédiatement l'invitation de la liste (UI optimiste)
+      // MAJ optimiste : retirer de la liste des invitations et marquer comme enrolled.
       setInvitedEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
+      if (acceptedGigId) {
+        setEnrolledGigIds(prev => (prev.includes(acceptedGigId) ? prev : [...prev, acceptedGigId]));
+      }
+
+      showToast('Invitation acceptée ! Vous êtes maintenant inscrit à ce gig.', 'success');
 
       // Rafraîchir tous les statuts pour mettre à jour l'UI
       console.log('🔄 Refreshing all statuses after acceptance...');
@@ -719,7 +733,7 @@ export function GigsMarketplace() {
     const token = getAuthToken();
     if (!token) {
       console.error('❌ Token not found');
-      alert('Authentication required. Please log in again.');
+      showToast('Authentification requise. Veuillez vous reconnecter.', 'error');
       return;
     }
 
@@ -743,13 +757,13 @@ export function GigsMarketplace() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Failed to reject invitation:', errorText);
-        alert(`Failed to reject invitation: ${response.status} ${response.statusText}`);
+        showToast('Échec du refus de l\'invitation.', 'error');
         throw new Error(`Failed to reject invitation: ${errorText}`);
       }
 
       const result = await response.json();
       console.log('✅ Invitation rejected successfully:', result);
-      alert('Invitation rejected successfully!');
+      showToast('Invitation refusée.', 'success');
 
       // Retirer immédiatement l'invitation de la liste (UI optimiste)
       setInvitedEnrollments((prev: any[]) => prev.filter(enrollment => enrollment.id !== enrollmentId));
@@ -1454,6 +1468,25 @@ export function GigsMarketplace() {
 
   return (
     <div className="space-y-6">
+      {/* Toast de notification (accept / reject invitation) */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[200] animate-fade-in">
+          <div
+            className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border font-semibold text-sm max-w-sm ${toast.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
+          >
+            {toast.type === 'success' ? (
+              <Check className="w-5 h-5 text-emerald-600 shrink-0" strokeWidth={3} />
+            ) : (
+              <X className="w-5 h-5 text-rose-600 shrink-0" strokeWidth={3} />
+            )}
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
