@@ -17,13 +17,13 @@ export const HARX_BUTTON_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D
 const RED = '#ED1C24';
 
 /**
- * Navbar background — vivid diagonal matching the logo: orange → red → magenta.
- * (orange top-left, red center, magenta bottom-right — exactly like logo-pink.png)
+ * Navbar background — vivid diagonal HARX gradient: red → magenta.
+ * (red on the left flowing into magenta on the right.)
  */
-export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${HARX_BRAND.orange} 0%, ${RED} 45%, ${HARX_BRAND.magenta} 100%)`;
+export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${RED} 0%, ${HARX_BRAND.magenta} 100%)`;
 
-/** Sidebar background — vivid vertical flow: orange → red → magenta. */
-export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${HARX_BRAND.orange} 0%, ${RED} 40%, ${HARX_BRAND.magenta} 100%)`;
+/** Sidebar background — vivid vertical flow: red → magenta. */
+export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${RED} 0%, ${HARX_BRAND.magenta} 100%)`;
 
 /** Sidebar body continues the same vivid vertical flow below the logo strip. */
 export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${RED} 0%, ${HARX_BRAND.magenta} 60%, ${HARX_BRAND.magentaDeep} 100%)`;
