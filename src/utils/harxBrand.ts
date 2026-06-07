@@ -13,20 +13,23 @@ export const HARX_BRAND = {
  */
 export const HARX_BUTTON_GRADIENT = 'linear-gradient(135deg, #F9484A 0%, #E6188D 100%)';
 
-/** Base red used as the gradients' starting color. */
+/** Base red used as the gradients' anchor color. */
 const RED = '#ED1C24';
 
-/** Navbar background — dark diagonal: red → deep magenta → bordeaux. */
-export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${RED} 0%, #C2186F 55%, #8A1250 100%)`;
+/**
+ * Navbar background — vivid diagonal matching the logo: orange → red → magenta.
+ * (orange top-left, red center, magenta bottom-right — exactly like logo-pink.png)
+ */
+export const HARX_NAVBAR_BG = `linear-gradient(135deg, ${HARX_BRAND.orange} 0%, ${RED} 45%, ${HARX_BRAND.magenta} 100%)`;
 
-/** Sidebar background — dark vertical flow: red → deep magenta → bordeaux. */
-export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${RED} 0%, #C2186F 50%, #8A1250 100%)`;
+/** Sidebar background — vivid vertical flow: orange → red → magenta. */
+export const HARX_SIDEBAR_BG = `linear-gradient(180deg, ${HARX_BRAND.orange} 0%, ${RED} 40%, ${HARX_BRAND.magenta} 100%)`;
 
-/** Sidebar body continues the same vertical flow below the logo strip. */
-export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${HARX_BRAND.red} 0%, ${HARX_BRAND.magenta} 45%, ${HARX_BRAND.magentaDeep} 75%, ${HARX_BRAND.magentaDarker} 100%)`;
+/** Sidebar body continues the same vivid vertical flow below the logo strip. */
+export const HARX_SIDEBAR_BODY_GRADIENT = `linear-gradient(180deg, ${RED} 0%, ${HARX_BRAND.magenta} 60%, ${HARX_BRAND.magentaDeep} 100%)`;
 
 /** Soft drop shadow used under the navbar / logo strip for depth. */
-export const HARX_BAR_SHADOW = '0 10px 24px -10px rgba(138, 18, 80, 0.6)';
+export const HARX_BAR_SHADOW = '0 10px 24px -10px rgba(230, 24, 141, 0.55)';
 
 /** Subtle text shadow to keep white labels crisp over the gradient. */
 export const HARX_TEXT_SHADOW = '0 1px 2px rgba(122, 14, 80, 0.4)';
