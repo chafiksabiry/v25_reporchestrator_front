@@ -39,20 +39,20 @@ function App() {
     <Router basename={getRouterBasename()}>
       <Routes>
         {/* Onboarding orchestrator (shared Sidebar + TopBar shell).
-            The orchestrator home now lives at `/onboarding` so the root `/`
+            The orchestrator home now lives at `/orchestrator` so the root `/`
             falls through to the dashboard catch-all below. */}
         <Route element={<OnboardingShell />}>
-          <Route path="/onboarding" element={<OnboardingDashboard />} />
-          <Route path="/onboarding/signup" element={<SignUp />} />
-          <Route path="/onboarding/profile" element={<OnboardingProfile />} />
-          <Route path="/onboarding/skills" element={<SkillsAssessment />} />
-          <Route path="/onboarding/subscription" element={<Subscription />} />
-          <Route path="/onboarding/marketplace" element={<Marketplace />} />
-          <Route path="/onboarding/operations" element={<OnboardingOperations />} />
-          <Route path="/onboarding/support" element={<Support />} />
-          <Route path="/onboarding/quality" element={<QualityControl />} />
-          <Route path="/onboarding/career" element={<CareerTrack />} />
-          <Route path="/onboarding/wallet" element={<WalletDashboard />} />
+          <Route path="/orchestrator" element={<OnboardingDashboard />} />
+          <Route path="/orchestrator/signup" element={<SignUp />} />
+          <Route path="/orchestrator/profile" element={<OnboardingProfile />} />
+          <Route path="/orchestrator/skills" element={<SkillsAssessment />} />
+          <Route path="/orchestrator/subscription" element={<Subscription />} />
+          <Route path="/orchestrator/marketplace" element={<Marketplace />} />
+          <Route path="/orchestrator/operations" element={<OnboardingOperations />} />
+          <Route path="/orchestrator/support" element={<Support />} />
+          <Route path="/orchestrator/quality" element={<QualityControl />} />
+          <Route path="/orchestrator/career" element={<CareerTrack />} />
+          <Route path="/orchestrator/wallet" element={<WalletDashboard />} />
 
           {/* Profile creation v2 — inside the shared shell so it keeps the
               global Sidebar + TopBar. */}
@@ -70,7 +70,7 @@ function App() {
 
         {/* Rep dashboard (merged from v25_dash_rep_front).
             Mounted once via a root splat so its internal <Routes> (absolute
-            paths like /profile, /wallet, /gigs-marketplace) match the full
+            paths like /profile, /wallet, /marketplace) match the full
             path. Explicit routes above keep priority over this catch-all. */}
         <Route path="*" element={<DashboardRoutes />} />
       </Routes>

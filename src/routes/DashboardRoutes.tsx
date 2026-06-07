@@ -104,7 +104,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
           <Routes>
             <Route path="/" element={<Dashboard profile={userProfile} />} />
             <Route path="/dashboard" element={<Dashboard profile={userProfile} />} />
-            <Route path="/gigs-marketplace" element={
+            <Route path="/marketplace" element={
               <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
                 <GigsMarketplace />
               </PhaseProtectedRoute>

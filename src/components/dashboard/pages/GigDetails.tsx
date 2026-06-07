@@ -1074,7 +1074,7 @@ export function GigDetails() {
           <h2 className="text-2xl font-black text-gray-900 mb-2">Gig Not Found</h2>
           <p className="text-gray-500 mb-8 font-medium">{error || 'The requested gig could not be found or has been archived.'}</p>
           <button
-            onClick={() => navigate('/gigs-marketplace')}
+            onClick={() => navigate('/marketplace')}
             className="w-full bg-gradient-harx text-white py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-harx-500/20 transition-all font-black text-sm uppercase tracking-wider hover:-translate-y-0.5"
           >
             Back to Marketplace
@@ -1106,7 +1106,7 @@ export function GigDetails() {
         {/* Header avec bouton retour */}
         <div className="mb-6">
           <button
-            onClick={() => navigate('/gigs-marketplace')}
+            onClick={() => navigate('/marketplace')}
             className="flex items-center text-gray-500 hover:text-harx-600 mb-6 transition-colors font-bold group"
           >
             <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />

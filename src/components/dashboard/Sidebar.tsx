@@ -108,7 +108,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     {
       icon: Briefcase,
       label: t('sidebar.marketplace'),
-      path: '/gigs-marketplace',
+      path: '/marketplace',
       isAccessible: () => isPhaseCompleted(4)
     },
 
@@ -151,7 +151,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   const filteredNavItems = navItems.filter(item => item.isAccessible());
 
-  const group1 = filteredNavItems.filter(i => ['/dashboard', '/gigs-marketplace', '/workspace'].includes(i.path));
+  const group1 = filteredNavItems.filter(i => ['/dashboard', '/marketplace', '/workspace'].includes(i.path));
   const group2 = filteredNavItems.filter(i => ['/training'].includes(i.path));
   const group3 = filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
 
@@ -228,7 +228,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               )}
             </p>
             <button
-              onClick={() => navigate('/onboarding')}
+              onClick={() => navigate('/orchestrator')}
               className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
             >
               {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
