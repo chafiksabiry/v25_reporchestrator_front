@@ -99,7 +99,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     {
       icon: LayoutDashboard,
       label: t('sidebar.dashboard'),
-      path: '/',
+      // Must be `/dashboard`: the exact `/` route renders the onboarding
+      // orchestrator (OnboardingDashboard), the real dashboard lives under
+      // the DashboardRoutes catch-all at `/dashboard`.
+      path: '/dashboard',
       isAccessible: () => onboardingComplete
     },
     {
@@ -148,7 +151,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   const filteredNavItems = navItems.filter(item => item.isAccessible());
 
-  const group1 = filteredNavItems.filter(i => ['/', '/gigs-marketplace', '/workspace'].includes(i.path));
+  const group1 = filteredNavItems.filter(i => ['/dashboard', '/gigs-marketplace', '/workspace'].includes(i.path));
   const group2 = filteredNavItems.filter(i => ['/training'].includes(i.path));
   const group3 = filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
 
