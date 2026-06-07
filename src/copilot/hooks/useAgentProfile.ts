@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getAgentId, getAuthToken } from '../../utils/authUtils';
 
 export interface AgentProfile {
     _id: string;
@@ -28,41 +29,17 @@ export const useAgentProfile = () => {
 
     useEffect(() => {
         const fetchProfile = async () => {
-            // Helper to get cookie by name
-            const getCookie = (name: string): string | null => {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-                return null;
-            };
+            const agentId = getAgentId();
 
-            // Try to get userId from various sources
-            let userId: string | null = getCookie('userId');
-
-            if (!userId) {
-                try {
-                    const profileDataString = localStorage.getItem('profileData');
-                    if (profileDataString) {
-                        const profileData = JSON.parse(profileDataString);
-                        userId = profileData.userId || profileData._id;
-                    }
-                    if (!userId) {
-                        userId = localStorage.getItem('userId');
-                    }
-                } catch (e) {
-                    console.error('Error parsing profileData:', e);
-                }
-            }
-
-            if (!userId) {
-                console.warn('[useAgentProfile] No userId found in cookies or localStorage');
-                window.location.href = '/auth';
+            if (!agentId) {
+                console.warn('[useAgentProfile] No agentId found');
+                setError('Agent not authenticated');
                 return;
             }
 
             setLoading(true);
             try {
-                const token = localStorage.getItem('token');
+                const token = getAuthToken();
                 const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
                 let apiUrl = import.meta.env.VITE_API_URL_CALL ||
@@ -75,7 +52,7 @@ export const useAgentProfile = () => {
                     console.log('[useAgentProfile] Normalized API URL:', apiUrl);
                 }
 
-                const response = await axios.get<AgentApiResponse>(`${apiUrl}/agents/${userId}`, { headers });
+                const response = await axios.get<AgentApiResponse>(`${apiUrl}/agents/${agentId}`, { headers });
 
                 if (response.data.success) {
                     setProfile(response.data.data);
@@ -83,7 +60,7 @@ export const useAgentProfile = () => {
             } catch (err: any) {
                 console.error('Error fetching agent profile:', err);
                 if (err.response?.status === 401 || err.response?.status === 403) {
-                    window.location.href = '/auth';
+                    setError('Session expired — please sign in again');
                     return;
                 }
                 setError(err.message);
