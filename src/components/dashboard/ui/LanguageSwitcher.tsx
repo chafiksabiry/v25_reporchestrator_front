@@ -37,8 +37,8 @@ export function LanguageSwitcher() {
         className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md hover:bg-white/20 p-1 pr-3.5 rounded-2xl border border-white/20 hover:border-white/40 shadow-lg shadow-black/10 transition-all duration-300 group text-white"
         title="Change Language"
       >
-        <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/30 shadow-inner">
-          <img src={currentLang.flagUrl} alt={currentLang.label} className="w-full h-full object-cover scale-150" />
+        <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/30 shadow-inner bg-white">
+          <img src={currentLang.flagUrl} alt={currentLang.label} className="w-full h-full object-cover" />
         </div>
         <span className="font-black text-sm tracking-wide whitespace-nowrap">
           {currentLang.label}
@@ -63,8 +63,8 @@ export function LanguageSwitcher() {
                 title={lang.label}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full overflow-hidden shadow-inner shrink-0 ring-2 ${isActive ? 'ring-white/40' : 'ring-white/10'}`}>
-                    <img src={lang.flagUrl} alt={lang.label} className="w-full h-full object-cover scale-150" />
+                  <div className={`w-6 h-6 rounded-full overflow-hidden shadow-inner shrink-0 bg-white ring-2 ${isActive ? 'ring-white/40' : 'ring-white/10'}`}>
+                    <img src={lang.flagUrl} alt={lang.label} className="w-full h-full object-cover" />
                   </div>
                   <span className={`tracking-wide ${isActive ? 'text-white' : 'text-gray-200'}`}>{lang.label}</span>
                 </div>
