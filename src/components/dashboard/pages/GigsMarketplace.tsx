@@ -2149,26 +2149,56 @@ export function GigsMarketplace() {
                         ) : null}
                       </div>
 
-                      <div className="mt-4 flex gap-2">
-                        <button
-                          onClick={() => acceptInvitation(enrollment.id)}
-                          className="flex-[2] bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-1.5 group/btn"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>ACCEPT</span>
-                        </button>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAcceptFromCard(enrollment.gig._id);
+                            }}
+                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                              ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
+                              }`}
+                          >
+                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'accept' ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" strokeWidth={3} />
+                                <span>Accept</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRejectFromCard(enrollment.gig._id);
+                            }}
+                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                              : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+                              }`}
+                          >
+                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'reject' ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+                            ) : (
+                              <>
+                                <X className="w-4 h-4" strokeWidth={3} />
+                                <span>Decline</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                         <button
                           onClick={() => navigate(`/gig/${enrollment.gig._id}`)}
-                          className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-3 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
-                          DETAILS
-                        </button>
-                        <button
-                          onClick={() => rejectInvitation(enrollment.id)}
-                          className="w-11 bg-rose-50 text-rose-500 py-2.5 rounded-xl hover:bg-rose-100 transition-all font-black text-[11px] flex items-center justify-center"
-                          title="Reject Invitation"
-                        >
-                          ✕
+                          View Details
                         </button>
                       </div>
                     </div>
