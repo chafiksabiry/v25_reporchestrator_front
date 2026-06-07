@@ -375,7 +375,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   </button>
 
                   {isWorkspaceOpen && (
-                    <div className="ml-5 pl-2 border-l border-white/10 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                    <div className="ml-5 pl-2 border-l border-white/15 space-y-1 animate-in slide-in-from-top-1 duration-200">
                       {item.subItems.map((sub) => {
                         const isSubActive = location.search.includes(sub.path.split('?')[1]);
                         return (
@@ -395,12 +395,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                               navigate(sub.path);
                             }}
                             className={`flex w-full items-center rounded-xl transition-all duration-300 group relative space-x-3 py-2.5 px-4 ${isSubActive
-                                ? 'bg-gradient-to-r from-harx-500/20 to-transparent text-white border-l-2 border-harx-500'
+                                ? 'bg-white/20 text-white border-l-2 border-white shadow-sm shadow-black/10'
                                 : 'text-white/70 hover:bg-white/10 hover:text-white'
                               }`}
                           >
-                            <sub.icon className={`h-3.5 w-3.5 transition-colors ${isSubActive ? 'text-harx-400' : 'text-current'}`} />
-                            <span className={`font-black text-[11px] uppercase tracking-widest ${isSubActive ? 'text-harx-400' : 'text-current'}`}>
+                            <sub.icon className={`h-3.5 w-3.5 transition-colors ${isSubActive ? 'text-white' : 'text-current'}`} />
+                            <span className={`font-black text-[11px] uppercase tracking-widest ${isSubActive ? 'text-white' : 'text-current'}`}>
                               {sub.label}
                             </span>
                           </NavLink>
