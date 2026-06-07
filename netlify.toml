@@ -22,8 +22,10 @@
   VITE_DASH_COMPANY_BACKEND = "https://v25dashboardbackend-production.up.railway.app/api"
   VITE_DASHBOARD_COMPANY_API_URL = "https://v25dashboardbackend-production.up.railway.app/api"
   # Calls / Twilio backend — call records, Twilio token (/api/calls/*)
-  VITE_CALLS_API_URL = "https://v25dashcallsbackend-production.up.railway.app/api"
-  VITE_API_URL_CALL = "https://v25dashcallsbackend-production.up.railway.app/api"
+  # NOTE: no trailing /api — twilioCallService.ts and useLead.ts append the
+  # /api prefix themselves, so adding it here produces a double /api/api/ 404.
+  VITE_CALLS_API_URL = "https://v25dashcallsbackend-production.up.railway.app"
+  VITE_API_URL_CALL = "https://v25dashcallsbackend-production.up.railway.app"
   # Comporchestrator backend
   VITE_COMPORCHESTRATOR_BACK_URL = "https://v25comporchestratorback-production.up.railway.app/api"
 
