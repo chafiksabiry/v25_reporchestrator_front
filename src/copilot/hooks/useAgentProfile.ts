@@ -47,6 +47,10 @@ export const useAgentProfile = () => {
                     professionalSummary: local.professionalSummary,
                     status: local.status,
                 });
+                // Local profile is sufficient for the cockpit; skip the remote
+                // /agents call which rejects rep tokens with 401 and only adds
+                // noise to the network console.
+                return;
             }
 
             if (!agentId) {
