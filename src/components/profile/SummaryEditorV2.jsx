@@ -2041,8 +2041,27 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               videoRelevance: editedProfile.experience[videoModalExp.index].videoRelevance,
               videoAnalyzedAt: editedProfile.experience[videoModalExp.index].videoAnalyzedAt,
             } : null}
-            onAnalysisComplete={() => {
-              if (onProfileUpdate) onProfileUpdate(editedProfile);
+            onAnalysisComplete={(data) => {
+              if (!data) return;
+              const idx = videoModalExp.index;
+              setEditedProfile((prev) => {
+                const experience = [...(prev.experience || [])];
+                if (!experience[idx]) return prev;
+                experience[idx] = {
+                  ...experience[idx],
+                  videoUrl: data.videoUrl,
+                  videoDuration: data.duration,
+                  videoTranscription: data.transcription,
+                  videoAnalysis: data.analysis,
+                  videoLanguageAssessment: data.languageAssessment,
+                  videoFraudCheck: data.fraudCheck,
+                  videoRelevance: data.relevance,
+                  videoAnalyzedAt: new Date().toISOString(),
+                };
+                const updated = { ...prev, experience };
+                if (onProfileUpdate) onProfileUpdate(updated);
+                return updated;
+              });
             }}
           />
         )}

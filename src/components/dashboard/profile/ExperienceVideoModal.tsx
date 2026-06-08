@@ -155,7 +155,7 @@ interface ExperienceVideoModalProps {
   profileId: string;
   experienceIndex?: number;
   savedData?: SavedVideoData | null;
-  onAnalysisComplete?: () => void;
+  onAnalysisComplete?: (data?: AnalysisResult) => void;
   referencePhotoUrl?: string | null;
 }
 
@@ -692,7 +692,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
-        onAnalysisComplete?.();
+        onAnalysisComplete?.(data);
       }
       if (data?.videoUrl) {
         showSavedVideo(data.videoUrl);
