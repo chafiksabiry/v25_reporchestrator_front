@@ -567,6 +567,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         videoRef.current.src = URL.createObjectURL(blob);
         videoRef.current.muted = false;
         videoRef.current.loop = true;
+        videoRef.current.controls = true;
         videoRef.current.play().catch(() => {});
       }
       stopCamera();
@@ -645,6 +646,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
   const timeRemaining = MAX_DURATION - elapsed;
   const progressPct = (elapsed / MAX_DURATION) * 100;
+  const showVideoControls =
+    viewMode === 'saved' || !!result?.videoUrl || (!!recordedBlob && !isRecording);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -690,10 +693,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               ) : (
                 <video
                   ref={videoRef}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full ${showVideoControls ? 'object-contain' : 'object-cover'}`}
                   playsInline
-                  autoPlay={viewMode === 'record'}
-                  controls={viewMode === 'saved' || !!result?.videoUrl}
+                  autoPlay={viewMode === 'record' && !showVideoControls}
+                  controls={showVideoControls}
                 />
               )}
 
