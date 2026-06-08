@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle } from 'lucide-react';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -1040,10 +1040,36 @@ export const ProfileView: React.FC<{
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
                 {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done.
-                    Hidden entirely once every phase (1-5) is completed — Publish takes over. */}
+                    Once every phase (1-5) is completed an attractive Publish banner takes over. */}
                 {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].every(
                   (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
-                ) ? null : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
+                ) ? (
+                  profile.status !== 'completed' ? (
+                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                          <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-base font-black tracking-tight">
+                            {isFr ? 'Votre profil est prêt à être publié !' : 'Your profile is ready to publish!'}
+                          </p>
+                          <p className="text-xs font-medium text-white/85 mt-0.5">
+                            {isFr ? 'Toutes les phases sont complétées. Publiez pour devenir visible aux entreprises.' : 'All phases are complete. Publish to become visible to companies.'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handlePublish}
+                        disabled={isPublishing}
+                        className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap"
+                      >
+                        {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                        {isPublishing ? (isFr ? 'Publication...' : 'Publishing...') : (isFr ? 'Publier mon profil' : 'Publish my profile')}
+                      </button>
+                    </div>
+                  ) : null
+                ) : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
                   <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                     <div className="flex items-start gap-3">
                       <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -1085,28 +1111,16 @@ export const ProfileView: React.FC<{
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
                     <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || 'Representative'}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {/* Small Onboarding Info */}
-                    <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl flex items-center gap-2">
-                      <ClipboardCheck className="w-4 h-4" />
-                      <span className="text-xs font-black uppercase tracking-wider">
-                        Phase {profile.onboardingProgress?.currentPhase || 1}
-                      </span>
+                  {profile.status === 'completed' && (
+                    <div className="flex items-center gap-3">
+                      <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl flex items-center gap-2">
+                        <Check className="w-4 h-4" strokeWidth={3} />
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          {isFr ? 'Publié' : 'Published'}
+                        </span>
+                      </div>
                     </div>
-                    {/* Publish only once every onboarding phase (1-5) is completed */}
-                    {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].every(
-                      (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
-                    ) && profile.status !== 'completed' && (
-                      <button
-                        onClick={handlePublish}
-                        disabled={isPublishing}
-                        className="px-6 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 disabled:opacity-50"
-                      >
-                        {isPublishing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check size={16} />}
-                        {isPublishing ? 'Publishing...' : 'Publish'}
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end mb-3">
