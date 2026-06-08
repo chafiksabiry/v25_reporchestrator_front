@@ -834,30 +834,6 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               </div>
             )}
 
-            {analyzing && (
-              <div className="h-full flex flex-col items-center justify-center gap-6 py-16">
-                <div className="relative w-24 h-24">
-                  <div className="absolute inset-0 rounded-full border-4 border-harx-100 animate-ping opacity-30" />
-                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-harx-500 animate-spin" />
-                  <div className="absolute inset-3 rounded-full bg-gradient-to-br from-harx-100 to-indigo-100 flex items-center justify-center">
-                    <Sparkles className="w-8 h-8 text-harx-500" />
-                  </div>
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="text-base font-black text-slate-800">{t('analyzingTitle')}</p>
-                  <p className="text-sm text-slate-500">{t('analyzingSteps')}</p>
-                </div>
-                <div className="flex gap-2 flex-wrap justify-center max-w-xs">
-                  {[t('stepTechnical'), t('stepLanguages'), t('stepIndustries'), t('stepActivities'), t('stepContactCenter')].map((step, i) => (
-                    <span key={step} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-full">
-                      <Loader2 className="w-2.5 h-2.5 animate-spin" style={{ animationDelay: `${i * 0.15}s` }} />
-                      {step}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {analyzeError && (
               <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
