@@ -2821,8 +2821,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             {renderSkillSection('Notable Companies', editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies')}
           </div>
 
-          {/* Availability Section — hidden for now */}
-          {SHOW_PROFILE_DETAILS && (
+          {/* Availability Section */}
           <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-6">Working Hours & Availability</h3>
 
@@ -3178,7 +3177,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             )}
           </div>
-          )}
 
           {/* Summary Section */}
           <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
