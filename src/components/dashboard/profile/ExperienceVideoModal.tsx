@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Video,
   VideoOff,
@@ -583,6 +584,16 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     };
   }, [isOpen, savedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Lock background scroll while the modal is open (it's portaled to body).
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
   // ── Recording ──────────────────────────────────────────────────────────────
   const startRecording = () => {
     if (!stream) return;
@@ -701,7 +712,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   }, [noFaceStreak, isRecording, faceAbsenceInvalid]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  return (
+  // Render through a portal to document.body so `position: fixed` is anchored to
+  // the real viewport, not the (CSS-transformed) Qiankun micro-frontend container.
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-start justify-center px-4 pt-20 pb-4 bg-black/70 animate-in fade-in duration-200">
       <div className="relative w-full max-w-4xl max-h-[calc(100vh-6rem)] bg-white rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
 
@@ -1447,6 +1460,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
