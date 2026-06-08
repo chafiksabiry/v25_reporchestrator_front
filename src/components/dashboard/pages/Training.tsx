@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -23,8 +23,6 @@ import {
   getViewerThemeTokens,
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
-import { CertificationView } from '../CertificationView';
-import { getProfileData } from '../../../utils/profileUtils';
 
 type JourneyRow = Record<string, unknown> & { __gigTitle?: string; __gigId?: string };
 type ModuleRow = { _id?: string; id?: string; title?: string; sections?: unknown[]; quizzes?: unknown[] };
@@ -655,6 +653,7 @@ async function fetchEnrolledGigsForAgent(
 
 export function Training() {
   const location = useLocation();
+  const navigate = useNavigate();
   const repId = getAgentId();
   const { setTrainingNav, clearTrainingNav } = useRepTrainingNav();
   const [loading, setLoading] = useState(true);
@@ -683,12 +682,8 @@ export function Training() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [formationViewerSlideIndex, setFormationViewerSlideIndex] = useState(0);
-  const [showCertification, setShowCertification] = useState(false);
-  /** Formation pour laquelle on affiche le certificat (découplé du viewer de formation). */
-  const [certJourney, setCertJourney] = useState<JourneyRow | null>(null);
   /** Onglet actif de la page : formations en cours / certifications obtenues. */
   const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications'>('trainings');
-  const [traineeProfile, setTraineeProfile] = useState<any>(null);
   type QuizQuestionState = {
     selected: number | null;
     revealed: boolean;
@@ -829,25 +824,21 @@ export function Training() {
     };
   }, []);
 
-  // Fetch profile for certification
+  // Ouvrir l'onglet Certifications si ?tab=certifications dans l'URL
   useEffect(() => {
-    getProfileData().then(data => setTraineeProfile(data));
-  }, []);
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab === 'certifications') setTrainingTab('certifications');
+  }, [location.search]);
 
-  // Trigger certification view when journey is completed
+  // Redirection vers la page certificat quand la formation est terminée
   useEffect(() => {
     if (selectedJourneyId && structuredProgressByJourney[selectedJourneyId]?.status === 'completed') {
-      // Small delay to ensure everything is saved before showing the "wow" screen
       const timer = setTimeout(() => {
-        const j = displayJourneys.find((x) => journeyKey(x) === selectedJourneyId) || null;
-        setCertJourney(j);
-        setIssuedCert(null);
-        setShowCertification(true);
-        void issueCertification(selectedJourneyId);
+        navigate(`/certification/journey/${encodeURIComponent(selectedJourneyId)}`);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [selectedJourneyId, structuredProgressByJourney, displayJourneys]);
+  }, [selectedJourneyId, structuredProgressByJourney, navigate]);
 
   /** Formations terminées (= certifiées) pour la section Certifications. */
   const completedJourneys = useMemo(() => {
@@ -860,33 +851,10 @@ export function Training() {
     });
   }, [displayJourneys, structuredProgressByJourney, progressByJourney]);
 
-  /** Certificat émis côté backend (certificateId + date réelle), persiste dans la collection `certifications`. */
-  const [issuedCert, setIssuedCert] = useState<{ certificateId?: string; issuedAt?: string } | null>(null);
-
-  /** Émet (ou récupère) le certificat côté backend → persiste le document en base. */
-  const issueCertification = useCallback(async (journeyId: string) => {
-    const base = trainingApiBase();
-    if (!base || !repId || !journeyId) return;
-    const token = getAuthToken() || '';
-    try {
-      const res = await axios.get<{ success?: boolean; certification?: { certificateId?: string; issuedAt?: string } }>(
-        `${base}/training_journeys/certification/${encodeURIComponent(repId)}/${encodeURIComponent(journeyId)}`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
-      );
-      const cert = res.data?.certification;
-      if (cert) setIssuedCert({ certificateId: cert.certificateId, issuedAt: cert.issuedAt });
-    } catch (e) {
-      console.warn('[Training] issueCertification failed', e);
-    }
-  }, [repId]);
-
   const openCertificate = useCallback((j: JourneyRow) => {
-    setCertJourney(j);
-    setIssuedCert(null);
-    setShowCertification(true);
     const id = journeyKey(j);
-    if (id) void issueCertification(id);
-  }, [issueCertification]);
+    if (id) navigate(`/certification/journey/${encodeURIComponent(id)}`);
+  }, [navigate]);
 
   // When user picks a gig, refetch trainings for that gig so the list updates even if the initial bulk load failed
   useEffect(() => {
@@ -3195,15 +3163,6 @@ export function Training() {
               )}
           </div>
         </div>
-      )}
-      {showCertification && (certJourney || selectedJourney) && (
-        <CertificationView
-          traineeName={traineeProfile?.basicInfo?.firstName ? `${traineeProfile.basicInfo.firstName} ${traineeProfile.basicInfo.lastName || ''}` : 'Trainee'}
-          trainingTitle={journeyTitle((certJourney || selectedJourney)!)}
-          completionDate={(issuedCert?.issuedAt ? new Date(issuedCert.issuedAt) : new Date()).toLocaleDateString('fr-FR')}
-          certificateId={issuedCert?.certificateId}
-          onClose={() => setShowCertification(false)}
-        />
       )}
     </div>
   );
