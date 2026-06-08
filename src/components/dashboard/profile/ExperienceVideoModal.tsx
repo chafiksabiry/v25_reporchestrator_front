@@ -92,12 +92,19 @@ interface FraudCheck {
   checkedFrames?: number;
 }
 
+interface Relevance {
+  onTopic: boolean;
+  score: number;
+  reason?: string;
+}
+
 interface AnalysisResult {
   videoUrl?: string | null;
   duration?: number | null;
   transcription: string;
   languageAssessment?: LanguageAssessment;
   fraudCheck?: FraudCheck;
+  relevance?: Relevance;
   analysis: {
     technicalSkills: SkillScore[];
     professionalSkills?: SkillScore[];
@@ -128,6 +135,7 @@ interface SavedVideoData {
   videoAnalysis?: AnalysisResult['analysis'];
   videoLanguageAssessment?: LanguageAssessment;
   videoFraudCheck?: FraudCheck;
+  videoRelevance?: Relevance;
   videoAnalyzedAt?: string;
 }
 
@@ -168,6 +176,7 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
     transcription: saved.videoTranscription || '',
     languageAssessment: saved.videoLanguageAssessment,
     fraudCheck: saved.videoFraudCheck,
+    relevance: saved.videoRelevance,
     analysis: saved.videoAnalysis,
   };
 };
@@ -691,6 +700,28 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     Analysis saved to your profile
                   </div>
                 )}
+
+                {/* Off-topic warning */}
+                {result.relevance && result.relevance.onTopic === false && (
+                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-black text-red-700">Off-topic video</span>
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-full">
+                          Relevance {result.relevance.score}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-red-500 mt-1">
+                        {result.relevance.reason || 'This video does not seem to describe the stated experience.'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Skills, industries and activities were not added to your profile. Please record a video that describes this specific experience.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Summary banner */}
                 <div className="p-4 bg-gradient-to-r from-harx-50 to-indigo-50 border border-harx-100 rounded-2xl">
                   <div className="flex items-center justify-between mb-2">
