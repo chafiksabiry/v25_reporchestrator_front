@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight } from 'lucide-react';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -1038,6 +1038,41 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
+                {/* Phase 1 onboarding: warning while incomplete, continue CTA once done */}
+                {(profile.onboardingProgress?.phases?.phase1?.status === 'completed') ? (
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <div className="flex items-start gap-3">
+                      <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-black text-emerald-800">
+                          {t('profile.phase1Done.title', { defaultValue: 'Phase 1 completed' })}
+                        </p>
+                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                          {t('profile.phase1Done.desc', { defaultValue: 'Your basic profile is ready. Continue your onboarding to unlock the rest.' })}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate('/orchestrator')}
+                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+                    >
+                      {t('profile.phase1Done.cta', { defaultValue: 'Continue onboarding' })}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-black text-amber-800">
+                        {t('profile.phase1Warning.title', { defaultValue: 'Complete Phase 1 to continue' })}
+                      </p>
+                      <p className="text-xs font-medium text-amber-700 mt-0.5">
+                        {t('profile.phase1Warning.desc', { defaultValue: 'Finish setting up your basic profile (Phase 1) before continuing your onboarding.' })}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {/* Action Buttons Top Right */}
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
                   <div>
