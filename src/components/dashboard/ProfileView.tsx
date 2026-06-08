@@ -1061,13 +1061,13 @@ export const ProfileView: React.FC<{
                     </button>
                   </div>
                 ) : (
-                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border border-yellow-300">
+                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-black text-amber-800">
+                      <p className="text-sm font-black text-yellow-800">
                         {t('profile.phase1Warning.title', { defaultValue: 'Complete Phase 1 to continue' })}
                       </p>
-                      <p className="text-xs font-medium text-amber-700 mt-0.5">
+                      <p className="text-xs font-medium text-yellow-700 mt-0.5">
                         {t('profile.phase1Warning.desc', { defaultValue: 'Finish setting up your basic profile (Phase 1) before continuing your onboarding.' })}
                       </p>
                     </div>
