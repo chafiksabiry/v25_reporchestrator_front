@@ -144,10 +144,10 @@ function Subscription() {
           const selectedPlan = plans.find(p => p.id === planId);
           toast.success(`${selectedPlan?.name || 'Plan'} activated successfully!`);
 
-          // Navigate back to dashboard after a short delay
+          // Navigate back to the onboarding dashboard to continue
           setTimeout(() => {
-            console.log('➡️ Phase 4 - Navigating back to dashboard');
-            navigate('/');
+            console.log('➡️ Phase 4 - Navigating back to onboarding');
+            navigate('/orchestrator');
           }, 1500);
 
         } catch (err) {
@@ -181,7 +181,7 @@ function Subscription() {
       <Toaster position="top-right" />
       
       <button 
-        onClick={() => navigate('/')}
+        onClick={() => navigate('/orchestrator')}
         className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
       >
         <ArrowLeft className="w-5 h-5 mr-2" />
