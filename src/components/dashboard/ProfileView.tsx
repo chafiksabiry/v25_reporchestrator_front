@@ -1038,17 +1038,17 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Phase 1 onboarding: warning while incomplete, continue CTA once done */}
-                {(profile.onboardingProgress?.phases?.phase1?.status === 'completed') ? (
+                {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done */}
+                {(profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
                   <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                     <div className="flex items-start gap-3">
                       <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-black text-emerald-800">
-                          {t('profile.phase1Done.title', { defaultValue: 'Phase 1 completed' })}
+                          {t('profile.phase2Done.title', { defaultValue: 'Phase 2 completed' })}
                         </p>
                         <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                          {t('profile.phase1Done.desc', { defaultValue: 'Your basic profile is ready. Continue your onboarding to unlock the rest.' })}
+                          {t('profile.phase2Done.desc', { defaultValue: 'Your profile is complete. Continue your onboarding to unlock the rest.' })}
                         </p>
                       </div>
                     </div>
@@ -1056,7 +1056,7 @@ export const ProfileView: React.FC<{
                       onClick={() => navigate('/orchestrator')}
                       className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
                     >
-                      {t('profile.phase1Done.cta', { defaultValue: 'Continue onboarding' })}
+                      {t('profile.phase2Done.cta', { defaultValue: 'Continue onboarding' })}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1065,10 +1065,10 @@ export const ProfileView: React.FC<{
                     <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-black text-yellow-800">
-                        {t('profile.phase1Warning.title', { defaultValue: 'Complete Phase 1 to continue' })}
+                        {t('profile.phase2Warning.title', { defaultValue: 'Complete Phase 2 to continue' })}
                       </p>
                       <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                        {t('profile.phase1Warning.desc', { defaultValue: 'Finish setting up your basic profile (Phase 1) before continuing your onboarding.' })}
+                        {t('profile.phase2Warning.desc', { defaultValue: 'Finish your profile (experience, languages, skills, availability…) before continuing your onboarding.' })}
                       </p>
                     </div>
                   </div>
@@ -1087,7 +1087,10 @@ export const ProfileView: React.FC<{
                         Phase {profile.onboardingProgress?.currentPhase || 1}
                       </span>
                     </div>
-                    {profile.status !== 'completed' && (
+                    {/* Publish only once every onboarding phase (1-4) is completed */}
+                    {['phase1', 'phase2', 'phase3', 'phase4'].every(
+                      (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
+                    ) && profile.status !== 'completed' && (
                       <button
                         onClick={handlePublish}
                         disabled={isPublishing}
