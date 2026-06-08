@@ -7,6 +7,8 @@ interface CertificationViewProps {
   completionDate: string;
   /** Identifiant officiel du certificat (issu de la base). À défaut, un id local est généré. */
   certificateId?: string;
+  /** URL de partage (page /certification/:certificateId). */
+  shareUrl?: string;
   onClose: () => void;
   visualTheme?: {
     primaryColor?: string;
@@ -31,6 +33,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
   trainingTitle,
   completionDate,
   certificateId,
+  shareUrl,
   onClose,
 }) => {
   const [showContent, setShowContent] = useState(false);
@@ -71,10 +74,13 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
   }, [onClose]);
 
   const handleShare = async () => {
+    const pageUrl =
+      shareUrl ||
+      (typeof window !== 'undefined' ? window.location.href : '');
     const shareData = {
       title: 'Certification HARX Academy',
       text: `${traineeName} vient d'obtenir la certification « ${trainingTitle} » sur HARX Academy ! 🎓`,
-      url: typeof window !== 'undefined' ? window.location.href : '',
+      url: pageUrl,
     };
     try {
       if (typeof navigator !== 'undefined' && (navigator as any).share) {

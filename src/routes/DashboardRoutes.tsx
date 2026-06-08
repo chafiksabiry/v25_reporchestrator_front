@@ -12,6 +12,7 @@ import { Profile } from '../components/dashboard/pages/Profile';
 import { Payouts } from '../components/dashboard/pages/Payouts';
 import { Learning } from '../components/dashboard/pages/Learning';
 import { Training } from '../components/dashboard/pages/Training';
+import { CertificationPage } from '../components/dashboard/pages/CertificationPage';
 import { Operations } from '../components/dashboard/pages/Operations';
 import { Workspace } from '../components/dashboard/pages/Workspace';
 import { Community } from '../components/dashboard/pages/Community';
@@ -127,6 +128,12 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
                 <Training />
               </PhaseProtectedRoute>
             } />
+            <Route path="/certification/journey/:journeyId" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <CertificationPage />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/certification/:certificateId" element={<CertificationPage />} />
             <Route path="/operations" element={<Operations />} />
             <Route path="/workspace" element={
               <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
