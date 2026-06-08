@@ -24,17 +24,28 @@ import { dashRepApiUrl } from '../../../utils/repApiUrl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type RefLabel = string | { _id?: string; name?: string };
+
 interface SkillScore {
-  name: string;
+  name?: string;
+  skill?: RefLabel;
   score: number;
   evidence?: string;
 }
 
 interface LanguageScore {
-  language: string;
+  language: RefLabel;
+  name?: string;
   level: string;
   score: number;
   evidence?: string;
+}
+
+interface NamedScore {
+  name?: string;
+  industry?: RefLabel;
+  activity?: RefLabel;
+  score: number;
 }
 
 interface ContactCenterSkill {
@@ -50,8 +61,8 @@ interface AnalysisResult {
     professionalSkills?: SkillScore[];
     softSkills?: SkillScore[];
     spokenLanguages: LanguageScore[];
-    industries: { name: string; score: number }[];
-    activities: { name: string; score: number }[];
+    industries: NamedScore[];
+    activities: NamedScore[];
     contactCenterSkills: {
       customerService: ContactCenterSkill;
       communication: ContactCenterSkill;
@@ -88,6 +99,20 @@ interface ExperienceVideoModalProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const MAX_DURATION = 120; // 2 minutes in seconds
+
+const refLabel = (value?: RefLabel | null, fallback = 'Unknown'): string => {
+  if (!value) return fallback;
+  if (typeof value === 'string') {
+    if (/^[a-f0-9]{24}$/i.test(value)) return fallback;
+    return value;
+  }
+  return value.name || fallback;
+};
+
+const skillLabel = (skill: SkillScore): string => skill.name || refLabel(skill.skill);
+const industryLabel = (item: NamedScore): string => item.name || refLabel(item.industry);
+const activityLabel = (item: NamedScore): string => item.name || refLabel(item.activity);
+const languageLabel = (lang: LanguageScore): string => lang.name || refLabel(lang.language);
 
 const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   if (!saved?.videoAnalysis) return null;
@@ -627,7 +652,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.technicalSkills.length}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
                     ))}
                   </Section>
                 )}
@@ -640,7 +665,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.professionalSkills!.length}
                   >
                     {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
                     ))}
                   </Section>
                 )}
@@ -653,7 +678,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.softSkills!.length}
                   >
                     {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skill.name} score={skill.score} label={skill.name} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
                     ))}
                   </Section>
                 )}
@@ -666,11 +691,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.spokenLanguages.length}
                   >
                     {result.analysis.spokenLanguages.filter((l) => l.score > 0).sort((a, b) => b.score - a.score).map((lang) => (
-                      <div key={lang.language} className="flex items-center gap-3">
+                      <div key={languageLabel(lang)} className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-slate-700">{lang.language}</span>
+                              <span className="text-xs font-black text-slate-700">{languageLabel(lang)}</span>
                               <span className={`px-2 py-0.5 text-[9px] font-black rounded-full ${levelBadge[lang.level] || 'bg-slate-100 text-slate-500'}`}>
                                 {lang.level}
                               </span>
@@ -690,7 +715,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {result.analysis.industries?.length > 0 && (
                   <Section icon={<Building2 className="w-4 h-4" />} title="Industries" count={result.analysis.industries.filter((i) => i.score > 0).length}>
                     {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
-                      <ScoreBar key={ind.name} score={ind.score} label={ind.name} />
+                      <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
                     ))}
                   </Section>
                 )}
@@ -701,10 +726,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     <div className="flex flex-wrap gap-2">
                       {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
                         <span
-                          key={act.name}
+                          key={activityLabel(act)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
                         >
-                          {act.name}
+                          {activityLabel(act)}
                           <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
                         </span>
                       ))}
