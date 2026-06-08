@@ -6,7 +6,73 @@ import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 import { Video } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
+
+// Bilingual (EN/FR) strings for the CV review page. The active language is read
+// from i18next; we fall back to English when a key/locale is missing.
+const PAGE_STRINGS = {
+  stepBadge: { en: 'Step 3 · Verify & save', fr: 'Étape 3 · Vérifier et enregistrer' },
+  pageTitle: { en: 'Your professional story', fr: 'Votre parcours professionnel' },
+  pageSubtitle: {
+    en: 'Review the information extracted from your CV. Edit anything that needs a correction, then continue.',
+    fr: 'Vérifiez les informations extraites de votre CV. Corrigez ce qui doit l’être, puis continuez.',
+  },
+  confirmContinue: { en: 'Confirm to continue', fr: 'Confirmer pour continuer' },
+  continueToProfile: { en: 'Continue to my profile', fr: 'Continuer vers mon profil' },
+  everythingGood: {
+    en: 'Everything looks good? Continue to your full REPS profile.',
+    fr: 'Tout est bon ? Continuez vers votre profil REPS complet.',
+  },
+  edit: { en: 'Edit', fr: 'Modifier' },
+  save: { en: 'Save', fr: 'Enregistrer' },
+  saving: { en: 'Saving…', fr: 'Enregistrement…' },
+  cancel: { en: 'Cancel', fr: 'Annuler' },
+  personalInfo: { en: 'Personal information', fr: 'Informations personnelles' },
+  name: { en: 'Name', fr: 'Nom' },
+  country: { en: 'Country', fr: 'Pays' },
+  email: { en: 'Email', fr: 'E-mail' },
+  phone: { en: 'Phone', fr: 'Téléphone' },
+  experienceLabel: { en: 'Experience', fr: 'Expérience' },
+  languages: { en: 'Languages', fr: 'Langues' },
+  professionalExperience: { en: 'Professional Experience', fr: 'Expérience professionnelle' },
+  addExperience: { en: 'Add Experience', fr: 'Ajouter une expérience' },
+  workingHours: { en: 'Working Hours & Availability', fr: 'Horaires de travail et disponibilité' },
+  professionalSummary: { en: 'Professional summary', fr: 'Résumé professionnel' },
+  summarySubtitle: {
+    en: 'AI-generated from your CV — edit or regenerate anytime.',
+    fr: 'Généré par IA à partir de votre CV — modifiable ou régénérable à tout moment.',
+  },
+  regenerate: { en: 'Regenerate', fr: 'Régénérer' },
+  generating: { en: 'Generating…', fr: 'Génération…' },
+  notableCompanies: { en: 'Notable Companies', fr: 'Entreprises notables' },
+  noSummary: {
+    en: 'No summary yet. Click Edit, then Regenerate to create one from your CV.',
+    fr: 'Pas encore de résumé. Cliquez sur Modifier, puis Régénérer pour en créer un à partir de votre CV.',
+  },
+  summaryPlaceholder: { en: 'Edit your professional summary...', fr: 'Modifiez votre résumé professionnel...' },
+  warnVideoTitle: {
+    en: 'A video is required for each experience',
+    fr: 'Une vidéo est requise pour chaque expérience',
+  },
+  warnAddExp: {
+    en: 'Add at least one experience, then record a video for it.',
+    fr: 'Ajoutez au moins une expérience, puis enregistrez une vidéo pour celle-ci.',
+  },
+  warnBottom: {
+    en: 'Record a video for every experience above to unlock the “Continue” button.',
+    fr: 'Enregistrez une vidéo pour chaque expérience ci-dessus pour débloquer le bouton « Continuer ».',
+  },
+  recordAnalyze: { en: 'Record & Analyze with AI', fr: 'Enregistrer et analyser avec l’IA' },
+  viewAnalysis: { en: 'View AI Analysis', fr: 'Voir l’analyse IA' },
+  expVideoMissing: {
+    en: 'Video required — record a video for this experience to continue.',
+    fr: 'Vidéo requise — enregistrez une vidéo pour cette expérience afin de continuer.',
+  },
+  expVideoDone: { en: 'Video recorded', fr: 'Vidéo enregistrée' },
+  savedSuccess: { en: 'Saved successfully!', fr: 'Enregistré avec succès !' },
+  saveError: { en: 'Error saving. Please try again.', fr: 'Erreur lors de l’enregistrement. Veuillez réessayer.' },
+};
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -406,6 +472,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   console.log("generatedSummary : ", generatedSummary);
   const [editedSummary, setEditedSummary] = useState(generatedSummary);
   const [loading, setLoading] = useState(false);
+  const { i18n } = useTranslation();
+  const uiLang = (i18n.language || 'en').slice(0, 2);
+  const t = (key) => PAGE_STRINGS[key]?.[uiLang] || PAGE_STRINGS[key]?.en || key;
+
   const [editingProfile, setEditingProfile] = useState(false);
   // Per-section editing: each visible section can be edited/saved independently
   // (no global "Edit profile" mode). Keys: basic | experience | availability |
@@ -1657,12 +1727,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       <div className="mb-6 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-            {title === 'Technical Skills' && '🔧'}
-            {title === 'Professional Skills' && '💼'}
-            {title === 'Soft Skills' && '🤝'}
-            {title === 'Notable Companies' && '🌟'}
-            {title === 'Industries' && '🏭'}
-            {title === 'Activities' && '🎯'}
+            {type === 'technical' && '🔧'}
+            {type === 'professional' && '💼'}
+            {type === 'soft' && '🤝'}
+            {type === 'notableCompanies' && '🌟'}
+            {type === 'industries' && '🏭'}
+            {type === 'activities' && '🎯'}
             <span className="ml-2">{title}</span>
           </h3>
           {type === 'notableCompanies' && renderSectionControls('companies')}
@@ -1932,7 +2002,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       <div className="mb-8 space-y-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Professional Experience</h3>
+            <h3 className="text-xl font-bold text-gray-900">{t('professionalExperience')}</h3>
             <div className="flex items-center gap-2">
               {isSectionEditing('experience') && (
                 <button
@@ -1942,7 +2012,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  Add Experience
+                  {t('addExperience')}
                 </button>
               )}
               {renderSectionControls('experience')}
@@ -2010,6 +2080,22 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       ))}
                     </ul>
 
+                    {role.videoUrl || role.videoAnalysis ? (
+                      <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <svg className="h-4 w-4 flex-shrink-0 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-bold text-emerald-700">{t('expVideoDone')}</span>
+                      </div>
+                    ) : (
+                      <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border-2 border-red-200 animate-pulse">
+                        <svg className="h-4 w-4 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-bold text-red-600">{t('expVideoMissing')}</span>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => setVideoModalExp({
@@ -2017,14 +2103,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         company: String(role.company || ''),
                         index,
                       })}
-                      className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
+                      className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
                         role.videoUrl || role.videoAnalysis
                           ? 'border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50'
                           : 'border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50'
                       }`}
                     >
                       <Video className="w-4 h-4" />
-                      {role.videoUrl || role.videoAnalysis ? 'View AI Analysis' : 'Record & Analyze with AI'}
+                      {role.videoUrl || role.videoAnalysis ? t('viewAnalysis') : t('recordAnalyze')}
                     </button>
                   </div>
                 )}
@@ -2405,10 +2491,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       if (onProfileUpdate) onProfileUpdate(editedProfile);
       setSectionEditing((prev) => ({ ...prev, [section]: false }));
       if (section === 'summary') setIsEditing(false);
-      showToast('Saved successfully!', 'success');
+      showToast(t('savedSuccess'), 'success');
     } catch (error) {
       console.error(`Error saving section "${section}":`, error);
-      showToast('Error saving. Please try again.', 'error');
+      showToast(t('saveError'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -2423,7 +2509,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           disabled={isSaving}
           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
-          Cancel
+          {t('cancel')}
         </button>
         <button
           onClick={() => saveSection(section)}
@@ -2436,7 +2522,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           )}
-          {isSaving ? 'Saving…' : 'Save'}
+          {isSaving ? t('saving') : t('save')}
         </button>
       </div>
     ) : (
@@ -2447,7 +2533,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
-        Edit
+        {t('edit')}
       </button>
     );
 
@@ -2491,13 +2577,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-harx-50 text-harx-700 text-xs font-semibold tracking-wide uppercase">
                 <span className="h-1.5 w-1.5 rounded-full bg-harx-500" />
-                Step 3 · Verify &amp; save
+                {t('stepBadge')}
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-                Your professional story
+                {t('pageTitle')}
               </h2>
               <p className="mt-1 text-sm text-gray-500 max-w-lg">
-                Review the information extracted from your CV. Edit anything that needs a correction, then continue.
+                {t('pageSubtitle')}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -2506,7 +2592,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   onClick={pushToRepsProfile}
                   className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
                 >
-                  Confirm to continue
+                  {t('confirmContinue')}
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -2529,11 +2615,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                    A video is required for each experience
+                    {t('warnVideoTitle')}
                   </p>
                   <p className="mt-1 text-sm font-semibold text-red-600">
                     {experienceList.length === 0
-                      ? 'Add at least one experience, then record a video for it.'
+                      ? t('warnAddExp')
+                      : uiLang === 'fr'
+                      ? `${missingVideosCount} expérience${experienceList.length > 1 ? 's' : ''} sur ${experienceList.length} ${missingVideosCount > 1 ? 'n’ont' : 'n’a'} pas encore de vidéo. Utilisez le bouton « ${t('recordAnalyze')} » sur chaque expérience ci-dessous. Vous ne pouvez pas continuer tant que toutes les vidéos ne sont pas enregistrées.`
                       : `${missingVideosCount} of ${experienceList.length} experience${experienceList.length > 1 ? 's' : ''} still ${missingVideosCount > 1 ? 'need' : 'needs'} a video. Use the “Record & Analyze with AI” button on each experience below. You can’t continue until all videos are recorded.`}
                   </p>
                 </div>
@@ -2543,7 +2631,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
           {/* Profile Overview */}
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Personal information</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('personalInfo')}</h3>
             {renderSectionControls('basic')}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -2853,7 +2941,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             ) : (
               <>
                 <ProfileReadField
-                  label="Name"
+                  label={t('name')}
                   value={editedProfile.personalInfo.name}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2863,7 +2951,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 />
                 <div>
                   <ProfileReadField
-                    label="Country"
+                    label={t('country')}
                     value={countryDisplay}
                     icon={
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2875,7 +2963,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
                 </div>
                 <ProfileReadField
-                  label="Email"
+                  label={t('email')}
                   value={editedProfile.personalInfo.email}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2884,7 +2972,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   }
                 />
                 <ProfileReadField
-                  label="Phone"
+                  label={t('phone')}
                   value={editedProfile.personalInfo.phone}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2893,8 +2981,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   }
                 />
                 <ProfileReadField
-                  label="Experience"
-                  value={`${editedProfile.professionalSummary?.yearsOfExperience || 0} years`}
+                  label={t('experienceLabel')}
+                  value={`${editedProfile.professionalSummary?.yearsOfExperience || 0} ${uiLang === 'fr' ? 'ans' : 'years'}`}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -2908,7 +2996,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                       </svg>
                     </span>
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Languages</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t('languages')}</h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {editedProfile.personalInfo.languages.map((lang, index) => {
@@ -2949,13 +3037,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 {renderSkillSection('Activities', editedProfile.professionalSummary?.activities || [], 'activities')}
               </>
             )}
-            {renderSkillSection('Notable Companies', editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies', isSectionEditing('companies'))}
+            {renderSkillSection(t('notableCompanies'), editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies', isSectionEditing('companies'))}
           </div>
 
           {/* Availability Section */}
           <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Working Hours & Availability</h3>
+              <h3 className="text-xl font-bold text-gray-900">{t('workingHours')}</h3>
               {renderSectionControls('availability')}
             </div>
 
@@ -3316,8 +3404,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Professional summary</h3>
-                <p className="text-sm text-gray-500 mt-0.5">AI-generated from your CV — edit or regenerate anytime.</p>
+                <h3 className="text-xl font-bold text-gray-900">{t('professionalSummary')}</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{t('summarySubtitle')}</p>
               </div>
               <div className="flex items-center gap-2 self-start">
                 {isSectionEditing('summary') && (
@@ -3340,13 +3428,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 value={editedSummary}
                 onChange={(e) => handleSummaryChange(e.target.value)}
                 className="w-full h-64 p-4 border rounded-xl focus:ring-2 focus:ring-harx-500 focus:border-harx-500"
-                placeholder="Edit your professional summary..."
+                placeholder={t('summaryPlaceholder')}
               />
             ) : (
               <div className="bg-white/80 backdrop-blur-sm border border-white p-6 rounded-2xl shadow-inner">
                 <p className="text-gray-800 whitespace-pre-line text-base sm:text-lg leading-relaxed">
-                  {editedProfile.professionalSummary?.profileDescription ||
-                    'No summary yet. Click Edit, then Regenerate to create one from your CV.'}
+                  {editedProfile.professionalSummary?.profileDescription || t('noSummary')}
                 </p>
               </div>
             )}
@@ -3356,13 +3443,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           {allExperiencesHaveVideo ? (
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm text-gray-600">
-                Everything looks good? Continue to your full REPS profile.
+                {t('everythingGood')}
               </p>
               <button
                 onClick={pushToRepsProfile}
                 className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-xl shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center justify-center gap-2"
               >
-                Continue to my profile
+                {t('continueToProfile')}
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
@@ -3374,7 +3461,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <p className="text-sm font-bold text-red-700">
-                Record a video for every experience above to unlock the “Continue” button.
+                {t('warnBottom')}
               </p>
             </div>
           )}
