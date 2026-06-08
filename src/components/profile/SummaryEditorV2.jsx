@@ -5,6 +5,8 @@ import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateS
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
+import { Video } from 'lucide-react';
+import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -474,6 +476,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   // New state for country mismatch detection
   const [firstLoginLocation, setFirstLoginLocation] = useState(null);
+  const [videoModalExp, setVideoModalExp] = useState(null);
 
   const proficiencyLevels = [
     { value: 'A1', label: 'A1 - Beginner', description: 'Can understand and use basic phrases, introduce themselves' },
@@ -1996,12 +1999,53 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         </li>
                       ))}
                     </ul>
+
+                    <button
+                      type="button"
+                      onClick={() => setVideoModalExp({
+                        title: String(role.title || role.role || ''),
+                        company: String(role.company || ''),
+                        index,
+                      })}
+                      className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
+                        role.videoUrl || role.videoAnalysis
+                          ? 'border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50'
+                          : 'border-harx-200 text-harx-600 hover:border-harx-400 hover:bg-harx-50/50'
+                      }`}
+                    >
+                      <Video className="w-4 h-4" />
+                      {role.videoUrl || role.videoAnalysis ? 'View AI Analysis' : 'Record & Analyze with AI'}
+                    </button>
                   </div>
                 )}
               </div>
             ))}
           </div>
         </div>
+
+        {videoModalExp && (
+          <ExperienceVideoModal
+            isOpen={!!videoModalExp}
+            onClose={() => setVideoModalExp(null)}
+            experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+            experienceIndex={videoModalExp.index}
+            profileId={editedProfile._id || editedProfile.id || ''}
+            referencePhotoUrl={editedProfile?.personalInfo?.photo?.url || null}
+            savedData={editedProfile.experience?.[videoModalExp.index] ? {
+              videoUrl: editedProfile.experience[videoModalExp.index].videoUrl,
+              videoDuration: editedProfile.experience[videoModalExp.index].videoDuration,
+              videoTranscription: editedProfile.experience[videoModalExp.index].videoTranscription,
+              videoAnalysis: editedProfile.experience[videoModalExp.index].videoAnalysis,
+              videoLanguageAssessment: editedProfile.experience[videoModalExp.index].videoLanguageAssessment,
+              videoFraudCheck: editedProfile.experience[videoModalExp.index].videoFraudCheck,
+              videoRelevance: editedProfile.experience[videoModalExp.index].videoRelevance,
+              videoAnalyzedAt: editedProfile.experience[videoModalExp.index].videoAnalyzedAt,
+            } : null}
+            onAnalysisComplete={() => {
+              if (onProfileUpdate) onProfileUpdate(editedProfile);
+            }}
+          />
+        )}
       </div>
     );
   };
