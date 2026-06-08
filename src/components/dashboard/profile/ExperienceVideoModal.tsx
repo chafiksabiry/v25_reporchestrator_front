@@ -488,6 +488,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Wall-clock timestamp (ms) when recording started. Using real time keeps the
+  // elapsed counter accurate even when the main thread is busy (e.g. live face
+  // matching) and the interval fires less often than once per second.
+  const startTimeRef = useRef<number>(0);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -618,15 +622,16 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
     setElapsed(0);
+    startTimeRef.current = Date.now();
     timerRef.current = setInterval(() => {
-      setElapsed((prev) => {
-        if (prev >= MAX_DURATION - 1) {
-          stopRecording();
-          return MAX_DURATION;
-        }
-        return prev + 1;
-      });
-    }, 1000);
+      const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      if (secs >= MAX_DURATION) {
+        setElapsed(MAX_DURATION);
+        stopRecording();
+        return;
+      }
+      setElapsed(secs);
+    }, 250);
   };
 
   const stopRecording = () => {
@@ -634,6 +639,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       mediaRecorderRef.current.stop();
     }
     if (timerRef.current) clearInterval(timerRef.current);
+    if (startTimeRef.current) {
+      const secs = Math.min(MAX_DURATION, Math.floor((Date.now() - startTimeRef.current) / 1000));
+      setElapsed(secs);
+    }
     setIsRecording(false);
   };
 
