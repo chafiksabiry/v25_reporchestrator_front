@@ -630,17 +630,6 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     enterRecordMode();
   };
 
-  // If the person leaves the frame for too long during recording, cut the
-  // recording and mark it invalid so it cannot be analyzed (must record again).
-  useEffect(() => {
-    if (!isRecording || faceAbsenceInvalid) return;
-    if (noFaceStreak >= ABSENCE_CUT_TICKS) {
-      setFaceAbsenceInvalid(true);
-      stopRecording();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noFaceStreak, isRecording, faceAbsenceInvalid]);
-
   // ── Analysis ───────────────────────────────────────────────────────────────
   const analyzeVideo = async () => {
     if (!recordedBlob || !profileId) return;
@@ -699,6 +688,17 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     referencePhotoUrl,
     active: faceMatchActive,
   });
+
+  // If the person leaves the frame for too long during recording, cut the
+  // recording and mark it invalid so it cannot be analyzed (must record again).
+  useEffect(() => {
+    if (!isRecording || faceAbsenceInvalid) return;
+    if (noFaceStreak >= ABSENCE_CUT_TICKS) {
+      setFaceAbsenceInvalid(true);
+      stopRecording();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noFaceStreak, isRecording, faceAbsenceInvalid]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
