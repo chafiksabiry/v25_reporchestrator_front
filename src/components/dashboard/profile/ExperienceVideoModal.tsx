@@ -197,12 +197,124 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
 const langAssessmentLabel = (entry: LanguageAssessmentEntry): string =>
   entry.languageName || refLabel(entry.language);
 
-const fraudRiskStyles: Record<string, { badge: string; label: string }> = {
-  low: { badge: 'bg-emerald-100 text-emerald-700', label: 'Low risk' },
-  medium: { badge: 'bg-amber-100 text-amber-700', label: 'Medium risk' },
-  high: { badge: 'bg-red-100 text-red-700', label: 'High risk' },
-  unknown: { badge: 'bg-slate-100 text-slate-500', label: 'Not verified' },
+const fraudRiskStyles: Record<string, { badge: string }> = {
+  low: { badge: 'bg-emerald-100 text-emerald-700' },
+  medium: { badge: 'bg-amber-100 text-amber-700' },
+  high: { badge: 'bg-red-100 text-red-700' },
+  unknown: { badge: 'bg-slate-100 text-slate-500' },
 };
+
+// ─── Static UI strings (EN / FR) ───────────────────────────────────────────────
+// AI-generated text is already bilingual; these are the fixed interface labels.
+const STRINGS: Record<string, { en: string; fr: string }> = {
+  headerTitle: { en: 'AI Experience Analysis', fr: 'Analyse IA de l’expérience' },
+  retry: { en: 'Retry', fr: 'Réessayer' },
+  saved: { en: 'Saved', fr: 'Enregistré' },
+  recorded: { en: 'Recorded', fr: 'Enregistré' },
+  left: { en: 'left', fr: 'restant' },
+  recordNewVideo: { en: 'Record New Video', fr: 'Enregistrer une nouvelle vidéo' },
+  recordHint: {
+    en: 'Record between 30 seconds and 2 minutes describing your experience, skills, and achievements.',
+    fr: 'Enregistrez entre 30 secondes et 2 minutes pour décrire votre expérience, vos compétences et vos réalisations.',
+  },
+  startRecording: { en: 'Start Recording', fr: 'Démarrer l’enregistrement' },
+  stopRecording: { en: 'Stop Recording', fr: 'Arrêter l’enregistrement' },
+  minDurationWarn: {
+    en: 'Recording is too short — at least 30s is required. Please retake.',
+    fr: 'L’enregistrement est trop court — au moins 30 s sont requises. Veuillez recommencer.',
+  },
+  analysisComplete: { en: 'Analysis Complete', fr: 'Analyse terminée' },
+  analyzeWithAI: { en: 'Analyze with AI', fr: 'Analyser avec l’IA' },
+  retake: { en: 'Retake', fr: 'Recommencer' },
+  analyzingShort: { en: 'AI is analyzing...', fr: 'L’IA analyse...' },
+  analyzingStepsShort: {
+    en: 'Uploading → Processing video → Extracting skills',
+    fr: 'Téléversement → Traitement vidéo → Extraction des compétences',
+  },
+  emptyTitle: { en: 'Record your experience', fr: 'Enregistrez votre expérience' },
+  emptyDesc: {
+    en: 'Talk about what you did, tools you used, and achievements. The AI will detect your skills and score them automatically.',
+    fr: 'Parlez de ce que vous avez fait, des outils utilisés et de vos réalisations. L’IA détectera vos compétences et les évaluera automatiquement.',
+  },
+  tagSkills: { en: 'Skills', fr: 'Compétences' },
+  tagLanguages: { en: 'Languages', fr: 'Langues' },
+  tagIndustries: { en: 'Industries', fr: 'Secteurs' },
+  tagContactCenter: { en: 'Contact Center', fr: 'Centre de contact' },
+  analyzingTitle: { en: 'AI is analyzing your video', fr: 'L’IA analyse votre vidéo' },
+  analyzingSteps: {
+    en: 'Uploading → Processing video → Detecting skills → Scoring...',
+    fr: 'Téléversement → Traitement vidéo → Détection des compétences → Évaluation...',
+  },
+  stepTechnical: { en: 'Technical Skills', fr: 'Compétences techniques' },
+  stepLanguages: { en: 'Languages', fr: 'Langues' },
+  stepIndustries: { en: 'Industries', fr: 'Secteurs' },
+  stepActivities: { en: 'Activities', fr: 'Activités' },
+  stepContactCenter: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
+  analysisFailed: { en: 'Analysis failed', fr: 'L’analyse a échoué' },
+  savedToProfile: { en: 'Analysis saved to your profile', fr: 'Analyse enregistrée dans votre profil' },
+  aiSummary: { en: 'AI Summary', fr: 'Résumé IA' },
+  relevance: { en: 'Relevance', fr: 'Pertinence' },
+  offTopicReasonFallback: {
+    en: 'This video does not seem to describe the stated experience.',
+    fr: 'Cette vidéo ne semble pas décrire l’expérience indiquée.',
+  },
+  offTopicHelp: {
+    en: 'Detected skills were still added — record a video about this specific experience for better results.',
+    fr: 'Les compétences détectées ont quand même été ajoutées — enregistrez une vidéo sur cette expérience précise pour de meilleurs résultats.',
+  },
+  identityFraud: { en: 'Identity & anti-fraud', fr: 'Identité & anti-fraude' },
+  riskLow: { en: 'Low risk', fr: 'Risque faible' },
+  riskMedium: { en: 'Medium risk', fr: 'Risque moyen' },
+  riskHigh: { en: 'High risk', fr: 'Risque élevé' },
+  riskUnknown: { en: 'Not verified', fr: 'Non vérifié' },
+  fraudFace: { en: 'Face', fr: 'Visage' },
+  fraudLive: { en: 'Live', fr: 'En direct' },
+  fraudLiveness: { en: 'Liveness', fr: 'Authenticité' },
+  yes: { en: 'Yes', fr: 'Oui' },
+  no: { en: 'No', fr: 'Non' },
+  langAssessment: { en: 'Language Assessment (CEFR)', fr: 'Évaluation linguistique (CECR)' },
+  metricFluency: { en: 'Fluency', fr: 'Fluidité' },
+  metricGrammar: { en: 'Grammar', fr: 'Grammaire' },
+  metricVocabulary: { en: 'Vocabulary', fr: 'Vocabulaire' },
+  metricCoherence: { en: 'Coherence', fr: 'Cohérence' },
+  metricPronunciation: { en: 'Pronunciation', fr: 'Prononciation' },
+  confLow: { en: 'low confidence', fr: 'confiance faible' },
+  confMedium: { en: 'medium confidence', fr: 'confiance moyenne' },
+  confHigh: { en: 'high confidence', fr: 'confiance élevée' },
+  strengths: { en: 'Strengths', fr: 'Points forts' },
+  toImprove: { en: 'To improve', fr: 'À améliorer' },
+  technicalSkills: { en: 'Technical Skills', fr: 'Compétences techniques' },
+  professionalSkills: { en: 'Professional Skills', fr: 'Compétences professionnelles' },
+  softSkills: { en: 'Soft Skills', fr: 'Compétences comportementales' },
+  languages: { en: 'Languages', fr: 'Langues' },
+  industries: { en: 'Industries', fr: 'Secteurs' },
+  activities: { en: 'Activities', fr: 'Activités' },
+  contactCenterSkills: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
+  ccCustomerService: { en: 'Customer Service', fr: 'Service client' },
+  ccCommunication: { en: 'Communication', fr: 'Communication' },
+  ccProblemSolving: { en: 'Problem Solving', fr: 'Résolution de problèmes' },
+  ccEmpathy: { en: 'Empathy', fr: 'Empathie' },
+  ccMultitasking: { en: 'Multitasking', fr: 'Multitâche' },
+  ccSalesOrientation: { en: 'Sales Orientation', fr: 'Sens commercial' },
+  ccConflictResolution: { en: 'Conflict Resolution', fr: 'Gestion des conflits' },
+  ccProductKnowledge: { en: 'Product Knowledge', fr: 'Connaissance produit' },
+  transcript: { en: 'Transcript', fr: 'Transcription' },
+  recordAgain: { en: 'Record Again', fr: 'Enregistrer à nouveau' },
+  cameraError: {
+    en: 'Camera / microphone access denied. Please allow camera access and retry.',
+    fr: 'Accès caméra / micro refusé. Autorisez l’accès à la caméra puis réessayez.',
+  },
+  analysisFailedRetry: { en: 'Analysis failed. Please try again.', fr: 'L’analyse a échoué. Veuillez réessayer.' },
+};
+
+const makeTr =
+  (lang: string) =>
+  (key: keyof typeof STRINGS): string => {
+    const code = (lang || 'en').slice(0, 2);
+    const entry = STRINGS[key];
+    if (!entry) return String(key);
+    return entry[code as 'en' | 'fr'] || entry.en;
+  };
 
 const hasSavedAnalysis = (saved?: SavedVideoData | null) =>
   Boolean(saved?.videoUrl || saved?.videoAnalysis);
@@ -342,6 +454,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 }) => {
   const { i18n } = useTranslation();
   const uiLang = i18n.language || 'en';
+  const t = makeTr(uiLang);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -375,7 +488,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         videoRef.current.play().catch(() => {});
       }
     } catch (err: any) {
-      setCameraError('Camera / microphone access denied. Please allow camera access and retry.');
+      setCameraError(t('cameraError'));
     }
   }, []);
 
@@ -522,7 +635,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         showSavedVideo(data.videoUrl);
       }
     } catch (err: any) {
-      setAnalyzeError(err.message || 'Analysis failed. Please try again.');
+      setAnalyzeError(err.message || t('analysisFailedRetry'));
     } finally {
       setAnalyzing(false);
     }
@@ -545,7 +658,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white">AI Experience Analysis</h2>
+              <h2 className="text-base font-black text-white">{t('headerTitle')}</h2>
               <p className="text-xs text-slate-400 font-medium truncate max-w-xs">
                 {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
               </p>
@@ -571,7 +684,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     onClick={startCamera}
                     className="px-4 py-2 bg-harx-600 text-white rounded-xl text-xs font-black"
                   >
-                    Retry
+                    {t('retry')}
                   </button>
                 </div>
               ) : (
@@ -595,7 +708,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               {/* Time remaining warning */}
               {isRecording && timeRemaining <= 30 && (
                 <div className="absolute top-3 right-3 bg-red-500/80 text-white px-3 py-1.5 rounded-full text-xs font-black">
-                  {formatTime(timeRemaining)} left
+                  {formatTime(timeRemaining)} {t('left')}
                 </div>
               )}
 
@@ -603,13 +716,13 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               {viewMode === 'saved' && result && !isRecording && (
                 <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-indigo-500/80 px-3 py-1.5 rounded-full">
                   <CheckCircle className="w-3 h-3 text-white" />
-                  <span className="text-xs font-black text-white">Saved</span>
+                  <span className="text-xs font-black text-white">{t('saved')}</span>
                 </div>
               )}
               {recordedBlob && !isRecording && viewMode === 'record' && (
                 <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-emerald-500/80 px-3 py-1.5 rounded-full">
                   <CheckCircle className="w-3 h-3 text-white" />
-                  <span className="text-xs font-black text-white">Recorded</span>
+                  <span className="text-xs font-black text-white">{t('recorded')}</span>
                 </div>
               )}
             </div>
@@ -632,22 +745,20 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Record New Video
+                  {t('recordNewVideo')}
                 </button>
               )}
 
               {viewMode === 'record' && !recordedBlob && !isRecording && (
                 <div className="text-center">
-                  <p className="text-xs text-slate-400 mb-3">
-                    Record between <span className="text-white font-black">30 seconds</span> and <span className="text-white font-black">2 minutes</span> describing your experience, skills, and achievements.
-                  </p>
+                  <p className="text-xs text-slate-400 mb-3">{t('recordHint')}</p>
                   <button
                     onClick={startRecording}
                     disabled={!!cameraError || !stream}
                     className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-red-500 hover:bg-red-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95"
                   >
                     <Circle className="w-4 h-4 fill-white" />
-                    Start Recording
+                    {t('startRecording')}
                   </button>
                 </div>
               )}
@@ -658,7 +769,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl text-sm font-black transition-all active:scale-95"
                 >
                   <Square className="w-4 h-4 fill-white" />
-                  Stop Recording
+                  {t('stopRecording')}
                 </button>
               )}
 
@@ -667,7 +778,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   {!result && elapsed < MIN_DURATION && (
                     <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
                       <AlertCircle className="w-3.5 h-3.5" />
-                      Recording is {elapsed}s — at least {MIN_DURATION}s is required. Please retake.
+                      {t('minDurationWarn')}
                     </p>
                   )}
                   <button
@@ -676,7 +787,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
                   >
                     <Sparkles className="w-4 h-4" />
-                    {result ? 'Analysis Complete' : 'Analyze with AI'}
+                    {result ? t('analysisComplete') : t('analyzeWithAI')}
                   </button>
                   {!result && (
                     <button
@@ -684,7 +795,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      Retake
+                      {t('retake')}
                     </button>
                   )}
                 </div>
@@ -694,8 +805,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 <div className="flex flex-col items-center gap-3 py-2">
                   <Loader2 className="w-8 h-8 text-harx-400 animate-spin" />
                   <div className="text-center">
-                    <p className="text-sm font-black text-white">AI is analyzing...</p>
-                    <p className="text-xs text-slate-400 mt-1">Uploading → Processing video → Extracting skills</p>
+                    <p className="text-sm font-black text-white">{t('analyzingShort')}</p>
+                    <p className="text-xs text-slate-400 mt-1">{t('analyzingStepsShort')}</p>
                   </div>
                 </div>
               )}
@@ -710,13 +821,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   <Sparkles className="w-10 h-10 text-harx-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-800 mb-2">Record your experience</h3>
-                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
-                    Talk about what you did, tools you used, and achievements. The AI will detect your skills and score them automatically.
-                  </p>
+                  <h3 className="text-lg font-black text-slate-800 mb-2">{t('emptyTitle')}</h3>
+                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{t('emptyDesc')}</p>
                 </div>
                 <div className="flex gap-3 flex-wrap justify-center">
-                  {['Skills', 'Languages', 'Industries', 'Contact Center'].map((tag) => (
+                  {[t('tagSkills'), t('tagLanguages'), t('tagIndustries'), t('tagContactCenter')].map((tag) => (
                     <span key={tag} className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-black rounded-full">
                       {tag}
                     </span>
@@ -735,11 +844,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </div>
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-base font-black text-slate-800">AI is analyzing your video</p>
-                  <p className="text-sm text-slate-500">Uploading → Processing video → Detecting skills → Scoring...</p>
+                  <p className="text-base font-black text-slate-800">{t('analyzingTitle')}</p>
+                  <p className="text-sm text-slate-500">{t('analyzingSteps')}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-center max-w-xs">
-                  {['Technical Skills', 'Languages', 'Industries', 'Activities', 'Contact Center Skills'].map((step, i) => (
+                  {[t('stepTechnical'), t('stepLanguages'), t('stepIndustries'), t('stepActivities'), t('stepContactCenter')].map((step, i) => (
                     <span key={step} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-full">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" style={{ animationDelay: `${i * 0.15}s` }} />
                       {step}
@@ -753,9 +862,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-black text-red-700">Analysis failed</p>
+                  <p className="text-sm font-black text-red-700">{t('analysisFailed')}</p>
                   <p className="text-xs text-red-500 mt-1">{analyzeError}</p>
-                  <button onClick={analyzeVideo} className="mt-2 text-xs font-black text-red-600 underline">Retry</button>
+                  <button onClick={analyzeVideo} className="mt-2 text-xs font-black text-red-600 underline">{t('retry')}</button>
                 </div>
               </div>
             )}
@@ -765,14 +874,14 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {savedFlag && (
                   <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
                     <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                    Analysis saved to your profile
+                    {t('savedToProfile')}
                   </div>
                 )}
 
                 {/* Summary banner */}
                 <div className="rounded-2xl border border-harx-100 overflow-hidden">
                   <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gradient-to-r from-harx-50 to-indigo-50 border-b border-harx-100">
-                    <span className="text-xs font-black text-harx-600 uppercase tracking-widest">AI Summary</span>
+                    <span className="text-xs font-black text-harx-600 uppercase tracking-widest">{t('aiSummary')}</span>
                     <span className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-harx-100 rounded-full text-[11px] font-black text-harx-700">
                       <CheckCircle className="w-3 h-3 text-emerald-500" />
                       {result.analysis.overallConfidence}%
@@ -796,19 +905,16 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       {result.relevance && result.relevance.onTopic === false && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 border border-red-100 text-[11px] text-red-600 font-black">
                           <AlertCircle className="w-3 h-3" />
-                          Relevance {result.relevance.score}%
+                          {t('relevance')} {result.relevance.score}%
                         </span>
                       )}
                     </div>
                     {result.relevance && result.relevance.onTopic === false && (
                       <div className="rounded-xl bg-red-50 border border-red-100 p-3 space-y-1">
                         <p className="text-xs text-red-700 leading-relaxed">
-                          {localize(result.relevance.reason, uiLang) ||
-                            'This video does not seem to describe the stated experience.'}
+                          {localize(result.relevance.reason, uiLang) || t('offTopicReasonFallback')}
                         </p>
-                        <p className="text-[11px] text-slate-500">
-                          Detected skills were still added — record a video about this specific experience for better results.
-                        </p>
+                        <p className="text-[11px] text-slate-500">{t('offTopicHelp')}</p>
                       </div>
                     )}
                   </div>
@@ -831,37 +937,45 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       ) : (
                         <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />
                       )}
-                      <span className="text-sm font-black text-slate-800">Identity & anti-fraud</span>
+                      <span className="text-sm font-black text-slate-800">{t('identityFraud')}</span>
                       <span
                         className={`ml-auto px-2.5 py-0.5 text-[10px] font-black rounded-full ${
                           fraudRiskStyles[result.fraudCheck.fraudRisk]?.badge || fraudRiskStyles.unknown.badge
                         }`}
                       >
-                        {fraudRiskStyles[result.fraudCheck.fraudRisk]?.label || 'Not verified'}
+                        {t(
+                          result.fraudCheck.fraudRisk === 'low'
+                            ? 'riskLow'
+                            : result.fraudCheck.fraudRisk === 'medium'
+                            ? 'riskMedium'
+                            : result.fraudCheck.fraudRisk === 'high'
+                            ? 'riskHigh'
+                            : 'riskUnknown'
+                        )}
                       </span>
                     </div>
                     <div className="p-4 space-y-3">
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           {
-                            label: 'Face',
+                            label: t('fraudFace'),
                             value:
                               result.fraudCheck.faceDetected === null
                                 ? 'N/A'
                                 : result.fraudCheck.faceDetected
-                                ? 'Yes'
-                                : 'No',
+                                ? t('yes')
+                                : t('no'),
                           },
                           {
-                            label: 'Live',
+                            label: t('fraudLive'),
                             value:
                               result.fraudCheck.looksLive === null
                                 ? 'N/A'
                                 : result.fraudCheck.looksLive
-                                ? 'Yes'
-                                : 'No',
+                                ? t('yes')
+                                : t('no'),
                           },
-                          { label: 'Liveness', value: `${result.fraudCheck.livenessConfidence}%` },
+                          { label: t('fraudLiveness'), value: `${result.fraudCheck.livenessConfidence}%` },
                         ].map((item) => (
                           <div
                             key={item.label}
@@ -892,7 +1006,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {result.languageAssessment?.assessable && (result.languageAssessment.languages?.length ?? 0) > 0 && (
                   <Section
                     icon={<Globe className="w-4 h-4" />}
-                    title="Language Assessment (CEFR)"
+                    title={t('langAssessment')}
                     count={result.languageAssessment.languages.length}
                   >
                     <div className="space-y-4">
@@ -900,37 +1014,43 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         const name = langAssessmentLabel(lang);
                         const strengths = localize(lang.strengths, uiLang);
                         const improvements = localize(lang.areasForImprovement, uiLang);
+                        const confKey =
+                          lang.pronunciationEstimate?.confidence === 'high'
+                            ? 'confHigh'
+                            : lang.pronunciationEstimate?.confidence === 'medium'
+                            ? 'confMedium'
+                            : 'confLow';
                         const metrics = [
                           lang.fluency && {
                             key: 'fluency',
-                            label: 'Fluency',
+                            label: t('metricFluency'),
                             score: lang.fluency.score,
                             feedback: localize(lang.fluency.feedback, uiLang),
                           },
                           lang.grammar && {
                             key: 'grammar',
-                            label: 'Grammar',
+                            label: t('metricGrammar'),
                             score: lang.grammar.score,
                             feedback: localize(lang.grammar.feedback, uiLang),
                           },
                           lang.vocabulary && {
                             key: 'vocabulary',
-                            label: 'Vocabulary',
+                            label: t('metricVocabulary'),
                             score: lang.vocabulary.score,
                             feedback: localize(lang.vocabulary.feedback, uiLang),
                           },
                           lang.coherence && {
                             key: 'coherence',
-                            label: 'Coherence',
+                            label: t('metricCoherence'),
                             score: lang.coherence.score,
                             feedback: localize(lang.coherence.feedback, uiLang),
                           },
                           lang.pronunciationEstimate && {
                             key: 'pronunciation',
-                            label: 'Pronunciation',
+                            label: t('metricPronunciation'),
                             score: lang.pronunciationEstimate.score,
                             feedback: localize(lang.pronunciationEstimate.feedback, uiLang),
-                            extra: `${lang.pronunciationEstimate.confidence || 'low'} confidence`,
+                            extra: t(confKey),
                           },
                         ].filter(Boolean) as Array<{
                           key: string;
@@ -964,7 +1084,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             </div>
 
                             <div className="p-4 space-y-3">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              <div className="space-y-2.5">
                                 {metrics.map((metric) => (
                                   <MetricTile
                                     key={metric.key}
@@ -979,12 +1099,12 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                               {(strengths || improvements) && (
                                 <div className="grid grid-cols-1 gap-2 pt-1">
                                   {strengths && (
-                                    <InsightBox tone="positive" title="Strengths">
+                                    <InsightBox tone="positive" title={t('strengths')}>
                                       {strengths}
                                     </InsightBox>
                                   )}
                                   {improvements && (
-                                    <InsightBox tone="warning" title="To improve">
+                                    <InsightBox tone="warning" title={t('toImprove')}>
                                       {improvements}
                                     </InsightBox>
                                   )}
@@ -1002,7 +1122,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {result.analysis.technicalSkills?.length > 0 && (
                   <Section
                     icon={<Briefcase className="w-4 h-4" />}
-                    title="Technical Skills"
+                    title={t('technicalSkills')}
                     count={result.analysis.technicalSkills.length}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
@@ -1015,7 +1135,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
                   <Section
                     icon={<Briefcase className="w-4 h-4" />}
-                    title="Professional Skills"
+                    title={t('professionalSkills')}
                     count={result.analysis.professionalSkills!.length}
                   >
                     {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
@@ -1028,7 +1148,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {(result.analysis.softSkills?.length ?? 0) > 0 && (
                   <Section
                     icon={<Sparkles className="w-4 h-4" />}
-                    title="Soft Skills"
+                    title={t('softSkills')}
                     count={result.analysis.softSkills!.length}
                   >
                     {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
@@ -1041,7 +1161,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {result.analysis.spokenLanguages?.length > 0 && (
                   <Section
                     icon={<Globe className="w-4 h-4" />}
-                    title="Languages"
+                    title={t('languages')}
                     count={result.analysis.spokenLanguages.length}
                   >
                     {result.analysis.spokenLanguages.filter((l) => l.score > 0).sort((a, b) => b.score - a.score).map((lang) => (
@@ -1067,7 +1187,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
                 {/* Industries */}
                 {result.analysis.industries?.length > 0 && (
-                  <Section icon={<Building2 className="w-4 h-4" />} title="Industries" count={result.analysis.industries.filter((i) => i.score > 0).length}>
+                  <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
                     {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
                       <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
                     ))}
@@ -1076,7 +1196,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
                 {/* Activities */}
                 {result.analysis.activities?.length > 0 && (
-                  <Section icon={<Activity className="w-4 h-4" />} title="Activities" count={result.analysis.activities.filter((a) => a.score > 0).length} defaultOpen={false}>
+                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length} defaultOpen={false}>
                     <div className="flex flex-wrap gap-2">
                       {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
                         <span
@@ -1091,26 +1211,42 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </Section>
                 )}
 
-                {/* Contact Center Skills */}
-                {result.analysis.contactCenterSkills && (
-                  <Section icon={<Headphones className="w-4 h-4" />} title="Contact Center Skills" defaultOpen={false}>
-                    {Object.entries(result.analysis.contactCenterSkills).map(([key, val]: [string, any]) => {
-                      const labels: Record<string, string> = {
-                        customerService: 'Customer Service',
-                        communication: 'Communication',
-                        problemSolving: 'Problem Solving',
-                        empathy: 'Empathy',
-                        multitasking: 'Multitasking',
-                        salesOrientation: 'Sales Orientation',
-                        conflictResolution: 'Conflict Resolution',
-                        productKnowledge: 'Product Knowledge',
-                      };
-                      return (
-                        <ScoreBar key={key} score={val.score} label={labels[key] || key} feedback={localize(val.notes, uiLang)} />
-                      );
-                    })}
-                  </Section>
-                )}
+                {/* Contact Center Skills — only the ones actually detected */}
+                {(() => {
+                  const cc = result.analysis.contactCenterSkills;
+                  if (!cc) return null;
+                  const labelKeys: Record<string, keyof typeof STRINGS> = {
+                    customerService: 'ccCustomerService',
+                    communication: 'ccCommunication',
+                    problemSolving: 'ccProblemSolving',
+                    empathy: 'ccEmpathy',
+                    multitasking: 'ccMultitasking',
+                    salesOrientation: 'ccSalesOrientation',
+                    conflictResolution: 'ccConflictResolution',
+                    productKnowledge: 'ccProductKnowledge',
+                  };
+                  const detected = Object.entries(cc)
+                    .filter(([, val]: [string, any]) => (val?.score ?? 0) > 0)
+                    .sort(([, a]: [string, any], [, b]: [string, any]) => (b?.score ?? 0) - (a?.score ?? 0));
+                  if (detected.length === 0) return null;
+                  return (
+                    <Section
+                      icon={<Headphones className="w-4 h-4" />}
+                      title={t('contactCenterSkills')}
+                      count={detected.length}
+                      defaultOpen={false}
+                    >
+                      {detected.map(([key, val]: [string, any]) => (
+                        <ScoreBar
+                          key={key}
+                          score={val.score}
+                          label={labelKeys[key] ? t(labelKeys[key]) : key}
+                          feedback={localize(val.notes, uiLang)}
+                        />
+                      ))}
+                    </Section>
+                  );
+                })()}
 
                 {/* Transcript toggle */}
                 {result.transcription && (
@@ -1121,7 +1257,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     >
                       <div className="flex items-center gap-2.5">
                         <Mic className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm font-black text-slate-700">Transcript</span>
+                        <span className="text-sm font-black text-slate-700">{t('transcript')}</span>
                       </div>
                       {showTranscript ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                     </button>
@@ -1139,7 +1275,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 rounded-2xl text-xs font-black transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Record Again
+                  {t('recordAgain')}
                 </button>
               </div>
             )}
