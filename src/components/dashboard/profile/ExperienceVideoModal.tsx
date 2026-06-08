@@ -732,7 +732,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         {localize(result.relevance.reason, uiLang) || 'This video does not seem to describe the stated experience.'}
                       </p>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        Skills, industries and activities were not added to your profile. Please record a video that describes this specific experience.
+                        Detected skills were still added, but for the most accurate results please record a video that describes this specific experience.
                       </p>
                     </div>
                   </div>
