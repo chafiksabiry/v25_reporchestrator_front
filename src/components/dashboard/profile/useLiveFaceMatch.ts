@@ -8,8 +8,8 @@ const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/mode
 // < 0.55 is a confident match for the same person across lighting/angle changes.
 const MATCH_THRESHOLD = 0.55;
 
-// How often we sample the live video while recording / previewing.
-const CHECK_INTERVAL_MS = 1500;
+// How often we sample the live video while recording.
+const CHECK_INTERVAL_MS = 2000;
 
 export type FaceMatchStatus =
   | 'idle' // nothing to do yet
@@ -80,7 +80,7 @@ export function useLiveFaceMatch({ videoRef, referencePhotoUrl, active }: UseLiv
         return;
       }
       detectorOptionsRef.current = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 320,
+        inputSize: 224,
         scoreThreshold: 0.5,
       });
       try {

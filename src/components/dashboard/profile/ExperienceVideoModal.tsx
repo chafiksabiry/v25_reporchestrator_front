@@ -665,10 +665,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const showVideoControls =
     viewMode === 'saved' || !!result?.videoUrl || (!!recordedBlob && !isRecording);
 
-  // Live identity check: compare the filmed face to the profile photo while the
-  // live camera is showing (preview + recording), without ever cutting recording.
-  const faceMatchActive =
-    isOpen && viewMode === 'record' && !!stream && !recordedBlob && !result && !cameraError;
+  // Live identity check: only WHILE recording (never during idle preview), so the
+  // start/retake controls stay responsive. Never cuts the recording.
+  const faceMatchActive = isOpen && isRecording && !!stream && !cameraError;
   const { status: faceMatchStatus } = useLiveFaceMatch({
     videoRef,
     referencePhotoUrl,
