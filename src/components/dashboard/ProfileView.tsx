@@ -1070,8 +1070,8 @@ export const ProfileView: React.FC<{
                       </p>
                       <p className="text-xs font-medium text-yellow-700 mt-0.5">
                         {isFr
-                          ? 'Ajoutez votre photo de profil pour compléter la Phase 2. (Expérience, langues, compétences et disponibilité sont gérés via vos vidéos d’expérience.)'
-                          : 'Upload your profile photo to complete Phase 2. (Experience, languages, skills and availability are handled through your experience videos.)'}
+                          ? 'Ajoutez votre photo de profil pour compléter la Phase 2.'
+                          : 'Upload your profile photo to complete Phase 2.'}
                       </p>
                     </div>
                   </div>
