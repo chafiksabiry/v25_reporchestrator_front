@@ -162,6 +162,9 @@ interface ExperienceVideoModalProps {
 
 const MAX_DURATION = 120; // 2 minutes in seconds
 const MIN_DURATION = 30; // minimum required recording length in seconds
+// Face-absence escalation (counts of consecutive ~2s samples with no face):
+const ABSENCE_THREAT_TICKS = 2; // ~4s absent → strong "you'll be cut" warning
+const ABSENCE_CUT_TICKS = 4; // ~8s absent → auto-stop + block analysis
 
 // Picks the right language from a bilingual { en, fr } field, with graceful
 // fallback for legacy string data or a missing locale.
@@ -321,6 +324,14 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
     fr: 'Le visage ne correspond pas à votre photo de profil',
   },
   faceMatchNoFace: { en: 'No face detected — center your face', fr: 'Aucun visage détecté — centrez votre visage' },
+  faceAbsenceThreat: {
+    en: 'You left the frame! Come back now or the recording will be stopped and NOT analyzed.',
+    fr: 'Vous avez quitté le cadre ! Revenez maintenant, sinon l’enregistrement sera coupé et NON analysé.',
+  },
+  faceAbsenceCut: {
+    en: 'Recording stopped: you left the frame for too long. This video will not be analyzed — please record again.',
+    fr: 'Enregistrement coupé : vous avez quitté le cadre trop longtemps. Cette vidéo ne sera pas analysée — veuillez recommencer.',
+  },
 };
 
 const makeTr =
@@ -488,6 +499,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const [showTranscript, setShowTranscript] = useState(false);
   const [viewMode, setViewMode] = useState<'saved' | 'record'>('record');
   const [savedFlag, setSavedFlag] = useState(false);
+  // Set when the person left the frame for too long → recording is discarded and
+  // cannot be analyzed (the user must record again).
+  const [faceAbsenceInvalid, setFaceAbsenceInvalid] = useState(false);
 
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -530,6 +544,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     setResult(null);
     setAnalyzeError(null);
     setSavedFlag(false);
+    setFaceAbsenceInvalid(false);
     setElapsed(0);
     if (videoRef.current) {
       videoRef.current.src = '';
@@ -615,6 +630,17 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     enterRecordMode();
   };
 
+  // If the person leaves the frame for too long during recording, cut the
+  // recording and mark it invalid so it cannot be analyzed (must record again).
+  useEffect(() => {
+    if (!isRecording || faceAbsenceInvalid) return;
+    if (noFaceStreak >= ABSENCE_CUT_TICKS) {
+      setFaceAbsenceInvalid(true);
+      stopRecording();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noFaceStreak, isRecording, faceAbsenceInvalid]);
+
   // ── Analysis ───────────────────────────────────────────────────────────────
   const analyzeVideo = async () => {
     if (!recordedBlob || !profileId) return;
@@ -668,7 +694,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // Live identity check: only WHILE recording (never during idle preview), so the
   // start/retake controls stay responsive. Never cuts the recording.
   const faceMatchActive = isOpen && isRecording && !!stream && !cameraError;
-  const { status: faceMatchStatus } = useLiveFaceMatch({
+  const { status: faceMatchStatus, noFaceStreak } = useLiveFaceMatch({
     videoRef,
     referencePhotoUrl,
     active: faceMatchActive,
@@ -756,24 +782,34 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
               {/* Live identity-match overlay (never interrupts recording) */}
               {faceMatchActive &&
-                (faceMatchStatus === 'mismatch' || faceMatchStatus === 'no-face') && (
-                  <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
-                    <div
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-sm text-white text-xs font-black shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
-                        faceMatchStatus === 'mismatch' ? 'bg-red-600/85' : 'bg-amber-500/85'
-                      }`}
-                    >
-                      {faceMatchStatus === 'mismatch' ? (
-                        <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      )}
-                      <span className="leading-tight">
-                        {faceMatchStatus === 'mismatch' ? t('faceMatchMismatch') : t('faceMatchNoFace')}
-                      </span>
+                (faceMatchStatus === 'mismatch' || faceMatchStatus === 'no-face') &&
+                (() => {
+                  // Escalate when the person stays out of frame: threat to cut + no analysis.
+                  const threat =
+                    faceMatchStatus === 'no-face' && noFaceStreak >= ABSENCE_THREAT_TICKS;
+                  const isDanger = faceMatchStatus === 'mismatch' || threat;
+                  const label = threat
+                    ? t('faceAbsenceThreat')
+                    : faceMatchStatus === 'mismatch'
+                    ? t('faceMatchMismatch')
+                    : t('faceMatchNoFace');
+                  return (
+                    <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
+                      <div
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-sm text-white text-xs font-black shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+                          isDanger ? 'bg-red-600/90' : 'bg-amber-500/85'
+                        } ${threat ? 'ring-2 ring-red-300 animate-pulse' : ''}`}
+                      >
+                        {isDanger ? (
+                          <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        )}
+                        <span className="leading-tight">{label}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               {/* Live identity-match status pill (bottom-right) */}
               {faceMatchActive &&
@@ -842,28 +878,46 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
               {recordedBlob && !analyzing && (
                 <div className="space-y-2">
-                  {!result && elapsed < MIN_DURATION && (
-                    <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      {t('minDurationWarn')}
-                    </p>
-                  )}
-                  <button
-                    onClick={analyzeVideo}
-                    disabled={!!result || elapsed < MIN_DURATION}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {result ? t('analysisComplete') : t('analyzeWithAI')}
-                  </button>
-                  {!result && (
-                    <button
-                      onClick={retake}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      {t('retake')}
-                    </button>
+                  {faceAbsenceInvalid ? (
+                    <>
+                      <p className="flex items-start gap-1.5 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-[11px] font-bold text-red-400 leading-snug">
+                        <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        {t('faceAbsenceCut')}
+                      </p>
+                      <button
+                        onClick={retake}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        {t('retake')}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {!result && elapsed < MIN_DURATION && (
+                        <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {t('minDurationWarn')}
+                        </p>
+                      )}
+                      <button
+                        onClick={analyzeVideo}
+                        disabled={!!result || elapsed < MIN_DURATION}
+                        className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {result ? t('analysisComplete') : t('analyzeWithAI')}
+                      </button>
+                      {!result && (
+                        <button
+                          onClick={retake}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          {t('retake')}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -1307,7 +1361,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
                 {/* Activities */}
                 {result.analysis.activities?.length > 0 && (
-                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length} defaultOpen={false}>
+                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length}>
                     <div className="flex flex-wrap gap-2">
                       {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
                         <span

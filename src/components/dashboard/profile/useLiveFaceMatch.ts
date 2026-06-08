@@ -54,60 +54,62 @@ interface UseLiveFaceMatchArgs {
  */
 export function useLiveFaceMatch({ videoRef, referencePhotoUrl, active }: UseLiveFaceMatchArgs) {
   const [status, setStatus] = useState<FaceMatchStatus>('idle');
-  const [refReady, setRefReady] = useState(false);
+  // Number of consecutive samples with NO detectable face (person left the frame).
+  const [noFaceStreak, setNoFaceStreak] = useState(0);
   const referenceDescriptorRef = useRef<Float32Array | null>(null);
   const detectorOptionsRef = useRef<faceapi.TinyFaceDetectorOptions | null>(null);
   const runningRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks the photo URL we have already prepared a descriptor for, so the heavy
+  // tfjs work runs only ONCE and only when matching actually starts.
+  const preparedUrlRef = useRef<string | null>(null);
 
-  // Build the reference descriptor from the profile photo whenever it changes.
-  useEffect(() => {
-    let cancelled = false;
-    referenceDescriptorRef.current = null;
-    setRefReady(false);
-
+  // Lazily load models + build the reference descriptor. All heavy tfjs work is
+  // deferred until matching is first activated (i.e. when recording starts), so
+  // opening the modal / preview never blocks the main thread.
+  const prepare = useCallback(async (): Promise<boolean> => {
     if (!referencePhotoUrl) {
       setStatus('no-reference');
-      return;
+      return false;
+    }
+    if (preparedUrlRef.current === referencePhotoUrl && referenceDescriptorRef.current) {
+      return true; // already prepared for this photo
     }
 
     setStatus('loading');
-    (async () => {
-      const ok = await ensureModels();
-      if (cancelled) return;
-      if (!ok) {
+    const ok = await ensureModels();
+    if (!ok) {
+      setStatus('unavailable');
+      return false;
+    }
+    detectorOptionsRef.current = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 224,
+      scoreThreshold: 0.5,
+    });
+    try {
+      const img = await faceapi.fetchImage(referencePhotoUrl);
+      const detection = await faceapi
+        .detectSingleFace(img, detectorOptionsRef.current)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+      if (!detection) {
         setStatus('unavailable');
-        return;
+        return false;
       }
-      detectorOptionsRef.current = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 224,
-        scoreThreshold: 0.5,
-      });
-      try {
-        const img = await faceapi.fetchImage(referencePhotoUrl);
-        if (cancelled) return;
-        const detection = await faceapi
-          .detectSingleFace(img, detectorOptionsRef.current)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (cancelled) return;
-        if (!detection) {
-          // Can't read a face from the profile photo → silently disable.
-          setStatus('unavailable');
-          return;
-        }
-        referenceDescriptorRef.current = detection.descriptor;
-        setRefReady(true);
-        setStatus('checking');
-      } catch (err: any) {
-        console.warn('Could not build reference face descriptor:', err?.message || err);
-        setStatus('unavailable');
-      }
-    })();
+      referenceDescriptorRef.current = detection.descriptor;
+      preparedUrlRef.current = referencePhotoUrl;
+      return true;
+    } catch (err: any) {
+      console.warn('Could not build reference face descriptor:', err?.message || err);
+      setStatus('unavailable');
+      return false;
+    }
+  }, [referencePhotoUrl]);
 
-    return () => {
-      cancelled = true;
-    };
+  // Reset cached descriptor when the reference photo changes.
+  useEffect(() => {
+    referenceDescriptorRef.current = null;
+    preparedUrlRef.current = null;
   }, [referencePhotoUrl]);
 
   const runCheck = useCallback(async () => {
@@ -125,8 +127,10 @@ export function useLiveFaceMatch({ videoRef, referencePhotoUrl, active }: UseLiv
         .withFaceDescriptor();
       if (!detection) {
         setStatus('no-face');
+        setNoFaceStreak((n) => n + 1);
         return;
       }
+      setNoFaceStreak(0);
       const distance = faceapi.euclideanDistance(reference, detection.descriptor);
       setStatus(distance <= MATCH_THRESHOLD ? 'match' : 'mismatch');
     } catch {
@@ -136,8 +140,9 @@ export function useLiveFaceMatch({ videoRef, referencePhotoUrl, active }: UseLiv
     }
   }, [videoRef]);
 
-  // Start/stop the sampling loop based on `active` and reference availability.
+  // Start the loop only while active; do all preparation lazily here.
   useEffect(() => {
+    let cancelled = false;
     const clear = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -145,16 +150,30 @@ export function useLiveFaceMatch({ videoRef, referencePhotoUrl, active }: UseLiv
       }
     };
 
-    if (!active || !refReady) {
+    if (!active) {
       clear();
+      setNoFaceStreak(0);
       return clear;
     }
 
-    setStatus('checking');
-    runCheck();
-    intervalRef.current = setInterval(runCheck, CHECK_INTERVAL_MS);
-    return clear;
-  }, [active, refReady, runCheck]);
+    (async () => {
+      const ready = await prepare();
+      if (cancelled || !active) return;
+      if (!ready) return;
+      setStatus('checking');
+      setNoFaceStreak(0);
+      runCheck();
+      intervalRef.current = setInterval(runCheck, CHECK_INTERVAL_MS);
+    })();
 
-  return { status };
+    return () => {
+      cancelled = true;
+      clear();
+    };
+  }, [active, prepare, runCheck]);
+
+  // Approximate continuous absence duration, derived from the sampling interval.
+  const noFaceMs = noFaceStreak * CHECK_INTERVAL_MS;
+
+  return { status, noFaceStreak, noFaceMs };
 }
