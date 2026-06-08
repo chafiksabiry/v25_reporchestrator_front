@@ -2473,6 +2473,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
       : editedProfile.personalInfo.country || '—';
 
+  // Continuing is only allowed once EVERY experience has a recorded/analyzed
+  // video. Until then we hide the "Confirm to continue" buttons and show a loud
+  // warning prompting the user to record the missing videos.
+  const experienceList = Array.isArray(editedProfile.experience) ? editedProfile.experience : [];
+  const experiencesWithVideo = experienceList.filter((exp) => exp && (exp.videoUrl || exp.videoAnalysis)).length;
+  const allExperiencesHaveVideo =
+    experienceList.length > 0 && experiencesWithVideo === experienceList.length;
+  const missingVideosCount = experienceList.length - experiencesWithVideo;
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
@@ -2492,17 +2501,45 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={pushToRepsProfile}
-                className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
-              >
-                Confirm to continue
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
+              {allExperiencesHaveVideo && (
+                <button
+                  onClick={pushToRepsProfile}
+                  className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
+                >
+                  Confirm to continue
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Loud warning: record a video for every experience before continuing */}
+          {!allExperiencesHaveVideo && (
+            <div className="mb-8 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 p-5 shadow-lg shadow-red-200/50 animate-pulse">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-base font-black uppercase tracking-wide text-red-700 flex items-center gap-2">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    A video is required for each experience
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-red-600">
+                    {experienceList.length === 0
+                      ? 'Add at least one experience, then record a video for it.'
+                      : `${missingVideosCount} of ${experienceList.length} experience${experienceList.length > 1 ? 's' : ''} still ${missingVideosCount > 1 ? 'need' : 'needs'} a video. Use the “Record & Analyze with AI” button on each experience below. You can’t continue until all videos are recorded.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Profile Overview */}
           <div className="flex items-center justify-between mb-3">
@@ -3316,7 +3353,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Action Buttons */}
-          {(
+          {allExperiencesHaveVideo ? (
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm text-gray-600">
                 Everything looks good? Continue to your full REPS profile.
@@ -3330,6 +3367,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
               </button>
+            </div>
+          ) : (
+            <div className="mt-8 flex items-center gap-3 p-5 rounded-2xl bg-red-50 border-2 border-red-200">
+              <svg className="h-5 w-5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <p className="text-sm font-bold text-red-700">
+                Record a video for every experience above to unlock the “Continue” button.
+              </p>
             </div>
           )}
         </div>
