@@ -6,6 +6,11 @@ import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 
+// Temporarily hide the detailed sections (skills, industries, activities,
+// working hours/schedule) on the CV review page, and skip their requirements.
+// Flip back to true to restore them.
+const SHOW_PROFILE_DETAILS = false;
+
 // Add CSS styles for error highlighting
 const styles = `
   @keyframes highlightError {
@@ -974,8 +979,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           console.error('Years of experience validation failed:', errors.yearsExperience);
         } */
 
-    // Validate industries (at least one required)
-    if (!editedProfile.professionalSummary.industries?.length) {
+    // Validate industries (at least one required) — skipped while the section is hidden.
+    if (SHOW_PROFILE_DETAILS && !editedProfile.professionalSummary.industries?.length) {
       errors.industries = 'At least one industry is required';
       console.error('Industries validation failed:', errors.industries);
     }
@@ -1423,45 +1428,17 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
 
   const pushToRepsProfile = () => {
-    const { isValid, errors } = validateProfile();
-    console.log('validateProfile() result:', isValid);
-
-    if (isValid) {
-      // Update the isBasicProfileCompleted field to true
-      updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
-        .then(() => {
-          // Always stay inside the unified app — internal SPA navigation only.
-          navigate('/profile');
-        })
-        .catch(error => {
-          console.error('Error updating isBasicProfileCompleted:', error);
-          // Navigate anyway so the user is not stuck on the editor.
-          navigate('/profile');
-        });
-    } else {
-      // Update validation errors state
-      setValidationErrors(errors);
-
-      // Use setTimeout to ensure the DOM has updated with the error elements
-      setTimeout(() => {
-        const firstErrorKey = Object.keys(errors)[0];
-        const errorElement = document.getElementById(`error-${firstErrorKey}`);
-        if (errorElement) {
-          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-          // Add a temporary highlight effect
-          errorElement.classList.add('highlight-error');
-          setTimeout(() => {
-            errorElement.classList.remove('highlight-error');
-          }, 2000);
-        } else {
-          console.error('Error element not found:', firstErrorKey);
-        }
-      }, 100);
-
-      // Show error toast
-      showToast('Please fill in all required fields', 'error');
-    }
+    // Requirements are cancelled for now: confirm & continue without gating.
+    updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
+      .then(() => {
+        // Always stay inside the unified app — internal SPA navigation only.
+        navigate('/profile');
+      })
+      .catch(error => {
+        console.error('Error updating isBasicProfileCompleted:', error);
+        // Navigate anyway so the user is not stuck on the editor.
+        navigate('/profile');
+      });
   };
 
   // Render validation error message
@@ -2350,15 +2327,26 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={() => setEditingProfile(true)}
-                  className="px-4 py-2 text-sm font-semibold rounded-xl text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-2"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Edit profile
-                </button>
+                <>
+                  <button
+                    onClick={() => setEditingProfile(true)}
+                    className="px-4 py-2 text-sm font-semibold rounded-xl text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-2"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit profile
+                  </button>
+                  <button
+                    onClick={pushToRepsProfile}
+                    className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
+                  >
+                    Confirm to continue
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -2758,15 +2746,20 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
           {/* Skills Sections */}
           <div className="space-y-6">
-            {renderSkillSection('Technical Skills', editedProfile.skills?.technical || [], 'technical')}
-            {renderSkillSection('Professional Skills', editedProfile.skills?.professional || [], 'professional')}
-            {renderSkillSection('Soft Skills', editedProfile.skills?.soft || [], 'soft')}
-            {renderSkillSection('Industries', editedProfile.professionalSummary?.industries || [], 'industries')}
-            {renderSkillSection('Activities', editedProfile.professionalSummary?.activities || [], 'activities')}
+            {SHOW_PROFILE_DETAILS && (
+              <>
+                {renderSkillSection('Technical Skills', editedProfile.skills?.technical || [], 'technical')}
+                {renderSkillSection('Professional Skills', editedProfile.skills?.professional || [], 'professional')}
+                {renderSkillSection('Soft Skills', editedProfile.skills?.soft || [], 'soft')}
+                {renderSkillSection('Industries', editedProfile.professionalSummary?.industries || [], 'industries')}
+                {renderSkillSection('Activities', editedProfile.professionalSummary?.activities || [], 'activities')}
+              </>
+            )}
             {renderSkillSection('Notable Companies', editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies')}
           </div>
 
-          {/* Availability Section */}
+          {/* Availability Section — hidden for now */}
+          {SHOW_PROFILE_DETAILS && (
           <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-6">Working Hours & Availability</h3>
 
@@ -3122,6 +3115,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             )}
           </div>
+          )}
 
           {/* Summary Section */}
           <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
