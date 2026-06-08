@@ -239,21 +239,73 @@ const levelBadge: Record<string, string> = {
 
 // ─── Score Bar ────────────────────────────────────────────────────────────────
 
-const ScoreBar: React.FC<{ score: number; label: string; sublabel?: string }> = ({ score, label, sublabel }) => (
-  <div className="flex items-center gap-3">
-    <div className="flex-1 min-w-0">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-xs font-black text-slate-700 truncate">{label}</span>
-        {sublabel && <span className="text-[10px] font-bold text-slate-400 ml-1 flex-shrink-0">{sublabel}</span>}
+const ScoreBar: React.FC<{ score: number; label: string; feedback?: string }> = ({ score, label, feedback }) => (
+  <div className="space-y-1.5">
+    <div className="flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-black text-slate-700">{label}</span>
+        <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-700 ${scoreColor(score)}`}
+            style={{ width: `${score}%` }}
+          />
+        </div>
       </div>
-      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${scoreColor(score)}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
+      <span className={`text-sm font-black flex-shrink-0 w-8 text-right tabular-nums ${scoreTextColor(score)}`}>
+        {score}
+      </span>
     </div>
-    <span className={`text-sm font-black flex-shrink-0 w-10 text-right ${scoreTextColor(score)}`}>{score}</span>
+    {feedback && (
+      <p className="text-[11px] text-slate-500 leading-relaxed pr-10">{feedback}</p>
+    )}
+  </div>
+);
+
+// Compact metric tile used inside the CEFR language card (2-column grid).
+const MetricTile: React.FC<{
+  score: number;
+  label: string;
+  feedback?: string;
+  extra?: string;
+}> = ({ score, label, feedback, extra }) => (
+  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] font-black text-slate-600 uppercase tracking-wide">{label}</span>
+      <span className={`text-sm font-black tabular-nums ${scoreTextColor(score)}`}>{score}</span>
+    </div>
+    <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-700 ${scoreColor(score)}`}
+        style={{ width: `${score}%` }}
+      />
+    </div>
+    {extra && <p className="text-[10px] font-bold text-slate-400 uppercase">{extra}</p>}
+    {feedback && <p className="text-[11px] text-slate-500 leading-relaxed">{feedback}</p>}
+  </div>
+);
+
+const InsightBox: React.FC<{ tone: 'positive' | 'warning'; title: string; children: React.ReactNode }> = ({
+  tone,
+  title,
+  children,
+}) => (
+  <div
+    className={`rounded-xl border p-3 ${
+      tone === 'positive'
+        ? 'bg-emerald-50/80 border-emerald-100'
+        : 'bg-amber-50/80 border-amber-100'
+    }`}
+  >
+    <p
+      className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
+        tone === 'positive' ? 'text-emerald-700' : 'text-amber-700'
+      }`}
+    >
+      {title}
+    </p>
+    <p className={`text-xs leading-relaxed ${tone === 'positive' ? 'text-emerald-800' : 'text-amber-800'}`}>
+      {children}
+    </p>
   </div>
 );
 
@@ -651,7 +703,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
           </div>
 
           {/* Right — Results */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-5 pr-4 space-y-4 min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-track]:bg-transparent">
             {!result && !analyzing && (
               <div className="h-full flex flex-col items-center justify-center text-center py-16 gap-4">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-harx-100 to-indigo-100 flex items-center justify-center">
@@ -717,49 +769,47 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </div>
                 )}
 
-                {/* Off-topic warning */}
-                {result.relevance && result.relevance.onTopic === false && (
-                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-black text-red-700">Off-topic video</span>
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-full">
-                          Relevance {result.relevance.score}%
-                        </span>
-                      </div>
-                      <p className="text-xs text-red-500 mt-1">
-                        {localize(result.relevance.reason, uiLang) || 'This video does not seem to describe the stated experience.'}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Detected skills were still added, but for the most accurate results please record a video that describes this specific experience.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {/* Summary banner */}
-                <div className="p-4 bg-gradient-to-r from-harx-50 to-indigo-50 border border-harx-100 rounded-2xl">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-2xl border border-harx-100 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gradient-to-r from-harx-50 to-indigo-50 border-b border-harx-100">
                     <span className="text-xs font-black text-harx-600 uppercase tracking-widest">AI Summary</span>
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-white border border-harx-100 rounded-full text-xs font-black text-harx-700">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-harx-100 rounded-full text-[11px] font-black text-harx-700">
                       <CheckCircle className="w-3 h-3 text-emerald-500" />
-                      Confidence {result.analysis.overallConfidence}%
+                      {result.analysis.overallConfidence}%
                     </span>
                   </div>
-                  <p className="text-sm text-slate-700 leading-relaxed">{localize(result.analysis.summary, uiLang)}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                    {result.analysis.detectedLanguageOfSpeech && (
-                      <span className="flex items-center gap-1.5">
-                        <Mic className="w-3 h-3" />
-                        Spoken in: <span className="font-black">{result.analysis.detectedLanguageOfSpeech}</span>
-                      </span>
-                    )}
-                    {typeof result.duration === 'number' && (
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" />
-                        Duration: <span className="font-black">{Math.round(result.duration)}s</span>
-                      </span>
+                  <div className="p-4 bg-white space-y-3">
+                    <p className="text-sm text-slate-700 leading-relaxed">{localize(result.analysis.summary, uiLang)}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.analysis.detectedLanguageOfSpeech && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600">
+                          <Mic className="w-3 h-3" />
+                          <span className="font-black">{result.analysis.detectedLanguageOfSpeech}</span>
+                        </span>
+                      )}
+                      {typeof result.duration === 'number' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600">
+                          <Clock className="w-3 h-3" />
+                          <span className="font-black">{Math.round(result.duration)}s</span>
+                        </span>
+                      )}
+                      {result.relevance && result.relevance.onTopic === false && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 border border-red-100 text-[11px] text-red-600 font-black">
+                          <AlertCircle className="w-3 h-3" />
+                          Relevance {result.relevance.score}%
+                        </span>
+                      )}
+                    </div>
+                    {result.relevance && result.relevance.onTopic === false && (
+                      <div className="rounded-xl bg-red-50 border border-red-100 p-3 space-y-1">
+                        <p className="text-xs text-red-700 leading-relaxed">
+                          {localize(result.relevance.reason, uiLang) ||
+                            'This video does not seem to describe the stated experience.'}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Detected skills were still added — record a video about this specific experience for better results.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -767,7 +817,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {/* Anti-fraud check */}
                 {result.fraudCheck && (
                   <div
-                    className={`flex items-start gap-3 p-4 rounded-2xl border ${
+                    className={`rounded-2xl border overflow-hidden ${
                       result.fraudCheck.fraudRisk === 'high'
                         ? 'bg-red-50 border-red-200'
                         : result.fraudCheck.fraudRisk === 'medium'
@@ -775,27 +825,62 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         : 'bg-emerald-50 border-emerald-200'
                     }`}
                   >
-                    {result.fraudCheck.fraudRisk === 'low' ? (
-                      <ShieldCheck className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <ShieldAlert className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-black text-slate-800">Identity & anti-fraud check</span>
-                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full ${fraudRiskStyles[result.fraudCheck.fraudRisk]?.badge || fraudRiskStyles.unknown.badge}`}>
-                          {fraudRiskStyles[result.fraudCheck.fraudRisk]?.label || 'Not verified'}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                        <span>Face detected: <span className="font-black">{result.fraudCheck.faceDetected === null ? 'N/A' : result.fraudCheck.faceDetected ? 'Yes' : 'No'}</span></span>
-                        <span>Live person: <span className="font-black">{result.fraudCheck.looksLive === null ? 'N/A' : result.fraudCheck.looksLive ? 'Yes' : 'No'}</span></span>
-                        <span>Liveness: <span className="font-black">{result.fraudCheck.livenessConfidence}%</span></span>
+                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-black/5">
+                      {result.fraudCheck.fraudRisk === 'low' ? (
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      ) : (
+                        <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-black text-slate-800">Identity & anti-fraud</span>
+                      <span
+                        className={`ml-auto px-2.5 py-0.5 text-[10px] font-black rounded-full ${
+                          fraudRiskStyles[result.fraudCheck.fraudRisk]?.badge || fraudRiskStyles.unknown.badge
+                        }`}
+                      >
+                        {fraudRiskStyles[result.fraudCheck.fraudRisk]?.label || 'Not verified'}
+                      </span>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          {
+                            label: 'Face',
+                            value:
+                              result.fraudCheck.faceDetected === null
+                                ? 'N/A'
+                                : result.fraudCheck.faceDetected
+                                ? 'Yes'
+                                : 'No',
+                          },
+                          {
+                            label: 'Live',
+                            value:
+                              result.fraudCheck.looksLive === null
+                                ? 'N/A'
+                                : result.fraudCheck.looksLive
+                                ? 'Yes'
+                                : 'No',
+                          },
+                          { label: 'Liveness', value: `${result.fraudCheck.livenessConfidence}%` },
+                        ].map((item) => (
+                          <div
+                            key={item.label}
+                            className="rounded-xl bg-white/70 border border-black/5 px-2 py-2.5 text-center"
+                          >
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{item.label}</p>
+                            <p className="text-xs font-black text-slate-800 mt-0.5">{item.value}</p>
+                          </div>
+                        ))}
                       </div>
                       {result.fraudCheck.reasons?.length > 0 && (
-                        <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-500 space-y-0.5">
+                        <ul className="space-y-1.5">
                           {result.fraudCheck.reasons.slice(0, 3).map((reason, i) => (
-                            <li key={i}>{localize(reason, uiLang)}</li>
+                            <li
+                              key={i}
+                              className="flex gap-2 text-[11px] text-slate-600 leading-relaxed before:content-['•'] before:text-slate-400 before:flex-shrink-0"
+                            >
+                              {localize(reason, uiLang)}
+                            </li>
                           ))}
                         </ul>
                       )}
@@ -810,38 +895,106 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     title="Language Assessment (CEFR)"
                     count={result.languageAssessment.languages.length}
                   >
-                    {result.languageAssessment.languages.map((lang) => (
-                      <div key={langAssessmentLabel(lang)} className="rounded-xl border border-slate-100 p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-black text-slate-800">{langAssessmentLabel(lang)}</span>
-                          <div className="flex items-center gap-2">
-                            {lang.cefr && (
-                              <span className={`px-2 py-0.5 text-[9px] font-black rounded-full ${levelBadge[lang.cefr] || 'bg-slate-100 text-slate-500'}`}>
-                                {lang.cefr}
-                              </span>
-                            )}
-                            <span className={`text-sm font-black ${scoreTextColor(lang.overallScore)}`}>{lang.overallScore}</span>
+                    <div className="space-y-4">
+                      {result.languageAssessment.languages.map((lang) => {
+                        const name = langAssessmentLabel(lang);
+                        const strengths = localize(lang.strengths, uiLang);
+                        const improvements = localize(lang.areasForImprovement, uiLang);
+                        const metrics = [
+                          lang.fluency && {
+                            key: 'fluency',
+                            label: 'Fluency',
+                            score: lang.fluency.score,
+                            feedback: localize(lang.fluency.feedback, uiLang),
+                          },
+                          lang.grammar && {
+                            key: 'grammar',
+                            label: 'Grammar',
+                            score: lang.grammar.score,
+                            feedback: localize(lang.grammar.feedback, uiLang),
+                          },
+                          lang.vocabulary && {
+                            key: 'vocabulary',
+                            label: 'Vocabulary',
+                            score: lang.vocabulary.score,
+                            feedback: localize(lang.vocabulary.feedback, uiLang),
+                          },
+                          lang.coherence && {
+                            key: 'coherence',
+                            label: 'Coherence',
+                            score: lang.coherence.score,
+                            feedback: localize(lang.coherence.feedback, uiLang),
+                          },
+                          lang.pronunciationEstimate && {
+                            key: 'pronunciation',
+                            label: 'Pronunciation',
+                            score: lang.pronunciationEstimate.score,
+                            feedback: localize(lang.pronunciationEstimate.feedback, uiLang),
+                            extra: `${lang.pronunciationEstimate.confidence || 'low'} confidence`,
+                          },
+                        ].filter(Boolean) as Array<{
+                          key: string;
+                          label: string;
+                          score: number;
+                          feedback: string;
+                          extra?: string;
+                        }>;
+
+                        return (
+                          <div key={name} className="rounded-2xl border border-slate-200 overflow-hidden">
+                            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-b border-slate-100">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm font-black text-slate-800 truncate">{name}</span>
+                                {lang.cefr && (
+                                  <span
+                                    className={`px-2 py-0.5 text-[9px] font-black rounded-full flex-shrink-0 ${
+                                      levelBadge[lang.cefr] || 'bg-slate-100 text-slate-500'
+                                    }`}
+                                  >
+                                    {lang.cefr}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-baseline gap-0.5 flex-shrink-0">
+                                <span className={`text-xl font-black tabular-nums ${scoreTextColor(lang.overallScore)}`}>
+                                  {lang.overallScore}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400">/100</span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {metrics.map((metric) => (
+                                  <MetricTile
+                                    key={metric.key}
+                                    label={metric.label}
+                                    score={metric.score}
+                                    feedback={metric.feedback}
+                                    extra={metric.extra}
+                                  />
+                                ))}
+                              </div>
+
+                              {(strengths || improvements) && (
+                                <div className="grid grid-cols-1 gap-2 pt-1">
+                                  {strengths && (
+                                    <InsightBox tone="positive" title="Strengths">
+                                      {strengths}
+                                    </InsightBox>
+                                  )}
+                                  {improvements && (
+                                    <InsightBox tone="warning" title="To improve">
+                                      {improvements}
+                                    </InsightBox>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        {lang.fluency && <ScoreBar score={lang.fluency.score} label="Fluency" sublabel={localize(lang.fluency.feedback, uiLang)} />}
-                        {lang.grammar && <ScoreBar score={lang.grammar.score} label="Grammar" sublabel={localize(lang.grammar.feedback, uiLang)} />}
-                        {lang.vocabulary && <ScoreBar score={lang.vocabulary.score} label="Vocabulary" sublabel={localize(lang.vocabulary.feedback, uiLang)} />}
-                        {lang.coherence && <ScoreBar score={lang.coherence.score} label="Coherence" sublabel={localize(lang.coherence.feedback, uiLang)} />}
-                        {lang.pronunciationEstimate && (
-                          <ScoreBar
-                            score={lang.pronunciationEstimate.score}
-                            label="Pronunciation (est.)"
-                            sublabel={`${lang.pronunciationEstimate.confidence || 'low'} confidence${localize(lang.pronunciationEstimate.feedback, uiLang) ? ' — ' + localize(lang.pronunciationEstimate.feedback, uiLang) : ''}`}
-                          />
-                        )}
-                        {localize(lang.strengths, uiLang) && (
-                          <p className="text-[11px] text-emerald-600"><span className="font-black">Strengths:</span> {localize(lang.strengths, uiLang)}</p>
-                        )}
-                        {localize(lang.areasForImprovement, uiLang) && (
-                          <p className="text-[11px] text-amber-600"><span className="font-black">To improve:</span> {localize(lang.areasForImprovement, uiLang)}</p>
-                        )}
-                      </div>
-                    ))}
+                        );
+                      })}
+                    </div>
                   </Section>
                 )}
 
@@ -853,7 +1006,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.technicalSkills.length}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -866,7 +1019,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.professionalSkills!.length}
                   >
                     {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -879,7 +1032,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.softSkills!.length}
                   >
                     {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -953,7 +1106,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         productKnowledge: 'Product Knowledge',
                       };
                       return (
-                        <ScoreBar key={key} score={val.score} label={labels[key] || key} sublabel={localize(val.notes, uiLang)} />
+                        <ScoreBar key={key} score={val.score} label={labels[key] || key} feedback={localize(val.notes, uiLang)} />
                       );
                     })}
                   </Section>
