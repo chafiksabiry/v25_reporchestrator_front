@@ -492,6 +492,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // elapsed counter accurate even when the main thread is busy (e.g. live face
   // matching) and the interval fires less often than once per second.
   const startTimeRef = useRef<number>(0);
+  // Guards the open/close lifecycle so the modal initializes exactly once per
+  // open session. Without this, a new `savedData` reference (e.g. parent
+  // re-render after onAnalysisComplete) would re-run the effect and wrongly
+  // reset the flow back to the record screen, discarding the recorded clip.
+  const initializedRef = useRef(false);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -562,6 +567,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // ── Open/close lifecycle ───────────────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
+      // Initialize once per open session. Re-renders that change the savedData
+      // reference while the modal stays open must NOT reset the flow.
+      if (initializedRef.current) return;
+      initializedRef.current = true;
+
       setAnalyzeError(null);
       setElapsed(0);
       setSavedFlag(false);
@@ -579,6 +589,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         enterRecordMode();
       }
     } else {
+      initializedRef.current = false;
       stopCamera();
       if (timerRef.current) clearInterval(timerRef.current);
       setViewMode('record');
