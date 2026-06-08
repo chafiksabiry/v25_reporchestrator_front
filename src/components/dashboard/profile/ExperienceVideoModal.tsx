@@ -23,17 +23,21 @@ import {
   ShieldAlert,
   Clock,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type RefLabel = string | { _id?: string; name?: string };
 
+// AI text fields are stored bilingually; older data may still be a plain string.
+type LocalizedText = string | { en?: string; fr?: string } | null;
+
 interface SkillScore {
   name?: string;
   skill?: RefLabel;
   score: number;
-  evidence?: string;
+  evidence?: LocalizedText;
 }
 
 interface LanguageScore {
@@ -41,7 +45,7 @@ interface LanguageScore {
   name?: string;
   level: string;
   score: number;
-  evidence?: string;
+  evidence?: LocalizedText;
 }
 
 interface NamedScore {
@@ -53,12 +57,12 @@ interface NamedScore {
 
 interface ContactCenterSkill {
   score: number;
-  notes: string;
+  notes: LocalizedText;
 }
 
 interface SubScore {
   score: number;
-  feedback?: string;
+  feedback?: LocalizedText;
   confidence?: 'low' | 'medium' | 'high';
 }
 
@@ -72,8 +76,8 @@ interface LanguageAssessmentEntry {
   vocabulary?: SubScore;
   coherence?: SubScore;
   pronunciationEstimate?: SubScore;
-  strengths?: string;
-  areasForImprovement?: string;
+  strengths?: LocalizedText;
+  areasForImprovement?: LocalizedText;
 }
 
 interface LanguageAssessment {
@@ -88,14 +92,14 @@ interface FraudCheck {
   looksLive: boolean | null;
   livenessConfidence: number;
   fraudRisk: 'low' | 'medium' | 'high' | 'unknown';
-  reasons: string[];
+  reasons: LocalizedText[];
   checkedFrames?: number;
 }
 
 interface Relevance {
   onTopic: boolean;
   score: number;
-  reason?: string;
+  reason?: LocalizedText;
 }
 
 interface AnalysisResult {
@@ -124,7 +128,7 @@ interface AnalysisResult {
     };
     overallConfidence: number;
     detectedLanguageOfSpeech: string;
-    summary: string;
+    summary: LocalizedText;
   };
 }
 
@@ -153,6 +157,15 @@ interface ExperienceVideoModalProps {
 
 const MAX_DURATION = 120; // 2 minutes in seconds
 const MIN_DURATION = 30; // minimum required recording length in seconds
+
+// Picks the right language from a bilingual { en, fr } field, with graceful
+// fallback for legacy string data or a missing locale.
+const localize = (value: LocalizedText | undefined, lang: string): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  const code = (lang || 'en').slice(0, 2);
+  return value[code as 'en' | 'fr'] || value.en || value.fr || '';
+};
 
 const refLabel = (value?: RefLabel | null, fallback = 'Unknown'): string => {
   if (!value) return fallback;
@@ -275,6 +288,9 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete,
 }) => {
+  const { i18n } = useTranslation();
+  const uiLang = i18n.language || 'en';
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -713,7 +729,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-red-500 mt-1">
-                        {result.relevance.reason || 'This video does not seem to describe the stated experience.'}
+                        {localize(result.relevance.reason, uiLang) || 'This video does not seem to describe the stated experience.'}
                       </p>
                       <p className="text-[11px] text-slate-500 mt-1">
                         Skills, industries and activities were not added to your profile. Please record a video that describes this specific experience.
@@ -731,7 +747,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       Confidence {result.analysis.overallConfidence}%
                     </span>
                   </div>
-                  <p className="text-sm text-slate-700 leading-relaxed">{result.analysis.summary}</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{localize(result.analysis.summary, uiLang)}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                     {result.analysis.detectedLanguageOfSpeech && (
                       <span className="flex items-center gap-1.5">
@@ -779,7 +795,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       {result.fraudCheck.reasons?.length > 0 && (
                         <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-500 space-y-0.5">
                           {result.fraudCheck.reasons.slice(0, 3).map((reason, i) => (
-                            <li key={i}>{reason}</li>
+                            <li key={i}>{localize(reason, uiLang)}</li>
                           ))}
                         </ul>
                       )}
@@ -807,22 +823,22 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             <span className={`text-sm font-black ${scoreTextColor(lang.overallScore)}`}>{lang.overallScore}</span>
                           </div>
                         </div>
-                        {lang.fluency && <ScoreBar score={lang.fluency.score} label="Fluency" sublabel={lang.fluency.feedback} />}
-                        {lang.grammar && <ScoreBar score={lang.grammar.score} label="Grammar" sublabel={lang.grammar.feedback} />}
-                        {lang.vocabulary && <ScoreBar score={lang.vocabulary.score} label="Vocabulary" sublabel={lang.vocabulary.feedback} />}
-                        {lang.coherence && <ScoreBar score={lang.coherence.score} label="Coherence" sublabel={lang.coherence.feedback} />}
+                        {lang.fluency && <ScoreBar score={lang.fluency.score} label="Fluency" sublabel={localize(lang.fluency.feedback, uiLang)} />}
+                        {lang.grammar && <ScoreBar score={lang.grammar.score} label="Grammar" sublabel={localize(lang.grammar.feedback, uiLang)} />}
+                        {lang.vocabulary && <ScoreBar score={lang.vocabulary.score} label="Vocabulary" sublabel={localize(lang.vocabulary.feedback, uiLang)} />}
+                        {lang.coherence && <ScoreBar score={lang.coherence.score} label="Coherence" sublabel={localize(lang.coherence.feedback, uiLang)} />}
                         {lang.pronunciationEstimate && (
                           <ScoreBar
                             score={lang.pronunciationEstimate.score}
                             label="Pronunciation (est.)"
-                            sublabel={`${lang.pronunciationEstimate.confidence || 'low'} confidence${lang.pronunciationEstimate.feedback ? ' — ' + lang.pronunciationEstimate.feedback : ''}`}
+                            sublabel={`${lang.pronunciationEstimate.confidence || 'low'} confidence${localize(lang.pronunciationEstimate.feedback, uiLang) ? ' — ' + localize(lang.pronunciationEstimate.feedback, uiLang) : ''}`}
                           />
                         )}
-                        {lang.strengths && (
-                          <p className="text-[11px] text-emerald-600"><span className="font-black">Strengths:</span> {lang.strengths}</p>
+                        {localize(lang.strengths, uiLang) && (
+                          <p className="text-[11px] text-emerald-600"><span className="font-black">Strengths:</span> {localize(lang.strengths, uiLang)}</p>
                         )}
-                        {lang.areasForImprovement && (
-                          <p className="text-[11px] text-amber-600"><span className="font-black">To improve:</span> {lang.areasForImprovement}</p>
+                        {localize(lang.areasForImprovement, uiLang) && (
+                          <p className="text-[11px] text-amber-600"><span className="font-black">To improve:</span> {localize(lang.areasForImprovement, uiLang)}</p>
                         )}
                       </div>
                     ))}
@@ -837,7 +853,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.technicalSkills.length}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -850,7 +866,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.professionalSkills!.length}
                   >
                     {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -863,7 +879,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.softSkills!.length}
                   >
                     {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={skill.evidence} />
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} sublabel={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -937,7 +953,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         productKnowledge: 'Product Knowledge',
                       };
                       return (
-                        <ScoreBar key={key} score={val.score} label={labels[key] || key} sublabel={val.notes} />
+                        <ScoreBar key={key} score={val.score} label={labels[key] || key} sublabel={localize(val.notes, uiLang)} />
                       );
                     })}
                   </Section>

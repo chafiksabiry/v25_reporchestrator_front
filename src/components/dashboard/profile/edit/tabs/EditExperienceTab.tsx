@@ -301,8 +301,12 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
           profileId={profile._id || profile.id || ''}
           savedData={profile.experience?.[videoModalExp.index] ? {
             videoUrl: profile.experience[videoModalExp.index].videoUrl,
+            videoDuration: profile.experience[videoModalExp.index].videoDuration,
             videoTranscription: profile.experience[videoModalExp.index].videoTranscription,
             videoAnalysis: profile.experience[videoModalExp.index].videoAnalysis,
+            videoLanguageAssessment: profile.experience[videoModalExp.index].videoLanguageAssessment,
+            videoFraudCheck: profile.experience[videoModalExp.index].videoFraudCheck,
+            videoRelevance: profile.experience[videoModalExp.index].videoRelevance,
             videoAnalyzedAt: profile.experience[videoModalExp.index].videoAnalyzedAt,
           } : null}
           onAnalysisComplete={async () => {
