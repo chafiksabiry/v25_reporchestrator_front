@@ -1498,25 +1498,56 @@ export function GigsMarketplace() {
         </div>
       </div>
 
-      {/* Onboarding warning: complete the last phase by applying to / enrolling in a gig */}
-      {!loading &&
-        enrolledGigIds.length === 0 &&
-        enrolledGigs.length === 0 &&
-        pendingRequests.length === 0 && (
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-black text-yellow-800">
-                {isFrMarket ? 'Complétez la dernière phase' : 'Complete your final phase'}
-              </p>
-              <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                {isFrMarket
-                  ? 'Postulez à un gig ou inscrivez-vous pour finaliser votre onboarding.'
-                  : 'Apply to a gig or enroll to finish your onboarding.'}
-              </p>
+      {/* Onboarding status banner. Reaching this page means phases 1-4 are done,
+          so the final phase completes once the rep applies to / enrolls in a gig. */}
+      {!loading && (() => {
+        const hasGigEngagement =
+          enrolledGigIds.length > 0 ||
+          enrolledGigs.length > 0 ||
+          pendingRequests.length > 0;
+
+        if (!hasGigEngagement) {
+          return (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-black text-yellow-800">
+                  {isFrMarket ? 'Complétez la dernière phase' : 'Complete your final phase'}
+                </p>
+                <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                  {isFrMarket
+                    ? 'Postulez à un gig ou inscrivez-vous pour finaliser votre onboarding.'
+                    : 'Apply to a gig or enroll to finish your onboarding.'}
+                </p>
+              </div>
             </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+            <div className="flex items-start gap-3">
+              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
+              <div>
+                <p className="text-sm font-black text-emerald-800">
+                  {isFrMarket ? 'Onboarding terminé !' : 'Onboarding complete!'}
+                </p>
+                <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                  {isFrMarket
+                    ? 'Toutes les phases sont validées. Publiez votre profil pour devenir visible.'
+                    : 'All phases are done. Publish your profile to become visible.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/profile')}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+            >
+              {isFrMarket ? 'Publier mon profil' : 'Publish my profile'}
+            </button>
           </div>
-        )}
+        );
+      })()}
 
       <div className="flex space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button

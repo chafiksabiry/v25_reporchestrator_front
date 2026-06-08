@@ -1090,8 +1090,8 @@ export const ProfileView: React.FC<{
                         Phase {profile.onboardingProgress?.currentPhase || 1}
                       </span>
                     </div>
-                    {/* Publish only once every onboarding phase (1-4) is completed */}
-                    {['phase1', 'phase2', 'phase3', 'phase4'].every(
+                    {/* Publish only once every onboarding phase (1-5) is completed */}
+                    {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].every(
                       (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
                     ) && profile.status !== 'completed' && (
                       <button
