@@ -1039,8 +1039,11 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done */}
-                {(profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
+                {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done.
+                    Hidden entirely once every phase (1-5) is completed — Publish takes over. */}
+                {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].every(
+                  (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
+                ) ? null : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
                   <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                     <div className="flex items-start gap-3">
                       <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
