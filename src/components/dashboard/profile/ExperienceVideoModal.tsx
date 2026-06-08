@@ -19,6 +19,9 @@ import {
   Activity,
   Headphones,
   Loader2,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
 } from 'lucide-react';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
 
@@ -53,9 +56,48 @@ interface ContactCenterSkill {
   notes: string;
 }
 
+interface SubScore {
+  score: number;
+  feedback?: string;
+  confidence?: 'low' | 'medium' | 'high';
+}
+
+interface LanguageAssessmentEntry {
+  language?: RefLabel;
+  languageName?: string;
+  cefr?: string | null;
+  overallScore: number;
+  fluency?: SubScore;
+  grammar?: SubScore;
+  vocabulary?: SubScore;
+  coherence?: SubScore;
+  pronunciationEstimate?: SubScore;
+  strengths?: string;
+  areasForImprovement?: string;
+}
+
+interface LanguageAssessment {
+  assessable: boolean;
+  languages: LanguageAssessmentEntry[];
+}
+
+interface FraudCheck {
+  faceDetected: boolean | null;
+  faceCount: number | null;
+  samePersonAcrossFrames: boolean | null;
+  looksLive: boolean | null;
+  livenessConfidence: number;
+  fraudRisk: 'low' | 'medium' | 'high' | 'unknown';
+  reasons: string[];
+  checkedFrames?: number;
+}
+
 interface AnalysisResult {
   videoUrl?: string | null;
+  duration?: number | null;
   transcription: string;
+  languageAssessment?: LanguageAssessment;
+  fraudCheck?: FraudCheck;
   analysis: {
     technicalSkills: SkillScore[];
     professionalSkills?: SkillScore[];
@@ -81,8 +123,11 @@ interface AnalysisResult {
 
 interface SavedVideoData {
   videoUrl?: string;
+  videoDuration?: number;
   videoTranscription?: string;
   videoAnalysis?: AnalysisResult['analysis'];
+  videoLanguageAssessment?: LanguageAssessment;
+  videoFraudCheck?: FraudCheck;
   videoAnalyzedAt?: string;
 }
 
@@ -99,6 +144,7 @@ interface ExperienceVideoModalProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const MAX_DURATION = 120; // 2 minutes in seconds
+const MIN_DURATION = 30; // minimum required recording length in seconds
 
 const refLabel = (value?: RefLabel | null, fallback = 'Unknown'): string => {
   if (!value) return fallback;
@@ -118,9 +164,22 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   if (!saved?.videoAnalysis) return null;
   return {
     videoUrl: saved.videoUrl,
+    duration: saved.videoDuration,
     transcription: saved.videoTranscription || '',
+    languageAssessment: saved.videoLanguageAssessment,
+    fraudCheck: saved.videoFraudCheck,
     analysis: saved.videoAnalysis,
   };
+};
+
+const langAssessmentLabel = (entry: LanguageAssessmentEntry): string =>
+  entry.languageName || refLabel(entry.language);
+
+const fraudRiskStyles: Record<string, { badge: string; label: string }> = {
+  low: { badge: 'bg-emerald-100 text-emerald-700', label: 'Low risk' },
+  medium: { badge: 'bg-amber-100 text-amber-700', label: 'Medium risk' },
+  high: { badge: 'bg-red-100 text-red-700', label: 'High risk' },
+  unknown: { badge: 'bg-slate-100 text-slate-500', label: 'Not verified' },
 };
 
 const hasSavedAnalysis = (saved?: SavedVideoData | null) =>
@@ -503,7 +562,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               {viewMode === 'record' && !recordedBlob && !isRecording && (
                 <div className="text-center">
                   <p className="text-xs text-slate-400 mb-3">
-                    Record up to <span className="text-white font-black">2 minutes</span> describing your experience, skills, and achievements.
+                    Record between <span className="text-white font-black">30 seconds</span> and <span className="text-white font-black">2 minutes</span> describing your experience, skills, and achievements.
                   </p>
                   <button
                     onClick={startRecording}
@@ -528,10 +587,16 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
               {recordedBlob && !analyzing && (
                 <div className="space-y-2">
+                  {!result && elapsed < MIN_DURATION && (
+                    <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Recording is {elapsed}s — at least {MIN_DURATION}s is required. Please retake.
+                    </p>
+                  )}
                   <button
                     onClick={analyzeVideo}
-                    disabled={!!result}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-default text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
+                    disabled={!!result || elapsed < MIN_DURATION}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
                   >
                     <Sparkles className="w-4 h-4" />
                     {result ? 'Analysis Complete' : 'Analyze with AI'}
@@ -636,13 +701,102 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     </span>
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed">{result.analysis.summary}</p>
-                  {result.analysis.detectedLanguageOfSpeech && (
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <Mic className="w-3 h-3" />
-                      Spoken in: <span className="font-black">{result.analysis.detectedLanguageOfSpeech}</span>
-                    </div>
-                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                    {result.analysis.detectedLanguageOfSpeech && (
+                      <span className="flex items-center gap-1.5">
+                        <Mic className="w-3 h-3" />
+                        Spoken in: <span className="font-black">{result.analysis.detectedLanguageOfSpeech}</span>
+                      </span>
+                    )}
+                    {typeof result.duration === 'number' && (
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        Duration: <span className="font-black">{Math.round(result.duration)}s</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Anti-fraud check */}
+                {result.fraudCheck && (
+                  <div
+                    className={`flex items-start gap-3 p-4 rounded-2xl border ${
+                      result.fraudCheck.fraudRisk === 'high'
+                        ? 'bg-red-50 border-red-200'
+                        : result.fraudCheck.fraudRisk === 'medium'
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-emerald-50 border-emerald-200'
+                    }`}
+                  >
+                    {result.fraudCheck.fraudRisk === 'low' ? (
+                      <ShieldCheck className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <ShieldAlert className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-black text-slate-800">Identity & anti-fraud check</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full ${fraudRiskStyles[result.fraudCheck.fraudRisk]?.badge || fraudRiskStyles.unknown.badge}`}>
+                          {fraudRiskStyles[result.fraudCheck.fraudRisk]?.label || 'Not verified'}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                        <span>Face detected: <span className="font-black">{result.fraudCheck.faceDetected === null ? 'N/A' : result.fraudCheck.faceDetected ? 'Yes' : 'No'}</span></span>
+                        <span>Live person: <span className="font-black">{result.fraudCheck.looksLive === null ? 'N/A' : result.fraudCheck.looksLive ? 'Yes' : 'No'}</span></span>
+                        <span>Liveness: <span className="font-black">{result.fraudCheck.livenessConfidence}%</span></span>
+                      </div>
+                      {result.fraudCheck.reasons?.length > 0 && (
+                        <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-500 space-y-0.5">
+                          {result.fraudCheck.reasons.slice(0, 3).map((reason, i) => (
+                            <li key={i}>{reason}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detailed language assessment */}
+                {result.languageAssessment?.assessable && (result.languageAssessment.languages?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Globe className="w-4 h-4" />}
+                    title="Language Assessment (CEFR)"
+                    count={result.languageAssessment.languages.length}
+                  >
+                    {result.languageAssessment.languages.map((lang) => (
+                      <div key={langAssessmentLabel(lang)} className="rounded-xl border border-slate-100 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black text-slate-800">{langAssessmentLabel(lang)}</span>
+                          <div className="flex items-center gap-2">
+                            {lang.cefr && (
+                              <span className={`px-2 py-0.5 text-[9px] font-black rounded-full ${levelBadge[lang.cefr] || 'bg-slate-100 text-slate-500'}`}>
+                                {lang.cefr}
+                              </span>
+                            )}
+                            <span className={`text-sm font-black ${scoreTextColor(lang.overallScore)}`}>{lang.overallScore}</span>
+                          </div>
+                        </div>
+                        {lang.fluency && <ScoreBar score={lang.fluency.score} label="Fluency" sublabel={lang.fluency.feedback} />}
+                        {lang.grammar && <ScoreBar score={lang.grammar.score} label="Grammar" sublabel={lang.grammar.feedback} />}
+                        {lang.vocabulary && <ScoreBar score={lang.vocabulary.score} label="Vocabulary" sublabel={lang.vocabulary.feedback} />}
+                        {lang.coherence && <ScoreBar score={lang.coherence.score} label="Coherence" sublabel={lang.coherence.feedback} />}
+                        {lang.pronunciationEstimate && (
+                          <ScoreBar
+                            score={lang.pronunciationEstimate.score}
+                            label="Pronunciation (est.)"
+                            sublabel={`${lang.pronunciationEstimate.confidence || 'low'} confidence${lang.pronunciationEstimate.feedback ? ' — ' + lang.pronunciationEstimate.feedback : ''}`}
+                          />
+                        )}
+                        {lang.strengths && (
+                          <p className="text-[11px] text-emerald-600"><span className="font-black">Strengths:</span> {lang.strengths}</p>
+                        )}
+                        {lang.areasForImprovement && (
+                          <p className="text-[11px] text-amber-600"><span className="font-black">To improve:</span> {lang.areasForImprovement}</p>
+                        )}
+                      </div>
+                    ))}
+                  </Section>
+                )}
 
                 {/* Technical Skills */}
                 {result.analysis.technicalSkills?.length > 0 && (
