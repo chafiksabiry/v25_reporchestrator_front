@@ -3,7 +3,7 @@ import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigate } from 'react-router-dom';
-import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play, Check, X } from 'lucide-react';
+import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play, Check, X, AlertTriangle } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
@@ -429,7 +429,8 @@ interface EnrolledGig {
 }
 
 export function GigsMarketplace() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFrMarket = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
   const agentId = getAgentId();
 
@@ -1496,6 +1497,26 @@ export function GigsMarketplace() {
           </p>
         </div>
       </div>
+
+      {/* Onboarding warning: complete the last phase by applying to / enrolling in a gig */}
+      {!loading &&
+        enrolledGigIds.length === 0 &&
+        enrolledGigs.length === 0 &&
+        pendingRequests.length === 0 && (
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-black text-yellow-800">
+                {isFrMarket ? 'Complétez la dernière phase' : 'Complete your final phase'}
+              </p>
+              <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                {isFrMarket
+                  ? 'Postulez à un gig ou inscrivez-vous pour finaliser votre onboarding.'
+                  : 'Apply to a gig or enroll to finish your onboarding.'}
+              </p>
+            </div>
+          </div>
+        )}
 
       <div className="flex space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
