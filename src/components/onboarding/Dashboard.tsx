@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   UserPlus,
   UserCircle,
-  Award,
   CreditCard,
   ShoppingBag,
   PhoneCall,
@@ -170,21 +169,6 @@ const phaseTemplates = [
     optionalActions: [
       'Upload a professional photo',
       'Complete your bio'
-    ]
-  },
-  {
-    id: 3,
-    name: 'Skills Assessment',
-    description: 'Complete tests and get your Bolt Score',
-    icon: Award,
-    path: '/orchestrator/skills',
-    requiredActions: [
-      'Complete language assessment',
-      'Complete contact center assessment'
-    ],
-    optionalActions: [
-      'Complete technical evaluation',
-      'Review REPS best practices'
     ]
   },
   {
@@ -643,15 +627,6 @@ function Dashboard() {
         return;
       }
 
-      // Phase 3 (Skills Assessment): open the profile on the Skills tab
-      if (phase.id === 3) {
-        if (phase.status === 'pending') {
-          await progressService.updatePhaseStatus(phase.id, 'in-progress');
-        }
-        navigate('/profile?tab=skills');
-        return;
-      }
-
       // For phase 5 (marketplace), show coming soon popup
       if (phase.id === 5) {
         setShowComingSoonModal(true);
@@ -766,9 +741,9 @@ function Dashboard() {
     );
   }
 
-  // Only show phases 1-5, hide phases 6-10
-  const visiblePhases = phases.filter(phase => phase.id <= 5);
-  const visiblePhaseTemplates = phaseTemplates.filter(phase => phase.id <= 5);
+  // Show phases 1-5 (phase 3 removed — assessments via experience videos), hide 6-10
+  const visiblePhases = phases.filter(phase => phase.id <= 5 && phase.id !== 3);
+  const visiblePhaseTemplates = phaseTemplates.filter(phase => phase.id <= 5 && phase.id !== 3);
   const visibleCompletedPhases = visiblePhases.filter(p => p.status === 'completed').length;
   const progressPercentage = (visibleCompletedPhases / visiblePhaseTemplates.length) * 100;
 
@@ -893,7 +868,7 @@ function Dashboard() {
                               </div>
                             )}
                           </h3>
-                          <p className="mt-1 text-xs font-bold text-gray-600 uppercase tracking-widest">Phase {phase.id} • {phase.description}</p>
+                          <p className="mt-1 text-xs font-bold text-gray-600 uppercase tracking-widest">Phase {index + 1} • {phase.description}</p>
                         </div>
                       </div>
                       <div className="flex items-center">
