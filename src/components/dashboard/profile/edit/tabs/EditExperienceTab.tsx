@@ -299,6 +299,7 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
           experience={{ title: videoModalExp.title, company: videoModalExp.company }}
           experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
+          referencePhotoUrl={profile?.personalInfo?.photo?.url || null}
           savedData={profile.experience?.[videoModalExp.index] ? {
             videoUrl: profile.experience[videoModalExp.index].videoUrl,
             videoDuration: profile.experience[videoModalExp.index].videoDuration,

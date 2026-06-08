@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { useLiveFaceMatch } from './useLiveFaceMatch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ interface ExperienceVideoModalProps {
   experienceIndex?: number;
   savedData?: SavedVideoData | null;
   onAnalysisComplete?: () => void;
+  referencePhotoUrl?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -312,6 +314,13 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
     fr: 'Accès caméra / micro refusé. Autorisez l’accès à la caméra puis réessayez.',
   },
   analysisFailedRetry: { en: 'Analysis failed. Please try again.', fr: 'L’analyse a échoué. Veuillez réessayer.' },
+  faceMatchChecking: { en: 'Verifying your identity…', fr: 'Vérification de votre identité…' },
+  faceMatchOk: { en: 'Identity verified', fr: 'Identité vérifiée' },
+  faceMatchMismatch: {
+    en: 'Face does not match your profile photo',
+    fr: 'Le visage ne correspond pas à votre photo de profil',
+  },
+  faceMatchNoFace: { en: 'No face detected — center your face', fr: 'Aucun visage détecté — centrez votre visage' },
 };
 
 const makeTr =
@@ -457,7 +466,7 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
-  isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete,
+  isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete, referencePhotoUrl,
 }) => {
   const { i18n } = useTranslation();
   const uiLang = i18n.language || 'en';
@@ -656,6 +665,16 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const showVideoControls =
     viewMode === 'saved' || !!result?.videoUrl || (!!recordedBlob && !isRecording);
 
+  // Live identity check: compare the filmed face to the profile photo while the
+  // live camera is showing (preview + recording), without ever cutting recording.
+  const faceMatchActive =
+    isOpen && viewMode === 'record' && !!stream && !recordedBlob && !result && !cameraError;
+  const { status: faceMatchStatus } = useLiveFaceMatch({
+    videoRef,
+    referencePhotoUrl,
+    active: faceMatchActive,
+  });
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200">
@@ -735,6 +754,45 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   <span className="text-xs font-black text-white">{t('recorded')}</span>
                 </div>
               )}
+
+              {/* Live identity-match overlay (never interrupts recording) */}
+              {faceMatchActive &&
+                (faceMatchStatus === 'mismatch' || faceMatchStatus === 'no-face') && (
+                  <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
+                    <div
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-sm text-white text-xs font-black shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+                        faceMatchStatus === 'mismatch' ? 'bg-red-600/85' : 'bg-amber-500/85'
+                      }`}
+                    >
+                      {faceMatchStatus === 'mismatch' ? (
+                        <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      )}
+                      <span className="leading-tight">
+                        {faceMatchStatus === 'mismatch' ? t('faceMatchMismatch') : t('faceMatchNoFace')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+              {/* Live identity-match status pill (bottom-right) */}
+              {faceMatchActive &&
+                (faceMatchStatus === 'match' || faceMatchStatus === 'checking') && (
+                  <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/55 px-3 py-1.5 rounded-full">
+                    {faceMatchStatus === 'match' ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[11px] font-black text-emerald-300">{t('faceMatchOk')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Loader2 className="w-3 h-3 text-slate-300 animate-spin" />
+                        <span className="text-[11px] font-black text-slate-200">{t('faceMatchChecking')}</span>
+                      </>
+                    )}
+                  </div>
+                )}
             </div>
 
             {/* Progress bar */}
