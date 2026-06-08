@@ -702,8 +702,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center px-4 pt-20 pb-4 bg-black/70 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl max-h-[calc(100vh-6rem)] bg-white rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 flex-shrink-0">
