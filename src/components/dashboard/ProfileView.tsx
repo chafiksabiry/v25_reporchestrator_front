@@ -135,7 +135,8 @@ export const ProfileView: React.FC<{
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
   const getInitialTab = () => {
     try {
@@ -1045,10 +1046,10 @@ export const ProfileView: React.FC<{
                       <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-black text-emerald-800">
-                          {t('profile.phase2Done.title', { defaultValue: 'Phase 2 completed' })}
+                          {isFr ? 'Phase 2 complétée' : 'Phase 2 completed'}
                         </p>
                         <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                          {t('profile.phase2Done.desc', { defaultValue: 'Your profile is complete. Continue your onboarding to unlock the rest.' })}
+                          {isFr ? 'Votre profil est complet. Continuez votre onboarding pour débloquer la suite.' : 'Your profile is complete. Continue your onboarding to unlock the rest.'}
                         </p>
                       </div>
                     </div>
@@ -1056,19 +1057,21 @@ export const ProfileView: React.FC<{
                       onClick={() => navigate('/orchestrator')}
                       className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
                     >
-                      {t('profile.phase2Done.cta', { defaultValue: 'Continue onboarding' })}
+                      {isFr ? 'Continuer l’onboarding' : 'Continue onboarding'}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border border-yellow-300">
+                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
                     <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-black text-yellow-800">
-                        {t('profile.phase2Warning.title', { defaultValue: 'Complete Phase 2 to continue' })}
+                        {isFr ? 'Complétez la Phase 2 pour continuer' : 'Complete Phase 2 to continue'}
                       </p>
                       <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                        {t('profile.phase2Warning.desc', { defaultValue: 'Finish your profile (experience, languages, skills, availability…) before continuing your onboarding.' })}
+                        {isFr
+                          ? 'Ajoutez votre photo de profil pour compléter la Phase 2. (Expérience, langues, compétences et disponibilité sont gérés via vos vidéos d’expérience.)'
+                          : 'Upload your profile photo to complete Phase 2. (Experience, languages, skills and availability are handled through your experience videos.)'}
                       </p>
                     </div>
                   </div>
