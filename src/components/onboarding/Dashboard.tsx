@@ -187,15 +187,13 @@ const phaseTemplates = [
     name: 'Marketplace Access',
     description: 'Browse and apply for gigs',
     icon: ShoppingBag,
-    path: '/orchestrator/marketplace',
+    path: '/marketplace',
     requiredActions: [
-      'Complete marketplace orientation',
-      'Set up gig preferences'
+      'Apply or enroll in a gig'
     ],
     optionalActions: [
       'Review available opportunities',
-      'Submit first application',
-      'Complete profile visibility settings'
+      'Set up gig preferences'
     ]
   },
   {
@@ -537,6 +535,29 @@ function Dashboard() {
         status = 'in-progress';
       }
 
+      // Marketplace (last phase) has no dedicated backend phase. It completes once
+      // the rep has applied to / enrolled in at least one gig. It unlocks (becomes
+      // in-progress) as soon as the subscription phase (phase4) is completed.
+      if (phase.id === 5) {
+        const gigs = (apiData as any).gigs;
+        const subscriptionDone =
+          apiOnboarding.phases.phase4?.status === 'completed';
+        const hasGigEngagement =
+          Array.isArray(gigs) &&
+          gigs.some((g: any) => g && ['requested', 'enrolled'].includes(g.status));
+
+        if (hasGigEngagement) {
+          status = 'completed';
+          completedActions = [0];
+        } else if (subscriptionDone) {
+          status = 'in-progress';
+          completedActions = [];
+        } else {
+          status = 'pending';
+          completedActions = [];
+        }
+      }
+
       return {
         ...phase,
         status,
@@ -627,9 +648,10 @@ function Dashboard() {
         return;
       }
 
-      // For phase 5 (marketplace), show coming soon popup
+      // Marketplace (last phase): go to the real marketplace, available gigs tab.
+      // The phase completes once the rep applies to / enrolls in a gig.
       if (phase.id === 5) {
-        setShowComingSoonModal(true);
+        navigate('/marketplace');
         return;
       }
 
