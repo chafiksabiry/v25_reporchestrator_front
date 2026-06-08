@@ -91,6 +91,9 @@ interface FraudCheck {
   samePersonAcrossFrames: boolean | null;
   looksLive: boolean | null;
   livenessConfidence: number;
+  identityMatch?: boolean | null;
+  identityConfidence?: number;
+  identityChecked?: boolean;
   fraudRisk: 'low' | 'medium' | 'high' | 'unknown';
   reasons: LocalizedText[];
   checkedFrames?: number;
@@ -270,6 +273,10 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   fraudFace: { en: 'Face', fr: 'Visage' },
   fraudLive: { en: 'Live', fr: 'En direct' },
   fraudLiveness: { en: 'Liveness', fr: 'Authenticité' },
+  identityMatch: { en: 'Photo match', fr: 'Correspondance photo' },
+  identityMatchYes: { en: 'Matches your profile photo', fr: 'Correspond à votre photo de profil' },
+  identityMatchNo: { en: 'Does not match your profile photo', fr: 'Ne correspond pas à votre photo de profil' },
+  identityMatchUnknown: { en: 'Could not be verified', fr: 'Non vérifiable' },
   yes: { en: 'Yes', fr: 'Oui' },
   no: { en: 'No', fr: 'Non' },
   langAssessment: { en: 'Language Assessment (CEFR)', fr: 'Évaluation linguistique (CECR)' },
@@ -980,6 +987,59 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                           </div>
                         ))}
                       </div>
+
+                      {/* Identity match vs. profile photo */}
+                      {result.fraudCheck.identityChecked && (
+                        <div
+                          className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 border ${
+                            result.fraudCheck.identityMatch === true
+                              ? 'bg-emerald-50 border-emerald-100'
+                              : result.fraudCheck.identityMatch === false
+                              ? 'bg-red-50 border-red-100'
+                              : 'bg-slate-50 border-slate-100'
+                          }`}
+                        >
+                          {result.fraudCheck.identityMatch === true ? (
+                            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          ) : result.fraudCheck.identityMatch === false ? (
+                            <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          ) : (
+                            <ShieldAlert className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                              {t('identityMatch')}
+                            </p>
+                            <p
+                              className={`text-xs font-black ${
+                                result.fraudCheck.identityMatch === true
+                                  ? 'text-emerald-700'
+                                  : result.fraudCheck.identityMatch === false
+                                  ? 'text-red-700'
+                                  : 'text-slate-500'
+                              }`}
+                            >
+                              {result.fraudCheck.identityMatch === true
+                                ? t('identityMatchYes')
+                                : result.fraudCheck.identityMatch === false
+                                ? t('identityMatchNo')
+                                : t('identityMatchUnknown')}
+                            </p>
+                          </div>
+                          {result.fraudCheck.identityMatch !== null &&
+                            typeof result.fraudCheck.identityConfidence === 'number' &&
+                            result.fraudCheck.identityConfidence > 0 && (
+                              <span
+                                className={`text-sm font-black tabular-nums flex-shrink-0 ${
+                                  result.fraudCheck.identityMatch ? 'text-emerald-600' : 'text-red-600'
+                                }`}
+                              >
+                                {result.fraudCheck.identityConfidence}%
+                              </span>
+                            )}
+                        </div>
+                      )}
+
                       {result.fraudCheck.reasons?.length > 0 && (
                         <ul className="space-y-1.5">
                           {result.fraudCheck.reasons.slice(0, 3).map((reason, i) => (
