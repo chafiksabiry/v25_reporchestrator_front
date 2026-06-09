@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Fonction utilitaire pour construire l'URL de l'app principale
   const getMainAppUrl = () => {
-    return `${window.location.protocol}//${window.location.host}/app1`;
+    return `${window.location.protocol}//${window.location.host}/auth/signin`;
   };
 
   // Fonction pour vérifier si l'utilisateur est authentifié (utilisée uniquement si nécessaire)
