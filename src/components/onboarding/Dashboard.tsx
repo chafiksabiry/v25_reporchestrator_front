@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import config from '../../config';
 import progressService, { UserProgress } from '../../services/progressService';
+import { OnboardingNextStepButton } from './OnboardingNextStepButton';
 import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
 
 // Define the phase interface
@@ -57,7 +58,6 @@ interface ApiPhase2RequiredActions {
   industriesAdded: boolean;
   activitiesAdded: boolean;
   availabilitySet: boolean;
-  videoUploaded: boolean;
   [key: string]: boolean;
 }
 
@@ -769,6 +769,10 @@ function Dashboard() {
   const visibleCompletedPhases = visiblePhases.filter(p => p.status === 'completed').length;
   const progressPercentage = (visibleCompletedPhases / visiblePhaseTemplates.length) * 100;
 
+  // Next actionable phase = first visible phase that isn't completed yet.
+  // Powers the floating "Next step" guide button (mirrors the company orchestrator).
+  const nextActionablePhase = visiblePhases.find(p => p.status !== 'completed');
+
   return (
     <div className="space-y-6">
       {/* Coming Soon Modal */}
@@ -1022,6 +1026,14 @@ function Dashboard() {
           })}
         </div>
       </div>
+
+      {/* Floating "Next step" guide — points to the next incomplete phase */}
+      {nextActionablePhase && (
+        <OnboardingNextStepButton
+          title={nextActionablePhase.name}
+          onClick={() => handlePhaseAction(nextActionablePhase)}
+        />
+      )}
     </div>
   );
 }
