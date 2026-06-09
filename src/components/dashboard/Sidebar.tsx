@@ -47,16 +47,47 @@ type TrainingSidebarModule = {
   slides: TrainingSidebarSlide[];
 };
 
+const PHASE_COMPLETION_CACHE_KEY = 'rep_phase_completion';
+
+const readPhaseCompletionCache = (): Record<number, boolean> => {
+  try {
+    const raw = localStorage.getItem(PHASE_COMPLETION_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
 export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
+  // While the profile is still loading, `phases` is undefined. Rather than
+  // momentarily assuming onboarding is incomplete (which flashes the warning
+  // card + an empty menu before the real data arrives), fall back to the last
+  // known completion snapshot persisted in localStorage.
   const isPhaseCompleted = (phaseNumber: number): boolean => {
-    if (!phases) return false;
-    return phases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
+    if (phases) {
+      return phases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
+    }
+    return readPhaseCompletionCache()[phaseNumber] === true;
   };
+
+  // Persist the completion snapshot whenever real phases are available.
+  useEffect(() => {
+    if (!phases) return;
+    const snapshot: Record<number, boolean> = {};
+    for (let n = 1; n <= 5; n++) {
+      snapshot[n] = phases[`phase${n}` as keyof Phases]?.status === 'completed';
+    }
+    try {
+      localStorage.setItem(PHASE_COMPLETION_CACHE_KEY, JSON.stringify(snapshot));
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [phases]);
 
   // Onboarding is considered complete (agent profile created) only when the
   // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
