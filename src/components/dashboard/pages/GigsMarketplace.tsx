@@ -8,6 +8,7 @@ import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
+import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 
@@ -458,6 +459,35 @@ export function GigsMarketplace() {
   };
   const [expandedActivities, setExpandedActivities] = useState<Record<string, boolean>>({});
   const [expandedIndustries, setExpandedIndustries] = useState<Record<string, boolean>>({});
+
+  // Whether the rep already published their profile (`status === 'completed'`).
+  // Read from the cached profile so the onboarding banner doesn't keep showing
+  // the "Publish my profile" button after the rep has already published.
+  const [isProfilePublished, setIsProfilePublished] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('profileData');
+      return cached ? JSON.parse(cached)?.status === 'completed' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await fetchProfileFromAPI();
+        if (!cancelled && profile) {
+          setIsProfilePublished(profile.status === 'completed');
+        }
+      } catch {
+        // keep the cached value on failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSmartStart = (gigId: string) => {
     navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(gigId)}`, { state: { gigId } });
@@ -1518,6 +1548,25 @@ export function GigsMarketplace() {
                   {isFrMarket
                     ? 'Postulez à un gig ou inscrivez-vous pour finaliser votre onboarding.'
                     : 'Apply to a gig or enroll to finish your onboarding.'}
+                </p>
+              </div>
+            </div>
+          );
+        }
+
+        // Profile already published → confirmation only, no publish button.
+        if (isProfilePublished) {
+          return (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
+              <div>
+                <p className="text-sm font-black text-emerald-800">
+                  {isFrMarket ? 'Profil publié !' : 'Profile published!'}
+                </p>
+                <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                  {isFrMarket
+                    ? 'Votre profil est visible par les entreprises. Postulez aux gigs qui vous intéressent.'
+                    : 'Your profile is visible to companies. Apply to the gigs you like.'}
                 </p>
               </div>
             </div>
