@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children, fallback }) => {
   // Construire l'URL complète pour l'app principale
   const getMainAppUrl = () => {
     if (fallback) return fallback;
-    return `${window.location.protocol}//${window.location.host}/app1`;
+    return `${window.location.protocol}//${window.location.host}/auth/signin`;
   };
 
   // Plus besoin de vérifier à chaque changement de route

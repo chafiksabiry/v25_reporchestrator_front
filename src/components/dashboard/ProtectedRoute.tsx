@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children, fallback }: { children: React.ReactNode; fal
   // Construire l'URL complète pour l'app principale
   const getMainAppUrl = () => {
     if (fallback) return fallback;
-    return `${window.location.protocol}//${window.location.host}/app1`;
+    return `${window.location.protocol}//${window.location.host}/auth/signin`;
   };
 
   useEffect(() => {
