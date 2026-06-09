@@ -1554,23 +1554,9 @@ export function GigsMarketplace() {
           );
         }
 
-        // Profile already published → confirmation only, no publish button.
+        // Profile already published → no onboarding banner at all.
         if (isProfilePublished) {
-          return (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
-              <div>
-                <p className="text-sm font-black text-emerald-800">
-                  {isFrMarket ? 'Profil publié !' : 'Profile published!'}
-                </p>
-                <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                  {isFrMarket
-                    ? 'Votre profil est visible par les entreprises. Postulez aux gigs qui vous intéressent.'
-                    : 'Your profile is visible to companies. Apply to the gigs you like.'}
-                </p>
-              </div>
-            </div>
-          );
+          return null;
         }
 
         return (
