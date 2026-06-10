@@ -26,6 +26,7 @@ import {
 import { CallRecords } from '../CallRecords';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getAgentId } from '../../../utils/authUtils';
 import Cookies from 'js-cookie';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import {
@@ -41,7 +42,11 @@ const MIN_WITHDRAWAL_AMOUNT = 1000;
 export function WalletPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const agentId = user?.agentId;
+  // Use the same agentId resolution as the rest of the app (header, calls).
+  // `user?.agentId` from AuthContext can differ from the profile/agent _id that
+  // the AgentWallet ledger is keyed on, which made the wallet page fetch an
+  // empty wallet (0,00€) while the header showed the real balance.
+  const agentId = getAgentId() || user?.agentId;
   const [activeTab, setActiveTab] = useState('transactions');
   const [selectedDateRange, setSelectedDateRange] = useState('this-month');
   const [selectedGigId, setSelectedGigId] = useState('all');
