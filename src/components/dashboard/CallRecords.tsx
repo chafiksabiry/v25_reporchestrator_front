@@ -197,6 +197,10 @@ interface CallRecordsProps {
    *  parent can clear its `pendingOpenCallSid` state and avoid re-opening
    *  on subsequent renders. */
   onAutoOpenHandled?: () => void;
+  /** Fired when one or more calls finish AI analysis (pending → settled).
+   *  Used by the wallet page to refresh balances since a validated call/sale
+   *  books new commissions server-side. */
+  onAnalysisSettled?: () => void;
 }
 
 /** A `processing`/`pending` call older than this is considered stuck (worker
@@ -255,6 +259,7 @@ export function CallRecords({
   transactionValidationFilter = 'all',
   autoOpenSid,
   onAutoOpenHandled,
+  onAnalysisSettled,
 }: CallRecordsProps) {
   const { t, i18n } = useTranslation();
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
@@ -317,6 +322,10 @@ export function CallRecords({
           setSelectedCall({ ...selectedCall, ...patch });
         }
         fetchCallRecords();
+        // A freshly validated call books commissions server-side — refresh wallet.
+        if (response.validByAI === true || (response.data as any)?.validByAI === true) {
+          onAnalysisSettled?.();
+        }
       }
     } catch (error) {
       console.error('Error analyzing call:', error);
@@ -383,6 +392,29 @@ export function CallRecords({
     }, 5000);
     return () => clearInterval(interval);
   }, [hasPendingAnalyses]);
+
+  // Detect calls that just finished analysis (pending -> settled). When that
+  // happens for a validated call, the backend books new commissions, so we
+  // notify the parent (wallet) to refresh balances.
+  const prevPendingIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentPending = new Set(
+      callRecords.filter((r) => isAnalysisPending(r)).map((r) => r._id)
+    );
+    const prevPending = prevPendingIdsRef.current;
+
+    let someSettled = false;
+    prevPending.forEach((id) => {
+      if (!currentPending.has(id)) {
+        const settled = callRecords.find((r) => r._id === id);
+        // Only refresh when the settled call actually earns (validated).
+        if (settled && settled.validByAI === true) someSettled = true;
+      }
+    });
+
+    prevPendingIdsRef.current = currentPending;
+    if (someSettled) onAnalysisSettled?.();
+  }, [callRecords, onAnalysisSettled]);
 
   useEffect(() => {
     if (!selectedCall) return;
