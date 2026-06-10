@@ -22,6 +22,11 @@ import {
   CreditCard,
 } from 'lucide-react';
 import api from '../../utils/client';
+import {
+  hasValidatedTransactionSale,
+  resolveCallRepCommission,
+  resolveTransactionRepCommission,
+} from '../../utils/commissionUtils';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -578,7 +583,7 @@ export function CallRecords({
                             {record.validByAI === true || record.valid === true ? (
                               <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100/40 shadow-sm w-36 whitespace-nowrap">
                                 <Check className="w-3.5 h-3.5" />
-                                Validé par AI (+{(record.repCallCommission !== undefined ? record.repCallCommission : (record.lead?.gigId?.commission?.commission_per_call || record.lead?.gigId?.rewardPerCall || 4) * 0.7).toFixed(2)}€)
+                                Validé par AI (+{resolveCallRepCommission(record).toFixed(2)}€)
                               </span>
                             ) : record.validByAI === false ? (
                               (() => {
@@ -628,18 +633,18 @@ export function CallRecords({
                               <div className="flex flex-col items-center gap-1">
                                 <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100/40 shadow-sm w-36 whitespace-nowrap">
                                   <Check className="w-3.5 h-3.5" />
-                                  Signé (+{(record.repTransactionCommission !== undefined ? record.repTransactionCommission : (record.transaction?.repTransactionCommission !== undefined ? record.transaction.repTransactionCommission : (record.lead?.gigId?.commission?.transactionCommission || record.lead?.gigId?.rewardPerSale || 30) * 0.7)).toFixed(2)}€)
+                                  Signé (+{resolveTransactionRepCommission(record).toFixed(2)}€)
                                 </span>
                               </div>
                             ) : (record.validByAI === null || record.validByAI === undefined) ? (
                               <div className="flex flex-col items-center justify-center min-w-[80px]">
                                 <span className="text-slate-300 font-bold text-sm tracking-widest">-</span>
                               </div>
-                            ) : record.transaction?.validByAI === true ? (
+                            ) : hasValidatedTransactionSale(record) ? (
                               <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-200/40 shadow-sm w-44 whitespace-nowrap text-center cursor-help" title="Analyse IA positive, en attente de validation finale par l'entreprise">
-                                  <Clock className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-                                  Wait for Company Validation
+                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-200/40 shadow-sm w-44 whitespace-nowrap text-center cursor-help" title="Transaction validée par l'IA — commission enregistrée au portefeuille">
+                                  <Check className="w-3.5 h-3.5 text-blue-500" />
+                                  Validé IA (+{resolveTransactionRepCommission(record).toFixed(2)}€)
                                 </span>
                                 {record.argumentation_score !== undefined && (
                                   <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {record.argumentation_score}%</span>
