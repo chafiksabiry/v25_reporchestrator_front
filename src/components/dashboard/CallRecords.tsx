@@ -642,7 +642,7 @@ export function CallRecords({
                               </div>
                             ) : hasValidatedTransactionSale(record) ? (
                               <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-200/40 shadow-sm w-44 whitespace-nowrap text-center cursor-help" title="Transaction validée par l'IA — commission enregistrée au portefeuille">
+                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-200/40 shadow-sm w-44 whitespace-nowrap text-center cursor-help" title="Transaction validée par l'IA — commission comptée au portefeuille (disponible ou en attente)">
                                   <Check className="w-3.5 h-3.5 text-blue-500" />
                                   Validé IA (+{resolveTransactionRepCommission(record).toFixed(2)}€)
                                 </span>

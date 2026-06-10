@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getUserInfo, getProfileData } from '../../utils/authUtils';
+import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
+import api from '../../utils/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import config from '../../config';
@@ -63,19 +64,21 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const [balance, setBalance] = useState(() => {
-    const saved = localStorage.getItem('rep_available_balance');
-    return saved ? parseFloat(saved) : 0.00;
-  });
+  const readWalletTotal = () => {
+    const available = parseFloat(localStorage.getItem('rep_available_balance') || '0');
+    const pending = parseFloat(localStorage.getItem('rep_pending_balance') || '0');
+    const safeAvailable = Number.isFinite(available) ? available : 0;
+    const safePending = Number.isFinite(pending) ? pending : 0;
+    return safeAvailable + safePending;
+  };
+
+  const [balance, setBalance] = useState(() => readWalletTotal());
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
   const [displayName, setDisplayName] = useState<string>('User');
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
-      const saved = localStorage.getItem('rep_available_balance');
-      if (saved) {
-        setBalance(parseFloat(saved));
-      }
+      setBalance(readWalletTotal());
     };
     window.addEventListener('WALLET_BALANCE_UPDATED', handleBalanceUpdate);
 
