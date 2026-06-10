@@ -277,6 +277,15 @@ export function WalletPage() {
     fetchWalletData();
   }, [agentId]);
 
+  // Refresh wallet cards live when the WebSocket layer signals new commissions.
+  useEffect(() => {
+    const handler = () => {
+      void fetchWalletData();
+    };
+    window.addEventListener('REP_WALLET_REFRESH', handler);
+    return () => window.removeEventListener('REP_WALLET_REFRESH', handler);
+  }, [agentId]);
+
   // Sync state changes with localStorage and emit sync event
   useEffect(() => {
     localStorage.setItem('rep_available_balance', availableBalance.toString());
@@ -796,6 +805,7 @@ export function WalletPage() {
                     gigId={selectedGigId === 'all' ? undefined : selectedGigId} 
                     callValidationFilter={callValidationFilter}
                     transactionValidationFilter={transactionValidationFilter}
+                    onAnalysisSettled={fetchWalletData}
                   />
                 </div>
               </>

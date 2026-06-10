@@ -26,6 +26,25 @@ import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
 import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
 import { HARX_NAVBAR_BG } from '../utils/harxBrand';
+import { connectRepEscrowSocket } from '../lib/escrowSocket';
+
+async function syncRepWalletBalance() {
+  const agentId = getAgentId();
+  if (!agentId) return;
+  try {
+    const res = await api.get(`/escrow/agent/wallet/${agentId}`);
+    if (res.data?.success) {
+      const available = Number(res.data.data.availableBalance ?? 0);
+      localStorage.setItem('rep_available_balance', String(available));
+      localStorage.setItem('rep_pending_balance', String(Number(res.data.data.pendingCommissions ?? 0)));
+      window.dispatchEvent(new Event('WALLET_BALANCE_UPDATED'));
+      // Let the wallet page (if open) refetch its full state.
+      window.dispatchEvent(new Event('REP_WALLET_REFRESH'));
+    }
+  } catch {
+    // ignore
+  }
+}
 
 function DashboardAppContent() {
   useAuth();
@@ -39,27 +58,23 @@ function DashboardAppContent() {
         const profileData = await fetchProfileFromAPI();
         setUserProfile(profileData);
         setLoading(false);
-
-        const agentId = profileData?._id || getAgentId();
-        if (agentId) {
-          try {
-            const res = await api.get(`/escrow/agent/wallet/${agentId}`);
-            if (res.data?.success) {
-              const available = Number(res.data.data.availableBalance ?? 0);
-              localStorage.setItem('rep_available_balance', String(available));
-              localStorage.setItem('rep_pending_balance', String(Number(res.data.data.pendingCommissions ?? 0)));
-              window.dispatchEvent(new Event('WALLET_BALANCE_UPDATED'));
-            }
-          } catch {
-            // ignore
-          }
-        }
+        await syncRepWalletBalance();
       } catch {
         setLoading(false);
       }
     };
 
     initializeProfileData();
+
+    // Live wallet updates over WebSocket: refresh as soon as the backend books
+    // new commissions for this rep (after a validated call/sale).
+    const disposeSocket = connectRepEscrowSocket(() => {
+      void syncRepWalletBalance();
+    });
+
+    return () => {
+      disposeSocket();
+    };
   }, []);
 
   return (
