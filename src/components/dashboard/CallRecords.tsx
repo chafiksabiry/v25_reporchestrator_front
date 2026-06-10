@@ -194,6 +194,12 @@ interface CallRecordsProps {
   onAutoOpenHandled?: () => void;
 }
 
+/** A `processing`/`pending` call older than this is considered stuck (worker
+ *  hung or backend restarted mid-analysis). We stop the infinite spinner and
+ *  let the user retry instead of waiting forever. Kept in sync with the
+ *  backend's STALE_PROCESSING_MS. */
+const STALE_ANALYSIS_MS = 5 * 60 * 1000;
+
 /** Is the AI analyzer still running (or hasn't run yet) for this call? */
 function isAnalysisPending(record: CallRecord): boolean {
   // Prefer the explicit lifecycle field when the backend has set it.
@@ -202,6 +208,15 @@ function isAnalysisPending(record: CallRecord): boolean {
   }
   // Legacy fallback: pre-analyzer calls only had `validByAI == null`.
   return record.validByAI == null;
+}
+
+/** Has a pending analysis been stuck long enough that we should let the user
+ *  retry rather than keep spinning? */
+function isAnalysisStale(record: CallRecord): boolean {
+  if (!isAnalysisPending(record)) return false;
+  const ts = record.updatedAt ? new Date(record.updatedAt).getTime() : NaN;
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
 /** Map `callOutcome` to a short label + tone for the disposition pill. */
@@ -406,8 +421,13 @@ export function CallRecords({
     return true;
   });
 
+  // Actively analyzing = we just kicked it off (analyzingCallId) OR the backend
+  // reports pending/processing AND the lock isn't stale. A stale lock no longer
+  // blocks the button so the user can relaunch the analysis.
+  const selectedCallStale = selectedCall ? isAnalysisStale(selectedCall) : false;
   const selectedCallAnalyzing = selectedCall
-    ? analyzingCallId === selectedCall._id || isAnalysisPending(selectedCall)
+    ? analyzingCallId === selectedCall._id ||
+      (isAnalysisPending(selectedCall) && !selectedCallStale)
     : false;
 
   return (
@@ -835,13 +855,18 @@ export function CallRecords({
                   ) : (
                     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">Transcript not available</p>
+                      {selectedCallStale && (
+                        <p className="text-amber-500 font-bold text-[10px] uppercase tracking-widest">
+                          Analyse bloquée — relancez-la
+                        </p>
+                      )}
                       <button
                         onClick={() => handleAnalyzeCall(selectedCall._id)}
                         disabled={selectedCallAnalyzing}
                         className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
-                        {selectedCallAnalyzing ? 'Analyse...' : 'Analyze & Transcribe'}
+                        {selectedCallAnalyzing ? 'Analyse...' : selectedCallStale ? 'Réessayer l\'analyse' : 'Analyze & Transcribe'}
                       </button>
                     </div>
                   )}
@@ -853,13 +878,18 @@ export function CallRecords({
                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">
                         Analyse détaillée non encore générée
                       </p>
+                      {selectedCallStale && (
+                        <p className="text-amber-500 font-bold text-[10px] uppercase tracking-widest">
+                          Analyse bloquée — relancez-la
+                        </p>
+                      )}
                       <button
                         onClick={() => handleAnalyzeCall(selectedCall._id)}
                         disabled={selectedCallAnalyzing}
                         className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
-                        {selectedCallAnalyzing ? 'Analyse...' : 'Lancer l\'analyse IA'}
+                        {selectedCallAnalyzing ? 'Analyse...' : selectedCallStale ? 'Réessayer l\'analyse' : 'Lancer l\'analyse IA'}
                       </button>
                     </div>
                   ) : (
