@@ -710,6 +710,8 @@ export function Training() {
   const progressSyncInFlightRef = useRef<Set<string>>(new Set());
   /** POST /section/start déjà envoyé pour cette clé (même parcours). */
   const sectionStartSentRef = useRef<Set<string>>(new Set());
+  /** Promesses /section/start en cours — le complete attend leur résolution. */
+  const sectionStartPromiseRef = useRef<Map<string, Promise<void>>>(new Map());
   /** POST /section/complete déjà envoyé (évite doublons au « Suivant »). */
   const sectionCompleteSentRef = useRef<Set<string>>(new Set());
   /** Index précédent du viewer formation — pour détecter navigation avant → suivant. */
@@ -1154,6 +1156,7 @@ export function Training() {
       setSessionManualDurationMs(0);
     }
     sectionStartSentRef.current.clear();
+    sectionStartPromiseRef.current.clear();
     sectionCompleteSentRef.current.clear();
     prevFormationSlideIndexRef.current = null;
     quizOutcomeSentRef.current.clear();
@@ -1436,6 +1439,53 @@ export function Training() {
     [repId]
   );
 
+  const ensureSectionStarted = useCallback(
+    async (args: { courseId: string; moduleId: string; sectionId: string }) => {
+      if (!repId) return;
+      const { courseId, moduleId, sectionId } = args;
+      if (!/^[a-f\d]{24}$/i.test(moduleId) || !/^[a-f\d]{24}$/i.test(sectionId)) return;
+
+      const sentKey = `${courseId}:${moduleId}:${sectionId}`;
+      if (sectionStartSentRef.current.has(sentKey)) return;
+
+      const existing = sectionStartPromiseRef.current.get(sentKey);
+      if (existing) {
+        await existing;
+        return;
+      }
+
+      const base = trainingApiBase();
+      if (!base) return;
+
+      const syncKey = `start:${sentKey}`;
+      progressSyncInFlightRef.current.add(syncKey);
+      const promise = axios
+        .post(`${base}/training_journeys/section/start`, {
+          repId,
+          courseId,
+          moduleId,
+          sectionId,
+        })
+        .then(async () => {
+          sectionStartSentRef.current.add(sentKey);
+          await Promise.all([
+            fetchTrainingProgressRows(),
+            fetchSlideProgressSummary(),
+            fetchStructuredProgress(courseId),
+          ]);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          progressSyncInFlightRef.current.delete(syncKey);
+          sectionStartPromiseRef.current.delete(sentKey);
+        });
+
+      sectionStartPromiseRef.current.set(sentKey, promise);
+      await promise;
+    },
+    [repId, fetchTrainingProgressRows, fetchSlideProgressSummary, fetchStructuredProgress]
+  );
+
   /** POST /section/complete — appelé au « Suivant » (sortie section) ou sur dernière slide section. */
   const completeSectionProgressAtLeave = useCallback(
     async (args: { moduleIndex: number; section: unknown }) => {
@@ -1485,8 +1535,8 @@ export function Training() {
       const status: 'not_started' | 'in_progress' | 'completed' =
         progress >= 100 && !hasQuizzes ? 'completed' : progress > 0 ? 'in_progress' : 'not_started';
 
-      try {
-        await axios.post(`${base}/training_journeys/section/complete`, {
+      const postSectionComplete = () =>
+        axios.post(`${base}/training_journeys/section/complete`, {
           repId,
           courseId: selectedJourneyId,
           moduleId,
@@ -1496,14 +1546,37 @@ export function Training() {
           completedSections: nextDone.filter((id) => /^[a-f\d]{24}$/i.test(id)),
           durationMs: sectionDurationMs,
         });
+
+      const finalizeComplete = async () => {
+        await postSectionComplete();
         sectionCompleteSentRef.current.add(sentKey);
         await Promise.all([
           fetchTrainingProgressRows(),
           fetchSlideProgressSummary(),
           fetchStructuredProgress(selectedJourneyId),
         ]);
-      } catch {
-        /* ignore */
+      };
+
+      try {
+        await ensureSectionStarted({
+          courseId: selectedJourneyId,
+          moduleId,
+          sectionId: sectionMongoId,
+        });
+        await finalizeComplete();
+      } catch (err) {
+        const is409 = axios.isAxiosError(err) && err.response?.status === 409;
+        if (!is409) return;
+        try {
+          await ensureSectionStarted({
+            courseId: selectedJourneyId,
+            moduleId,
+            sectionId: sectionMongoId,
+          });
+          await finalizeComplete();
+        } catch {
+          /* ignore */
+        }
       } finally {
         progressSyncInFlightRef.current.delete(syncKey);
       }
@@ -1513,6 +1586,7 @@ export function Training() {
       selectedJourneyId,
       selectedJourney,
       completedSectionsByJourney,
+      ensureSectionStarted,
       fetchTrainingProgressRows,
       fetchSlideProgressSummary,
       fetchStructuredProgress,
@@ -1560,46 +1634,17 @@ export function Training() {
     if (!/^[a-f\d]{24}$/i.test(moduleId)) return;
     if (!sectionIdForApi || !/^[a-f\d]{24}$/i.test(sectionIdForApi)) return;
 
-    const sentKey = `${selectedJourneyId}:${moduleId}:${sectionIdForApi || sectionKey}`;
-    if (sectionStartSentRef.current.has(sentKey)) return;
-
-    const syncKey = `start:${sentKey}`;
-    if (progressSyncInFlightRef.current.has(syncKey)) return;
-    progressSyncInFlightRef.current.add(syncKey);
-
-    const base = trainingApiBase();
-    if (!base) {
-      progressSyncInFlightRef.current.delete(syncKey);
-      return;
-    }
-
-    axios
-      .post(`${base}/training_journeys/section/start`, {
-        repId,
-        courseId: selectedJourneyId,
-        moduleId,
-        sectionId: sectionIdForApi,
-      })
-      .then(async () => {
-        sectionStartSentRef.current.add(sentKey);
-        await Promise.all([
-          fetchTrainingProgressRows(),
-          fetchSlideProgressSummary(),
-          fetchStructuredProgress(selectedJourneyId),
-        ]);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        progressSyncInFlightRef.current.delete(syncKey);
-      });
+    void ensureSectionStarted({
+      courseId: selectedJourneyId,
+      moduleId,
+      sectionId: sectionIdForApi,
+    });
   }, [
     repId,
     selectedJourneyId,
     selectedJourney,
     currentFormationViewerSlide,
-    fetchTrainingProgressRows,
-    fetchSlideProgressSummary,
-    fetchStructuredProgress,
+    ensureSectionStarted,
   ]);
 
   /** Marque la section comme terminée seulement après « Suivant » (index qui augmente), pas à l’ouverture. */
