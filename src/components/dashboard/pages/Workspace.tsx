@@ -395,8 +395,14 @@ export function WorkspaceContent() {
 
           setEnrolledGigs(enrolled);
 
-          // If no gigId from location, pick the first enrolled one
-          if (!selectedGigId && enrolled.length > 0) {
+          const enrolledIds = new Set(enrolled.map((g) => g._id));
+          const persistedGigId = selectedGigId || gigId;
+
+          // Drop a stale session gig that is no longer enrolled for this rep.
+          if (persistedGigId && !enrolledIds.has(persistedGigId)) {
+            setSelectedGigId('');
+            sessionStorage.removeItem('activeGigId');
+          } else if (!selectedGigId && enrolled.length > 0) {
             setSelectedGigId(enrolled[0]._id);
           }
         }
@@ -408,16 +414,20 @@ export function WorkspaceContent() {
 
   const fetchLeads = async (page: number = 1) => {
     const activeGigId = selectedGigId || gigId;
+
+    // Leads are scoped to a gig. Without a selected enrolled gig we must not
+    // call /leads/user/:id (that endpoint returns demo / cross-gig data).
+    if (!activeGigId) {
+      setLeads([]);
+      setTotalPages(1);
+      setIsLoadingLeads(false);
+      return;
+    }
+
     console.log("🔍 Workspace: fetching leads", { activeGigId, page });
     const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
-    const userId = localStorage.getItem('agentId') || '682b590b4d60b1ff380973c2';
     const limit = 50;
-
-    let url = `${baseUrl}/leads/user/${userId}?page=${page}&limit=${limit}`;
-
-    if (activeGigId) {
-      url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}`;
-    }
+    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}`;
 
     try {
       setIsLoadingLeads(true);
@@ -580,7 +590,11 @@ export function WorkspaceContent() {
                   </div>
                 ) : leads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
-                    <p className="text-gray-400 font-medium">No leads found {gigId ? "for this gig" : "for your account"}.</p>
+                    <p className="text-gray-400 font-medium">
+                      {!selectedGigId
+                        ? t('workspaceGuard.noGigLeads', 'Sélectionnez un gig inscrit pour afficher vos prospects.')
+                        : t('workspaceGuard.noLeadsForGig', 'Aucun prospect pour ce gig pour le moment.')}
+                    </p>
                   </div>
                 ) : (
                   <>

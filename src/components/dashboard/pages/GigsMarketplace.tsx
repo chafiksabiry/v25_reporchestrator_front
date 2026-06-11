@@ -9,6 +9,7 @@ import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
+import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 
@@ -1497,6 +1498,15 @@ export function GigsMarketplace() {
     }
   };
 
+  const hasMarketplaceGigEngagement =
+    enrolledGigIds.length > 0 ||
+    enrolledGigs.length > 0 ||
+    pendingRequests.length > 0;
+
+  const scrollToGigGrid = () => {
+    document.getElementById('rep-gig-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast de notification (accept / reject invitation) */}
@@ -1531,12 +1541,7 @@ export function GigsMarketplace() {
       {/* Onboarding status banner. Reaching this page means phases 1-4 are done,
           so the final phase completes once the rep applies to / enrolls in a gig. */}
       {!loading && (() => {
-        const hasGigEngagement =
-          enrolledGigIds.length > 0 ||
-          enrolledGigs.length > 0 ||
-          pendingRequests.length > 0;
-
-        if (!hasGigEngagement) {
+        if (!hasMarketplaceGigEngagement) {
           return (
             <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
               <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
@@ -1654,7 +1659,7 @@ export function GigsMarketplace() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div id="rep-gig-grid" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {(currentGigs as PopulatedGig[]).map((gig) => {
               const gigStatus = getGigStatus(gig._id);
               const gigStyle = getCardStyleForStatus(gigStatus);
@@ -2568,6 +2573,26 @@ export function GigsMarketplace() {
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
+      )}
+
+      {!loading && !isProfilePublished && (
+        <OnboardingNextStepButton
+          title={
+            hasMarketplaceGigEngagement
+              ? (isFrMarket ? 'Publier mon profil' : 'Publish my profile')
+              : (isFrMarket ? 'Place de marché' : 'Marketplace')
+          }
+          hint={
+            hasMarketplaceGigEngagement
+              ? (isFrMarket ? 'Dernière étape pour devenir visible' : 'Final step to become visible')
+              : (isFrMarket ? 'Postulez à au moins un gig ci-dessous' : 'Apply to at least one gig below')
+          }
+          onClick={
+            hasMarketplaceGigEngagement
+              ? () => navigate('/profile')
+              : scrollToGigGrid
+          }
+        />
       )}
     </div>
   );

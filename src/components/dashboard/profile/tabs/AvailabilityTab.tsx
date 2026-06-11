@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Clock, CheckCircle, AlertTriangle, RefreshCw, ChevronRight, Pencil } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Clock, CheckCircle, AlertTriangle, RefreshCw, ChevronRight, Pencil, Search, X, ChevronDown, MapPin } from 'lucide-react';
 
 interface AvailabilityTabProps {
   profile: any;
@@ -50,9 +50,70 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
     timeZoneToId(profile.availability?.timeZone)
   );
 
+  // Searchable timezone combobox state.
+  const [tzSearch, setTzSearch] = useState('');
+  const [tzOpen, setTzOpen] = useState(false);
+  const tzRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tzRef.current && !tzRef.current.contains(event.target as Node)) setTzOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedTimezone = useMemo(
+    () => (allTimezones || []).find((tz: any) => tz && String(tz._id) === String(editingTimezoneId)),
+    [allTimezones, editingTimezoneId]
+  );
+
+  // The browser's IANA timezone (e.g. "Europe/Paris") matches our `zoneName`
+  // field exactly, so we can offer a one-click "use my timezone" shortcut.
+  const detectedZoneName = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      return '';
+    }
+  }, []);
+
+  const detectedTimezone = useMemo(
+    () => (allTimezones || []).find((tz: any) => tz && tz.zoneName === detectedZoneName),
+    [allTimezones, detectedZoneName]
+  );
+
+  // Suggested shortcuts: the detected timezone first, then other zones that
+  // share its country (e.g. all FR zones). Keeps the list short and relevant.
+  const suggestedTimezones = useMemo(() => {
+    if (!detectedTimezone) return [] as any[];
+    const sameCountry = (allTimezones || []).filter(
+      (tz: any) =>
+        tz &&
+        tz.countryCode === detectedTimezone.countryCode &&
+        tz._id !== detectedTimezone._id
+    );
+    return [detectedTimezone, ...sameCountry].slice(0, 6);
+  }, [allTimezones, detectedTimezone]);
+
+  const filteredTimezones = useMemo(() => {
+    const search = tzSearch.trim().toLowerCase();
+    const list = (allTimezones || []).filter(Boolean);
+    if (!search) return list;
+    return list.filter((tz: any) => repWizardApi.formatTimezone(tz).toLowerCase().includes(search));
+  }, [allTimezones, tzSearch, repWizardApi]);
+
+  const selectTimezone = (tz: any) => {
+    setEditingTimezoneId(tz._id);
+    setTzOpen(false);
+    setTzSearch('');
+  };
+
   const resetAvailabilityDraft = () => {
     setEditingSchedule(defaultSchedule);
     setEditingTimezoneId(timeZoneToId(profile.availability?.timeZone));
+    setTzSearch('');
+    setTzOpen(false);
   };
 
   const saveAvailability = async () => {
@@ -145,18 +206,124 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Selected Timezone</h3>
             <div className="p-5 bg-slate-200/40 rounded-2xl border border-slate-200/30">
               {isEditingAvailability ? (
-                <select
-                  value={editingTimezoneId}
-                  onChange={(e) => setEditingTimezoneId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-harx-200"
-                >
-                  <option value="">Select timezone...</option>
-                  {(allTimezones || []).filter(Boolean).map((tz: any) => (
-                    <option key={tz._id} value={tz._id}>
-                      {repWizardApi.formatTimezone(tz)}
-                    </option>
-                  ))}
-                </select>
+                <div ref={tzRef} className="relative">
+                  {/* Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTzOpen((prev) => !prev);
+                      setTzSearch('');
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 outline-none transition-all focus:ring-2 focus:ring-harx-200"
+                  >
+                    <span className={selectedTimezone ? 'truncate' : 'truncate text-slate-400'}>
+                      {selectedTimezone ? repWizardApi.formatTimezone(selectedTimezone) : 'Select timezone...'}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform ${tzOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {tzOpen && (
+                    <div className="absolute z-30 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-xl">
+                      {/* Search field */}
+                      <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+                        <Search className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={tzSearch}
+                          onChange={(e) => setTzSearch(e.target.value)}
+                          placeholder="Search timezone or city..."
+                          className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
+                        />
+                        {tzSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setTzSearch('')}
+                            className="flex-shrink-0 text-slate-300 hover:text-slate-500"
+                            aria-label="Clear"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {/* Options */}
+                      <div className="max-h-60 overflow-y-auto py-1">
+                        {/* Quick suggestions (no active search) — pinned to the top */}
+                        {!tzSearch && suggestedTimezones.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-widest text-harx-500">
+                              <MapPin className="w-3 h-3" />
+                              Suggested for you
+                            </div>
+                            {suggestedTimezones.map((tz: any) => {
+                              const isSelected = String(tz._id) === String(editingTimezoneId);
+                              const isDetected = tz._id === detectedTimezone?._id;
+                              return (
+                                <button
+                                  key={`sugg-${tz._id}`}
+                                  type="button"
+                                  onClick={() => selectTimezone(tz)}
+                                  className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-harx-50/70 ${
+                                    isSelected ? 'bg-harx-50 font-bold text-harx-700' : 'font-medium text-slate-700'
+                                  }`}
+                                >
+                                  <span className="truncate">{repWizardApi.formatTimezone(tz)}</span>
+                                  <span className="flex items-center gap-1.5 flex-shrink-0">
+                                    {isDetected && (
+                                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                                        Detected
+                                      </span>
+                                    )}
+                                    {isSelected && <CheckCircle className="w-4 h-4 text-harx-500" />}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                            <div className="my-1 border-t border-slate-100" />
+                            <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                              All timezones
+                            </div>
+                          </>
+                        )}
+                        {filteredTimezones.length > 0 ? (
+                          filteredTimezones.map((tz: any) => {
+                            const isSelected = String(tz._id) === String(editingTimezoneId);
+                            return (
+                              <button
+                                key={tz._id}
+                                type="button"
+                                onClick={() => selectTimezone(tz)}
+                                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-harx-50/70 ${
+                                  isSelected ? 'bg-harx-50 font-bold text-harx-700' : 'font-medium text-slate-700'
+                                }`}
+                              >
+                                <span className="truncate">{repWizardApi.formatTimezone(tz)}</span>
+                                {isSelected && <CheckCircle className="w-4 h-4 flex-shrink-0 text-harx-500" />}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-3 py-4 text-center text-xs font-medium text-slate-400">
+                            No timezone matches "{tzSearch}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* One-click shortcut: use the browser-detected timezone without
+                    opening the long list. Hidden once it's already selected. */}
+                {detectedTimezone && String(detectedTimezone._id) !== String(editingTimezoneId) && (
+                  <button
+                    type="button"
+                    onClick={() => selectTimezone(detectedTimezone)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Use my timezone · {repWizardApi.formatTimezone(detectedTimezone)}
+                  </button>
+                )}
               ) : (
                 <span className="text-sm font-bold text-slate-700">
                   {timezoneData

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
+import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
@@ -1117,15 +1118,7 @@ export const ProfileView: React.FC<{
                     'requested') is enough — a full enrollment ('enrolled') is NOT
                     required. We read profile.gigs directly so this holds even if the
                     derived phase5 status isn't echoed back on the profile. */}
-                {['phase1', 'phase2', 'phase3', 'phase4'].every(
-                  (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
-                ) && (
-                  profile.onboardingProgress?.phases?.phase5?.status === 'completed' ||
-                  (Array.isArray(profile.gigs) &&
-                    profile.gigs.some(
-                      (g: any) => g && (g.status === 'requested' || g.status === 'enrolled')
-                    ))
-                ) ? (
+                {isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
                   profile.status !== 'completed' ? (
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
                       <div className="flex items-start gap-3">
@@ -1151,6 +1144,29 @@ export const ProfileView: React.FC<{
                       </button>
                     </div>
                   ) : null
+                ) : isRepCoreOnboardingDone(profile) ? (
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-black text-amber-900">
+                          {isFr ? 'Dernière étape : postuler à un gig' : 'Final step: apply to a gig'}
+                        </p>
+                        <p className="text-xs font-medium text-amber-800 mt-0.5">
+                          {isFr
+                            ? 'Parcourez la place de marché et postulez à au moins une mission pour finaliser votre onboarding.'
+                            : 'Browse the marketplace and apply to at least one gig to finish your onboarding.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate('/marketplace')}
+                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+                    >
+                      {isFr ? 'Voir les missions' : 'Browse missions'}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 ) : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
                   <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                     <div className="flex items-start gap-3">
@@ -1165,7 +1181,7 @@ export const ProfileView: React.FC<{
                       </div>
                     </div>
                     <button
-                      onClick={() => navigate('/orchestrator')}
+                      onClick={() => navigate(getRepOnboardingStep(profile).path)}
                       className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
                     >
                       {isFr ? 'Continuer l’onboarding' : 'Continue onboarding'}
