@@ -198,7 +198,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   return (
     <header
       style={{ backgroundImage: HARX_NAVBAR_BG, boxShadow: HARX_BAR_SHADOW, textShadow: HARX_TEXT_SHADOW }}
-      className="relative h-16 grid grid-cols-3 items-center px-8 shrink-0 z-20"
+      className="relative h-16 grid grid-cols-3 items-center px-4 sm:px-8 shrink-0 z-20"
     >
 
       {/* ── Col 1: Left — hamburger (mobile) ── */}
@@ -211,8 +211,10 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
         </button>
       </div>
 
-      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ── */}
-      <div className="flex items-center justify-center gap-3">
+      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ──
+          Hidden below lg so the cards don't overlap the language/avatar on
+          narrow screens; they're reachable via the sidebar/wallet page. */}
+      <div className="hidden lg:flex items-center justify-center gap-3">
 
         {onboardingComplete && (
           <>
