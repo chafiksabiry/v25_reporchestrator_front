@@ -999,6 +999,11 @@ export const ProfileView: React.FC<{
                 ? ['languages']
                 : []
             }
+            warningMessages={{
+              languages: isFr
+                ? 'Niveaux de langue non vérifiés. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
+                : 'Language levels not verified. Record a video in the Experience tab to detect them.',
+            }}
           />
         </div>
 
