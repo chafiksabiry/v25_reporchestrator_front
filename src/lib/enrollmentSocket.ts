@@ -1,4 +1,5 @@
 import { getAgentId } from '../utils/authUtils';
+import { onRealtimeEvent, onRealtimeConnect, type RealtimeEvent } from './realtime';
 
 type EnrollmentMessage = {
   type?: string;
@@ -8,108 +9,42 @@ type EnrollmentMessage = {
   [key: string]: unknown;
 };
 
-function getWsUrl(): string | null {
-  const base =
-    import.meta.env.VITE_MATCHING_API_URL ||
-    'https://v25matchingbackend-production.up.railway.app/api';
-
-  try {
-    const url = new URL(base);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    // The WS server is mounted at `/enrollment-updates` on the server root, not under /api.
-    url.pathname = '/enrollment-updates';
-    url.search = '';
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
 export type EnrollmentSocketOptions = {
-  /** Called on every successful connect/reconnect (catches missed broadcasts while offline). */
+  /** Called on every successful connect/reconnect (catches missed events while offline). */
   onConnect?: () => void;
 };
 
+/** Event types the rep marketplace reacts to. */
+const RELEVANT_TYPES = ['enrollment_update', 'invitation_new'];
+
 /**
- * Connect to the matching backend enrollment WebSocket and invoke
- * `onEnrollmentUpdate` whenever a company approves/changes the current rep's
- * enrollment (marketplace: PENDING → Enrolled, without a page reload).
- * Returns a disposer that closes the socket and stops reconnection.
+ * Listen to live rep events (enrollment approvals + new invitations) over the
+ * shared Socket.IO hub. The server only sends events targeting this rep's room,
+ * but we still defensively filter by repId. Returns a disposer.
+ *
+ * The signature is kept stable for existing callers; under the hood it now uses
+ * the unified Socket.IO client instead of a dedicated raw WebSocket.
  */
 export function connectRepEnrollmentSocket(
   onEnrollmentUpdate: (data: EnrollmentMessage) => void,
   options?: EnrollmentSocketOptions
 ): () => void {
-  const wsUrl = getWsUrl();
-  if (!wsUrl) return () => {};
+  const disposeEvent = onRealtimeEvent((evt: RealtimeEvent) => {
+    const data: EnrollmentMessage = { type: evt.type, ...(evt.payload || {}) };
 
-  let socket: WebSocket | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  let disposed = false;
-
-  const RELEVANT_TYPES = new Set(['enrollment_update']);
-
-  const connect = () => {
-    if (disposed) return;
-    try {
-      socket = new WebSocket(wsUrl);
-    } catch {
-      scheduleReconnect();
+    const myAgentId = getAgentId();
+    if (data.repId && myAgentId && String(data.repId) !== String(myAgentId)) {
       return;
     }
+    onEnrollmentUpdate(data);
+  }, RELEVANT_TYPES);
 
-    socket.onopen = () => {
-      options?.onConnect?.();
-    };
-
-    socket.onmessage = (event) => {
-      let data: EnrollmentMessage;
-      try {
-        data = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (!data?.type || !RELEVANT_TYPES.has(data.type)) return;
-
-      // Only react to events targeting this rep.
-      const myAgentId = getAgentId();
-      if (data.repId && myAgentId && String(data.repId) !== String(myAgentId)) {
-        return;
-      }
-      onEnrollmentUpdate(data);
-    };
-
-    socket.onclose = () => {
-      socket = null;
-      scheduleReconnect();
-    };
-
-    socket.onerror = () => {
-      try {
-        socket?.close();
-      } catch {
-        /* ignore */
-      }
-    };
-  };
-
-  const scheduleReconnect = () => {
-    if (disposed || reconnectTimer) return;
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      connect();
-    }, 5000);
-  };
-
-  connect();
+  const disposeConnect = options?.onConnect
+    ? onRealtimeConnect(options.onConnect)
+    : () => {};
 
   return () => {
-    disposed = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    try {
-      socket?.close();
-    } catch {
-      /* ignore */
-    }
+    disposeEvent();
+    disposeConnect();
   };
 }

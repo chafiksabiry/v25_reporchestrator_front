@@ -1395,12 +1395,19 @@ export function GigsMarketplace() {
           );
         }
         refreshStatuses();
+        const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
         if (data?.status === 'enrolled') {
-          const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
           showToast(
             isFr
               ? '🎉 Votre candidature a été approuvée — vous êtes inscrit !'
               : '🎉 Your application was approved — you are enrolled!',
+            'success'
+          );
+        } else if (data?.type === 'invitation_new') {
+          showToast(
+            isFr
+              ? '📩 Vous avez reçu une nouvelle invitation à un gig !'
+              : '📩 You received a new gig invitation!',
             'success'
           );
         }
