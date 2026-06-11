@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle, Video } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { repApiClient } from '../../../../utils/client';
 
 interface SpecializationTabProps {
   profile: any;
   onDeleteItemClick: (section: 'industries' | 'activities' | 'notableCompanies', index: number) => void;
   onAddItemClick: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void;
+  /** Navigate to the Experience tab so the rep can record a video (industries
+   *  & activities are detected from the experience video). */
+  onGoToExperience?: () => void;
 }
 
-export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, onDeleteItemClick, onAddItemClick }) => {
+export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, onDeleteItemClick, onAddItemClick, onGoToExperience }) => {
+  const { i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
   const [allIndustries, setAllIndustries] = useState<Array<{ _id: string; name: string }>>([]);
   const [allActivities, setAllActivities] = useState<Array<{ _id: string; name: string }>>([]);
   const [industrySearch, setIndustrySearch] = useState('');
@@ -70,6 +76,43 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
     });
   }, [allActivities, selectedActivityIds, activitySearch]);
 
+  const industriesCount = profile.professionalSummary?.industries?.length || 0;
+  const activitiesCount = profile.professionalSummary?.activities?.length || 0;
+
+  const renderVideoWarning = (kind: 'industries' | 'activities') => {
+    const titleFr = kind === 'industries' ? 'Aucune industrie détectée' : 'Aucune activité détectée';
+    const titleEn = kind === 'industries' ? 'No industry detected' : 'No activity detected';
+    const hintFr = kind === 'industries'
+      ? 'Enregistrez une vidéo dans l’onglet Expérience pour détecter automatiquement vos industries.'
+      : 'Enregistrez une vidéo dans l’onglet Expérience pour détecter automatiquement vos activités.';
+    const hintEn = kind === 'industries'
+      ? 'Record a video in the Experience tab to automatically detect your industries.'
+      : 'Record a video in the Experience tab to automatically detect your activities.';
+    return (
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-300/80 shadow-sm">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-yellow-100">
+            <AlertTriangle className="w-5 h-5 text-yellow-600" />
+          </span>
+          <div>
+            <p className="text-sm font-black text-yellow-800">{isFr ? titleFr : titleEn}</p>
+            <p className="text-xs font-medium text-yellow-700/90 mt-0.5">{isFr ? hintFr : hintEn}</p>
+          </div>
+        </div>
+        {onGoToExperience && (
+          <button
+            type="button"
+            onClick={onGoToExperience}
+            className="px-5 py-2.5 rounded-xl bg-gradient-harx text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/25 active:scale-95 whitespace-nowrap"
+          >
+            <Video className="w-4 h-4" />
+            {isFr ? 'Enregistrer' : 'Record'}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const renderEditableBadge = (
     label: string,
     className: string,
@@ -95,10 +138,16 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
       {/* Industries Section */}
       <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-black text-harx-900 tracking-tight">Primary Industries</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight">
+            {isFr ? 'Industries principales' : 'Primary Industries'}
+          </h2>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {isFr ? 'Détecté depuis vos vidéos' : 'Detected from your videos'}
+          </span>
         </div>
+        {industriesCount === 0 && renderVideoWarning('industries')}
         <div className="flex flex-wrap gap-3">
-          {profile.professionalSummary?.industries?.length > 0 ? (
+          {industriesCount > 0 ? (
             profile.professionalSummary.industries.map((ind: any, idx: number) =>
               renderEditableBadge(
                 typeof ind === 'string' ? ind : ind.name || ind._id,
@@ -109,7 +158,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               )
             )
           ) : (
-            <p className="text-slate-500 italic">No industries specified</p>
+            <p className="text-slate-500 italic">{isFr ? 'Aucune industrie spécifiée' : 'No industries specified'}</p>
           )}
         </div>
         <div ref={industryRef} className="mt-4">
@@ -152,10 +201,16 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
       {/* Activities Section */}
       <div className="bg-harx-alt-50/25 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-alt-100/70">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-black text-harx-alt-900 tracking-tight">Professional Activities</h2>
+          <h2 className="text-xl font-black text-harx-alt-900 tracking-tight">
+            {isFr ? 'Activités professionnelles' : 'Professional Activities'}
+          </h2>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {isFr ? 'Détecté depuis vos vidéos' : 'Detected from your videos'}
+          </span>
         </div>
+        {activitiesCount === 0 && renderVideoWarning('activities')}
         <div className="flex flex-wrap gap-3">
-          {profile.professionalSummary?.activities?.length > 0 ? (
+          {activitiesCount > 0 ? (
             profile.professionalSummary.activities.map((act: any, idx: number) =>
               renderEditableBadge(
                 typeof act === 'string' ? act : act.name || act._id,
@@ -166,7 +221,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               )
             )
           ) : (
-            <p className="text-slate-500 italic">No activities specified</p>
+            <p className="text-slate-500 italic">{isFr ? 'Aucune activité spécifiée' : 'No activities specified'}</p>
           )}
         </div>
         <div ref={activityRef} className="mt-4">

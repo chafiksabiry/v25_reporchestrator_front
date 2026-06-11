@@ -431,9 +431,58 @@ export const ProfileView: React.FC<{
   };
 
   const calculateOverallScore = () => {
-    if (!profile.skills?.contactCenter?.length || !profile.skills.contactCenter[0]?.assessmentResults?.keyMetrics) return 'N/A';
-    const { professionalism = 0, effectiveness = 0, customerFocus = 0 } = profile.skills.contactCenter[0].assessmentResults.keyMetrics;
-    return Math.floor((professionalism + effectiveness + customerFocus) / 3);
+    const scores: number[] = [];
+
+    // 1. Formal Contact Center assessments (canonical REPS key metrics).
+    (profile.skills?.contactCenter || []).forEach((skill: any) => {
+      const m = skill?.assessmentResults?.keyMetrics;
+      if (!m) return;
+      scores.push(Math.round(((m.professionalism || 0) + (m.effectiveness || 0) + (m.customerFocus || 0)) / 3));
+    });
+
+    // 2. Video-verified language scores already merged into the profile.
+    (profile.personalInfo?.languages || []).forEach((lang: any) => {
+      const ar = lang?.assessmentResults;
+      if (!ar || ar.source !== 'video') return;
+      if (typeof ar.overall?.score === 'number') {
+        scores.push(Math.round(ar.overall.score));
+        return;
+      }
+      const fluency = ar.fluency?.score ?? 0;
+      const proficiency = ar.proficiency?.score ?? 0;
+      const completeness = ar.completeness?.score ?? 0;
+      if (fluency || proficiency || completeness) {
+        scores.push(Math.round((fluency + proficiency + completeness) / 3));
+      }
+    });
+
+    // 3. Experience video analyses (when not yet reflected on profile languages).
+    if (scores.length === 0) {
+      (profile.experience || []).forEach((exp: any) => {
+        (exp?.videoLanguageAssessment?.languages || []).forEach((l: any) => {
+          if (typeof l.overallScore === 'number' && l.overallScore > 0) {
+            scores.push(Math.round(l.overallScore));
+          }
+        });
+        const analysis = exp?.videoAnalysis;
+        if (!analysis) return;
+        if (typeof analysis.overallConfidence === 'number' && analysis.overallConfidence > 0) {
+          scores.push(Math.round(analysis.overallConfidence));
+        }
+        const cc = analysis.contactCenterSkills;
+        if (cc && typeof cc === 'object') {
+          const ccScores = Object.values(cc)
+            .map((v: any) => v?.score)
+            .filter((s: unknown): s is number => typeof s === 'number' && s > 0);
+          if (ccScores.length > 0) {
+            scores.push(Math.round(ccScores.reduce((a, b) => a + b, 0) / ccScores.length));
+          }
+        }
+      });
+    }
+
+    if (scores.length === 0) return 'N/A';
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   };
 
   const findSkillData = (skillName: string) => {
@@ -868,6 +917,7 @@ export const ProfileView: React.FC<{
           profile={profile}
           onDeleteItemClick={(section, index) => onDeleteSpecializationItem?.(section, index)}
           onAddItemClick={(section, value) => onAddSpecializationItem?.(section, value)}
+          onGoToExperience={() => setActiveTab('experience')}
         />
       );
       case 'availability': return (
@@ -994,17 +1044,24 @@ export const ProfileView: React.FC<{
           <ProfileNavbar
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            warningTabs={
-              (profile?.personalInfo?.languages || []).some(
+            warningTabs={[
+              ...((profile?.personalInfo?.languages || []).some(
                 (l: any) => !l?.assessmentResults || l.assessmentResults.source === 'cv'
               )
                 ? ['languages']
-                : []
-            }
+                : []),
+              ...(((profile?.professionalSummary?.industries?.length || 0) === 0 ||
+                (profile?.professionalSummary?.activities?.length || 0) === 0)
+                ? ['specialization']
+                : []),
+            ]}
             warningMessages={{
               languages: isFr
                 ? 'Niveaux de langue non vérifiés. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
                 : 'Language levels not verified. Record a video in the Experience tab to detect them.',
+              specialization: isFr
+                ? 'Industries/activités manquantes. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
+                : 'Missing industries/activities. Record a video in the Experience tab to detect them.',
             }}
           />
         </div>
