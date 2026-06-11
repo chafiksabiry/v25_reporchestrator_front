@@ -61,10 +61,15 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
     (lang) => !existingNames.has(String(lang.name || '').toLowerCase())
   );
 
+  // A language is "verified" only when its scores come from a video/assessment.
+  // CV-imported estimates (source 'cv') still need to be confirmed by a video.
+  const isVideoVerified = (lang: any) =>
+    !!lang?.assessmentResults && lang.assessmentResults.source !== 'cv';
+
   const languagesList = profile.personalInfo?.languages || [];
   const totalCount = languagesList.length;
-  const unverifiedCount = languagesList.filter((lang: any) => !lang?.assessmentResults).length;
-  const verifiedCount = totalCount - unverifiedCount;
+  const verifiedCount = languagesList.filter(isVideoVerified).length;
+  const unverifiedCount = totalCount - verifiedCount;
   const hasUnverified = unverifiedCount > 0;
 
   const handleAddLanguage = () => {
@@ -206,7 +211,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               const stars = getProficiencyStars(lang.proficiency);
               const languageName = typeof lang.language === 'object' && lang.language ? lang.language.name : 'Unknown Language';
               const languageCode = typeof lang.language === 'object' && lang.language ? lang.language.code : '';
-              const isVerified = !!lang.assessmentResults;
+              const ar = lang.assessmentResults;
+              const isVerified = !!ar && ar.source !== 'cv';
+              const isCvEstimate = !!ar && ar.source === 'cv';
+              const hasScores = !!ar;
               const cefrStyle = CEFR_STYLES[String(lang.proficiency || '').toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200';
 
               const badge = (languageCode || languageName || '?').slice(0, 2).toUpperCase();
@@ -250,11 +258,17 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
                           isVerified
                             ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                            : 'bg-yellow-50 text-yellow-600 border border-yellow-200'
+                            : isCvEstimate
+                              ? 'bg-sky-50 text-sky-600 border border-sky-200'
+                              : 'bg-yellow-50 text-yellow-600 border border-yellow-200'
                         }`}
                       >
                         {isVerified ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                        {isVerified ? (isFr ? 'Vérifié' : 'Verified') : (isFr ? 'À valider' : 'To verify')}
+                        {isVerified
+                          ? (isFr ? 'Vérifié' : 'Verified')
+                          : isCvEstimate
+                            ? (isFr ? 'Estimé (CV)' : 'CV estimate')
+                            : (isFr ? 'À valider' : 'To verify')}
                       </span>
                     </div>
 
@@ -270,22 +284,34 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       </div>
                     </div>
 
-                    {isVerified ? (
-                      <div className="mt-4 grid grid-cols-3 gap-2.5">
-                        {[
-                          { label: isFr ? 'Aisance' : 'Fluency', value: lang.assessmentResults.fluency?.score || 0 },
-                          { label: isFr ? 'Niveau' : 'Proficiency', value: lang.assessmentResults.proficiency?.score || 0 },
-                          { label: isFr ? 'Complét.' : 'Comp.', value: lang.assessmentResults.completeness?.score || 0 },
-                        ].map((metric) => (
-                          <div key={metric.label} className="text-center">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{metric.label}</div>
-                            <div className="text-base font-black text-slate-900 mt-0.5">{metric.value}%</div>
-                            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200">
-                              <div className="h-full rounded-full bg-gradient-harx" style={{ width: `${Math.min(100, Math.max(0, metric.value))}%` }} />
+                    {hasScores ? (
+                      <>
+                        <div className="mt-4 grid grid-cols-3 gap-2.5">
+                          {[
+                            { label: isFr ? 'Aisance' : 'Fluency', value: ar.fluency?.score || 0 },
+                            { label: isFr ? 'Niveau' : 'Proficiency', value: ar.proficiency?.score || 0 },
+                            { label: isFr ? 'Complét.' : 'Comp.', value: ar.completeness?.score || 0 },
+                          ].map((metric) => (
+                            <div key={metric.label} className="text-center">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{metric.label}</div>
+                              <div className="text-base font-black text-slate-900 mt-0.5">{metric.value}%</div>
+                              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200">
+                                <div
+                                  className={`h-full rounded-full ${isVerified ? 'bg-gradient-harx' : 'bg-sky-300'}`}
+                                  style={{ width: `${Math.min(100, Math.max(0, metric.value))}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                        {isCvEstimate && (
+                          <p className="mt-2.5 text-[11px] font-medium text-sky-600 leading-snug">
+                            {isFr
+                              ? 'Estimation à partir du CV — enregistrez une vidéo dans Expérience pour valider.'
+                              : 'Estimated from your CV — record a video in Experience to validate.'}
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <div className="mt-4 flex items-center gap-2 rounded-xl bg-yellow-50/70 border border-yellow-200 px-3 py-2.5">
                         <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
