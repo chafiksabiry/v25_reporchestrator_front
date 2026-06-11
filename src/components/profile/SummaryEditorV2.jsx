@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
-import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary } from '../../lib/api/profiles';
+import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
+import { localizeText, localizeList } from '../../utils/i18nText';
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
@@ -477,8 +478,43 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [editedSummary, setEditedSummary] = useState(generatedSummary);
   const [loading, setLoading] = useState(false);
   const { i18n } = useTranslation();
-  const uiLang = (i18n.language || 'en').slice(0, 2);
+  const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
+  const otherLang = uiLang === 'fr' ? 'en' : 'fr';
   const t = (key) => PAGE_STRINGS[key]?.[uiLang] || PAGE_STRINGS[key]?.en || key;
+
+  // Build/refresh the { en, fr } mirror for a single free-text field on save:
+  // the active locale takes the edited value, the other locale is re-translated.
+  const buildTextI18n = async (activeValue, existing) => {
+    const mirror = {
+      en: '',
+      fr: '',
+      ...(existing && typeof existing === 'object' ? existing : {}),
+    };
+    mirror[uiLang] = activeValue || '';
+    try {
+      mirror[otherLang] = activeValue ? await translateText(activeValue, otherLang) : '';
+    } catch {
+      if (!mirror[otherLang]) mirror[otherLang] = activeValue || '';
+    }
+    return mirror;
+  };
+
+  // Same as buildTextI18n but for a string[] field (responsibilities, achievements).
+  const buildListI18n = async (activeList, existing) => {
+    const list = Array.isArray(activeList) ? activeList : [];
+    const mirror = {
+      en: [],
+      fr: [],
+      ...(existing && typeof existing === 'object' ? existing : {}),
+    };
+    mirror[uiLang] = list;
+    try {
+      mirror[otherLang] = list.length ? await translateText(list, otherLang) : [];
+    } catch {
+      if (!Array.isArray(mirror[otherLang]) || !mirror[otherLang].length) mirror[otherLang] = list;
+    }
+    return mirror;
+  };
 
   const [editingProfile, setEditingProfile] = useState(false);
   // Per-section editing: each visible section can be edited/saved independently
@@ -502,6 +538,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     yearsExperience: ''
   });
   const [editingExperience, setEditingExperience] = useState(null);
+  // Index of the experience currently being edited (editingExperience may be a
+  // localized copy, so we can't rely on reference equality).
+  const [editingExperienceIndex, setEditingExperienceIndex] = useState(-1);
   const [newExperience, setNewExperience] = useState({
     title: '',
     company: '',
@@ -2036,7 +2075,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           <div className="space-y-6">
             {editedProfile.experience?.map((role, index) => (
               <div key={index} className="relative">
-                {editingExperience === role ? (
+                {editingExperienceIndex === index ? (
                   <ExperienceForm
                     experience={editingExperience}
                     onSubmit={handleExperienceUpdate}
@@ -2047,7 +2086,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     {isSectionEditing('experience') && (
                       <div className="absolute top-4 right-4 opacity-60 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
                         <button
-                          onClick={() => setEditingExperience(role)}
+                          onClick={() => {
+                            // Open the form with the CURRENT language values so the
+                            // rep edits in the locale shown by the language bar.
+                            const localizedResp = localizeList(role.responsibilities_i18n, uiLang);
+                            const localizedAch = localizeList(role.achievements_i18n, uiLang);
+                            setEditingExperienceIndex(index);
+                            setEditingExperience({
+                              ...role,
+                              title: localizeText(role.title_i18n, uiLang) || role.title,
+                              responsibilities: localizedResp.length ? localizedResp : (role.responsibilities || []),
+                              achievements: localizedAch.length ? localizedAch : (role.achievements || []),
+                            });
+                          }}
                           className="p-2 text-harx-600 hover:text-harx-700 bg-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-harx-200"
                           title="Edit experience"
                         >
@@ -2068,7 +2119,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     )}
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="text-lg font-semibold text-gray-800">{role.title}</h4>
+                        <h4 className="text-lg font-semibold text-gray-800">
+                          {localizeText(role.title_i18n, uiLang) || role.title}
+                        </h4>
                         <p className="text-gray-600">{role.company}</p>
                       </div>
                       <div className="text-sm text-gray-500">
@@ -2076,7 +2129,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       </div>
                     </div>
                     <ul className="mt-3 space-y-2">
-                      {role.responsibilities?.map((resp, idx) => (
+                      {(localizeList(role.responsibilities_i18n, uiLang).length
+                        ? localizeList(role.responsibilities_i18n, uiLang)
+                        : role.responsibilities || []
+                      ).map((resp, idx) => (
                         <li key={idx} className="text-gray-700 flex items-start">
                           <span className="text-harx-500 mr-2">•</span>
                           {resp}
@@ -2172,8 +2228,23 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const handleExperienceUpdate = async (updatedExperience) => {
     try {
       const updatedExperiences = [...editedProfile.experience];
-      const index = editedProfile.experience.findIndex(exp => exp === editingExperience);
-      updatedExperiences[index] = updatedExperience;
+      const index = editingExperienceIndex >= 0
+        ? editingExperienceIndex
+        : editedProfile.experience.findIndex(exp => exp === editingExperience);
+      const prevExp = updatedExperiences[index] || {};
+      // Refresh the active locale of the _i18n mirrors right away so the display
+      // updates immediately; saveSection re-translates the other locale on save.
+      const merged = { ...prevExp, ...updatedExperience };
+      merged.title_i18n = {
+        en: '', fr: '', ...(prevExp.title_i18n || {}), [uiLang]: merged.title || '',
+      };
+      merged.responsibilities_i18n = {
+        en: [], fr: [], ...(prevExp.responsibilities_i18n || {}), [uiLang]: merged.responsibilities || [],
+      };
+      merged.achievements_i18n = {
+        en: [], fr: [], ...(prevExp.achievements_i18n || {}), [uiLang]: merged.achievements || [],
+      };
+      updatedExperiences[index] = merged;
 
       // Local update only
       setEditedProfile(prev => ({
@@ -2183,6 +2254,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, experience: true }));
       setEditingExperience(null);
+      setEditingExperienceIndex(-1);
     } catch (error) {
       console.error('Error updating experience:', error);
     }
@@ -2431,7 +2503,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const startSectionEdit = (section) => {
     setSectionEditing((prev) => ({ ...prev, [section]: true }));
     if (section === 'summary') {
-      setEditedSummary(editedProfile.professionalSummary?.profileDescription || '');
+      // Seed the editor with the CURRENT language version of the summary.
+      const localized = localizeText(
+        editedProfile.professionalSummary?.profileDescription_i18n,
+        uiLang
+      ) || editedProfile.professionalSummary?.profileDescription || '';
+      setEditedSummary(localized);
+      setEditedProfile((prev) => ({
+        ...prev,
+        professionalSummary: { ...prev.professionalSummary, profileDescription: localized },
+      }));
     }
   };
 
@@ -2474,15 +2555,36 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     if (isSaving) return;
     setIsSaving(true);
     try {
+      let savedProfile = editedProfile;
       if (section === 'basic') {
         await updateBasicInfo(editedProfile._id, editedProfile.personalInfo);
       } else if (section === 'experience') {
-        await updateExperience(editedProfile._id, editedProfile.experience);
+        // Keep the { en, fr } mirror in sync: the active locale holds the edited
+        // value, the other locale is re-translated.
+        const experienceToSave = await Promise.all(
+          (editedProfile.experience || []).map(async (exp) => {
+            const title_i18n = await buildTextI18n(exp.title, exp.title_i18n);
+            const responsibilities_i18n = await buildListI18n(exp.responsibilities, exp.responsibilities_i18n);
+            const achievements_i18n = await buildListI18n(exp.achievements, exp.achievements_i18n);
+            return { ...exp, title_i18n, responsibilities_i18n, achievements_i18n };
+          })
+        );
+        await updateExperience(editedProfile._id, experienceToSave);
+        savedProfile = { ...editedProfile, experience: experienceToSave };
+        setEditedProfile(savedProfile);
       } else if (section === 'availability') {
         await updateProfileData(editedProfile._id, { availability: editedProfile.availability });
       } else if (section === 'summary' || section === 'companies') {
+        const profileDescription_i18n =
+          section === 'summary'
+            ? await buildTextI18n(
+                editedProfile.professionalSummary?.profileDescription,
+                editedProfile.professionalSummary?.profileDescription_i18n
+              )
+            : editedProfile.professionalSummary?.profileDescription_i18n;
         const professionalSummaryToSave = {
           ...editedProfile.professionalSummary,
+          ...(profileDescription_i18n ? { profileDescription_i18n } : {}),
           industries: editedProfile.professionalSummary.industries?.map((industry) =>
             typeof industry === 'object' ? industry._id : industry
           ) || [],
@@ -2491,8 +2593,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           ) || [],
         };
         await updateProfileData(editedProfile._id, { professionalSummary: professionalSummaryToSave });
+        savedProfile = {
+          ...editedProfile,
+          professionalSummary: {
+            ...editedProfile.professionalSummary,
+            ...(profileDescription_i18n ? { profileDescription_i18n } : {}),
+          },
+        };
+        setEditedProfile(savedProfile);
       }
-      if (onProfileUpdate) onProfileUpdate(editedProfile);
+      if (onProfileUpdate) onProfileUpdate(savedProfile);
       setSectionEditing((prev) => ({ ...prev, [section]: false }));
       if (section === 'summary') setIsEditing(false);
       showToast(t('savedSuccess'), 'success');
@@ -3459,7 +3569,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             ) : (
               <div className="bg-white/80 backdrop-blur-sm border border-white p-6 rounded-2xl shadow-inner">
                 <p className="text-gray-800 whitespace-pre-line text-base sm:text-lg leading-relaxed">
-                  {editedProfile.professionalSummary?.profileDescription || t('noSummary')}
+                  {localizeText(editedProfile.professionalSummary?.profileDescription_i18n, uiLang) ||
+                    editedProfile.professionalSummary?.profileDescription ||
+                    t('noSummary')}
                 </p>
               </div>
             )}
