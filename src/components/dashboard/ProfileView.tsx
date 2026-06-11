@@ -991,7 +991,15 @@ export const ProfileView: React.FC<{
 
         {/* Navigation Tabs at the Top */}
         <div className="w-full">
-          <ProfileNavbar activeTab={activeTab} onTabChange={setActiveTab} />
+          <ProfileNavbar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            warningTabs={
+              (profile?.personalInfo?.languages || []).some((l: any) => !l?.assessmentResults)
+                ? ['languages']
+                : []
+            }
+          />
         </div>
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
