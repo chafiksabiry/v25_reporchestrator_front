@@ -79,6 +79,22 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
   const industriesCount = profile.professionalSummary?.industries?.length || 0;
   const activitiesCount = profile.professionalSummary?.activities?.length || 0;
 
+  // After adding an item the local profile only holds the raw id (the backend
+  // populates the name on the next fetch). Resolve the display name from the
+  // already-loaded option lists so it shows correctly without a refresh.
+  const industryNameById = useMemo(
+    () => new Map(allIndustries.map((i) => [String(i._id), i.name])),
+    [allIndustries]
+  );
+  const activityNameById = useMemo(
+    () => new Map(allActivities.map((a) => [String(a._id), a.name])),
+    [allActivities]
+  );
+  const resolveName = (item: any, map: Map<string, string>) => {
+    if (item && typeof item === 'object') return item.name || map.get(String(item._id)) || item._id;
+    return map.get(String(item)) || item;
+  };
+
   const renderVideoWarning = (kind: 'industries' | 'activities') => {
     const titleFr = kind === 'industries' ? 'Aucune industrie détectée' : 'Aucune activité détectée';
     const titleEn = kind === 'industries' ? 'No industry detected' : 'No activity detected';
@@ -150,7 +166,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
           {industriesCount > 0 ? (
             profile.professionalSummary.industries.map((ind: any, idx: number) =>
               renderEditableBadge(
-                typeof ind === 'string' ? ind : ind.name || ind._id,
+                resolveName(ind, industryNameById),
                 'bg-harx-50/80 text-harx-600 border-harx-100 shadow-harx-500/5',
                 `industry-${idx}`,
                 'industries',
@@ -213,7 +229,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
           {activitiesCount > 0 ? (
             profile.professionalSummary.activities.map((act: any, idx: number) =>
               renderEditableBadge(
-                typeof act === 'string' ? act : act.name || act._id,
+                resolveName(act, activityNameById),
                 'bg-harx-alt-50/80 text-harx-alt-600 border-harx-alt-100 shadow-harx-alt-500/5',
                 `activity-${idx}`,
                 'activities',
