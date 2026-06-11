@@ -1553,7 +1553,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     try {
       setLoading(true);
       const newSummary = await generateSummary(editedProfile);
-      console.log('Generated summary:', newSummary); // Temporaire pour debug
 
       // The backend now returns a bilingual { en, fr } object. Normalize it so
       // the textarea shows the active-language string and we keep the _i18n mirror.
