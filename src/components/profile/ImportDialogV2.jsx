@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { CVParser } from '../../lib/parsers/cvParser';
 import { useProfile } from '../../hooks/useProfile';
-import { getLanguageByCode } from '../../lib/api/languages';
+import { getLanguageByCode, getAllLanguages } from '../../lib/api/languages';
 import {
   extractBasicInfo,
   analyzeExperience,
@@ -155,18 +155,57 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       addAnalysisStep("Matching languages with database...");
       const matchedLanguages = [];
 
+      // Load the full DB language list once so we can fall back to a name match
+      // when the AI-provided ISO code is missing or doesn't resolve. This avoids
+      // silently dropping languages the CV clearly mentions.
+      let allDbLanguages = [];
+      try {
+        allDbLanguages = (await getAllLanguages()) || [];
+      } catch (error) {
+        console.warn('Could not preload language list for name fallback:', error);
+      }
+      const norm = (v) => String(v || '').trim().toLowerCase();
+      const findDbByName = (name) => {
+        const target = norm(name);
+        if (!target) return null;
+        return (
+          allDbLanguages.find((l) => norm(l.name) === target || norm(l.nativeName) === target) ||
+          null
+        );
+      };
+
+      const seenLanguageIds = new Set();
       for (const extractedLang of skills.languages) {
-        try {
-          const dbLanguage = await getLanguageByCode(extractedLang.iso639_1);
-          matchedLanguages.push({
-            language: dbLanguage,
-            proficiency: extractedLang.proficiency
-          });
-          console.log(`Matched language: ${extractedLang.language} (${extractedLang.iso639_1}) -> ${dbLanguage.name}`);
-        } catch (error) {
-          console.warn(`Could not match language code ${extractedLang.iso639_1} for ${extractedLang.language}:`, error);
-          // Skip languages that cannot be matched with the database
+        let dbLanguage = null;
+
+        if (extractedLang.iso639_1) {
+          try {
+            dbLanguage = await getLanguageByCode(extractedLang.iso639_1);
+          } catch (error) {
+            console.warn(`Code lookup failed for ${extractedLang.iso639_1} (${extractedLang.language}), trying name match:`, error);
+          }
         }
+
+        // Fall back to a name-based match (covers missing/unknown ISO codes).
+        if (!dbLanguage) {
+          dbLanguage = findDbByName(extractedLang.language);
+        }
+
+        if (!dbLanguage) {
+          console.warn(`Could not match language "${extractedLang.language}" (${extractedLang.iso639_1 || 'no code'}) with the database.`);
+          continue;
+        }
+
+        // Avoid duplicates when code + name resolve to the same DB language.
+        const dedupeKey = dbLanguage._id || dbLanguage.code || norm(dbLanguage.name);
+        if (seenLanguageIds.has(dedupeKey)) continue;
+        seenLanguageIds.add(dedupeKey);
+
+        matchedLanguages.push({
+          language: dbLanguage,
+          proficiency: extractedLang.proficiency
+        });
+        console.log(`Matched language: ${extractedLang.language} (${extractedLang.iso639_1 || 'name'}) -> ${dbLanguage.name}`);
       }
 
       if (matchedLanguages.length === 0) {
