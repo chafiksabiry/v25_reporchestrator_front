@@ -1627,7 +1627,7 @@ export function GigsMarketplace() {
 
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
           <p className="mt-2 text-gray-500 max-w-2xl text-sm leading-relaxed font-medium">
             Discover premium projects worldwide that match your unique skills and professional aspirations.<br />
             Take control of your journey, find your next exclusive mission, and start earning today.
@@ -1701,10 +1701,10 @@ export function GigsMarketplace() {
         );
       })()}
 
-      <div className="flex space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
+      <div className="flex space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => setActiveTab('available')}
-          className={`px-1 py-4 text-sm font-bold transition-all relative ${activeTab === 'available'
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'available'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
@@ -1714,7 +1714,7 @@ export function GigsMarketplace() {
         </button>
         <button
           onClick={() => setActiveTab('enrolled')}
-          className={`px-1 py-4 text-sm font-bold transition-all relative ${activeTab === 'enrolled'
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'enrolled'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
@@ -1724,7 +1724,7 @@ export function GigsMarketplace() {
         </button>
         <button
           onClick={() => setActiveTab('favorite')}
-          className={`px-1 py-4 text-sm font-bold transition-all relative ${activeTab === 'favorite'
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'favorite'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
@@ -1734,7 +1734,7 @@ export function GigsMarketplace() {
         </button>
         <button
           onClick={() => setActiveTab('invited')}
-          className={`px-1 py-4 text-sm font-bold transition-all relative ${activeTab === 'invited'
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'invited'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
