@@ -276,7 +276,11 @@ function ImportDialog({ isOpen, onClose, onImport }) {
           keyExpertise: experience.keyAreas || defaultArrays.keyAreas,
           notableCompanies: experience.notableCompanies || defaultArrays.notableCompanies
         },
-        availability: defaultAvailability,
+        availability: {
+          schedule: Array.isArray(availability?.schedule) ? availability.schedule : defaultAvailability.schedule,
+          timeZone: availability?.timeZone ?? defaultAvailability.timeZone,
+          flexibility: Array.isArray(availability?.flexibility) ? availability.flexibility : defaultAvailability.flexibility,
+        },
         // Categorized skills come from analyzeSkills (the dedicated skills
         // analyzer); fall back to analyzeExperience for backwards-compat. Both
         // naming conventions (`technical` / `technicalSkills`) are supported.

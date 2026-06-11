@@ -70,6 +70,10 @@ const PAGE_STRINGS = {
     fr: 'Vidéo requise — enregistrez une vidéo pour cette expérience afin de continuer.',
   },
   expVideoDone: { en: 'Video recorded', fr: 'Vidéo enregistrée' },
+  availMissing: {
+    en: 'Availability not set — click Edit to add your working schedule and time zone.',
+    fr: 'Disponibilité non renseignée — cliquez sur Modifier pour ajouter vos horaires et votre fuseau horaire.',
+  },
   savedSuccess: { en: 'Saved successfully!', fr: 'Enregistré avec succès !' },
   saveError: { en: 'Error saving. Please try again.', fr: 'Erreur lors de l’enregistrement. Veuillez réessayer.' },
 };
@@ -2568,6 +2572,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     experienceList.length > 0 && experiencesWithVideo === experienceList.length;
   const missingVideosCount = experienceList.length - experiencesWithVideo;
 
+  const hasAvailabilitySet = (() => {
+    const avail = editedProfile.availability;
+    const hasSchedule =
+      Array.isArray(avail?.schedule) &&
+      avail.schedule.length > 0 &&
+      avail.schedule.every((s) => s?.day && s?.hours?.start && s?.hours?.end);
+    const tz = avail?.timeZone;
+    const hasTimeZone = Boolean(
+      tz && (typeof tz === 'object' ? tz._id || tz.zoneName : String(tz).trim())
+    );
+    return hasSchedule && hasTimeZone;
+  })();
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
@@ -3336,6 +3353,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             ) : (
               <div className="space-y-6">
+                {!hasAvailabilitySet && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border-2 border-amber-200">
+                    <svg className="h-4 w-4 flex-shrink-0 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-bold text-amber-800">{t('availMissing')}</span>
+                  </div>
+                )}
+
                 {/* Schedule Display */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-2">Working Schedule</h4>
