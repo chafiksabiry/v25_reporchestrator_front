@@ -282,7 +282,7 @@ function Dashboard() {
   const [phases, setPhases] = useState<Phase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userData, setUserData] = useState<{ userId: string; agentId: string; token: string | null } | null>(null);
+  const [userData, setUserData] = useState<{ userId: string; agentId: string | null; token: string | null } | null>(null);
   const [completedPhases, setCompletedPhases] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);

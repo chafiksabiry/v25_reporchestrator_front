@@ -263,6 +263,14 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return found || [];
       };
 
+      // keyAreas may come back bilingual ({ en, fr }[]) from analyzeExperience — flatten
+      // to string[] for Mongoose keyExpertise while keeping the _i18n mirror.
+      const keyAreasN = normalizeBilingualList(experience.keyAreas || [], activeLang);
+
+      const rawTimeZone = availability?.timeZone;
+      const safeTimeZone =
+        rawTimeZone && String(rawTimeZone).trim() ? rawTimeZone : defaultAvailability.timeZone;
+
       // Combine all data with proper error handling and defaults
       const combinedData = {
         personalInfo: {
@@ -277,12 +285,13 @@ function ImportDialog({ isOpen, onClose, onImport }) {
           currentRole: basicInfo.currentRole || '',
           industries: [],
           activities: [],
-          keyExpertise: experience.keyAreas || defaultArrays.keyAreas,
+          keyExpertise: keyAreasN.active,
+          keyExpertise_i18n: keyAreasN.i18n,
           notableCompanies: experience.notableCompanies || defaultArrays.notableCompanies
         },
         availability: {
           schedule: Array.isArray(availability?.schedule) ? availability.schedule : defaultAvailability.schedule,
-          timeZone: availability?.timeZone ?? defaultAvailability.timeZone,
+          timeZone: safeTimeZone,
           flexibility: Array.isArray(availability?.flexibility) ? availability.flexibility : defaultAvailability.flexibility,
         },
         // Categorized skills come from analyzeSkills (the dedicated skills
