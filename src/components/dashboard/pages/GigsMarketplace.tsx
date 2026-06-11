@@ -1734,12 +1734,17 @@ export function GigsMarketplace() {
         </button>
         <button
           onClick={() => setActiveTab('invited')}
-          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'invited'
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'invited'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
         >
           {t('gigsMarketplace.tabs.invited')}
+          {invitedEnrollments.length > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-md animate-pulse">
+              {invitedEnrollments.length > 99 ? '99+' : invitedEnrollments.length}
+            </span>
+          )}
           {activeTab === 'invited' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
       </div>
