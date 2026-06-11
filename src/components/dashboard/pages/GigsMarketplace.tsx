@@ -448,6 +448,13 @@ export function GigsMarketplace() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [gigsPerPage] = useState(9);
+
+  // Reset pagination when switching tabs: each tab has its own result count,
+  // so a leftover page index (e.g. page 2 from "Available") would slice an
+  // empty page on a tab that only has one page.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
@@ -1519,6 +1526,14 @@ export function GigsMarketplace() {
   const indexOfFirstGig = indexOfLastGig - gigsPerPage;
   const currentGigs = filteredAndSortedGigs.slice(indexOfFirstGig, indexOfLastGig);
   const totalPages = Math.ceil(filteredAndSortedGigs.length / gigsPerPage);
+
+  // Safety clamp: if the result set shrinks (e.g. unfavoriting) below the
+  // current page, snap back so we never render an empty page.
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   // Log les gigs actuellement affichés pour debug
   console.log('🎯 GIGS ACTUELLEMENT AFFICHÉS:', {
