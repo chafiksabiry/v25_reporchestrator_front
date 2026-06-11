@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Star, Globe, Plus, X, Video } from 'lucide-react';
+import { Star, Globe, Plus, X, Video, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface LanguagesTabProps {
@@ -49,6 +49,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   const selectableLanguages = (availableLanguages || []).filter(
     (lang) => !existingNames.has(String(lang.name || '').toLowerCase())
   );
+
+  const languagesList = profile.personalInfo?.languages || [];
+  const unverifiedCount = languagesList.filter((lang: any) => !lang?.assessmentResults).length;
+  const hasUnverified = unverifiedCount > 0;
 
   const handleAddLanguage = () => {
     const selected = selectableLanguages.find(
@@ -115,6 +119,33 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
             </button>
           </div>
         )}
+        {hasUnverified && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-black text-yellow-800">
+                  {isFr
+                    ? `${unverifiedCount} langue${unverifiedCount > 1 ? 's' : ''} non vérifiée${unverifiedCount > 1 ? 's' : ''}`
+                    : `${unverifiedCount} language${unverifiedCount > 1 ? 's' : ''} not verified`}
+                </p>
+                <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                  {isFr
+                    ? 'Enregistrez une vidéo dans l’onglet Expérience pour détecter et valider vos niveaux de langue.'
+                    : 'Record a video in the Experience tab to detect and validate your language levels.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onGoToExperience}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+            >
+              <Video className="w-4 h-4" />
+              {isFr ? 'Enregistrer dans Expérience' : 'Record in Experience'}
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {profile.personalInfo?.languages?.length > 0 ? (
             profile.personalInfo.languages.map((lang: any, index: number) => {
@@ -157,11 +188,12 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="mb-6 p-4 bg-slate-200/30 rounded-2xl text-center">
-                      <p className="text-xs font-medium text-slate-400 italic">
+                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl flex items-center justify-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                      <p className="text-xs font-semibold text-yellow-700">
                         {isFr
-                          ? 'Détecté à partir de votre vidéo d’expérience'
-                          : 'Detected from your experience video'}
+                          ? 'Niveau non vérifié — enregistrez une vidéo dans Expérience'
+                          : 'Level not verified — record a video in Experience'}
                       </p>
                     </div>
                   )}
