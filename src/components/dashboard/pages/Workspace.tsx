@@ -140,17 +140,25 @@ export function WorkspaceContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
-  const [selectedGigId, setSelectedGigId] = useState<string>(gigId || '');
+  const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
+  // Do not hydrate from sessionStorage on first paint — a stale activeGigId from
+  // marketplace browsing would load demo leads for a gig the rep isn't enrolled in.
+  const [selectedGigId, setSelectedGigId] = useState<string>('');
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
 
-  // Auto-save selectedGigId to sessionStorage
+  const activeEnrolledGigId = useMemo(
+    () => (selectedGigId && enrolledGigs.some((g) => g._id === selectedGigId) ? selectedGigId : ''),
+    [selectedGigId, enrolledGigs]
+  );
+
+  // Only persist enrolled gigs to sessionStorage (never a stale marketplace id).
   useEffect(() => {
-    if (selectedGigId) {
-      sessionStorage.setItem('activeGigId', selectedGigId);
+    if (activeEnrolledGigId) {
+      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
     } else {
       sessionStorage.removeItem('activeGigId');
     }
-  }, [selectedGigId]);
+  }, [activeEnrolledGigId]);
 
   // Sync and Clean URL parameters to protect sensitive IDs from leaking
   useEffect(() => {
@@ -208,16 +216,17 @@ export function WorkspaceContent() {
   }, []);
 
   useEffect(() => {
-    if (gigId && gigId !== selectedGigId) {
+    if (!enrolledGigsLoaded) return;
+    if (gigId && enrolledGigs.some((g) => g._id === gigId) && gigId !== selectedGigId) {
       setSelectedGigId(gigId);
     }
-  }, [gigId, selectedGigId]);
+  }, [gigId, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
 
   useEffect(() => {
-    if (activeTab === 'voice') {
+    if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage);
     }
-  }, [activeTab, selectedGigId, currentPage]);
+  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded]);
 
   const canUseCopilot = useMemo(
     () =>
@@ -247,7 +256,7 @@ export function WorkspaceContent() {
 
   useEffect(() => {
     const evaluateCopilotGuard = async () => {
-      if (!selectedGigId) {
+      if (!activeEnrolledGigId) {
         setCopilotGuard({
           loading: false,
           isEnrolledInGig: false,
@@ -273,20 +282,7 @@ export function WorkspaceContent() {
         return;
       }
 
-      const isEnrolledInGig = enrolledGigs.some((g) => g._id === selectedGigId);
-      if (!isEnrolledInGig) {
-        setCopilotGuard({
-          loading: false,
-          isEnrolledInGig: false,
-          isTrainingComplete: false,
-          hasActiveReservationNow: false,
-          reservationWindowLabel: null,
-          reason: 'You must be enrolled in this gig.'
-        });
-        return;
-      }
-
-      setCopilotGuard((prev) => ({ ...prev, loading: true, reason: null }));
+      setCopilotGuard((prev) => ({ ...prev, loading: true, reason: null, isEnrolledInGig: true }));
 
       try {
         const now = new Date();
@@ -297,7 +293,7 @@ export function WorkspaceContent() {
         const [summaryRes, reservations] = await Promise.all([
           trainingBase
             ? fetch(
-              `${trainingBase}/training_journeys/rep/${encodeURIComponent(repId)}/slide-progress-summary?gigId=${encodeURIComponent(selectedGigId)}`,
+              `${trainingBase}/training_journeys/rep/${encodeURIComponent(repId)}/slide-progress-summary?gigId=${encodeURIComponent(activeEnrolledGigId)}`,
               {
                 headers: token ? { Authorization: `Bearer ${token}` } : undefined
               }
@@ -306,7 +302,7 @@ export function WorkspaceContent() {
               return null;
             })
             : Promise.resolve(null),
-          slotApi.getReservations(repId, selectedGigId).catch((err) => {
+          slotApi.getReservations(repId, activeEnrolledGigId).catch((err) => {
             console.error('Failed to fetch reservations:', err);
             return [];
           })
@@ -347,7 +343,7 @@ export function WorkspaceContent() {
 
         setCopilotGuard({
           loading: false,
-          isEnrolledInGig,
+          isEnrolledInGig: true,
           isTrainingComplete,
           hasActiveReservationNow,
           reservationWindowLabel,
@@ -357,7 +353,7 @@ export function WorkspaceContent() {
         console.error('Error evaluating copilot guard:', error);
         setCopilotGuard({
           loading: false,
-          isEnrolledInGig,
+          isEnrolledInGig: true,
           isTrainingComplete: false,
           hasActiveReservationNow: false,
           reservationWindowLabel: null,
@@ -366,8 +362,10 @@ export function WorkspaceContent() {
       }
     };
 
-    evaluateCopilotGuard();
-  }, [selectedGigId, enrolledGigs]);
+    if (enrolledGigsLoaded) {
+      evaluateCopilotGuard();
+    }
+  }, [activeEnrolledGigId, enrolledGigsLoaded]);
 
   const fetchEnrolledGigs = async () => {
     const agentId = localStorage.getItem('agentId');
@@ -380,43 +378,40 @@ export function WorkspaceContent() {
       });
       if (response.ok) {
         const profileData = await response.json();
-        if (profileData.gigs && Array.isArray(profileData.gigs)) {
-          // Filter enrolled gigs and fetch their details or use what's available
-          // For now, let's assume we might need to fetch titles if not in profile
-          // But usually, profile might have some gig info or we can fetch from Gigs API
-          const enrolled = profileData.gigs
-            .filter((g: any) => g.status === 'enrolled')
-            .map((g: any) => {
-              const gigInfo = g.gigId;
-              const id = typeof gigInfo === 'object' ? (gigInfo._id || gigInfo.$oid) : gigInfo;
-              const title = typeof gigInfo === 'object' && gigInfo.title ? gigInfo.title : (g.gigTitle || `Gig ${id}`);
-              return { _id: id, title };
-            });
+        const enrolled = (Array.isArray(profileData.gigs) ? profileData.gigs : [])
+          .filter((g: any) => g.status === 'enrolled')
+          .map((g: any) => {
+            const gigInfo = g.gigId;
+            const id = typeof gigInfo === 'object' ? (gigInfo._id || gigInfo.$oid) : gigInfo;
+            const title = typeof gigInfo === 'object' && gigInfo.title ? gigInfo.title : (g.gigTitle || `Gig ${id}`);
+            return { _id: String(id), title };
+          });
 
-          setEnrolledGigs(enrolled);
+        setEnrolledGigs(enrolled);
 
-          const enrolledIds = new Set(enrolled.map((g) => g._id));
-          const persistedGigId = selectedGigId || gigId;
+        const enrolledIds = new Set(enrolled.map((g) => g._id));
+        const persistedGigId = sessionStorage.getItem('activeGigId') || gigId || '';
 
-          // Drop a stale session gig that is no longer enrolled for this rep.
-          if (persistedGigId && !enrolledIds.has(persistedGigId)) {
-            setSelectedGigId('');
-            sessionStorage.removeItem('activeGigId');
-          } else if (!selectedGigId && enrolled.length > 0) {
-            setSelectedGigId(enrolled[0]._id);
-          }
+        if (enrolled.length === 0) {
+          setSelectedGigId('');
+          sessionStorage.removeItem('activeGigId');
+        } else if (persistedGigId && enrolledIds.has(persistedGigId)) {
+          setSelectedGigId(persistedGigId);
+        } else {
+          setSelectedGigId(enrolled[0]._id);
         }
       }
     } catch (error) {
       console.error('Error fetching enrolled gigs:', error);
+    } finally {
+      setEnrolledGigsLoaded(true);
     }
   };
 
   const fetchLeads = async (page: number = 1) => {
-    const activeGigId = selectedGigId || gigId;
+    const activeGigId = activeEnrolledGigId;
 
-    // Leads are scoped to a gig. Without a selected enrolled gig we must not
-    // call /leads/user/:id (that endpoint returns demo / cross-gig data).
+    // Leads are scoped to an enrolled gig only. Never call /leads/user/:id (demo data).
     if (!activeGigId) {
       setLeads([]);
       setTotalPages(1);
@@ -480,22 +475,50 @@ export function WorkspaceContent() {
             <div className="flex-1 overflow-y-auto">
               {/* Warnings, Exceptions and Info Banners */}
               <div className="space-y-4 mb-6">
-                {/* Info: No Gig Selected */}
-                {!selectedGigId && (
+                {/* No enrolled gigs at all */}
+                {enrolledGigsLoaded && enrolledGigs.length === 0 && (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in duration-300">
                     <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
                       <Layout className="w-5 h-5" />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <h4 className="text-xs font-black text-blue-900 tracking-tight uppercase">{t('workspaceGuard.selectGigTitle')}</h4>
+                      <h4 className="text-xs font-black text-blue-900 tracking-tight uppercase">
+                        {t('workspaceGuard.noEnrolledGigTitle', 'Aucun gig inscrit')}
+                      </h4>
                       <p className="text-[11px] text-blue-700 font-medium leading-relaxed">
-                        {t('workspaceGuard.selectGigDesc')}
+                        {t(
+                          'workspaceGuard.noEnrolledGigDesc',
+                          'Les prospects n’apparaissent qu’une fois inscrit à une mission. Postulez sur la place de marché puis attendez l’acceptation.'
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/marketplace')}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shrink-0 flex items-center gap-1.5"
+                    >
+                      {t('workspaceGuard.marketplaceButton', 'Missions')}
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Enrolled gigs exist but none selected in the dropdown */}
+                {enrolledGigsLoaded && enrolledGigs.length > 0 && !activeEnrolledGigId && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in duration-300">
+                    <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+                      <Layout className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h4 className="text-xs font-black text-blue-900 tracking-tight uppercase">{t('workspaceGuard.selectGigTitle', 'Sélectionnez un gig')}</h4>
+                      <p className="text-[11px] text-blue-700 font-medium leading-relaxed">
+                        {t('workspaceGuard.selectGigDesc', 'Choisissez un gig inscrit dans le menu ci-dessus pour afficher vos prospects.')}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {selectedGigId && !copilotGuard.loading && (
+                {activeEnrolledGigId && !copilotGuard.loading && (
                   <>
                     {/* Warning A: Training Incomplete */}
                     {!copilotGuard.isTrainingComplete && (
@@ -510,7 +533,7 @@ export function WorkspaceContent() {
                           </p>
                         </div>
                         <button
-                          onClick={() => navigate(`/training?gigId=${selectedGigId}`)}
+                          onClick={() => navigate(`/training?gigId=${activeEnrolledGigId}`)}
                           className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-amber-600/10 shrink-0 flex items-center gap-1.5"
                         >
                           {t('workspaceGuard.trainingButton')} <ChevronRight className="w-3 h-3" />
@@ -591,9 +614,14 @@ export function WorkspaceContent() {
                 ) : leads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
-                      {!selectedGigId
-                        ? t('workspaceGuard.noGigLeads', 'Sélectionnez un gig inscrit pour afficher vos prospects.')
-                        : t('workspaceGuard.noLeadsForGig', 'Aucun prospect pour ce gig pour le moment.')}
+                      {enrolledGigs.length === 0
+                        ? t(
+                            'workspaceGuard.noEnrolledLeads',
+                            'Aucun prospect — inscrivez-vous à une mission sur la place de marché pour débloquer vos leads.'
+                          )
+                        : !activeEnrolledGigId
+                          ? t('workspaceGuard.noGigLeads', 'Sélectionnez un gig inscrit pour afficher vos prospects.')
+                          : t('workspaceGuard.noLeadsForGig', 'Aucun prospect pour ce gig pour le moment.')}
                     </p>
                   </div>
                 ) : (
@@ -754,7 +782,7 @@ export function WorkspaceContent() {
         return (
           <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
-              gigId={selectedGigId}
+              gigId={activeEnrolledGigId}
               leadId={urlLeadId || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
               onAutoOpenHandled={() => setPendingOpenCallSid(null)}
@@ -866,8 +894,8 @@ export function WorkspaceContent() {
     }
     const leadIdString = lead._id || lead.id;
     sessionStorage.setItem('activeLeadId', leadIdString);
-    if (selectedGigId) {
-      sessionStorage.setItem('activeGigId', selectedGigId);
+    if (activeEnrolledGigId) {
+      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
     }
 
     const params = new URLSearchParams(location.search);
@@ -1114,12 +1142,12 @@ export function WorkspaceContent() {
               <button
                 onClick={() => {
                   setShowWarningModal(false);
-                  if (!selectedGigId || !copilotGuard.isEnrolledInGig) {
+                  if (!activeEnrolledGigId || !copilotGuard.isEnrolledInGig) {
                     navigate('/marketplace');
                   } else if (!copilotGuard.isTrainingComplete) {
-                    navigate(`/training?gigId=${selectedGigId}`);
+                    navigate(`/training?gigId=${activeEnrolledGigId}`);
                   } else if (!copilotGuard.hasActiveReservationNow) {
-                    navigate(`/session-planning?gigId=${selectedGigId}`);
+                    navigate(`/session-planning?gigId=${activeEnrolledGigId}`);
                   }
                 }}
                 className="w-full py-3 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 hover:from-rose-600 hover:to-pink-700 text-white font-extrabold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-rose-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +10,7 @@ import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFrom
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
+import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 
@@ -472,6 +473,14 @@ export function GigsMarketplace() {
       return false;
     }
   });
+  const [profileGigEngaged, setProfileGigEngaged] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('profileData');
+      return cached ? hasRepGigEngagement(JSON.parse(cached)) : false;
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -480,6 +489,7 @@ export function GigsMarketplace() {
         const profile = await fetchProfileFromAPI();
         if (!cancelled && profile) {
           setIsProfilePublished(profile.status === 'completed');
+          setProfileGigEngaged(hasRepGigEngagement(profile));
         }
       } catch {
         // keep the cached value on failure
@@ -893,12 +903,20 @@ export function GigsMarketplace() {
         if (response.status === 400 && errorText.includes('Cannot request enrollment for this gig at this time')) {
           console.log('⏳ Gig is already pending, refreshing status...');
           setApplicationMessage({ gigId, message: 'This gig is already pending', type: 'success' });
+          setProfileGigEngaged(true);
 
           // Rafraîchir tous les statuts
           await Promise.all([
             fetchPendingRequests(),
             fetchEnrolledGigIdsFromProfile()
           ]);
+
+          showToast(
+            isFrMarket
+              ? 'Candidature en attente — publiez votre profil pour continuer.'
+              : 'Application pending — publish your profile to continue.',
+            'success'
+          );
 
           return;
         }
@@ -910,6 +928,7 @@ export function GigsMarketplace() {
       console.log('✅ Application successful:', data);
 
       setApplicationMessage({ gigId, message: 'Application sent successfully!', type: 'success' });
+      setProfileGigEngaged(true);
 
       // Rafraîchir tous les statuts pour mettre à jour l'UI
       await Promise.all([
@@ -918,6 +937,13 @@ export function GigsMarketplace() {
         fetchInvitedEnrollments(),
         fetchEnrolledGigs()
       ]);
+
+      showToast(
+        isFrMarket
+          ? 'Candidature envoyée ! Prochaine étape : publier votre profil.'
+          : 'Application sent! Next step: publish your profile.',
+        'success'
+      );
 
       // Effacer le message après 3 secondes
       setTimeout(() => {
@@ -1498,10 +1524,30 @@ export function GigsMarketplace() {
     }
   };
 
-  const hasMarketplaceGigEngagement =
-    enrolledGigIds.length > 0 ||
-    enrolledGigs.length > 0 ||
-    pendingRequests.length > 0;
+  // Must match getGigStatus() — a card can show PENDING via gig.agents even when
+  // pendingRequests / profile.gigs haven't synced yet.
+  const hasMarketplaceGigEngagement = useMemo(() => {
+    if (
+      profileGigEngaged ||
+      enrolledGigIds.length > 0 ||
+      enrolledGigs.length > 0 ||
+      pendingRequests.length > 0
+    ) {
+      return true;
+    }
+
+    const agentId = getAgentId();
+    if (!agentId) return false;
+
+    return gigs.some((gig) => {
+      if (!gig.agents || !Array.isArray(gig.agents)) return false;
+      return gig.agents.some((agent: any) => {
+        const id = agent.agentId?.$oid || agent.agentId;
+        if (String(id) !== String(agentId)) return false;
+        return ['requested', 'enrolled', 'pending'].includes(String(agent.status || '').toLowerCase());
+      });
+    });
+  }, [profileGigEngaged, enrolledGigIds, enrolledGigs, pendingRequests, gigs]);
 
   const scrollToGigGrid = () => {
     document.getElementById('rep-gig-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1543,18 +1589,30 @@ export function GigsMarketplace() {
       {!loading && (() => {
         if (!hasMarketplaceGigEngagement) {
           return (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-black text-yellow-800">
-                  {isFrMarket ? 'Complétez la dernière phase' : 'Complete your final phase'}
-                </p>
-                <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                  {isFrMarket
-                    ? 'Postulez à un gig ou inscrivez-vous pour finaliser votre onboarding.'
-                    : 'Apply to a gig or enroll to finish your onboarding.'}
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
+                    {isFrMarket ? 'Étape 5 · Place de marché' : 'Step 5 · Marketplace'}
+                  </p>
+                  <p className="text-sm font-black text-yellow-800 mt-0.5">
+                    {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
+                  </p>
+                  <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                    {isFrMarket
+                      ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+                      : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={scrollToGigGrid}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap shrink-0"
+              >
+                {isFrMarket ? 'Voir les missions' : 'Browse gigs'}
+              </button>
             </div>
           );
         }
@@ -1569,13 +1627,16 @@ export function GigsMarketplace() {
             <div className="flex items-start gap-3">
               <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
               <div>
-                <p className="text-sm font-black text-emerald-800">
-                  {isFrMarket ? 'Onboarding terminé !' : 'Onboarding complete!'}
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                  {isFrMarket ? 'Prochaine étape · Profil' : 'Next step · Profile'}
+                </p>
+                <p className="text-sm font-black text-emerald-800 mt-0.5">
+                  {isFrMarket ? 'Candidature envoyée — publiez votre profil' : 'Application sent — publish your profile'}
                 </p>
                 <p className="text-xs font-medium text-emerald-700 mt-0.5">
                   {isFrMarket
-                    ? 'Toutes les phases sont validées. Publiez votre profil pour devenir visible.'
-                    : 'All phases are done. Publish your profile to become visible.'}
+                    ? 'Vous avez postulé (statut Pending). Publiez votre profil pour devenir visible aux entreprises — l’onglet Inscrites restera vide tant que votre candidature n’est pas acceptée.'
+                    : 'You applied (Pending status). Publish your profile to become visible — the Enrolled tab stays empty until your application is accepted.'}
                 </p>
               </div>
             </div>
