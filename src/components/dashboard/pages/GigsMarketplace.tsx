@@ -520,61 +520,43 @@ export function GigsMarketplace() {
     const agentId = getAgentId();
     if (!agentId) return 'none';
 
-    // Log pour déboguer
-    console.log(`🔍 getGigStatus for gig ${gigId}:`, {
-      enrolledGigIds: enrolledGigs.map(eg => eg.gig._id),
-      enrolledGigIdsFromProfile: enrolledGigIds,
-      invitedGigIds: invitedEnrollments.map(ie => ie.gig._id),
-      pendingGigIds: pendingRequests,
-      gigId
-    });
-
-    // 1. Vérifier d'abord les données du profil (plus fiables)
+    // Enrolled sources first — stale profile pending must not override approval.
+    if (enrolledGigs.some((eg) => eg.gig._id === gigId)) {
+      return 'enrolled';
+    }
     if (enrolledGigIds.includes(gigId)) {
-      console.log(`✅ Gig ${gigId} is ENROLLED (from profile)`);
       return 'enrolled';
     }
 
-    if (pendingRequests.includes(gigId)) {
-      console.log(`⏳ Gig ${gigId} is PENDING (from profile)`);
-      return 'pending';
-    }
-
-    // 2. Vérifier les données du gig directement (si disponible)
-    const currentGig = gigs.find(g => g._id === gigId);
-    if (currentGig && currentGig.agents && Array.isArray(currentGig.agents)) {
-      const agentInGig = currentGig.agents.find((agent: any) => agent.agentId === agentId);
-      if (agentInGig) {
-        if (agentInGig.status === 'enrolled') {
-          console.log(`✅ Gig ${gigId} is ENROLLED (from gig.agents)`);
-          return 'enrolled';
-        }
-        if (agentInGig.status === 'invited') {
-          console.log(`📨 Gig ${gigId} is INVITED (from gig.agents)`);
-          return 'invited';
-        }
-        if (agentInGig.status === 'requested' || agentInGig.status === 'pending') {
-          console.log(`⏳ Gig ${gigId} is PENDING/REQUESTED (from gig.agents)`);
-          return 'pending';
-        }
+    const currentGig = gigs.find((g) => g._id === gigId);
+    if (currentGig?.agents && Array.isArray(currentGig.agents)) {
+      const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
+      if (agentInGig?.status === 'enrolled') {
+        return 'enrolled';
       }
     }
 
-    // 3. Vérifier les données des API (fallback)
-    const enrolledGig = enrolledGigs.find(eg => eg.gig._id === gigId);
-    if (enrolledGig) {
-      console.log(`✅ Gig ${gigId} is ENROLLED (from API)`);
-      return 'enrolled';
-    }
-
-    // Vérifier si le gig est dans les invitations
-    const invitedGig = invitedEnrollments.find(ie => ie.gig._id === gigId);
+    const invitedGig = invitedEnrollments.find((ie) => ie.gig._id === gigId);
     if (invitedGig) {
-      console.log(`📨 Gig ${gigId} is INVITED`);
       return 'invited';
     }
+    if (currentGig?.agents && Array.isArray(currentGig.agents)) {
+      const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
+      if (agentInGig?.status === 'invited') {
+        return 'invited';
+      }
+    }
 
-    console.log(`❌ Gig ${gigId} has NO STATUS`);
+    if (pendingRequests.includes(gigId)) {
+      return 'pending';
+    }
+    if (currentGig?.agents && Array.isArray(currentGig.agents)) {
+      const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
+      if (agentInGig?.status === 'requested' || agentInGig?.status === 'pending') {
+        return 'pending';
+      }
+    }
+
     return 'none';
   };
 
@@ -1403,18 +1385,28 @@ export function GigsMarketplace() {
         .catch(() => {});
     };
 
-    const dispose = connectRepEnrollmentSocket((data) => {
-      refreshStatuses();
-      if (data?.status === 'enrolled') {
-        const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
-        showToast(
-          isFr
-            ? '🎉 Votre candidature a été approuvée — vous êtes inscrit !'
-            : '🎉 Your application was approved — you are enrolled!',
-          'success'
-        );
-      }
-    });
+    const dispose = connectRepEnrollmentSocket(
+      (data) => {
+        if (data?.gigId && data?.status === 'enrolled') {
+          const gigId = String(data.gigId);
+          setPendingRequests((prev) => prev.filter((id) => id !== gigId));
+          setEnrolledGigIds((prev) =>
+            prev.includes(gigId) ? prev : [...prev, gigId]
+          );
+        }
+        refreshStatuses();
+        if (data?.status === 'enrolled') {
+          const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+          showToast(
+            isFr
+              ? '🎉 Votre candidature a été approuvée — vous êtes inscrit !'
+              : '🎉 Your application was approved — you are enrolled!',
+            'success'
+          );
+        }
+      },
+      { onConnect: refreshStatuses }
+    );
 
     return () => {
       dispose();

@@ -25,6 +25,11 @@ function getWsUrl(): string | null {
   }
 }
 
+export type EnrollmentSocketOptions = {
+  /** Called on every successful connect/reconnect (catches missed broadcasts while offline). */
+  onConnect?: () => void;
+};
+
 /**
  * Connect to the matching backend enrollment WebSocket and invoke
  * `onEnrollmentUpdate` whenever a company approves/changes the current rep's
@@ -32,7 +37,8 @@ function getWsUrl(): string | null {
  * Returns a disposer that closes the socket and stops reconnection.
  */
 export function connectRepEnrollmentSocket(
-  onEnrollmentUpdate: (data: EnrollmentMessage) => void
+  onEnrollmentUpdate: (data: EnrollmentMessage) => void,
+  options?: EnrollmentSocketOptions
 ): () => void {
   const wsUrl = getWsUrl();
   if (!wsUrl) return () => {};
@@ -51,6 +57,10 @@ export function connectRepEnrollmentSocket(
       scheduleReconnect();
       return;
     }
+
+    socket.onopen = () => {
+      options?.onConnect?.();
+    };
 
     socket.onmessage = (event) => {
       let data: EnrollmentMessage;
