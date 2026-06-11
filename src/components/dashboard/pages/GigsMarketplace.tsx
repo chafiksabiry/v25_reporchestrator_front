@@ -876,6 +876,11 @@ export function GigsMarketplace() {
     setApplyingGigId(gigId);
     setApplicationMessage(null);
 
+    // The "publish your profile" guidance is only relevant for the very first
+    // application. Once the rep already has an engagement (or already published),
+    // subsequent applications just get a plain confirmation.
+    const isFirstApplication = !hasMarketplaceGigEngagement && !isProfilePublished;
+
     try {
       console.log('🚀 Applying to gig:', gigId);
       console.log('👤 Agent ID:', agentId);
@@ -913,9 +918,13 @@ export function GigsMarketplace() {
           ]);
 
           showToast(
-            isFrMarket
-              ? 'Candidature en attente — publiez votre profil pour continuer.'
-              : 'Application pending — publish your profile to continue.',
+            isFirstApplication
+              ? (isFrMarket
+                  ? 'Candidature en attente — publiez votre profil pour continuer.'
+                  : 'Application pending — publish your profile to continue.')
+              : (isFrMarket
+                  ? 'Cette mission est déjà en attente.'
+                  : 'This gig is already pending.'),
             'success'
           );
 
@@ -940,9 +949,13 @@ export function GigsMarketplace() {
       ]);
 
       showToast(
-        isFrMarket
-          ? 'Candidature envoyée ! Prochaine étape : publier votre profil.'
-          : 'Application sent! Next step: publish your profile.',
+        isFirstApplication
+          ? (isFrMarket
+              ? 'Candidature envoyée ! Prochaine étape : publier votre profil.'
+              : 'Application sent! Next step: publish your profile.')
+          : (isFrMarket
+              ? 'Candidature envoyée !'
+              : 'Application sent!'),
         'success'
       );
 
