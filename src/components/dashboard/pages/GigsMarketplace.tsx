@@ -438,7 +438,7 @@ export function GigsMarketplace() {
   const navigate = useNavigate();
   const agentId = getAgentId();
 
-  const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'favorite' | 'invited'>('available');
+  const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
   const [invitedEnrollments, setInvitedEnrollments] = useState<InvitedEnrollment[]>([]);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
