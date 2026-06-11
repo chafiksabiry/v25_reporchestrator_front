@@ -209,14 +209,25 @@ export const analyzeAvailability = async (contentToProcess) => {
   }
 };
 
-// Generate CV summary
+// Generate CV summary (returns a bilingual { en, fr } object)
 export const generateSummary = async (profileData) => {
   try {
     const { data } = await api.post('/cv/generate-summary', { profileData });
-    // La réponse est directement la chaîne de caractères
     return data;
   } catch (error) {
     console.error('Error generating CV summary:', error);
+    throw error.response?.data || error;
+  }
+};
+
+// Translate a free-text value (string or string[]) to a target language ('en' | 'fr').
+// Used to keep the {en,fr} pair in sync when a rep edits one locale.
+export const translateText = async (text, targetLang) => {
+  try {
+    const { data } = await api.post('/cv/translate', { text, targetLang });
+    return data?.translated;
+  } catch (error) {
+    console.error('Error translating text:', error);
     throw error.response?.data || error;
   }
 };

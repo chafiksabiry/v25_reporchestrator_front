@@ -15,8 +15,12 @@ import {
 import Cookies from 'js-cookie';
 
 import { chunkText, safeJSONParse, retryOperation } from '../../lib/utils/textProcessing';
+import { useTranslation } from 'react-i18next';
+import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18nText';
 
 function ImportDialog({ isOpen, onClose, onImport }) {
+  const { i18n } = useTranslation();
+  const activeLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const { createProfile } = useProfile();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -297,13 +301,22 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             throw new Error(`Invalid end date: ${role.endDate}`);
           }
 
+          // Free-text fields may come back bilingual ({ en, fr }) from the AI.
+          // Store the active-language value plus an _i18n mirror.
+          const titleN = normalizeBilingualText(role.title, activeLang);
+          const respN = normalizeBilingualList(role.responsibilities, activeLang);
+          const achN = normalizeBilingualList(role.achievements, activeLang);
+
           return {
-            title: role.title,
+            title: titleN.active,
+            title_i18n: titleN.i18n,
             company: role.company,
             startDate,
             endDate,
-            responsibilities: role.responsibilities || [],
-            achievements: role.achievements || []
+            responsibilities: respN.active,
+            responsibilities_i18n: respN.i18n,
+            achievements: achN.active,
+            achievements_i18n: achN.i18n
           };
         })
       };
@@ -311,18 +324,20 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       addAnalysisStep("Generating professional summary");
       setProgress(90);
 
-      // Generate optimized summary
-      const summary = await generateProfileSummary(combinedData);
+      // Generate optimized summary (bilingual { en, fr } from the backend).
+      const summaryRaw = await generateProfileSummary(combinedData);
       ensureNotCancelled();
-      console.log("Generated summary:", summary);
+      console.log("Generated summary:", summaryRaw);
 
       // Ensure we have a valid summary
-      if (!summary) {
+      if (!summaryRaw) {
         throw new Error('Failed to generate summary');
       }
 
-      // Update combinedData with the generated summary
-      combinedData.professionalSummary.profileDescription = summary;
+      // Normalize to active string + { en, fr } mirror.
+      const summaryN = normalizeBilingualText(summaryRaw, activeLang);
+      combinedData.professionalSummary.profileDescription = summaryN.active;
+      combinedData.professionalSummary.profileDescription_i18n = summaryN.i18n;
 
       addAnalysisStep("Analysis complete!");
       setProgress(100);
@@ -332,7 +347,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       const createdProfile = await createProfile(combinedData);
       ensureNotCancelled();
       Cookies.set('agentId', createdProfile._id);
-      onImport({ ...createdProfile, generatedSummary: summary });
+      onImport({ ...createdProfile, generatedSummary: summaryN.active });
 
       console.log("createdProfile : ", createdProfile);
       console.log("summary : ", summary);
