@@ -1,12 +1,14 @@
 import React from 'react';
-import { User, Zap, Briefcase, Globe, ClipboardCheck, Target, Clock } from 'lucide-react';
+import { User, Zap, Briefcase, Globe, ClipboardCheck, Target, Clock, AlertTriangle } from 'lucide-react';
 
 interface ProfileNavbarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  /** Tab ids that should display a warning badge (e.g. unverified languages). */
+  warningTabs?: string[];
 }
 
-export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabChange }) => {
+export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabChange, warningTabs = [] }) => {
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'experience', label: 'Experience', icon: Briefcase },
@@ -21,6 +23,7 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
       <nav className="flex items-center">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
+          const hasWarning = warningTabs.includes(tab.id);
           return (
             <button
               key={tab.id}
@@ -34,6 +37,15 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
             >
               <tab.icon className={`w-4 h-4 ${isActive ? 'text-harx-600' : 'text-gray-400'}`} />
               <span className="tracking-tight">{tab.label}</span>
+
+              {hasWarning && (
+                <span
+                  className="ml-0.5 inline-flex items-center justify-center"
+                  title="Action required"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 fill-yellow-100 animate-pulse" />
+                </span>
+              )}
               
               {/* Active Underline - Twilio Style with HARX Gradient */}
               {isActive && (
