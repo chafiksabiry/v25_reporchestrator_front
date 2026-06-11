@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
+import { NotificationsProvider } from '../../contexts/NotificationsContext';
 import { Sidebar } from '../dashboard/Sidebar';
 import { TopBar } from '../dashboard/TopBar';
 import { fetchProfileFromAPI } from '../../utils/profileUtils';
@@ -72,7 +73,9 @@ export default function OnboardingShell() {
   return (
     <AuthProvider>
       <RepTrainingNavProvider>
-        <OnboardingShellContent />
+        <NotificationsProvider>
+          <OnboardingShellContent />
+        </NotificationsProvider>
       </RepTrainingNavProvider>
     </AuthProvider>
   );

@@ -1401,14 +1401,28 @@ export function GigsMarketplace() {
             prev.includes(gigId) ? prev : [...prev, gigId]
           );
         }
+        // Reject: drop from pending so the gig returns to "Available" and the
+        // rep can re-apply.
+        if (data?.gigId && data?.status === 'rejected') {
+          const gigId = String(data.gigId);
+          setPendingRequests((prev) => prev.filter((id) => id !== gigId));
+          setEnrolledGigIds((prev) => prev.filter((id) => id !== gigId));
+        }
         refreshStatuses();
+        const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
         if (data?.status === 'enrolled') {
-          const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
           showToast(
             isFr
               ? '🎉 Votre candidature a été approuvée — vous êtes inscrit !'
               : '🎉 Your application was approved — you are enrolled!',
             'success'
+          );
+        } else if (data?.status === 'rejected') {
+          showToast(
+            isFr
+              ? "Votre candidature n'a pas été retenue cette fois. Vous pouvez re-postuler."
+              : 'Your application was not selected this time. You can re-apply.',
+            'error'
           );
         }
       },

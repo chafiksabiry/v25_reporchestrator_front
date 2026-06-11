@@ -5,6 +5,7 @@ import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
+import { NotificationBell } from './NotificationBell';
 import config from '../../config';
 import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
 
@@ -257,8 +258,9 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
       </div>
 
-      {/* ── Col 3: Right — Language + Avatar ── */}
-      <div className="flex items-center justify-end gap-4">
+      {/* ── Col 3: Right — Notifications + Language + Avatar ── */}
+      <div className="flex items-center justify-end gap-2 sm:gap-4">
+        <NotificationBell />
         <LanguageSwitcher />
         <div className="relative" ref={dropdownRef}>
           <div

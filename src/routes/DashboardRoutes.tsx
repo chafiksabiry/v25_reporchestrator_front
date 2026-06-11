@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
+import { NotificationsProvider } from '../contexts/NotificationsContext';
 import { Sidebar } from '../components/dashboard/Sidebar';
 import { TopBar } from '../components/dashboard/TopBar';
 import { Dashboard } from '../components/dashboard/pages/Dashboard';
@@ -79,12 +80,14 @@ function DashboardAppContent() {
 
   return (
     <RepTrainingNavProvider>
-      <DashboardRoutingWrapper
-        userProfile={userProfile}
-        loading={loading}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-      />
+      <NotificationsProvider>
+        <DashboardRoutingWrapper
+          userProfile={userProfile}
+          loading={loading}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+        />
+      </NotificationsProvider>
     </RepTrainingNavProvider>
   );
 }
