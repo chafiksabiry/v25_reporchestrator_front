@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calendar, Clock, Info, Loader2, Pencil, RefreshCw, RotateCcw, Video } from 'lucide-react';
+import { Calendar, Clock, Info, Loader2, Pencil, RefreshCw, RotateCcw, Video, Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const MAX_RECORDING_MS = 10 * 60 * 1000;
 
@@ -15,9 +16,14 @@ interface ProfileTabProps {
   onSaveAbout?: (value: string) => Promise<void> | void;
   onReplaceVideo?: (file: File) => Promise<void> | void;
   isUploadingVideo?: boolean;
+  onAddNotableCompany?: (value: string) => void;
+  onDeleteNotableCompany?: (index: number) => void;
 }
 
-export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, onReplaceVideo, isUploadingVideo = false }) => {
+export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, onReplaceVideo, isUploadingVideo = false, onAddNotableCompany, onDeleteNotableCompany }) => {
+  const { i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
+  const [notableCompanyInput, setNotableCompanyInput] = useState('');
   const [isEditingAbout, setIsEditingAbout] = useState(false);
   const [isEditingVideo, setIsEditingVideo] = useState(false);
   const [aboutDraft, setAboutDraft] = useState('');
@@ -268,6 +274,70 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
           )}
         </div>
 
+      </div>
+
+      {/* Notable Companies */}
+      <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-black text-harx-900 tracking-tight">
+            {isFr ? 'Entreprises notables' : 'Notable Companies Worked For'}
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              const value = notableCompanyInput.trim();
+              if (!value) return;
+              onAddNotableCompany?.(value);
+              setNotableCompanyInput('');
+            }}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-harx-50 text-harx-700 border border-harx-100 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {isFr ? 'Ajouter' : 'Add'}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {profile.professionalSummary?.notableCompanies?.length > 0 ? (
+            profile.professionalSummary.notableCompanies.map((company: string, idx: number) => (
+              <div
+                key={`company-${idx}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border shadow-sm transition-all hover:scale-105 bg-slate-50 text-slate-700 border-slate-100"
+              >
+                <span>{company}</span>
+                <button
+                  type="button"
+                  onClick={() => onDeleteNotableCompany?.(idx)}
+                  className="p-0.5 rounded-md hover:bg-white/50 transition-colors"
+                  title={isFr ? 'Supprimer' : 'Delete item'}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="text-slate-500 italic">
+              {isFr ? 'Aucune entreprise notable spécifiée' : 'No notable companies specified'}
+            </p>
+          )}
+        </div>
+        <div className="mt-4">
+          <input
+            type="text"
+            value={notableCompanyInput}
+            onChange={(e) => setNotableCompanyInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const value = notableCompanyInput.trim();
+                if (!value) return;
+                onAddNotableCompany?.(value);
+                setNotableCompanyInput('');
+              }
+            }}
+            placeholder={isFr ? 'Saisissez un nom d’entreprise et appuyez sur Entrée…' : 'Type company name and press Enter...'}
+            className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-harx-100/80 bg-harx-50/40 text-harx-900 shadow-sm outline-none focus:ring-2 focus:ring-harx-200"
+          />
+        </div>
       </div>
 
     </div>

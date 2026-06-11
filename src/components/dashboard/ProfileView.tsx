@@ -817,7 +817,7 @@ export const ProfileView: React.FC<{
 
   const renderActiveTab = () => {
     switch (activeTab) {
-      case 'profile': return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} />;
+      case 'profile': return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
       case 'skills': return (
         <SkillsTab
           profile={profile}
@@ -884,7 +884,7 @@ export const ProfileView: React.FC<{
         />
       );
 
-      default: return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} />;
+      default: return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
     }
   };
 
