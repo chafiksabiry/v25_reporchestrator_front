@@ -1409,6 +1409,32 @@ export function GigsMarketplace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Must match getGigStatus() — a card can show PENDING via gig.agents even when
+  // pendingRequests / profile.gigs haven't synced yet. Kept above loading/error
+  // early returns so hook order stays stable (React #310).
+  const hasMarketplaceGigEngagement = useMemo(() => {
+    if (
+      profileGigEngaged ||
+      enrolledGigIds.length > 0 ||
+      enrolledGigs.length > 0 ||
+      pendingRequests.length > 0
+    ) {
+      return true;
+    }
+
+    const agentId = getAgentId();
+    if (!agentId) return false;
+
+    return gigs.some((gig) => {
+      if (!gig.agents || !Array.isArray(gig.agents)) return false;
+      return gig.agents.some((agent: any) => {
+        const id = agent.agentId?.$oid || agent.agentId;
+        if (String(id) !== String(agentId)) return false;
+        return ['requested', 'enrolled', 'pending'].includes(String(agent.status || '').toLowerCase());
+      });
+    });
+  }, [profileGigEngaged, enrolledGigIds, enrolledGigs, pendingRequests, gigs]);
+
   // Filter and sort gigs based on active tab
   const getFilteredAndSortedGigs = () => {
     switch (activeTab) {
@@ -1568,31 +1594,6 @@ export function GigsMarketplace() {
         };
     }
   };
-
-  // Must match getGigStatus() — a card can show PENDING via gig.agents even when
-  // pendingRequests / profile.gigs haven't synced yet.
-  const hasMarketplaceGigEngagement = useMemo(() => {
-    if (
-      profileGigEngaged ||
-      enrolledGigIds.length > 0 ||
-      enrolledGigs.length > 0 ||
-      pendingRequests.length > 0
-    ) {
-      return true;
-    }
-
-    const agentId = getAgentId();
-    if (!agentId) return false;
-
-    return gigs.some((gig) => {
-      if (!gig.agents || !Array.isArray(gig.agents)) return false;
-      return gig.agents.some((agent: any) => {
-        const id = agent.agentId?.$oid || agent.agentId;
-        if (String(id) !== String(agentId)) return false;
-        return ['requested', 'enrolled', 'pending'].includes(String(agent.status || '').toLowerCase());
-      });
-    });
-  }, [profileGigEngaged, enrolledGigIds, enrolledGigs, pendingRequests, gigs]);
 
   const scrollToGigGrid = () => {
     document.getElementById('rep-gig-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
