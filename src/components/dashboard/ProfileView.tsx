@@ -1040,9 +1040,19 @@ export const ProfileView: React.FC<{
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
                 {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done.
-                    Once every phase (1-5) is completed an attractive Publish banner takes over. */}
-                {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].every(
+                    Publishing requires the core onboarding (phases 1-4) to be done AND
+                    the rep to have APPLIED to at least one gig. Applying (status
+                    'requested') is enough — a full enrollment ('enrolled') is NOT
+                    required. We read profile.gigs directly so this holds even if the
+                    derived phase5 status isn't echoed back on the profile. */}
+                {['phase1', 'phase2', 'phase3', 'phase4'].every(
                   (k) => profile.onboardingProgress?.phases?.[k]?.status === 'completed'
+                ) && (
+                  profile.onboardingProgress?.phases?.phase5?.status === 'completed' ||
+                  (Array.isArray(profile.gigs) &&
+                    profile.gigs.some(
+                      (g: any) => g && (g.status === 'requested' || g.status === 'enrolled')
+                    ))
                 ) ? (
                   profile.status !== 'completed' ? (
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
