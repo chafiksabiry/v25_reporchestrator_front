@@ -11,6 +11,7 @@ import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
+import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 
@@ -1364,11 +1365,11 @@ export function GigsMarketplace() {
     };
   }, [applicationMessage]);
 
-  // Live status sync: a rep's gig can flip from `requested` → `enrolled` the
-  // moment the company approves. The matching backend has no socket channel,
-  // so we keep statuses fresh by (1) polling on an interval and (2) refetching
-  // whenever the rep returns to the tab/window. This makes the "PENDING" badge
-  // update to "Enrolled" without a manual page reload.
+  // Live status sync over WebSocket: a rep's gig flips from `requested` →
+  // `enrolled` the moment the company approves. The matching backend pushes an
+  // `enrollment_update` event on `/enrollment-updates`; we listen here and
+  // refetch the affected data so the "PENDING" badge becomes "Enrolled" with no
+  // manual page reload.
   useEffect(() => {
     const agentId = getAgentId();
     if (!agentId) return;
@@ -1389,22 +1390,21 @@ export function GigsMarketplace() {
         .catch(() => {});
     };
 
-    const POLL_MS = 25000;
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refreshStatuses();
-    }, POLL_MS);
-
-    const onFocus = () => refreshStatuses();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshStatuses();
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
+    const dispose = connectRepEnrollmentSocket((data) => {
+      refreshStatuses();
+      if (data?.status === 'enrolled') {
+        const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+        showToast(
+          isFr
+            ? '🎉 Votre candidature a été approuvée — vous êtes inscrit !'
+            : '🎉 Your application was approved — you are enrolled!',
+          'success'
+        );
+      }
+    });
 
     return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
+      dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
