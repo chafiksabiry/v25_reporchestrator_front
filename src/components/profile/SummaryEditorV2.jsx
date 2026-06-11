@@ -65,8 +65,8 @@ const PAGE_STRINGS = {
     fr: 'Enregistrez une vidéo pour chaque expérience ci-dessus pour débloquer le bouton « Continuer ».',
   },
   warnBottomAvail: {
-    en: 'Set your working schedule and time zone above to unlock the “Continue” button.',
-    fr: 'Renseignez vos horaires de travail et votre fuseau horaire ci-dessus pour débloquer le bouton « Continuer ».',
+    en: 'Set your working schedule above to unlock the “Continue” button.',
+    fr: 'Renseignez vos horaires de travail ci-dessus pour débloquer le bouton « Continuer ».',
   },
   recordAnalyze: { en: 'Record & Analyze with AI', fr: 'Enregistrer et analyser avec l’IA' },
   viewAnalysis: { en: 'View AI Analysis', fr: 'Voir l’analyse IA' },
@@ -76,8 +76,8 @@ const PAGE_STRINGS = {
   },
   expVideoDone: { en: 'Video recorded', fr: 'Vidéo enregistrée' },
   availMissing: {
-    en: 'Availability not set — click Edit to add your working schedule and time zone.',
-    fr: 'Disponibilité non renseignée — cliquez sur Modifier pour ajouter vos horaires et votre fuseau horaire.',
+    en: 'Availability not set — click Edit to add your working schedule.',
+    fr: 'Disponibilité non renseignée — cliquez sur Modifier pour ajouter vos horaires de travail.',
   },
   savedSuccess: { en: 'Saved successfully!', fr: 'Enregistré avec succès !' },
   saveError: { en: 'Error saving. Please try again.', fr: 'Erreur lors de l’enregistrement. Veuillez réessayer.' },
@@ -2688,15 +2688,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   const hasAvailabilitySet = (() => {
     const avail = editedProfile.availability;
+    // Only a valid working schedule is required; the time zone is optional.
     const hasSchedule =
       Array.isArray(avail?.schedule) &&
       avail.schedule.length > 0 &&
       avail.schedule.every((s) => s?.day && s?.hours?.start && s?.hours?.end);
-    const tz = avail?.timeZone;
-    const hasTimeZone = Boolean(
-      tz && (typeof tz === 'object' ? tz._id || tz.zoneName : String(tz).trim())
-    );
-    return hasSchedule && hasTimeZone;
+    return hasSchedule;
   })();
 
   // The "Continue" button is only unlocked when every experience has a video
