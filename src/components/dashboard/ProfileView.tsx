@@ -845,7 +845,7 @@ export const ProfileView: React.FC<{
           profile={profile}
           availableLanguages={availableLanguages}
           getProficiencyStars={getProficiencyStars}
-          takeLanguageAssessment={takeLanguageAssessment}
+          onGoToExperience={() => setActiveTab('experience')}
           onAddItemClick={(item) => onAddLanguage?.(item)}
           onDeleteItemClick={(index) => onDeleteLanguage?.(index)}
         />
