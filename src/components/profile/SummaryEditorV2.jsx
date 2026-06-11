@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
-import { localizeText, localizeList } from '../../utils/i18nText';
+import { localizeText, localizeList, normalizeBilingualText } from '../../utils/i18nText';
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
@@ -1555,13 +1555,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       const newSummary = await generateSummary(editedProfile);
       console.log('Generated summary:', newSummary); // Temporaire pour debug
 
+      // The backend now returns a bilingual { en, fr } object. Normalize it so
+      // the textarea shows the active-language string and we keep the _i18n mirror.
+      const { active, i18n } = normalizeBilingualText(newSummary, uiLang);
+
       // Update only local state, don't save to database yet
-      setEditedSummary(newSummary);
+      setEditedSummary(active);
       setEditedProfile(prev => ({
         ...prev,
         professionalSummary: {
           ...prev.professionalSummary,
-          profileDescription: newSummary
+          profileDescription: active,
+          profileDescription_i18n: i18n
         }
       }));
 
@@ -1586,7 +1591,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       ...prev,
       professionalSummary: {
         ...prev.professionalSummary,
-        profileDescription: newSummary
+        profileDescription: newSummary,
+        // Keep the active-language slice of the _i18n mirror in sync so the
+        // read-only view (which prefers _i18n) reflects manual edits.
+        profileDescription_i18n: {
+          en: '',
+          fr: '',
+          ...(prev.professionalSummary?.profileDescription_i18n || {}),
+          [uiLang]: newSummary,
+        },
       }
     }));
 
