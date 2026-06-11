@@ -938,10 +938,18 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         disabled={!!result || elapsed < MIN_DURATION}
                         className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
                       >
-                        <Sparkles className="w-4 h-4" />
+                        {result ? <CheckCircle className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                         {result ? t('analysisComplete') : t('analyzeWithAI')}
                       </button>
-                      {!result && (
+                      {result ? (
+                        <button
+                          onClick={retake}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-harx-500/40 bg-harx-500/10 hover:bg-harx-500/20 text-harx-300 rounded-2xl text-xs font-black transition-all active:scale-95"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          {t('recordAgain')}
+                        </button>
+                      ) : (
                         <button
                           onClick={retake}
                           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-black transition-all"
