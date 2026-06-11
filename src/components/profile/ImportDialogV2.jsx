@@ -178,6 +178,22 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         );
       };
 
+      // CEFR level -> initial estimated score (0-100). The CV gives us a level
+      // but no measured score, so we seed a reasonable estimate per language so
+      // each card shows data immediately. These are flagged source:'cv' and stay
+      // "to verify" until the rep records an experience video.
+      const CEFR_BASE_SCORE = { A1: 30, A2: 45, B1: 60, B2: 75, C1: 88, C2: 96 };
+      const buildCvAssessment = (proficiency) => {
+        const base = CEFR_BASE_SCORE[String(proficiency || '').toUpperCase()] ?? 50;
+        return {
+          fluency: { score: base, feedback: '' },
+          proficiency: { score: base, feedback: '' },
+          completeness: { score: base, feedback: '' },
+          overall: { score: base, strengths: '', areasForImprovement: '' },
+          source: 'cv',
+        };
+      };
+
       const seenLanguageIds = new Set();
       for (const extractedLang of skills.languages) {
         let dbLanguage = null;
@@ -207,7 +223,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
         matchedLanguages.push({
           language: dbLanguage,
-          proficiency: extractedLang.proficiency
+          proficiency: extractedLang.proficiency,
+          assessmentResults: buildCvAssessment(extractedLang.proficiency)
         });
         console.log(`Matched language: ${extractedLang.language} (${extractedLang.iso639_1 || 'name'}) -> ${dbLanguage.name}`);
       }

@@ -995,7 +995,9 @@ export const ProfileView: React.FC<{
             activeTab={activeTab}
             onTabChange={setActiveTab}
             warningTabs={
-              (profile?.personalInfo?.languages || []).some((l: any) => !l?.assessmentResults)
+              (profile?.personalInfo?.languages || []).some(
+                (l: any) => !l?.assessmentResults || l.assessmentResults.source === 'cv'
+              )
                 ? ['languages']
                 : []
             }
