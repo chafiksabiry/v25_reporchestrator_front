@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Star, Globe, Plus, X } from 'lucide-react';
+import { Star, Globe, Plus, X, Video } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface LanguagesTabProps {
   profile: any;
   availableLanguages: Array<{ _id?: string; code?: string; name: string; nativeName?: string }>;
   getProficiencyStars: (proficiency: string) => number;
-  takeLanguageAssessment: (language: string, iso639_1Code?: string) => void;
+  /** Navigate to the Experience tab so the rep can record a video (languages
+   *  are detected from the experience video instead of a dedicated assessment). */
+  onGoToExperience: () => void;
   onAddItemClick: (item: { language: string; proficiency: string; languageId?: string }) => void;
   onDeleteItemClick: (index: number) => void;
 }
@@ -14,10 +17,12 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   profile, 
   availableLanguages,
   getProficiencyStars, 
-  takeLanguageAssessment,
+  onGoToExperience,
   onAddItemClick,
   onDeleteItemClick
 }) => {
+  const { i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
   const proficiencyOptions = [
     { value: 'A1', label: 'A1 - Beginner' },
     { value: 'A2', label: 'A2 - Elementary' },
@@ -153,7 +158,11 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                     </div>
                   ) : (
                     <div className="mb-6 p-4 bg-slate-200/30 rounded-2xl text-center">
-                      <p className="text-xs font-medium text-slate-400 italic">No assessment completed</p>
+                      <p className="text-xs font-medium text-slate-400 italic">
+                        {isFr
+                          ? 'Détecté à partir de votre vidéo d’expérience'
+                          : 'Detected from your experience video'}
+                      </p>
                     </div>
                   )}
 
@@ -166,14 +175,19 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                     >
                       <span className="inline-flex items-center gap-1">
                         <X className="w-3.5 h-3.5" />
-                        Delete
+                        {isFr ? 'Supprimer' : 'Delete'}
                       </span>
                     </button>
                     <button
-                      onClick={() => takeLanguageAssessment(languageName, languageCode)}
-                      className="flex-1 py-3 bg-gradient-harx text-white border border-harx-400/40 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 hover:opacity-90"
+                      type="button"
+                      onClick={onGoToExperience}
+                      title={isFr
+                        ? 'Enregistrez une vidéo dans Expérience pour détecter vos langues'
+                        : 'Record a video in Experience to detect your languages'}
+                      className="flex-1 py-3 bg-gradient-harx text-white border border-harx-400/40 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
                     >
-                      {lang.assessmentResults ? 'Retake Assessment' : 'Start Assessment'}
+                      <Video className="w-3.5 h-3.5" />
+                      {isFr ? 'Enregistrer dans Expérience' : 'Record in Experience'}
                     </button>
                   </div>
                 </div>
