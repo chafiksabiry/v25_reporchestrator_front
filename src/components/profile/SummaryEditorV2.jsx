@@ -736,6 +736,50 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     loadCountries();
   }, []);
 
+  // Auto-detect the user's time zone once the timezone list is loaded.
+  // Primary source: the browser/OS IANA zone (most precise, reflects the device
+  // location). Fallback: the country of the user's first login (IP-based).
+  const tzAutoDetectedRef = React.useRef(false);
+  useEffect(() => {
+    if (tzAutoDetectedRef.current) return;
+    if (!Array.isArray(countries) || countries.length === 0) return;
+    // Don't override a time zone the user has already set.
+    if (editedProfile?.availability?.timeZone) return;
+
+    let detected = null;
+
+    // 1) Browser/OS IANA zone, e.g. "Africa/Casablanca".
+    try {
+      const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (browserZone) {
+        detected = countries.find(
+          (tz) => tz.zoneName?.toLowerCase() === browserZone.toLowerCase()
+        );
+      }
+    } catch (e) {
+      // Intl not available — ignore and fall through to IP fallback.
+    }
+
+    // 2) Fallback: pick the primary zone for the IP-based first-login country.
+    if (!detected && firstLoginLocation?.countryCode) {
+      const countryZones = countries.filter(
+        (tz) => tz.countryCode === firstLoginLocation.countryCode
+      );
+      if (countryZones.length > 0) {
+        detected = [...countryZones].sort((a, b) => a.gmtOffset - b.gmtOffset)[0];
+      }
+    }
+
+    if (detected) {
+      tzAutoDetectedRef.current = true;
+      handleAvailabilityChangeLocal('timeZone', detected);
+      showToast(
+        `Fuseau horaire détecté automatiquement : ${detected.zoneName}. Vous pouvez le modifier si besoin.`,
+        'success'
+      );
+    }
+  }, [countries, firstLoginLocation, editedProfile?.availability?.timeZone]);
+
   // Load skills from API
   useEffect(() => {
     const loadSkills = async () => {
