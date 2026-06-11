@@ -1364,6 +1364,51 @@ export function GigsMarketplace() {
     };
   }, [applicationMessage]);
 
+  // Live status sync: a rep's gig can flip from `requested` → `enrolled` the
+  // moment the company approves. The matching backend has no socket channel,
+  // so we keep statuses fresh by (1) polling on an interval and (2) refetching
+  // whenever the rep returns to the tab/window. This makes the "PENDING" badge
+  // update to "Enrolled" without a manual page reload.
+  useEffect(() => {
+    const agentId = getAgentId();
+    if (!agentId) return;
+
+    const refreshStatuses = () => {
+      fetchInvitedEnrollments();
+      fetchEnrolledGigs();
+      fetchPendingRequests();
+      fetchEnrolledGigIdsFromProfile();
+      // Re-derive publish / onboarding state from the freshest profile.
+      fetchProfileFromAPI()
+        .then((profile) => {
+          if (profile) {
+            setIsProfilePublished(profile.status === 'completed');
+            setProfileGigEngaged(hasRepGigEngagement(profile));
+          }
+        })
+        .catch(() => {});
+    };
+
+    const POLL_MS = 25000;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshStatuses();
+    }, POLL_MS);
+
+    const onFocus = () => refreshStatuses();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshStatuses();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Filter and sort gigs based on active tab
   const getFilteredAndSortedGigs = () => {
     switch (activeTab) {
