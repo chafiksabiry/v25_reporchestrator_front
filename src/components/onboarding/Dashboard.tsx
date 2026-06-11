@@ -163,12 +163,12 @@ const phaseTemplates = [
     path: '/orchestrator/profile',
     requiredActions: [
       'Add your work experience',
-      'Record a video for each experience',
-      'Set your availability hours'
+      'Record a video for each experience'
     ],
     optionalActions: [
       'Upload a professional photo',
-      'Complete your bio'
+      'Complete your bio',
+      'Set your availability hours'
     ]
   },
   {
@@ -428,9 +428,10 @@ function Dashboard() {
           // For phase 2
           else if (phase.id === 2 && phaseKey === 'phase2') {
             const phase2Actions = apiPhase.requiredActions as ApiPhase2RequiredActions;
-            // 0: work experience added, 1: a video recorded for every experience,
-            // 2: availability set. Skills/industries/activities and the standalone
-            // 1-minute intro video are no longer shown as required actions.
+            // 0: work experience added, 1: a video recorded for every experience.
+            // Availability is now OPTIONAL (rarely present in a CV) and is mapped
+            // in the optional-actions block below. Skills/industries/activities and
+            // the standalone 1-minute intro video are not shown as required actions.
             if (phase2Actions.experienceAdded) completedActions.push(0);
 
             const experiences = (apiData as any).experience;
@@ -439,8 +440,6 @@ function Dashboard() {
               experiences.length > 0 &&
               experiences.every((exp: any) => exp && (exp.videoUrl || exp.videoAnalysis));
             if (allExperiencesHaveVideo) completedActions.push(1);
-
-            if (phase2Actions.availabilitySet) completedActions.push(2);
 
             // Log the completed required actions for phase 2
             console.log('🔍 Phase 2 - Mapped required actions:', completedActions);
@@ -489,8 +488,11 @@ function Dashboard() {
           // For phase 2
           else if (phase.id === 2 && phaseKey === 'phase2') {
             const phase2OptActions = apiPhase.optionalActions as ApiPhase2OptionalActions;
+            const phase2ReqActions = apiPhase.requiredActions as ApiPhase2RequiredActions;
             if (phase2OptActions.photoUploaded) optionalCompletedActions.push(requiredActionsLength + 0);
             if (phase2OptActions.bioCompleted) optionalCompletedActions.push(requiredActionsLength + 1);
+            // Availability moved to optional: tick it when the backend flag is set.
+            if (phase2ReqActions?.availabilitySet) optionalCompletedActions.push(requiredActionsLength + 2);
 
             // Log the completed optional actions for phase 2
             console.log('🔍 Phase 2 - Mapped optional actions:', optionalCompletedActions);
