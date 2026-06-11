@@ -64,6 +64,10 @@ const PAGE_STRINGS = {
     en: 'Record a video for every experience above to unlock the “Continue” button.',
     fr: 'Enregistrez une vidéo pour chaque expérience ci-dessus pour débloquer le bouton « Continuer ».',
   },
+  warnBottomAvail: {
+    en: 'Set your working schedule and time zone above to unlock the “Continue” button.',
+    fr: 'Renseignez vos horaires de travail et votre fuseau horaire ci-dessus pour débloquer le bouton « Continuer ».',
+  },
   recordAnalyze: { en: 'Record & Analyze with AI', fr: 'Enregistrer et analyser avec l’IA' },
   viewAnalysis: { en: 'View AI Analysis', fr: 'Voir l’analyse IA' },
   expVideoMissing: {
@@ -2695,6 +2699,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     return hasSchedule && hasTimeZone;
   })();
 
+  // The "Continue" button is only unlocked when every experience has a video
+  // AND the availability (schedule + time zone) has been filled in.
+  const canContinue = allExperiencesHaveVideo && hasAvailabilitySet;
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
@@ -2714,7 +2722,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {allExperiencesHaveVideo && (
+              {canContinue && (
                 <button
                   onClick={pushToRepsProfile}
                   className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
@@ -3578,7 +3586,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Action Buttons */}
-          {allExperiencesHaveVideo ? (
+          {canContinue ? (
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm text-gray-600">
                 {t('everythingGood')}
@@ -3599,7 +3607,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <p className="text-sm font-bold text-red-700">
-                {t('warnBottom')}
+                {!allExperiencesHaveVideo ? t('warnBottom') : t('warnBottomAvail')}
               </p>
             </div>
           )}
