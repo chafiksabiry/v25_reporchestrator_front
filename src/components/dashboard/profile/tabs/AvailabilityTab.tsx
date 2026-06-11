@@ -206,6 +206,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Selected Timezone</h3>
             <div className="p-5 bg-slate-200/40 rounded-2xl border border-slate-200/30">
               {isEditingAvailability ? (
+                <>
                 <div ref={tzRef} className="relative">
                   {/* Trigger */}
                   <button
@@ -324,6 +325,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                     Use my timezone · {repWizardApi.formatTimezone(detectedTimezone)}
                   </button>
                 )}
+                </>
               ) : (
                 <span className="text-sm font-bold text-slate-700">
                   {timezoneData
