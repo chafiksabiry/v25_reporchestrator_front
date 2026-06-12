@@ -536,6 +536,11 @@ export function CallRecords({
                             {record.lead?.First_Name ? `${record.lead.First_Name} ${record.lead.Last_Name || ''}`.trim() :
                               record.lead?.name || record.to || record.from || 'Unknown Customer'}
                           </span>
+                          {record.lead && (record.lead.First_Name || record.lead.Last_Name || record.lead.name) && (
+                            <span className="text-xs font-normal text-slate-400">
+                              ({record.lead.phone || record.lead.Phone || record.to || record.from})
+                            </span>
+                          )}
                           {record.validByAI === true && (
                             <span
                               title="Appel validé par l'IA — commission RepTransaction créée"

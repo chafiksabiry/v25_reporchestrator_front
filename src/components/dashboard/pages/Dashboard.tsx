@@ -749,6 +749,8 @@ export function Dashboard({ profile }: DashboardProps) {
                   const contact = (call.lead?.First_Name || call.lead?.Last_Name)
                     ? `${call.lead.First_Name || ''} ${call.lead.Last_Name || ''}`.trim()
                     : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || 'Contact inconnu');
+                  const phoneNum = call.lead?.phone || call.lead?.Phone || call.to || call.from || call.phoneNumber;
+                  const hasLeadName = !!(call.lead?.First_Name || call.lead?.Last_Name || call.lead?.name);
                   const durationSec = Number(call.duration || 0);
                   const billedMin = billedMinutesFromSeconds(durationSec);
                   const dateStr = call.startTime || call.createdAt;
@@ -763,7 +765,12 @@ export function Dashboard({ profile }: DashboardProps) {
                           {isValid ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate">{contact}</p>
+                          <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
+                            <span>{contact}</span>
+                            {hasLeadName && phoneNum && (
+                              <span className="text-[11px] font-normal text-slate-400">({phoneNum})</span>
+                            )}
+                          </p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
                             {dateStr ? new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
                             {billedMin > 0 && ` · ${billedMin} min`}
