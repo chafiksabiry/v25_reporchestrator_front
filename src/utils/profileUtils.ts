@@ -330,6 +330,45 @@ const getAuthApiBaseUrl = (): string => {
   return raw.replace(/\/+$/, '');
 };
 
+// Update the user's fullName in the `users` collection (registration/auth backend).
+// This keeps the auth-level identity in sync with the agent profile display name.
+export const updateUserFullName = async (
+  userId: string,
+  fullName: string
+): Promise<void> => {
+  const trimmed = (fullName || '').trim();
+  if (!trimmed) return;
+
+  const baseUrl = getAuthApiBaseUrl();
+  if (!baseUrl) {
+    throw new Error('Auth API URL is not configured (set VITE_AUTH_API_URL)');
+  }
+
+  const token = localStorage.getItem('token');
+
+  const response = await fetch(`${baseUrl}/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ fullName: trimmed }),
+  });
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const json = await response.json();
+      detail = json?.error || json?.message || '';
+    } catch {
+      // ignore JSON parse issues
+    }
+    throw new Error(
+      `Failed to update user fullName (status ${response.status})${detail ? `: ${detail}` : ''}`
+    );
+  }
+};
+
 // Function to fetch user's IP history
 export const fetchUserIpHistory = async (userId: string): Promise<IpHistoryResponse> => {
   try {
