@@ -34,16 +34,16 @@ export function LanguageSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md hover:bg-white/20 p-1 pr-3.5 rounded-2xl border border-white/20 hover:border-white/40 shadow-lg shadow-black/10 transition-all duration-300 group text-white"
+        className="flex items-center gap-1.5 md:gap-2.5 bg-white/10 backdrop-blur-md hover:bg-white/20 p-1 md:pr-3.5 rounded-2xl border border-white/20 hover:border-white/40 shadow-lg shadow-black/10 transition-all duration-300 group text-white"
         title="Change Language"
       >
         <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/30 shadow-inner bg-white">
           <img src={currentLang.flagUrl} alt={currentLang.label} className="w-full h-full object-cover" />
         </div>
-        <span className="font-black text-sm tracking-wide whitespace-nowrap">
+        <span className="font-black text-sm tracking-wide whitespace-nowrap hidden md:inline">
           {currentLang.label}
         </span>
-        <ChevronDown className={`w-4 h-4 text-white/70 transition-transform duration-300 group-hover:text-white ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-white/70 transition-transform duration-300 group-hover:text-white ${isOpen ? 'rotate-180' : ''} hidden md:block`} />
       </button>
 
       {isOpen && (
