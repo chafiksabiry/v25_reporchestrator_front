@@ -8,6 +8,10 @@ import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import config from '../../config';
 import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
+import {
+  PROFILE_UPDATE_EVENT,
+  USER_FULLNAME_UPDATE_EVENT,
+} from '../../utils/profileUtils';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -56,9 +60,6 @@ interface ProfileData {
 }
 
 // Add event listener for profile updates
-const PROFILE_UPDATE_EVENT = 'PROFILE_UPDATED';
-const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
-
 export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -120,17 +121,18 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     }
   };
 
-  // Resolve the best display name. The account-level identity (users.fullName,
-  // editable in Account Settings) is the source of truth and takes priority so
-  // that a name change persists after a refresh. We fall back to the agent
-  // profile persona name, then to "User".
+  // Resolve display name: users.fullName (account settings) is authoritative.
+  // Use localStorage first for instant correct label after refresh, then API.
   const resolveDisplayName = async () => {
+    const cachedUserName = (localStorage.getItem('userFullName') || '').trim();
     const agentName = (getProfileData()?.personalInfo?.name || '').trim();
-    // Show the persona name immediately to avoid a blank/"User" flash while we
-    // fetch the authoritative fullName from the auth backend.
-    if (agentName) {
+
+    if (cachedUserName) {
+      setDisplayName(cachedUserName);
+    } else if (agentName) {
       setDisplayName(agentName);
     }
+
     try {
       const { userId, token } = config.getUserData();
       const base = import.meta.env.VITE_AUTH_API_URL;
@@ -145,6 +147,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
           const json = await res.json();
           const fullName = (json?.data?.fullName || json?.fullName || '').trim();
           if (fullName) {
+            localStorage.setItem('userFullName', fullName);
             setDisplayName(fullName);
             return;
           }
@@ -153,7 +156,8 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     } catch (error) {
       console.warn('TopBar: could not resolve user fullName from auth backend', error);
     }
-    if (!agentName) {
+
+    if (!cachedUserName && !agentName) {
       setDisplayName('User');
     }
   };

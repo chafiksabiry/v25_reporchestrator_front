@@ -746,7 +746,9 @@ export function Dashboard({ profile }: DashboardProps) {
               <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
                 {visibleCalls.map((call: any) => {
                   const isValid = call.valid === true || call.validByAI === true;
-                  const contact = call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || 'Contact inconnu';
+                  const contact = (call.lead?.First_Name || call.lead?.Last_Name)
+                    ? `${call.lead.First_Name || ''} ${call.lead.Last_Name || ''}`.trim()
+                    : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || 'Contact inconnu');
                   const durationSec = Number(call.duration || 0);
                   const billedMin = billedMinutesFromSeconds(durationSec);
                   const dateStr = call.startTime || call.createdAt;

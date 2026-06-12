@@ -19,8 +19,10 @@ export interface Call {
         };
     };
     lead?: {
-        name: string;
-        phone: string;
+        name?: string;
+        First_Name?: string;
+        Last_Name?: string;
+        phone?: string;
     };
     ai_call_score?: any;
 }
@@ -201,7 +203,11 @@ function CallReportCard() {
             {/* Header */}
             <div className="flex justify-between items-start mb-10">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-bold text-[#1e1b4b] tracking-tight">{call?.lead?.name || call?.agent?.personalInfo?.name || 'Unknown'}</h1>
+                    <h1 className="text-3xl font-bold text-[#1e1b4b] tracking-tight">
+                        {call?.lead?.First_Name 
+                            ? `${call.lead.First_Name} ${call.lead.Last_Name || ''}`.trim() 
+                            : (call?.lead?.name || call?.agent?.personalInfo?.name || 'Unknown')}
+                    </h1>
                     <div className="flex items-center text-gray-400 text-sm font-medium">
                         <Clock className="w-4 h-4 mr-1.5" />
                         <span>{formatDate(call?.createdAt)}</span>

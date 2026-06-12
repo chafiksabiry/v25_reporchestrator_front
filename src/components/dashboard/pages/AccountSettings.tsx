@@ -15,6 +15,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import config from '../../../config';
+import { syncRepIdentityName } from '../../../utils/profileUtils';
 
 interface ApiUserResponse {
   success?: boolean;
@@ -31,8 +32,6 @@ interface ApiUserResponse {
 }
 
 type Section = 'profile' | 'email' | 'password' | 'phone';
-
-const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
 
 export function AccountSettings() {
   const [section, setSection] = useState<Section>('profile');
@@ -93,6 +92,9 @@ export function AccountSettings() {
       setFullName(resolvedName);
       setEditingFullName(resolvedName);
       setPhone(resolvedPhone);
+      if (resolvedName) {
+        localStorage.setItem('userFullName', resolvedName);
+      }
     } catch (err) {
       console.error('Failed to load user details:', err);
       toast.error('Impossible de charger le profil utilisateur.');
@@ -130,10 +132,8 @@ export function AccountSettings() {
       const nextName = data?.data?.fullName || trimmed;
       setFullName(nextName);
       setEditingFullName(nextName);
-      // Notify the TopBar to update its displayed name immediately (no reload).
-      window.dispatchEvent(
-        new CustomEvent(USER_FULLNAME_UPDATE_EVENT, { detail: { fullName: nextName } })
-      );
+      // Mirror on agent profile + local cache so refresh keeps the new name everywhere.
+      await syncRepIdentityName(nextName);
       toast.success('Nom mis à jour.');
     } catch (err) {
       toast.error(extractError(err, 'Échec de la mise à jour.'));
