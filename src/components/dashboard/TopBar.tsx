@@ -123,14 +123,16 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     }
   };
 
-  // Resolve the best display name: the agent profile name if it exists,
-  // otherwise (profile not created yet) fall back to the registration user's
-  // fullName fetched from the auth backend.
+  // Resolve the best display name. The account-level identity (users.fullName,
+  // editable in Account Settings) is the source of truth and takes priority so
+  // that a name change persists after a refresh. We fall back to the agent
+  // profile persona name, then to "User".
   const resolveDisplayName = async () => {
     const agentName = (getProfileData()?.personalInfo?.name || '').trim();
+    // Show the persona name immediately to avoid a blank/"User" flash while we
+    // fetch the authoritative fullName from the auth backend.
     if (agentName) {
       setDisplayName(agentName);
-      return;
     }
     try {
       const { userId, token } = config.getUserData();
@@ -154,7 +156,9 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
     } catch (error) {
       console.warn('TopBar: could not resolve user fullName from auth backend', error);
     }
-    setDisplayName('User');
+    if (!agentName) {
+      setDisplayName('User');
+    }
   };
 
   useEffect(() => {
