@@ -175,7 +175,7 @@ export function Profile() {
       console.log('🔄 Starting profile data loading process');
       try {
         console.log('🔍 Requesting profile data through getProfileData utility');
-        const profileData = await getProfileData();
+        const profileData = await fetchProfileFromAPI();
         console.log('✅ Profile data received successfully');
         console.log('💽 Setting profile data in component state');
         setProfile(profileData);

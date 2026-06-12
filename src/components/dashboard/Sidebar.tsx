@@ -58,6 +58,28 @@ const readPhaseCompletionCache = (): Record<number, boolean> => {
   }
 };
 
+/** Fallback when the `phases` prop is still loading after login (logout clears cache). */
+const readPhasesFromProfileStorage = (): Phases | undefined => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (!raw) return undefined;
+    const profile = JSON.parse(raw);
+    return profile?.onboardingProgress?.phases;
+  } catch {
+    return undefined;
+  }
+};
+
+const isProfilePublishedInStorage = (): boolean => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (!raw) return false;
+    return JSON.parse(raw)?.status === 'completed';
+  } catch {
+    return false;
+  }
+};
+
 export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const location = useLocation();
@@ -68,9 +90,11 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   // momentarily assuming onboarding is incomplete (which flashes the warning
   // card + an empty menu before the real data arrives), fall back to the last
   // known completion snapshot persisted in localStorage.
+  const effectivePhases = phases ?? readPhasesFromProfileStorage();
+
   const isPhaseCompleted = (phaseNumber: number): boolean => {
-    if (phases) {
-      return phases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
+    if (effectivePhases) {
+      return effectivePhases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
     }
     return readPhaseCompletionCache()[phaseNumber] === true;
   };
@@ -94,7 +118,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   // Planning and Wallet and show an onboarding guide instead.
   const isOnboardingComplete = (): boolean =>
     isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
-  const onboardingComplete = isOnboardingComplete();
+  // Published profile = onboarding funnel done (phases 1–4 + publish).
+  const onboardingComplete = isProfilePublishedInStorage() || isOnboardingComplete();
 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||

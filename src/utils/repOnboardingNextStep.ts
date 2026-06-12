@@ -19,8 +19,13 @@ export const hasRepGigEngagement = (profile: any): boolean =>
     (g: any) => g && ['requested', 'enrolled'].includes(g.status)
   );
 
-export const isRepCoreOnboardingDone = (profile: any): boolean =>
-  [1, 2, 3, 4].every((n) => isPhaseCompleted(profile?.onboardingProgress?.phases, n));
+/** Core onboarding = phases 1–4 only. Phase 5 in the DB is marketplace tracking, not a UI step. */
+export const isRepCoreOnboardingDone = (profile: any): boolean => {
+  if (isRepProfilePublished(profile)) return true;
+  return [1, 2, 3, 4].every((n) =>
+    isPhaseCompleted(profile?.onboardingProgress?.phases, n)
+  );
+};
 
 export const isRepProfilePublished = (profile: any): boolean =>
   profile?.status === 'completed';

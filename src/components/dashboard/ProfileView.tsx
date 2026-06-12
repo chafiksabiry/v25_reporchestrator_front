@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
-import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone } from '../../utils/repOnboardingNextStep';
+import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
@@ -1112,13 +1112,10 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Phase 2 onboarding: yellow warning while incomplete, continue CTA once done.
-                    Publishing requires the core onboarding (phases 1-4) to be done AND
-                    the rep to have APPLIED to at least one gig. Applying (status
-                    'requested') is enough — a full enrollment ('enrolled') is NOT
-                    required. We read profile.gigs directly so this holds even if the
-                    derived phase5 status isn't echoed back on the profile. */}
-                {isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
+                {/* Onboarding banners (phases 1–4 + gig apply). Hidden once published —
+                    status "completed" is the source of truth after logout/login. */}
+                {!isRepProfilePublished(profile) && (
+                isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
                   profile.status !== 'completed' ? (
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
                       <div className="flex items-start gap-3">
@@ -1202,6 +1199,7 @@ export const ProfileView: React.FC<{
                       </p>
                     </div>
                   </div>
+                )
                 )}
                 {/* Action Buttons Top Right */}
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
