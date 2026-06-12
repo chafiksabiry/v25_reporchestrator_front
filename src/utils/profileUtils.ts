@@ -68,6 +68,11 @@ export const getProfileData = async () => {
   if (dataIsFresh) {
     try {
       const parsedData = JSON.parse(storedProfile);
+      // Stale/partial cache after login can lack onboardingProgress while status
+      // is already "completed" — refetch so banners don't show Phase 2 warnings.
+      if (!parsedData?.onboardingProgress?.phases && parsedData?._id) {
+        return await fetchProfileFromAPI();
+      }
       return parsedData;
     } catch (err) {
       return await fetchProfileFromAPI();
