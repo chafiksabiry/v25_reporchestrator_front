@@ -32,7 +32,7 @@ interface ApiUserResponse {
 
 type Section = 'profile' | 'email' | 'password' | 'phone';
 
-const PROFILE_UPDATE_EVENT = 'PROFILE_UPDATED';
+const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
 
 export function AccountSettings() {
   const [section, setSection] = useState<Section>('profile');
@@ -130,7 +130,10 @@ export function AccountSettings() {
       const nextName = data?.data?.fullName || trimmed;
       setFullName(nextName);
       setEditingFullName(nextName);
-      window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+      // Notify the TopBar to update its displayed name immediately (no reload).
+      window.dispatchEvent(
+        new CustomEvent(USER_FULLNAME_UPDATE_EVENT, { detail: { fullName: nextName } })
+      );
       toast.success('Nom mis à jour.');
     } catch (err) {
       toast.error(extractError(err, 'Échec de la mise à jour.'));

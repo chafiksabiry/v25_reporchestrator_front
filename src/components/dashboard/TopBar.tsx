@@ -57,6 +57,7 @@ interface ProfileData {
 
 // Add event listener for profile updates
 const PROFILE_UPDATE_EVENT = 'PROFILE_UPDATED';
+const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
 
 export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -169,10 +170,21 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       setOnboardingComplete(computeOnboardingComplete());
     };
 
+    // Immediate update when the user edits their name in Account Settings:
+    // the event carries the new fullName so the bar reflects it without reload.
+    const handleFullNameUpdate = (e: Event) => {
+      const next = (e as CustomEvent)?.detail?.fullName;
+      if (typeof next === 'string' && next.trim()) {
+        setDisplayName(next.trim());
+      }
+    };
+
     window.addEventListener(PROFILE_UPDATE_EVENT, handleProfileUpdate);
+    window.addEventListener(USER_FULLNAME_UPDATE_EVENT, handleFullNameUpdate);
 
     return () => {
       window.removeEventListener(PROFILE_UPDATE_EVENT, handleProfileUpdate);
+      window.removeEventListener(USER_FULLNAME_UPDATE_EVENT, handleFullNameUpdate);
     };
   }, []);
 
