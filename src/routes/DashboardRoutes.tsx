@@ -100,13 +100,21 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
       {!isProfileEdit && (
-        <Sidebar
-          phases={userProfile?.onboardingProgress?.phases}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          isCollapsed={false}
-          setIsCollapsed={() => {}}
-        />
+        <>
+          <Sidebar
+            phases={userProfile?.onboardingProgress?.phases}
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            isCollapsed={false}
+            setIsCollapsed={() => {}}
+          />
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 z-20 bg-slate-950/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 cursor-pointer"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+        </>
       )}
       <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
         {!isProfileEdit && (
