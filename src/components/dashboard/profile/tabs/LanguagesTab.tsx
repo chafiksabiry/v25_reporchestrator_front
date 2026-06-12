@@ -173,8 +173,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
           </div>
         )}
 
-        {/* Global warning banner */}
-        {hasUnverified && (
+        {/* Global status banner — mirrors the Profile tab's two-state design:
+            yellow warning while some languages are unverified, green success
+            once every language is verified. */}
+        {hasUnverified ? (
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-300/80 shadow-sm">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-yellow-100">
@@ -202,7 +204,25 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               {isFr ? 'Enregistrer' : 'Record'}
             </button>
           </div>
-        )}
+        ) : totalCount > 0 ? (
+          <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-emerald-800">
+                {isFr
+                  ? `Toutes vos langues sont vérifiées (${verifiedCount}/${totalCount})`
+                  : `All your languages are verified (${verifiedCount}/${totalCount})`}
+              </p>
+              <p className="text-xs font-medium text-emerald-700/90 mt-0.5">
+                {isFr
+                  ? 'Vos niveaux ont été validés par vidéo. Rien d’autre à faire ici.'
+                  : 'Your levels have been validated by video. Nothing else to do here.'}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {/* Cards grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
