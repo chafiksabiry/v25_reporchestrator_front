@@ -1,5 +1,11 @@
 import { profileApi } from './client.tsx';
 import Cookies from 'js-cookie';
+import { getProfileData as getCachedProfileData, setProfileData } from './authUtils';
+
+/** Fired when `users.fullName` changes — TopBar listens for instant UI update. */
+export const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
+/** Fired when agent profile cache changes — sidebar / profile pages refresh. */
+export const PROFILE_UPDATE_EVENT = 'PROFILE_UPDATED';
 
 // Cache duration in milliseconds (30 minutes)
 const CACHE_DURATION = 30 * 60 * 1000;
@@ -367,6 +373,67 @@ export const updateUserFullName = async (
       `Failed to update user fullName (status ${response.status})${detail ? `: ${detail}` : ''}`
     );
   }
+
+  applyRepDisplayNameLocally(trimmed);
+};
+
+/** Update local caches + notify UI immediately (no network). */
+export const applyRepDisplayNameLocally = (fullName: string): void => {
+  const trimmed = (fullName || '').trim();
+  if (!trimmed) return;
+
+  localStorage.setItem('userFullName', trimmed);
+
+  const profile = getCachedProfileData();
+  if (profile?.personalInfo) {
+    setProfileData({
+      ...profile,
+      personalInfo: {
+        ...profile.personalInfo,
+        name: trimmed,
+      },
+    });
+    localStorage.setItem('profileDataTimestamp', Date.now().toString());
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(USER_FULLNAME_UPDATE_EVENT, { detail: { fullName: trimmed } })
+  );
+};
+
+/** Persist `personalInfo.name` on the agent profile (survives page refresh). */
+export const syncAgentProfileDisplayName = async (fullName: string): Promise<void> => {
+  const trimmed = (fullName || '').trim();
+  if (!trimmed) return;
+
+  const profile = getCachedProfileData();
+  const profileId = profile?._id;
+  if (!profileId || !profile?.personalInfo) return;
+
+  const { presentationVideo: _video, ...personalInfoWithoutVideo } = profile.personalInfo;
+  await updateBasicInfo(profileId, {
+    ...personalInfoWithoutVideo,
+    name: trimmed,
+  });
+};
+
+/**
+ * After `users.fullName` is saved, mirror the same label on the agent profile
+ * and refresh every consumer (TopBar, profile page, sidebar).
+ */
+export const syncRepIdentityName = async (fullName: string): Promise<void> => {
+  const trimmed = (fullName || '').trim();
+  if (!trimmed) return;
+
+  applyRepDisplayNameLocally(trimmed);
+
+  try {
+    await syncAgentProfileDisplayName(trimmed);
+  } catch (err) {
+    console.warn('Could not sync agent profile display name:', err);
+  }
+
+  window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
 };
 
 // Function to fetch user's IP history
