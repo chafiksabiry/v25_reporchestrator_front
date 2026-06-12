@@ -238,14 +238,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             {/* Wallet */}
             <button
               onClick={() => navigate('/wallet')}
-              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
+              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title="Mon Portefeuille"
             >
               <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Wallet className="w-4 h-4" />
               </div>
-              <div className="text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider block">Mon Portefeuille</span>
+              <div className="hidden md:block text-left leading-none">
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Mon Portefeuille</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
                   {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                 </span>
@@ -258,14 +258,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             {/* Session Planning */}
             <button
               onClick={() => navigate('/session-planning')}
-              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
+              className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title="Session Planning"
             >
               <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Calendar className="w-4 h-4" />
               </div>
-              <div className="text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider block">Planning</span>
+              <div className="hidden md:block text-left leading-none">
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Planning</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
               </div>
             </button>
@@ -294,7 +294,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                 {initials}
               </div>
             )}
-            <div className="text-right">
+            <div className="hidden md:block text-right">
               <p className="text-sm font-black tracking-tight text-white">{userName}</p>
             </div>
             <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
