@@ -2743,3 +2743,4 @@ export function GigsMarketplace() {
     </div>
   );
 }
+}
