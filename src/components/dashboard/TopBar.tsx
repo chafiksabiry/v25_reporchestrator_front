@@ -221,7 +221,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       {/* ── Col 1: Left — hamburger (mobile) ── */}
       <div className="flex items-center">
         <button
-          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all duration-300 shadow-sm md:hidden"
+          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all duration-300 shadow-sm lg:hidden"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
           <Menu className="h-5 w-5" />

@@ -54,6 +54,12 @@ function OnboardingShellContent() {
         isCollapsed={false}
         setIsCollapsed={() => {}}
       />
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-slate-950/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 cursor-pointer"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       <div
         className="flex flex-1 flex-col overflow-hidden"
         style={{ backgroundImage: HARX_NAVBAR_BG }}

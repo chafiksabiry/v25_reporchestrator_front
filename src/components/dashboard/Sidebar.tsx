@@ -113,6 +113,11 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     }
   }, [phases]);
 
+  // Close sidebar on navigation (responsive screen widths)
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname, setIsSidebarOpen]);
+
   // Onboarding is considered complete (agent profile created) only when the
   // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
   // Planning and Wallet and show an onboarding guide instead.
@@ -221,8 +226,8 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   return (
     <div
       style={{ backgroundImage: HARX_SIDEBAR_BG, boxShadow: HARX_BAR_SHADOW }}
-      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out md:relative flex flex-col overflow-hidden ${!isSidebarOpen
-          ? '-translate-x-full md:translate-x-0'
+      className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out lg:relative flex flex-col overflow-hidden ${!isSidebarOpen
+          ? '-translate-x-full lg:translate-x-0'
           : 'translate-x-0'
         } w-64`}
     >
@@ -235,7 +240,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         />
         <button
           onClick={() => setIsSidebarOpen(false)}
-          className="md:hidden absolute top-2 right-2 p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+          className="lg:hidden absolute top-2 right-2 p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
           aria-label="Close menu"
         >
           <X className="h-4 w-4 text-white" />
