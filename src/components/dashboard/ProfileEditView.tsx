@@ -4,7 +4,8 @@ import 'react-image-crop/dist/ReactCrop.css';
 import {
   X, Save, RefreshCw, Trash2, ChevronLeft
 } from 'lucide-react';
-import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch } from '../../utils/profileUtils';
+import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch, updateUserFullName } from '../../utils/profileUtils';
+import config from '../../config';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, SkillsByCategory, Skill } from '../../services/api/skills';
@@ -982,6 +983,23 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
           data: basicInfoPayload
         });
         updateTasks.push(updateBasicInfo(profile._id, basicInfoPayload));
+
+        // Keep the auth-level identity (users.fullName) in sync with the
+        // profile display name whenever the name was edited.
+        if (modifiedSections.personalInfo && profile.personalInfo?.name?.trim()) {
+          const authUserId =
+            config.getUserData()?.userId ||
+            localStorage.getItem('userId') ||
+            sessionStorage.getItem('userId') ||
+            '';
+          if (authUserId) {
+            updateTasks.push(
+              updateUserFullName(authUserId, profile.personalInfo.name).catch((err) => {
+                console.warn('⚠️ Could not sync users.fullName:', err);
+              })
+            );
+          }
+        }
       }
 
       // Save professional summary if modified
