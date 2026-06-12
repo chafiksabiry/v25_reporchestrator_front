@@ -68,10 +68,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
   const readWalletTotal = () => {
     const available = parseFloat(localStorage.getItem('rep_available_balance') || '0');
-    const pending = parseFloat(localStorage.getItem('rep_pending_balance') || '0');
-    const safeAvailable = Number.isFinite(available) ? available : 0;
-    const safePending = Number.isFinite(pending) ? pending : 0;
-    return safeAvailable + safePending;
+    return Number.isFinite(available) ? available : 0;
   };
 
   const [balance, setBalance] = useState(() => readWalletTotal());
