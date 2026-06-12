@@ -10,6 +10,7 @@ import { GigsMarketplace } from '../components/dashboard/pages/GigsMarketplace';
 import { GigDetails } from '../components/dashboard/pages/GigDetails';
 import { CompanyProfile } from '../components/dashboard/pages/CompanyProfile';
 import { Profile } from '../components/dashboard/pages/Profile';
+import { AccountSettings } from '../components/dashboard/pages/AccountSettings';
 import { Payouts } from '../components/dashboard/pages/Payouts';
 import { Learning } from '../components/dashboard/pages/Learning';
 import { Training } from '../components/dashboard/pages/Training';
@@ -139,6 +140,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
               </PhaseProtectedRoute>
             } />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/account-settings" element={<AccountSettings />} />
             <Route path="/payouts" element={<Payouts />} />
             <Route path="/learning" element={<Learning />} />
             <Route path="/training" element={

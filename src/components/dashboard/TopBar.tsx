@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar } from 'lucide-react';
+import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
@@ -319,6 +319,15 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                     <UserCircle className="h-4 w-4" />
                   </div>
                   <span>Mon Profil</span>
+                </button>
+                <button
+                  onClick={() => { setIsDropdownOpen(false); navigate('/account-settings'); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-white/15 transition-colors group"
+                >
+                  <div className="p-1.5 bg-white/20 text-white rounded-lg group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200">
+                    <Settings className="h-4 w-4" />
+                  </div>
+                  <span>Paramètres</span>
                 </button>
               </div>
 
