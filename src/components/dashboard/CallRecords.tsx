@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   Phone,
   Calendar,
@@ -22,6 +23,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import api from '../../utils/client';
+import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
   hasValidatedTransactionSale,
   resolveCallRepCommission,
@@ -268,6 +270,21 @@ export function CallRecords({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingCallId, setAnalyzingCallId] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<{ callId: string; message: string } | null>(null);
+
+  const patchCallInLists = (callId: string, patch: Partial<CallRecord>) => {
+    setCallRecords((prev) =>
+      prev.map((r) => {
+        const id = typeof r._id === 'object' ? (r._id as any).$oid : r._id;
+        return id === callId ? { ...r, ...patch } : r;
+      })
+    );
+    setSelectedCall((prev) => {
+      if (!prev) return prev;
+      const id = typeof prev._id === 'object' ? (prev._id as any).$oid : prev._id;
+      return id === callId ? { ...prev, ...patch } : prev;
+    });
+  };
   const fetchCallRecords = async (silent = false) => {
     try {
       const agentId = localStorage.getItem('agentId');
@@ -292,19 +309,27 @@ export function CallRecords({
   const handleAnalyzeCall = async (callId: string) => {
     try {
       setAnalyzingCallId(callId);
+      setAnalysisError(null);
       const response = await api.calls.analyze(callId);
 
       // Auto-analysis may already be running after hangup — poll, don't error.
       if (response.inProgress) {
         console.info('ℹ️ AI analysis already in progress — waiting for results…');
-        if (selectedCall && (selectedCall._id === callId || (selectedCall as any).$oid === callId)) {
-          setSelectedCall({ ...selectedCall, ai_call_status: 'processing' });
-        }
+        patchCallInLists(callId, { ai_call_status: 'processing' });
         await fetchCallRecords(true);
         return;
       }
 
+      if (!response.success) {
+        const message = getCallAnalyzeErrorMessage(response);
+        setAnalysisError({ callId, message });
+        toast.error(message);
+        patchCallInLists(callId, { ai_call_status: 'error' });
+        return;
+      }
+
       if (response.success) {
+        setAnalysisError(null);
         if (selectedCall && (selectedCall._id === callId || (selectedCall as any).$oid === callId)) {
           const isFullDoc =
             response.data && typeof response.data === 'object' && '_id' in response.data;
@@ -328,6 +353,10 @@ export function CallRecords({
         }
       }
     } catch (error) {
+      const message = getCallAnalyzeErrorMessage(error);
+      setAnalysisError({ callId, message });
+      toast.error(message);
+      patchCallInLists(callId, { ai_call_status: 'error' });
       console.error('Error analyzing call:', error);
     } finally {
       setAnalyzingCallId(null);
@@ -431,6 +460,7 @@ export function CallRecords({
   const openCallDetails = (call: CallRecord, tab: 'transcript' | 'insights') => {
     setSelectedCall(call);
     setActiveTab(tab);
+    setAnalysisError(null);
   };
 
   const filteredRecords = callRecords.filter(record => {
@@ -466,6 +496,22 @@ export function CallRecords({
     ? analyzingCallId === selectedCall._id ||
       (isAnalysisPending(selectedCall) && !selectedCallStale)
     : false;
+  const selectedCallId = selectedCall
+    ? (typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id)
+    : null;
+  const selectedCallAnalysisError =
+    analysisError?.callId === selectedCallId ? analysisError.message : null;
+
+  const renderAnalysisErrorBanner = () =>
+    selectedCallAnalysisError ? (
+      <div
+        role="alert"
+        className="w-full max-w-lg mx-auto flex items-start gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-sm font-medium text-left"
+      >
+        <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+        <p>{selectedCallAnalysisError}</p>
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-6 relative">
@@ -896,6 +942,7 @@ export function CallRecords({
                     ))
                   ) : (
                     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
+                      {renderAnalysisErrorBanner()}
                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">Transcript not available</p>
                       {selectedCallStale && (
                         <p className="text-amber-500 font-bold text-[10px] uppercase tracking-widest">
@@ -917,6 +964,7 @@ export function CallRecords({
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
                   {(!selectedCall.ai_call_score || !selectedCall.ai_call_score.overall?.score) ? (
                     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
+                      {renderAnalysisErrorBanner()}
                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">
                         Analyse détaillée non encore générée
                       </p>

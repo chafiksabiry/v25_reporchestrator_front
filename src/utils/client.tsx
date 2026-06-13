@@ -8,6 +8,7 @@ import axios from 'axios';
 // trailing `/api` (and slash) defensively so it works regardless of how the
 // env var is configured.
 import { stripApiSuffix, getRepApiHost } from './repApiUrl';
+import { isExpectedCallAnalyzeHttpError, toCallAnalyzeFailure } from './callAnalyzeErrors';
 
 const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
 const REP_API_URL = getRepApiHost();
@@ -100,10 +101,11 @@ const addAuthInterceptor = (axiosInstance: any) => {
       const isAnalysisInProgress =
         (status === 409 || status === 202) &&
         /analysis already in progress/i.test(msg);
+      const isExpectedAnalyzeError = isExpectedCallAnalyzeHttpError(error);
 
       // A missing profile is expected for reps who haven't onboarded yet —
       // don't pollute the console with a red error for it.
-      if (isExpectedNotFound || isAnalysisInProgress) {
+      if (isExpectedNotFound || isAnalysisInProgress || isExpectedAnalyzeError) {
         console.info("ℹ️ API resource not found (expected):", {
           url: error.config?.url,
           status,
@@ -311,6 +313,10 @@ export const callsApi = {
           message: data?.message || 'Analysis already in progress for this call.',
           ai_call_status: 'processing' as const,
         };
+      }
+      // Expected business errors (no recording, call not found, …) — surface to UI.
+      if (status === 400 || status === 404) {
+        return toCallAnalyzeFailure(error);
       }
       throw error;
     }
