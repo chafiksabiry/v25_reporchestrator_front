@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   Wallet, 
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import { CallRecords } from '../CallRecords';
+import { WalletFilterSelect } from '../ui/WalletFilterSelect';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getAgentId } from '../../../utils/authUtils';
@@ -125,32 +126,80 @@ export function WalletPage() {
     };
   }, []);
 
+  // Resolves the gig id of a call regardless of how the backend serialised it
+  // (populated object, ObjectId, or $oid wrapper). Returns undefined when the
+  // call is not attached to any gig.
+  const getGigIdFromCall = (record: any): string | undefined => {
+    const recordGig = record?.lead?.gigId;
+    if (!recordGig) return undefined;
+    const idStr = typeof recordGig === 'object'
+      ? (recordGig?._id || recordGig?.$oid)
+      : recordGig;
+    return idStr || undefined;
+  };
+
   const getCallCountForGig = (gigId: string) => {
-    if (gigId === 'all') return realCalls.length;
-    return realCalls.filter(record => {
-      const recordGig = record.lead?.gigId;
-      const idStr = typeof recordGig === 'object' 
-        ? (recordGig?._id || (recordGig as any)?.$oid) 
-        : recordGig;
-      return idStr === gigId;
-    }).length;
+    // "all" must only count calls that actually belong to a gig (i.e. the
+    // company's gigs the rep worked on), not every raw call in the database.
+    // Otherwise the total diverges from the sum of the per-gig counts.
+    if (gigId === 'all') {
+      return realCalls.filter(record => Boolean(getGigIdFromCall(record))).length;
+    }
+    return realCalls.filter(record => getGigIdFromCall(record) === gigId).length;
   };
 
   const gigsFilterOptions = [
     { id: 'all', title: `Tous les Gigs (${getCallCountForGig('all')})` },
-    ...Array.from(new Set(realCalls.map(c => {
-      const gig = c.lead?.gigId;
-      return typeof gig === 'object' ? (gig?._id || (gig as any)?.$oid) : gig;
-    }).filter(Boolean))).map(id => {
-      const call = realCalls.find(c => {
-        const gig = c.lead?.gigId;
-        const gigId = typeof gig === 'object' ? (gig?._id || (gig as any)?.$oid) : gig;
-        return gigId === id;
-      });
+    ...Array.from(new Set(realCalls.map(getGigIdFromCall).filter(Boolean) as string[])).map(id => {
+      const call = realCalls.find(c => getGigIdFromCall(c) === id);
       const title = call?.lead?.gigId?.title || "Projet Sans Titre";
       return { id, title: `${title} (${getCallCountForGig(id)})` };
     })
   ];
+
+  const gigSelectOptions = useMemo(
+    () => gigsFilterOptions.map((g) => ({ value: g.id, label: g.title })),
+    [gigsFilterOptions]
+  );
+
+  const dateRangeOptions = useMemo(
+    () => [
+      { value: 'today', label: "Aujourd'hui" },
+      { value: 'this-week', label: 'Cette semaine' },
+      { value: 'this-month', label: 'Ce mois' },
+      { value: 'last-month', label: 'Mois dernier' },
+    ],
+    []
+  );
+
+  const transactionSaleOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Toutes les ventes', tone: 'brand' as const },
+      { value: 'validated', label: 'Ventes validées', tone: 'success' as const },
+      { value: 'pending', label: 'Ventes en attente', tone: 'warning' as const },
+      { value: 'refused', label: 'Ventes refusées', tone: 'danger' as const },
+    ],
+    []
+  );
+
+  const callValidationOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Tous les appels', tone: 'brand' as const },
+      { value: 'approved', label: 'Validés uniquement', tone: 'success' as const },
+      { value: 'pending', label: 'En attente / Non validés', tone: 'warning' as const },
+    ],
+    []
+  );
+
+  const callTxValidationOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Toutes les transactions', tone: 'brand' as const },
+      { value: 'approved', label: 'Validées (Signées)', tone: 'success' as const },
+      { value: 'refused', label: 'Refusées', tone: 'danger' as const },
+      { value: 'pending', label: 'À valider (En attente)', tone: 'warning' as const },
+    ],
+    []
+  );
 
   // Rep keeps 70% of every commission; HARX keeps 30%. We only display the rep share.
   const REP_SHARE = 0.7;
@@ -417,167 +466,212 @@ export function WalletPage() {
     }
   };
 
-  const balanceStats = [
-    {
-      title: t('wallet.availableBalance'),
-      amount: `${availableBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`,
-      icon: Wallet,
-      change: `+${getWeeklyEarnings().toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ cette semaine`,
-      status: 'positive'
-    },
-    {
-      title: t('wallet.pendingEarnings'),
-      amount: `${pendingEarnings.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`,
-      icon: Clock,
-      change: `${pendingTransactionsCount} transactions en attente`,
-      status: 'neutral'
+  const fmtMoney = (value: number) =>
+    value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const weeklyEarnings = getWeeklyEarnings();
+  const progressPct = Math.min(100, Math.round((availableBalance / MIN_WITHDRAWAL_AMOUNT) * 100));
+  const remainingToMin = Math.max(0, MIN_WITHDRAWAL_AMOUNT - availableBalance);
+  const canWithdraw = availableBalance >= MIN_WITHDRAWAL_AMOUNT;
+
+  const filteredTransactions = transactions.filter((tx) => {
+    if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
+    if (transactionValidationFilter !== 'all') {
+      if (transactionValidationFilter === 'approved' || transactionValidationFilter === 'validated') {
+        if (tx.type === 'Payout') return false;
+        if (tx.status !== 'Completed' && tx.status !== 'Paid') return false;
+      }
+      if (transactionValidationFilter === 'pending' && tx.status !== 'Processing' && tx.status !== 'Pending') return false;
+      if (transactionValidationFilter === 'refused' && tx.status !== 'Refused') return false;
     }
-  ];
+    return true;
+  });
+
+  const getTxVisual = (type: string) => {
+    if (type === 'Payout') {
+      return { iconBg: 'bg-amber-50', iconText: 'text-amber-600', cardBorder: 'border-amber-100/60', label: 'Retrait' };
+    }
+    if (type === 'Bonus') {
+      return { iconBg: 'bg-violet-50', iconText: 'text-violet-600', cardBorder: 'border-violet-100/60', label: 'Bonus' };
+    }
+    if (type === 'Vente validée') {
+      return { iconBg: 'bg-harx-50', iconText: 'text-harx-600', cardBorder: 'border-harx-100/60', label: 'Vente' };
+    }
+    return { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600', cardBorder: 'border-emerald-100/60', label: 'Commission' };
+  };
+
+  const getTxStatusBadge = (status: string) => {
+    if (status === 'Completed' || status === 'Paid') {
+      return { label: 'Complété', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+    if (status === 'Refused' || status === 'Failed') {
+      return { label: 'Refusé', className: 'bg-rose-50 text-rose-700 border-rose-200' };
+    }
+    return { label: 'En cours', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+  };
 
   return (
     <div className="space-y-6 relative">
-      {/* Mini Notification Toast */}
+      {/* Inline Notification Banner (within the page, below the navbar) */}
       {toastMessage.text && (
-        <div className={`fixed bottom-6 right-6 px-5 py-3 rounded-xl shadow-xl border z-[9999] transition-all flex items-center gap-2 animate-in slide-in-from-bottom-2 ${
+        <div className={`px-5 py-3 rounded-xl shadow-sm border transition-all flex items-center gap-3 animate-in slide-in-from-top-2 fade-in ${
           toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
         }`}>
-          {toastMessage.type === 'success' ? <Check className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-rose-600" />}
-          <span className="text-xs font-bold">{toastMessage.text}</span>
+          {toastMessage.type === 'success' ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+          <span className="text-xs font-bold flex-1">{toastMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage({ text: '', type: null })}
+            className={`p-1 rounded-lg shrink-0 transition-colors ${
+              toastMessage.type === 'success' ? 'hover:bg-emerald-100 text-emerald-600' : 'hover:bg-rose-100 text-rose-600'
+            }`}
+            aria-label="Fermer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">{t('wallet.title')}</h1>
-        <div className="flex items-center space-x-4">
-          <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs font-bold transition-all">
-            <Download className="w-4 h-4" />
-            <span>{t('wallet.downloadStatement')}</span>
-          </button>
-          <button 
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">{t('wallet.title')}</h1>
+          <p className="text-sm text-slate-500 font-medium mt-1">
+            Suivez vos gains, vos commissions et gérez vos retraits en toute sécurité.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
             onClick={handleOpenWithdraw}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-bold shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 transition-all active:scale-95"
           >
+            <ArrowUpRight className="w-4 h-4" />
             {t('wallet.withdrawFunds')}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {balanceStats.map((stat, index) => {
-          const isAvailable = index === 0;
-          const progressPct = isAvailable
-            ? Math.min(100, Math.round((availableBalance / MIN_WITHDRAWAL_AMOUNT) * 100))
-            : 0;
-          const remainingToMin = Math.max(0, MIN_WITHDRAWAL_AMOUNT - availableBalance);
-          const canWithdraw = isAvailable && availableBalance >= MIN_WITHDRAWAL_AMOUNT;
-          return (
-            <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <stat.icon className="w-6 h-6 text-blue-600" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Hero: Available balance (premium dark card) ───────────────── */}
+        <div className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-7 text-white shadow-xl shadow-slate-900/25">
+          {/* Brand glow accents */}
+          <div className="absolute -top-16 -right-10 h-56 w-56 rounded-full bg-harx-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-harx-alt-500/15 blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-white" />
                 </div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  stat.status === 'positive' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
-                }`}>
-                  {stat.change}
-                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                    {t('wallet.availableBalance')}
+                  </p>
+                  <p className="text-[11px] font-semibold text-white/40 mt-0.5">Solde retirable</p>
+                </div>
               </div>
-              <p className="mt-4 text-2xl font-black text-slate-800 tracking-tight">{stat.amount}</p>
-              <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-wider">{stat.title}</p>
-
-              {isAvailable && (
-                <div
-                  className={`mt-5 relative overflow-hidden rounded-2xl p-4 border ${
-                    canWithdraw
-                      ? 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 border-emerald-100'
-                      : 'bg-gradient-to-br from-slate-50 via-white to-blue-50/40 border-slate-100'
-                  }`}
-                >
-                  {/* Decorative glow */}
-                  <div
-                    className={`absolute -top-10 -right-10 h-24 w-24 rounded-full blur-2xl ${
-                      canWithdraw ? 'bg-emerald-300/30' : 'bg-blue-300/20'
-                    }`}
-                  />
-
-                  <div className="relative z-10 flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
-                          canWithdraw
-                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                            : 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
-                        }`}
-                      >
-                        {canWithdraw ? <ShieldCheck className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">
-                          Seuil de retrait
-                        </p>
-                        <p className="text-sm font-black text-slate-900 tracking-tight leading-tight">
-                          {MIN_WITHDRAWAL_AMOUNT.toLocaleString('fr-FR')}€
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`text-xs font-black px-2.5 py-1 rounded-full shrink-0 ${
-                        canWithdraw
-                          ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
-                          : 'bg-white text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {progressPct}%
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 h-2.5 w-full bg-slate-100/80 rounded-full overflow-hidden shadow-inner">
-                    <div
-                      className={`h-full transition-all duration-1000 ease-out rounded-full relative ${
-                        canWithdraw
-                          ? 'bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/40'
-                          : 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 shadow-lg shadow-blue-500/30'
-                      }`}
-                      style={{ width: `${Math.max(progressPct, 2)}%` }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent rounded-full" />
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 mt-3 flex items-center gap-2">
-                    {canWithdraw ? (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <p className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">
-                          Retrait disponible
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <p className="text-[11px] font-bold text-slate-500">
-                          Encore{' '}
-                          <span className="font-black text-slate-900">
-                            {remainingToMin.toLocaleString('fr-FR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}€
-                          </span>{' '}
-                          avant retrait
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
+              {weeklyEarnings > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20">
+                  <ArrowDownRight className="w-3 h-3" />
+                  +{fmtMoney(weeklyEarnings)}€ cette semaine
+                </span>
               )}
             </div>
-          );
-        })}
+
+            <div className="mt-6 mb-7">
+              <p className="text-4xl sm:text-5xl font-black tracking-tight leading-none">
+                {fmtMoney(availableBalance)}<span className="text-2xl sm:text-3xl text-white/40 ml-1">€</span>
+              </p>
+            </div>
+
+            {/* Withdrawal threshold progress */}
+            <div className="mt-auto">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    canWithdraw ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70 border border-white/15'
+                  }`}>
+                    {canWithdraw ? <ShieldCheck className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                    Seuil de retrait · {MIN_WITHDRAWAL_AMOUNT.toLocaleString('fr-FR')}€
+                  </span>
+                </div>
+                <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
+                  canWithdraw ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 border border-white/15'
+                }`}>
+                  {progressPct}%
+                </span>
+              </div>
+
+              <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ease-out relative ${
+                    canWithdraw
+                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                      : 'bg-gradient-harx'
+                  }`}
+                  style={{ width: `${Math.max(progressPct, 2)}%` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent rounded-full" />
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                {canWithdraw ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <p className="text-[11px] font-black text-emerald-300 uppercase tracking-wider">
+                      Retrait disponible
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-3.5 h-3.5 text-white/40 shrink-0" />
+                    <p className="text-[11px] font-semibold text-white/50">
+                      Encore <span className="font-black text-white">{fmtMoney(remainingToMin)}€</span> avant retrait
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Pending earnings (clean white card) ───────────────────────── */}
+        <div className="relative overflow-hidden rounded-3xl bg-white p-7 shadow-sm border border-slate-100 flex flex-col">
+          <div className="flex items-start justify-between">
+            <div className="h-11 w-11 rounded-2xl bg-amber-50 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <span className="inline-flex items-center text-[11px] font-black px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+              {pendingTransactionsCount} en attente
+            </span>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+              {fmtMoney(pendingEarnings)}<span className="text-xl text-slate-300 ml-1">€</span>
+            </p>
+            <p className="text-[10px] text-slate-400 font-black mt-2 uppercase tracking-widest">
+              {t('wallet.pendingEarnings')}
+            </p>
+          </div>
+
+          <div className="mt-auto pt-5">
+            <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <Shield className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                Les gains en attente sont crédités après validation des appels et ventes par l'entreprise.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             {/* Header Tabs */}
             <div className="flex border-b border-slate-100 bg-slate-50/50">
               <button
@@ -585,7 +679,7 @@ export function WalletPage() {
                 onClick={() => setActiveTab('transactions')}
                 className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
                   activeTab === 'transactions' 
-                    ? 'border-blue-600 text-blue-600 bg-white' 
+                    ? 'border-harx-500 text-harx-600 bg-white' 
                     : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
                 }`}
               >
@@ -596,7 +690,7 @@ export function WalletPage() {
                 onClick={() => setActiveTab('calls')}
                 className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
                   activeTab === 'calls' 
-                    ? 'border-blue-600 text-blue-600 bg-white' 
+                    ? 'border-harx-500 text-harx-600 bg-white' 
                     : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
                 }`}
               >
@@ -606,205 +700,217 @@ export function WalletPage() {
 
             {activeTab === 'transactions' ? (
               <>
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Historique de Retraits & Commissions</h2>
-                    <div className="flex flex-wrap items-center gap-3">
-                      {/* Gig Filter */}
-                      <select
-                        value={selectedGigId}
-                        onChange={(e) => setSelectedGigId(e.target.value)}
-                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                      >
-                        {gigsFilterOptions.map(gig => (
-                          <option key={gig.id} value={gig.id}>{gig.title}</option>
-                        ))}
-                      </select>
-
-                      {/* Transaction Filter */}
-                      <select
-                        value={transactionValidationFilter}
-                        onChange={(e) => setTransactionValidationFilter(e.target.value)}
-                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                      >
-                        <option value="all">Toutes les Ventes</option>
-                        <option value="validated">Ventes Validées</option>
-                        <option value="pending">Ventes en Attente</option>
-                        <option value="rejected">Ventes Refusées</option>
-                        <option value="to_validate">À Valider (Moi)</option>
-                      </select>
-
-                      <select
-                        value={selectedDateRange}
-                        onChange={(e) => setSelectedDateRange(e.target.value)}
-                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                      >
-                        <option value="today">Today</option>
-                        <option value="this-week">This Week</option>
-                        <option value="this-month">This Month</option>
-                        <option value="last-month">Last Month</option>
-                      </select>
+                <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/40 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Filter className="w-4 h-4 text-harx-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                          Historique
+                        </span>
+                      </div>
+                      <h2 className="text-base font-black text-slate-900 tracking-tight">
+                        Retraits & Commissions
+                      </h2>
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        Suivez vos commissions validées et vos demandes de retrait.
+                      </p>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white">
+                        {filteredTransactions.length} opération{filteredTransactions.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <WalletFilterSelect
+                      label="Filtrer par gig"
+                      value={selectedGigId}
+                      onChange={setSelectedGigId}
+                      options={gigSelectOptions}
+                    />
+                    <WalletFilterSelect
+                      label="Ventes"
+                      value={transactionValidationFilter}
+                      onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
+                      options={transactionSaleOptions}
+                    />
+                    <WalletFilterSelect
+                      label="Période"
+                      value={selectedDateRange}
+                      onChange={setSelectedDateRange}
+                      options={dateRangeOptions}
+                    />
                   </div>
                 </div>
 
-                <div className="divide-y divide-slate-100">
-                  {transactions
-                    .filter(tx => {
-                      // Apply Gig Filter if it's a commission transaction
-                      if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
-                      
-                      if (transactionValidationFilter !== 'all') {
-                        if (transactionValidationFilter === 'approved' || transactionValidationFilter === 'validated') {
-                          if (tx.type === 'Payout') return false;
-                          if (tx.status !== 'Completed' && tx.status !== 'Paid') return false;
-                        }
-                        if (transactionValidationFilter === 'pending' && tx.status !== 'Processing' && tx.status !== 'Pending') return false;
-                        if (transactionValidationFilter === 'refused' && tx.status !== 'Refused') return false;
-                      }
-                      
-                      return true;
-                    })
-                    .map((transaction) => (
-                    <div key={transaction.id} className="p-6 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className={`p-2.5 rounded-xl ${
-                            transaction.type === 'Payout' ? 'bg-orange-50 text-orange-600' :
-                            transaction.type === 'Bonus' ? 'bg-violet-50 text-violet-600' :
-                            transaction.type === 'Vente validée' ? 'bg-blue-50 text-blue-600' :
-                            'bg-emerald-50 text-emerald-600'
-                          }`}>
-                            {transaction.type === 'Payout' ? (
-                              <ArrowUpRight className="w-5 h-5" />
-                            ) : (
-                              <ArrowDownRight className="w-5 h-5" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-slate-800 text-sm">{transaction.type === 'Payout' ? 'Retrait Demandé' : transaction.type}</p>
-                            <p className="text-xs text-slate-400 font-semibold mt-0.5">{transaction.description}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-black text-slate-900 text-sm">
-                            {transaction.type === 'Payout' ? '-' : '+'}
-                            {transaction.amount.toFixed(2)} €
-                          </p>
-                          <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
-                            transaction.status === 'Completed' 
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                              : 'bg-amber-50 text-amber-600 border border-amber-100'
-                          }`}>
-                            {transaction.status === 'Completed' ? 'Complété' : 'En cours'}
-                          </span>
-                        </div>
+                <div className="p-4 sm:p-6 bg-slate-50/40">
+                  {filteredTransactions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                        <Wallet className="w-7 h-7 text-slate-300" />
                       </div>
-                      <div className="mt-4 flex items-center justify-between text-[11px] text-slate-400 font-bold">
-                        <span>Ref: {transaction.reference}</span>
-                        <span>{new Date(transaction.date).toLocaleDateString()}</span>
-                      </div>
+                      <p className="text-sm font-black text-slate-700 uppercase tracking-wider">Aucune transaction</p>
+                      <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
+                        Ajustez les filtres ou effectuez des appels validés pour voir vos commissions ici.
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredTransactions.map((transaction) => {
+                        const visual = getTxVisual(transaction.type);
+                        const statusBadge = getTxStatusBadge(transaction.status);
+                        const isPayout = transaction.type === 'Payout';
+                        const title = isPayout ? 'Retrait demandé' : transaction.type;
+
+                        return (
+                          <div
+                            key={transaction.id}
+                            className={`group relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200 ${visual.cardBorder}`}
+                          >
+                            <div className="absolute inset-y-0 left-0 w-1 bg-gradient-harx opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className={`p-3 rounded-2xl shrink-0 shadow-sm ${visual.iconBg} ${visual.iconText}`}>
+                                  {isPayout ? (
+                                    <ArrowUpRight className="w-5 h-5" />
+                                  ) : (
+                                    <ArrowDownRight className="w-5 h-5" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${visual.iconBg} ${visual.iconText}`}>
+                                      {visual.label}
+                                    </span>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${statusBadge.className}`}>
+                                      {statusBadge.label}
+                                    </span>
+                                  </div>
+                                  <p className="font-extrabold text-slate-900 text-sm">{title}</p>
+                                  <p className="text-xs text-slate-500 font-medium mt-1 line-clamp-2 leading-relaxed">
+                                    {transaction.description}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-2 truncate">
+                                    Réf. {transaction.reference}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 sm:pl-4 sm:border-l sm:border-slate-100 shrink-0">
+                                <p className={`text-xl font-black tracking-tight ${isPayout ? 'text-slate-900' : 'text-emerald-600'}`}>
+                                  {isPayout ? '−' : '+'}
+                                  {transaction.amount.toFixed(2)} €
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  {new Date(transaction.date).toLocaleDateString('fr-FR', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
               <>
-                <div className="p-6 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                        Suivi des Appels éligibles aux commissions
+                <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/40 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Phone className="w-4 h-4 text-harx-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                          Suivi des appels
+                        </span>
+                      </div>
+                      <h3 className="text-base font-black text-slate-900 tracking-tight">
+                        Appels éligibles aux commissions
                       </h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
-                        Total : {getCallCountForGig('all')} appels
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        Chaque appel validé par l'entreprise crédite votre solde de gains.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white">
+                        {getCallCountForGig('all')} appels
                       </span>
                       {selectedGigId !== 'all' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
-                          Ce Gig : {getCallCountForGig(selectedGigId)}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-harx-50 text-harx-600 border border-harx-100">
+                          Ce gig : {getCallCountForGig(selectedGigId)}
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-1 uppercase">
-                      Chaque appel validé par l'entreprise crédite votre solde de gains.
-                    </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Filtrer par Gig :</span>
-                      <select
-                        value={selectedGigId}
-                        onChange={(e) => setSelectedGigId(e.target.value)}
-                        className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-black text-slate-700 bg-white shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      >
-                        {gigsFilterOptions.map(opt => (
-                          <option key={opt.id} value={opt.id}>{opt.title}</option>
-                        ))}
-                      </select>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Appels :</span>
-                      <select
-                        value={callValidationFilter}
-                        onChange={(e) => setCallValidationFilter(e.target.value as any)}
-                        className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-black text-slate-700 bg-white shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="all">Tous les appels</option>
-                        <option value="approved">Validés uniquement</option>
-                        <option value="pending">En attente / Non validés</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Transactions :</span>
-                      <select
-                        value={transactionValidationFilter}
-                        onChange={(e) => setTransactionValidationFilter(e.target.value as any)}
-                        className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-black text-slate-700 bg-white shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="all">Toutes les transactions</option>
-                        <option value="approved">Validées (Signées)</option>
-                        <option value="refused">Refusées</option>
-                        <option value="pending">À valider (En attente)</option>
-                      </select>
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <WalletFilterSelect
+                      label="Filtrer par gig"
+                      value={selectedGigId}
+                      onChange={setSelectedGigId}
+                      options={gigSelectOptions}
+                    />
+                    <WalletFilterSelect
+                      label="Appels"
+                      value={callValidationFilter}
+                      onChange={(v) => setCallValidationFilter(v as typeof callValidationFilter)}
+                      options={callValidationOptions}
+                    />
+                    <WalletFilterSelect
+                      label="Transactions"
+                      value={transactionValidationFilter}
+                      onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
+                      options={callTxValidationOptions}
+                    />
                   </div>
                 </div>
 
                 {/* Remboursement / Commission de Gig Info Banner */}
-                <div className="mx-6 mt-6 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-200">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-blue-500/15 text-blue-600 rounded-xl shrink-0">
+                <div className="mx-6 mt-6 relative overflow-hidden p-5 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-200 shadow-lg shadow-slate-900/20">
+                  <div className="absolute -top-12 -right-8 h-32 w-32 rounded-full bg-harx-500/20 blur-3xl pointer-events-none" />
+                  <div className="relative z-10 flex items-start gap-3">
+                    <div className="p-2.5 bg-white/10 backdrop-blur-sm border border-white/15 text-harx-300 rounded-xl shrink-0">
                       <Sparkles className="w-5 h-5 animate-pulse" />
                     </div>
                     <div>
-                      <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-widest block">Barème de Commission</span>
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed mt-0.5">
+                      <span className="text-[9px] text-harx-300 font-extrabold uppercase tracking-widest block">Barème de Commission</span>
+                      <p className="text-xs text-white/60 font-medium leading-relaxed mt-0.5">
                         {getSelectedGigCommission().rules}
                       </p>
                     </div>
                   </div>
-                  <div className="text-left sm:text-right shrink-0">
-                    <span className="text-[9px] font-black text-slate-400 block uppercase tracking-wider">
+                  <div className="relative z-10 text-left sm:text-right shrink-0">
+                    <span className="text-[9px] font-black text-white/40 block uppercase tracking-wider">
                       Ma commission
                     </span>
-                    <span className="text-sm font-black text-blue-600 block mt-0.5">
+                    <span className="text-sm font-black text-white block mt-0.5">
                       {getSelectedGigCommission().rate}
                     </span>
                     {!getSelectedGigCommission().bonus.startsWith('Aucun') && (
-                      <span className="inline-block text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md mt-1.5 max-w-[220px] text-right leading-snug">
+                      <span className="inline-block text-[8px] font-black text-emerald-300 bg-emerald-500/15 border border-emerald-400/20 px-1.5 py-0.5 rounded-md mt-1.5 max-w-[220px] text-right leading-snug">
                         {getSelectedGigCommission().bonus}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-6 bg-slate-50/40">
                   <CallRecords 
                     gigId={selectedGigId === 'all' ? undefined : selectedGigId} 
                     callValidationFilter={callValidationFilter}
-                    transactionValidationFilter={transactionValidationFilter}
+                    transactionValidationFilter={
+                      transactionValidationFilter === 'validated'
+                        ? 'approved'
+                        : transactionValidationFilter
+                    }
                     onAnalysisSettled={fetchWalletData}
                   />
                 </div>
@@ -822,13 +928,13 @@ export function WalletPage() {
           <div className="relative w-full max-w-md bg-white border border-slate-100 rounded-[2rem] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200">
             
             {/* Design Accents */}
-            <div className="absolute -top-12 -left-12 w-40 h-40 bg-emerald-500/5 blur-[50px] rounded-full pointer-events-none"></div>
-            <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-blue-500/5 blur-[50px] rounded-full pointer-events-none"></div>
+            <div className="absolute -top-12 -left-12 w-40 h-40 bg-harx-500/5 blur-[50px] rounded-full pointer-events-none"></div>
+            <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-harx-alt-500/5 blur-[50px] rounded-full pointer-events-none"></div>
 
             {/* Header Area */}
             <div className="flex justify-between items-center mb-6 border-b border-slate-50 pb-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <div className="p-2 bg-harx-50 text-harx-600 rounded-xl">
                   <Wallet className="w-5 h-5 animate-bounce-subtle" />
                 </div>
                 <div>
@@ -866,11 +972,11 @@ export function WalletPage() {
                       onClick={() => setSelectedMethod('bank')}
                       className={`p-4 rounded-2xl border text-left flex flex-col transition-all ${
                         selectedMethod === 'bank' 
-                          ? 'border-blue-500 bg-blue-50/25 ring-1 ring-blue-500' 
+                          ? 'border-harx-400 bg-harx-50/40 ring-1 ring-harx-400' 
                           : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
                       }`}
                     >
-                      <Bank className={`w-5 h-5 mb-2 ${selectedMethod === 'bank' ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <Bank className={`w-5 h-5 mb-2 ${selectedMethod === 'bank' ? 'text-harx-600' : 'text-slate-400'}`} />
                       <span className="text-xs font-black text-slate-700">Compte Bancaire</span>
                       <span className="text-[10px] text-slate-400 font-bold mt-0.5">Transit (...4567)</span>
                     </button>
@@ -879,11 +985,11 @@ export function WalletPage() {
                       onClick={() => setSelectedMethod('paypal')}
                       className={`p-4 rounded-2xl border text-left flex flex-col transition-all ${
                         selectedMethod === 'paypal' 
-                          ? 'border-blue-500 bg-blue-50/25 ring-1 ring-blue-500' 
+                          ? 'border-harx-400 bg-harx-50/40 ring-1 ring-harx-400' 
                           : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
                       }`}
                     >
-                      <CreditCard className={`w-5 h-5 mb-2 ${selectedMethod === 'paypal' ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <CreditCard className={`w-5 h-5 mb-2 ${selectedMethod === 'paypal' ? 'text-harx-600' : 'text-slate-400'}`} />
                       <span className="text-xs font-black text-slate-700">PayPal Wallet</span>
                       <span className="text-[10px] text-slate-400 font-bold mt-0.5">john.doe@example.com</span>
                     </button>
@@ -915,13 +1021,13 @@ export function WalletPage() {
                         setWithdrawAmount(e.target.value);
                         setValidationError('');
                       }}
-                      className="block w-full pl-9 pr-24 py-3 bg-slate-50 border border-slate-100 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 rounded-2xl text-sm font-extrabold text-slate-800"
+                      className="block w-full pl-9 pr-24 py-3 bg-slate-50 border border-slate-100 focus:border-harx-400 focus:bg-white focus:ring-2 focus:ring-harx-500/20 outline-none rounded-2xl text-sm font-extrabold text-slate-800 transition-all"
                     />
                     <div className="absolute inset-y-1 right-1 flex items-center">
                       <button
                         type="button"
                         onClick={() => setWithdrawAmount(availableBalance.toString())}
-                        className="px-3.5 h-full bg-white hover:bg-slate-50 border border-slate-150 text-[10px] font-black text-blue-600 rounded-xl uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                        className="px-3.5 h-full bg-white hover:bg-slate-50 border border-slate-150 text-[10px] font-black text-harx-600 rounded-xl uppercase tracking-wider transition-all shadow-sm active:scale-95"
                       >
                         Utiliser Max
                       </button>
@@ -956,9 +1062,9 @@ export function WalletPage() {
                 </div>
 
                 {/* Minimum amount banner */}
-                <div className="bg-blue-50/70 border border-blue-100 p-3.5 rounded-2xl flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                  <p className="text-[10px] text-blue-900 font-semibold leading-relaxed">
+                <div className="bg-harx-50/70 border border-harx-100 p-3.5 rounded-2xl flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-harx-500 mt-0.5 shrink-0" />
+                  <p className="text-[10px] text-harx-900 font-semibold leading-relaxed">
                     <span className="font-black uppercase tracking-wider">Retrait minimum : {MIN_WITHDRAWAL_AMOUNT}€.</span>
                     {' '}Les demandes inférieures à ce seuil sont automatiquement refusées par la plateforme.
                   </p>
@@ -966,7 +1072,7 @@ export function WalletPage() {
 
                 {/* Security hint disclaimer */}
                 <div className="bg-slate-50 p-3.5 rounded-2xl flex items-start gap-2.5">
-                  <Shield className="w-4 h-4 text-blue-500 mt-0.5 shrink-0 animate-pulse" />
+                  <Shield className="w-4 h-4 text-harx-500 mt-0.5 shrink-0 animate-pulse" />
                   <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
                     Vos fonds seront transférés sur-le-champ vers la plateforme sélectionnée. Des contrôles de conformité KYC sont actifs sur ce compte.
                   </p>
@@ -985,7 +1091,7 @@ export function WalletPage() {
                         className={`w-full py-3 text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl shadow-md transition-all active:scale-95 ${
                           disabled
                             ? 'bg-slate-300 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+                            : 'bg-gradient-harx hover:shadow-lg hover:shadow-harx-500/30'
                         }`}
                       >
                         {isBelowMin
@@ -1025,9 +1131,9 @@ export function WalletPage() {
                       setVerificationCode(e.target.value.replace(/\D/g, ''));
                       setValidationError('');
                     }}
-                    className="block w-32 mx-auto text-center py-2.5 bg-slate-50 border border-slate-100 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 rounded-2xl text-lg font-black text-slate-800 tracking-[0.75em]"
+                    className="block w-32 mx-auto text-center py-2.5 bg-slate-50 border border-slate-100 focus:border-harx-400 focus:bg-white focus:ring-2 focus:ring-harx-500/20 outline-none rounded-2xl text-lg font-black text-slate-800 tracking-[0.75em] transition-all"
                   />
-                  <p className="text-center text-[9px] text-blue-500 font-bold mt-2 uppercase tracking-wide">
+                  <p className="text-center text-[9px] text-harx-500 font-bold mt-2 uppercase tracking-wide">
                     Code de démonstration : Saisissez <span className="underline font-black text-xs">1234</span>
                   </p>
                 </div>
