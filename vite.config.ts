@@ -17,13 +17,19 @@ const removeReactRefreshScript = () => {
   };
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '');
+
+  // In dev (`vite`/`command === 'serve'`) the host must load chunks/assets from
+  // the LOCAL dev server, otherwise the browser fetches the production Netlify
+  // bundle and local source changes never appear. Only the production build
+  // keeps the absolute Netlify base.
+  const isDev = command === 'serve';
 
   return {
     // Absolute base so the host (qiankun) loads chunks/assets from the
-    // micro-app's own Netlify origin.
-    base: 'https://harxv25reporchestratorfront.netlify.app/',
+    // micro-app's own origin (local in dev, Netlify in production builds).
+    base: isDev ? 'http://localhost:5174/' : 'https://harxv25reporchestratorfront.netlify.app/',
     plugins: [
       react(),
       qiankun('reps', {

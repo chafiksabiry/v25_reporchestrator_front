@@ -514,267 +514,228 @@ export function CallRecords({
     ) : null;
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-black text-slate-900 uppercase tracking-widest">{t('calls.recordsTitle')}</h2>
+    <div className="space-y-5 relative">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-harx-600 mb-1">
+            {t('calls.recordsTitle')}
+          </p>
+          <h2 className="text-base font-black text-slate-900 tracking-tight">
+            Appels & commissions
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            {filteredRecords.length} appel{filteredRecords.length !== 1 ? 's' : ''} affiché{filteredRecords.length !== 1 ? 's' : ''}
+          </p>
+        </div>
         <button
           onClick={() => void fetchCallRecords()}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-white border border-slate-200 rounded-xl hover:border-harx-300 hover:text-harx-600 transition-all shadow-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>{t('calls.refresh')}</span>
         </button>
       </div>
 
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-4">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-pulse pb-6 border-b border-slate-50 last:border-none last:pb-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 shrink-0"></div>
-                  <div className="space-y-2">
-                    <div className="h-4 bg-slate-100 rounded-md w-36"></div>
-                    <div className="flex gap-2">
-                      <div className="h-4 bg-slate-100 rounded-full w-14"></div>
-                      <div className="h-4 bg-slate-100 rounded-full w-14"></div>
-                    </div>
-                    <div className="h-3 bg-slate-100 rounded-md w-28 mt-1"></div>
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="rounded-2xl border border-slate-100 bg-white p-5 animate-pulse">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-100 rounded-md w-40" />
+                  <div className="flex gap-2">
+                    <div className="h-5 bg-slate-100 rounded-full w-16" />
+                    <div className="h-5 bg-slate-100 rounded-full w-20" />
                   </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 md:gap-6">
-                  <div className="h-8 bg-slate-100 rounded-full w-24"></div>
-                  <div className="h-8 bg-slate-100 rounded-full w-24"></div>
-                  <div className="h-10 w-10 bg-slate-100 rounded-xl"></div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : filteredRecords.length === 0 ? (
-          <div className="flex flex-col justify-center items-center p-20 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-slate-50 flex items-center justify-center mb-6">
-              <Phone className="w-10 h-10 text-slate-300" />
             </div>
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">{t('calls.noCalls')}</h3>
-            <p className="text-sm text-slate-500 mt-2 max-w-sm">
-              {t('calls.noCallsDetail')}
-            </p>
+          ))}
+        </div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="flex flex-col justify-center items-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
+            <Phone className="w-8 h-8 text-slate-300" />
           </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {filteredRecords.map((record: CallRecord) => {
-              const callId = typeof record._id === 'object' ? (record._id as any).$oid : record._id;
-              return (
-                <div
-                  key={callId}
-                  className="p-6 hover:bg-slate-50/50 transition-all duration-300 group"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${record.direction === 'inbound' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
-                        <Phone className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-slate-900 text-sm tracking-tight flex items-center gap-2 flex-wrap">
-                          <span>
-                            {record.lead?.First_Name ? `${record.lead.First_Name} ${record.lead.Last_Name || ''}`.trim() :
-                              record.lead?.name || record.to || record.from || 'Unknown Customer'}
-                          </span>
-                          {record.lead && (record.lead.First_Name || record.lead.Last_Name || record.lead.name) && (
-                            <span className="text-xs font-normal text-slate-400">
-                              ({record.lead.phone || record.lead.Phone || record.to || record.from})
-                            </span>
-                          )}
-                          {record.validByAI === true && (
-                            <span
-                              title="Appel validé par l'IA — commission RepTransaction créée"
-                              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0"
-                            >
-                              <BadgeCheck className="w-3 h-3" />
-                            </span>
-                          )}
-                          {(() => {
-                            const badge = callOutcomeBadge(record.callOutcome);
-                            if (!badge) return null;
-                            return (
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${badge.tone}`}
-                                title={`Issue de l'appel : ${badge.label}`}
-                              >
-                                {badge.label}
-                              </span>
-                            );
-                          })()}
-                          {record.flags?.fraud === true && record.callOutcome !== 'fraud' && (
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border bg-rose-100 text-rose-800 border-rose-300"
-                              title="Score Fraud detection < 50"
-                            >
-                              <ShieldAlert className="w-2.5 h-2.5" />
-                              Fraude
-                            </span>
-                          )}
-                        </h3>
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm border ${record.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100/50' : 'bg-rose-50 text-rose-600 border-rose-100/50'}`}>
-                            {record.status}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${record.direction === 'inbound' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
-                            }`}>
-                            {record.direction}
-                          </span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 text-slate-500 border border-slate-100 px-2 py-0.5 rounded-full">
-                            Durée: {Math.floor((record.duration || 0) / 60)}m {(record.duration || 0) % 60}s
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-bold text-slate-400/90 mt-2 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-slate-300" />
-                          <span>{new Date(record.startTime || record.createdAt).toLocaleString()}</span>
-                        </div>
-                        <div className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1 flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <span>ID: {typeof record._id === 'object' ? (record._id as any).$oid : record._id}</span>
-                        </div>
-                      </div>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{t('calls.noCalls')}</h3>
+          <p className="text-xs text-slate-500 mt-2 max-w-sm font-medium">{t('calls.noCallsDetail')}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredRecords.map((record: CallRecord) => {
+            const callId = typeof record._id === 'object' ? (record._id as any).$oid : record._id;
+            const leadName =
+              record.lead?.First_Name
+                ? `${record.lead.First_Name} ${record.lead.Last_Name || ''}`.trim()
+                : record.lead?.name || record.to || record.from || 'Client inconnu';
+            const leadPhone = record.lead?.phone || record.lead?.Phone || record.to || record.from;
+            const status = record.status?.toLowerCase() || '';
+            const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
+            const showValidationSection =
+              status === 'completed' || record.validByAI != null || isUnansweredStatus;
+            const outcomeBadge = callOutcomeBadge(record.callOutcome);
+
+            return (
+              <div
+                key={callId}
+                className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                <div className="absolute inset-y-0 left-0 w-1 bg-gradient-harx opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
+                  {/* Lead + meta */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                        record.direction === 'inbound'
+                          ? 'bg-slate-100 text-slate-600'
+                          : 'bg-harx-50 text-harx-600'
+                      }`}
+                    >
+                      <Phone className="w-5 h-5" />
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 md:gap-6">
-                      {record.ai_call_score?.overall?.score !== undefined && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-full border border-amber-100/50 shadow-sm">
-                          <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                          <span className="text-xs font-black">{record.ai_call_score.overall.score}%</span>
-                        </div>
-                      )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-extrabold text-slate-900 text-sm truncate">{leadName}</h3>
+                        {leadPhone && (
+                          <span className="text-[11px] font-semibold text-slate-400">{leadPhone}</span>
+                        )}
+                        {record.validByAI === true && (
+                          <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" title="Appel validé par l'IA" />
+                        )}
+                      </div>
 
-                      {(() => {
-                        const status = record.status?.toLowerCase() || '';
-                        const isCompleted = status === 'completed';
-                        // Calls that never reached a human (no-answer / busy / canceled / failed)
-                        // are auto-refused server-side, so `validByAI` is already false.
-                        // We still render the badge in that case so the rep sees WHY there's
-                        // no commission, instead of a silent "-".
-                        const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
-                        const showValidationSection = isCompleted || record.validByAI != null || isUnansweredStatus;
-                        return showValidationSection;
-                      })() ? (
-                        <>
-                          <div className="h-8 w-px bg-slate-200/70 hidden sm:block"></div>
-                          {/* Validation de l'Appel AI */}
-                          <div className="flex flex-col items-center gap-1 min-w-[120px]">
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Appel</span>
-                            {record.validByAI === true || record.valid === true ? (
-                              <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100/40 shadow-sm w-36 whitespace-nowrap">
-                                <Check className="w-3.5 h-3.5" />
-                                Validé par AI (+{resolveCallRepCommission(record).toFixed(2)}€)
-                              </span>
-                            ) : record.validByAI === false ? (
-                              (() => {
-                                const status = record.status?.toLowerCase() || '';
-                                const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
-                                const label = isUnansweredStatus
-                                  ? (status === 'busy' ? 'Occupé' : status === 'no-answer' || status === 'noanswer' ? 'Non décroché' : status === 'failed' ? 'Échec' : 'Annulé')
-                                  : 'Refusé AI';
-                                return (
-                                  <span
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-100/40 shadow-sm w-32 whitespace-nowrap"
-                                    title={record.ai_refusal_reason || label}
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                    {label}
-                                  </span>
-                                );
-                              })()
-                            ) : record.ai_call_status === 'error' ? (
-                              <span
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-100/40 shadow-sm w-32 whitespace-nowrap"
-                                title="L'analyse a échoué — réessayez depuis l'aperçu"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                Erreur analyse
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-400 border border-slate-200/40 shadow-sm w-32 whitespace-nowrap"
-                                title={
-                                  record.ai_call_status === 'processing'
-                                    ? "L'IA scanne l'enregistrement…"
-                                    : "Analyse à venir"
-                                }
-                              >
-                                <Clock className="w-3.5 h-3.5 animate-pulse" />
-                                Analyse en cours
-                              </span>
-                            )}
-                          </div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {outcomeBadge && (
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${outcomeBadge.tone}`}>
+                            {outcomeBadge.label}
+                          </span>
+                        )}
+                        {record.flags?.fraud === true && record.callOutcome !== 'fraud' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
+                            <ShieldAlert className="w-2.5 h-2.5" />
+                            Fraude
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
+                            status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-rose-50 text-rose-700 border-rose-100'
+                          }`}
+                        >
+                          {record.status}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                            record.direction === 'inbound'
+                              ? 'bg-slate-100 text-slate-600'
+                              : 'bg-harx-50 text-harx-700'
+                          }`}
+                        >
+                          {record.direction}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
+                          {Math.floor((record.duration || 0) / 60)}m {(record.duration || 0) % 60}s
+                        </span>
+                      </div>
 
-                          <div className="h-8 w-px bg-slate-200/70 hidden sm:block"></div>
-
-                          <div className="flex flex-col items-center gap-1 min-w-[120px]">
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Transaction</span>
-                            {record.transaction?.validByReps === true ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100/40 shadow-sm w-36 whitespace-nowrap">
-                                  <Check className="w-3.5 h-3.5" />
-                                  Signé (+{resolveTransactionRepCommission(record).toFixed(2)}€)
-                                </span>
-                              </div>
-                            ) : (record.validByAI === null || record.validByAI === undefined) ? (
-                              <div className="flex flex-col items-center justify-center min-w-[80px]">
-                                <span className="text-slate-300 font-bold text-sm tracking-widest">-</span>
-                              </div>
-                            ) : hasValidatedTransactionSale(record) ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-200/40 shadow-sm w-44 whitespace-nowrap text-center cursor-help" title="Transaction validée par l'IA — commission comptée au portefeuille (disponible ou en attente)">
-                                  <Check className="w-3.5 h-3.5 text-blue-500" />
-                                  Validé IA (+{resolveTransactionRepCommission(record).toFixed(2)}€)
-                                </span>
-                                {record.argumentation_score !== undefined && (
-                                  <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {record.argumentation_score}%</span>
-                                )}
-                              </div>
-                            ) : record.transaction?.validByAI === false ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-100/40 shadow-sm w-32 whitespace-nowrap">
-                                  <X className="w-3.5 h-3.5" />
-                                  Refusé AI
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center min-w-[80px]">
-                                <span className="text-slate-300 font-bold text-sm tracking-widest">-</span>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="h-8 w-px bg-slate-200/70 hidden sm:block"></div>
-                          <div className="flex flex-col items-center justify-center min-w-[80px]">
-                            <span className="text-slate-300 font-bold text-sm tracking-widest">-</span>
-                          </div>
-                        </>
-                      )}
-
-                      {record.status?.toLowerCase() === 'completed' && (
-                        <div className="flex items-center gap-2 ml-2">
-                          <button
-                            onClick={() => openCallDetails(record, 'insights')}
-                            className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all"
-                            title="View Details"
-                          >
-                            <Brain className="w-5 h-5" />
-                          </button>
-                        </div>
-                      )}
+                      <p className="text-[10px] font-semibold text-slate-400 mt-2 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 shrink-0" />
+                        {new Date(record.startTime || record.createdAt).toLocaleString('fr-FR')}
+                      </p>
                     </div>
                   </div>
+
+                  {/* Score */}
+                  {record.ai_call_score?.overall?.score !== undefined && (
+                    <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 shrink-0">
+                      <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                      <span className="text-sm font-black">{record.ai_call_score.overall.score}%</span>
+                    </div>
+                  )}
+
+                  {/* Validation pills */}
+                  {showValidationSection && (
+                    <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 shrink-0">
+                      <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
+                        {record.validByAI === true || record.valid === true ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            <Check className="w-3 h-3" />
+                            +{resolveCallRepCommission(record).toFixed(2)}€
+                          </span>
+                        ) : record.validByAI === false ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100"
+                            title={record.ai_refusal_reason || undefined}
+                          >
+                            <X className="w-3 h-3" />
+                            {isUnansweredStatus
+                              ? status === 'busy'
+                                ? 'Occupé'
+                                : status === 'no-answer' || status === 'noanswer'
+                                  ? 'Non décroché'
+                                  : 'Annulé'
+                              : 'Refusé'}
+                          </span>
+                        ) : record.ai_call_status === 'error' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100">
+                            <X className="w-3 h-3" />
+                            Erreur
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-white text-slate-500 border border-slate-200">
+                            <Clock className="w-3 h-3 animate-pulse" />
+                            En cours
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="w-px bg-slate-200 hidden sm:block self-stretch" />
+
+                      <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
+                        {record.transaction?.validByReps === true ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            <Check className="w-3 h-3" />
+                            +{resolveTransactionRepCommission(record).toFixed(2)}€
+                          </span>
+                        ) : hasValidatedTransactionSale(record) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-harx-50 text-harx-700 border border-harx-100">
+                            <Check className="w-3 h-3" />
+                            +{resolveTransactionRepCommission(record).toFixed(2)}€
+                          </span>
+                        ) : record.transaction?.validByAI === false ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100">
+                            <X className="w-3 h-3" />
+                            Refusé
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-bold text-sm">—</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {status === 'completed' && (
+                    <button
+                      onClick={() => openCallDetails(record, 'insights')}
+                      className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-harx-600 hover:bg-harx-50 hover:border-harx-200 transition-all shrink-0 self-start lg:self-center"
+                      title="Voir l'analyse IA"
+                    >
+                      <Brain className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal Detail View */}
       {/* Modal Detail View */}
