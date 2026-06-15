@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { 
   Wallet, 
@@ -201,6 +202,18 @@ export function WalletPage() {
     []
   );
 
+  const resetTransactionFilters = () => {
+    setSelectedGigId('all');
+    setTransactionValidationFilter('all');
+    setSelectedDateRange('this-month');
+  };
+
+  const resetCallFilters = () => {
+    setSelectedGigId('all');
+    setCallValidationFilter('all');
+    setTransactionValidationFilter('all');
+  };
+
   // Rep keeps 70% of every commission; HARX keeps 30%. We only display the rep share.
   const REP_SHARE = 0.7;
   const fmtEur = (value: number) => `${(value).toFixed(2)} €`;
@@ -384,6 +397,9 @@ export function WalletPage() {
   const [validationError, setValidationError] = useState('');
   const [lastWithdrawal, setLastWithdrawal] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | null }>({ text: '', type: null });
+
+  // Transaction detail modal
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
 
   const showToast = (text: string, type: 'success' | 'error') => {
     setToastMessage({ text, type });
@@ -672,57 +688,91 @@ export function WalletPage() {
       <div>
         <div className="space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            {/* Header Tabs */}
-            <div className="flex border-b border-slate-100 bg-slate-50/50">
-              <button
-                type="button"
-                onClick={() => setActiveTab('transactions')}
-                className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
-                  activeTab === 'transactions' 
-                    ? 'border-harx-500 text-harx-600 bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
-                }`}
-              >
-                {t('wallet.transactionHistory')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('calls')}
-                className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
-                  activeTab === 'calls' 
-                    ? 'border-harx-500 text-harx-600 bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
-                }`}
-              >
-                Liste des Appels & Gains
-              </button>
+            {/* Header Tabs — segmented control */}
+            <div className="p-3 sm:p-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/80 to-white">
+              <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100/80 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('transactions')}
+                  className={`group relative flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                    activeTab === 'transactions'
+                      ? 'bg-white text-harx-600 shadow-sm shadow-slate-300/40 ring-1 ring-slate-200/70'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-lg shrink-0 transition-colors ${
+                    activeTab === 'transactions' ? 'bg-harx-50 text-harx-600' : 'bg-slate-200/60 text-slate-400 group-hover:bg-slate-200'
+                  }`}>
+                    <Wallet className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="truncate">{t('wallet.transactionHistory')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('calls')}
+                  className={`group relative flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                    activeTab === 'calls'
+                      ? 'bg-white text-harx-600 shadow-sm shadow-slate-300/40 ring-1 ring-slate-200/70'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-lg shrink-0 transition-colors ${
+                    activeTab === 'calls' ? 'bg-harx-50 text-harx-600' : 'bg-slate-200/60 text-slate-400 group-hover:bg-slate-200'
+                  }`}>
+                    <Phone className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="truncate">Liste des Appels & Gains</span>
+                </button>
+              </div>
             </div>
 
             {activeTab === 'transactions' ? (
               <>
-                <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/40 space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Filter className="w-4 h-4 text-harx-500" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-                          Historique
-                        </span>
+                {/* ── Title zone ── */}
+                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
+                        <Wallet className="w-3.5 h-3.5 text-harx-600" />
                       </div>
-                      <h2 className="text-base font-black text-slate-900 tracking-tight">
-                        Retraits & Commissions
-                      </h2>
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        Suivez vos commissions validées et vos demandes de retrait.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white">
-                        {filteredTransactions.length} opération{filteredTransactions.length !== 1 ? 's' : ''}
+                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                        Historique financier
                       </span>
                     </div>
+                    <h2 className="text-base font-black text-slate-900 tracking-tight">
+                      Retraits & Commissions
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Suivez vos commissions validées et vos demandes de retrait.
+                    </p>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
+                      {filteredTransactions.length}
+                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
+                        opération{filteredTransactions.length !== 1 ? 's' : ''}
+                      </span>
+                    </span>
+                  </div>
+                </div>
 
+                {/* ── Filter zone ── */}
+                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Filter className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
+                    </div>
+                    {(selectedGigId !== 'all' || transactionValidationFilter !== 'all' || selectedDateRange !== 'this-month') && (
+                      <button
+                        type="button"
+                        onClick={resetTransactionFilters}
+                        className="text-[10px] font-black uppercase tracking-wider text-harx-600 hover:text-harx-700 transition-colors"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <WalletFilterSelect
                       label="Filtrer par gig"
@@ -765,9 +815,11 @@ export function WalletPage() {
                         const title = isPayout ? 'Retrait demandé' : transaction.type;
 
                         return (
-                          <div
+                          <button
                             key={transaction.id}
-                            className={`group relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200 ${visual.cardBorder}`}
+                            type="button"
+                            onClick={() => setSelectedTransaction(transaction)}
+                            className={`group relative w-full text-left overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-harx-500/30 transition-all duration-200 cursor-pointer ${visual.cardBorder}`}
                           >
                             <div className="absolute inset-y-0 left-0 w-1 bg-gradient-harx opacity-0 group-hover:opacity-100 transition-opacity" />
 
@@ -812,9 +864,13 @@ export function WalletPage() {
                                     year: 'numeric',
                                   })}
                                 </p>
+                                <span className="hidden sm:flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-slate-300 group-hover:text-harx-500 transition-colors">
+                                  Détails
+                                  <ChevronRight className="w-3 h-3" />
+                                </span>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -823,34 +879,59 @@ export function WalletPage() {
               </>
             ) : (
               <>
-                <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/40 space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Phone className="w-4 h-4 text-harx-500" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-                          Suivi des appels
-                        </span>
+                {/* ── Title zone ── */}
+                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
+                        <Phone className="w-3.5 h-3.5 text-harx-600" />
                       </div>
-                      <h3 className="text-base font-black text-slate-900 tracking-tight">
-                        Appels éligibles aux commissions
-                      </h3>
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        Chaque appel validé par l'entreprise crédite votre solde de gains.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white">
-                        {getCallCountForGig('all')} appels
+                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                        Suivi des appels
                       </span>
-                      {selectedGigId !== 'all' && (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-harx-50 text-harx-600 border border-harx-100">
-                          Ce gig : {getCallCountForGig(selectedGigId)}
-                        </span>
-                      )}
                     </div>
+                    <h3 className="text-base font-black text-slate-900 tracking-tight">
+                      Appels éligibles aux commissions
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Chaque appel validé par l'entreprise crédite votre solde de gains.
+                    </p>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
+                      {getCallCountForGig('all')}
+                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
+                        appels
+                      </span>
+                    </span>
+                    {selectedGigId !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-harx-50 text-harx-700 border border-harx-100">
+                        {getCallCountForGig(selectedGigId)}
+                        <span className="text-[9px] font-bold text-harx-400 uppercase tracking-wider">
+                          ce gig
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
 
+                {/* ── Filter zone ── */}
+                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Filter className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
+                    </div>
+                    {(selectedGigId !== 'all' || callValidationFilter !== 'all' || transactionValidationFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={resetCallFilters}
+                        className="text-[10px] font-black uppercase tracking-wider text-harx-600 hover:text-harx-700 transition-colors"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <WalletFilterSelect
                       label="Filtrer par gig"
@@ -919,6 +1000,105 @@ export function WalletPage() {
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* TRANSACTION DETAIL MODAL */}
+      {/* ========================================================================= */}
+      {selectedTransaction && (() => {
+        const tx = selectedTransaction;
+        const visual = getTxVisual(tx.type);
+        const statusBadge = getTxStatusBadge(tx.status);
+        const isPayout = tx.type === 'Payout';
+        const title = isPayout ? 'Retrait demandé' : tx.type;
+        return createPortal(
+          <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 animate-in fade-in duration-200"
+            onClick={() => setSelectedTransaction(null)}
+          >
+            <div
+              className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl ring-1 ring-slate-900/5 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header — compact */}
+              <div className="relative px-5 py-5 bg-gradient-to-br from-slate-900 to-slate-800">
+                <button
+                  onClick={() => setSelectedTransaction(null)}
+                  className="absolute top-3 right-3 p-1.5 hover:bg-white/10 text-white/50 hover:text-white rounded-lg transition-all"
+                  aria-label="Fermer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-3.5">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shrink-0 shadow-md ${visual.iconBg} ${visual.iconText}`}>
+                    {isPayout ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-harx-300 block">
+                      {visual.label}
+                    </span>
+                    <p className={`text-2xl font-black tracking-tight leading-tight ${isPayout ? 'text-white' : 'text-emerald-400'}`}>
+                      {isPayout ? '−' : '+'}
+                      {tx.amount.toFixed(2)} €
+                    </p>
+                  </div>
+                  <span className={`ml-auto self-start mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${statusBadge.className}`}>
+                    {statusBadge.label}
+                  </span>
+                </div>
+              </div>
+
+              {/* Body — detail rows */}
+              <div className="px-5 py-2">
+                <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 pt-0.5">Type</span>
+                  <span className="text-xs font-bold text-slate-800 text-right">{title}</span>
+                </div>
+                {tx.description && (
+                  <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 pt-0.5">Description</span>
+                    <span className="text-xs font-medium text-slate-600 text-right leading-relaxed">{tx.description}</span>
+                  </div>
+                )}
+                {tx.method && (
+                  <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 pt-0.5">Méthode</span>
+                    <span className="text-xs font-bold text-slate-800 text-right">{tx.method}</span>
+                  </div>
+                )}
+                <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 pt-0.5">Date</span>
+                  <span className="text-xs font-bold text-slate-800 text-right capitalize">
+                    {new Date(tx.date).toLocaleDateString('fr-FR', {
+                      weekday: 'long',
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+                {tx.reference && (
+                  <div className="flex items-start justify-between gap-4 py-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 pt-0.5">Référence</span>
+                    <span className="text-[11px] font-mono font-semibold text-slate-500 text-right break-all">{tx.reference}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 pt-2 pb-5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTransaction(null)}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* WINDOW 1: GLASSMORPHIC WITHDRAWAL MODAL */}

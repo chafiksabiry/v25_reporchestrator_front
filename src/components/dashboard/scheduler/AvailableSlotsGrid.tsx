@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { Clock, Users, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
 import { slotApi, Slot, Reservation } from '../../../services/api/slotApi';
 import { getAgentId } from '../../../utils/authUtils';
@@ -64,12 +65,12 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
 
     const handleReserve = async (slot: Slot) => {
         if (!repId) {
-            setMessage({ text: 'Please log in to reserve slots', type: 'error' });
+            setMessage({ text: 'Veuillez vous connecter pour réserver des créneaux.', type: 'error' });
             return;
         }
 
         if (!slot._id) {
-            setMessage({ text: 'Invalid slot', type: 'error' });
+            setMessage({ text: 'Créneau invalide.', type: 'error' });
             return;
         }
 
@@ -86,7 +87,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
             return reservedKey === targetDateKey;
         });
         if (existingReservation) {
-            setMessage({ text: 'You already have a reservation for this slot', type: 'error' });
+            setMessage({ text: 'Vous avez déjà une réservation pour ce créneau.', type: 'error' });
             return;
         }
 
@@ -96,7 +97,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
         try {
             const note = resNotes[slot._id] || '';
             await slotApi.reserveSlot(slot._id, repId, note, format(selectedDate, 'yyyy-MM-dd'));
-            setMessage({ text: 'Slot reserved successfully!', type: 'success' });
+            setMessage({ text: 'Créneau réservé avec succès !', type: 'success' });
 
             // Clear the note for this slot
             setResNotes(prev => {
@@ -112,7 +113,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
             }, 3000);
         } catch (error: any) {
             console.error('Error reserving slot:', error);
-            const errorMsg = error.response?.data?.message || error.message || 'Failed to reserve slot';
+            const errorMsg = error.response?.data?.message || error.message || 'Échec de la réservation du créneau.';
             setMessage({ text: errorMsg, type: 'error' });
         } finally {
             setReservingSlotId(null);
@@ -125,7 +126,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
         setMessage(null);
         try {
             await slotApi.cancelReservation(reservation._id);
-            setMessage({ text: 'Reservation cancelled successfully.', type: 'success' });
+            setMessage({ text: 'Réservation annulée avec succès.', type: 'success' });
             await loadSlots();
             await loadReservations();
             setTimeout(() => {
@@ -133,7 +134,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
             }, 3000);
         } catch (error: any) {
             console.error('Error cancelling reservation:', error);
-            setMessage({ text: error.response?.data?.message || error.message || 'Failed to cancel reservation', type: 'error' });
+            setMessage({ text: error.response?.data?.message || error.message || "Échec de l'annulation de la réservation.", type: 'error' });
         } finally {
             setCancellingReservationId(null);
         }
@@ -142,7 +143,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
     if (!gigId || gigId === '' || !selectedDate) {
         return (
             <div className="bg-white/90 rounded-2xl shadow-sm border border-harx-100 p-6 text-center text-gray-500 text-sm">
-                Select a gig to see available slots
+                Sélectionnez un projet pour voir les créneaux disponibles.
             </div>
         );
     }
@@ -170,7 +171,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
         console.error('Error formatting date:', error);
         return (
             <div className="bg-white/90 rounded-2xl shadow-sm border border-harx-100 p-6 text-center text-harx-600 text-sm">
-                Error: Invalid date format
+                Erreur : format de date invalide.
             </div>
         );
     }
@@ -181,12 +182,12 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Calendar className="w-5 h-5 text-harx-600" />
-                        <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">
-                            Available Slots - {dateStr ? format(selectedDate, 'MMMM d, yyyy') : 'Loading...'}
+                        <h3 className="text-lg font-black text-gray-900 tracking-tight">
+                            <span className="capitalize">Créneaux disponibles — {dateStr ? format(selectedDate, 'd MMMM yyyy', { locale: fr }) : 'Chargement…'}</span>
                         </h3>
                     </div>
                     {isPastDate && (
-                        <span className="text-[10px] text-harx-600 font-black uppercase tracking-widest">Past date - viewing only</span>
+                        <span className="text-[10px] text-harx-600 font-black uppercase tracking-widest">Date passée — lecture seule</span>
                     )}
                 </div>
             </div>
@@ -207,10 +208,10 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
 
             <div className="divide-y divide-gray-100">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500 font-medium">Loading slots...</div>
+                    <div className="p-8 text-center text-gray-500 font-medium">Chargement des créneaux…</div>
                 ) : daySlots.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
-                        No slots available for this date. The company may need to generate slots first.
+                        Aucun créneau disponible pour cette date. L'entreprise doit d'abord générer des créneaux.
                     </div>
                 ) : (
                     daySlots
@@ -270,7 +271,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                                         <Users className="w-4 h-4 text-gray-400" />
                                                         <span className={`font-semibold ${remaining > 0 ? 'text-emerald-600' : 'text-red-600'
                                                             }`}>
-                                                            {remaining} / {slot.capacity} available
+                                                            {remaining} / {slot.capacity} disponible{remaining !== 1 ? 's' : ''}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -280,7 +281,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                                     }`}>
                                                         <CheckCircle className="w-4 h-4" />
                                                         <span className="font-medium">
-                                                            {isSlotPast ? 'You reserved and completed this slot' : 'You have reserved this slot'}
+                                                            {isSlotPast ? 'Vous avez réservé et complété ce créneau' : 'Vous avez réservé ce créneau'}
                                                         </span>
                                                     </div>
                                                 )}
@@ -295,15 +296,15 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                                                     disabled={cancellingReservationId === reservation?._id}
                                                                     className="px-4 py-2 text-xs font-black uppercase tracking-widest text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                 >
-                                                                    {cancellingReservationId === reservation?._id ? 'Cancelling...' : 'Cancel'}
+                                                                    {cancellingReservationId === reservation?._id ? 'Annulation…' : 'Annuler'}
                                                                 </button>
                                                                 <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-harx-700 bg-harx-50 rounded-xl border border-harx-100">
-                                                                    Reserved
+                                                                    Réservé
                                                                 </span>
                                                             </>
                                                         ) : (
                                                             <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100">
-                                                                Completed
+                                                                Terminé
                                                             </span>
                                                         )}
                                                     </>
@@ -313,11 +314,11 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                                         disabled={reservingSlotId === slot._id}
                                                         className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white bg-harx-600 rounded-xl hover:bg-harx-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                     >
-                                                        {reservingSlotId === slot._id ? 'Reserving...' : 'Reserve'}
+                                                        {reservingSlotId === slot._id ? 'Réservation…' : 'Réserver'}
                                                     </button>
                                                 ) : (
                                                     <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-400 bg-gray-100 rounded-xl">
-                                                        {isSlotPast ? 'Expired' : slot.status === 'full' ? 'Full' : 'Unavailable'}
+                                                        {isSlotPast ? 'Expiré' : slot.status === 'full' ? 'Complet' : 'Indisponible'}
                                                     </span>
                                                 )}
                                             </div>
@@ -327,7 +328,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                             <div className="flex items-center gap-3">
                                                 <input
                                                     type="text"
-                                                    placeholder="Add a note (e.g., 'I want to work on this slot')..."
+                                                    placeholder="Ajouter une note (ex : « Je souhaite travailler sur ce créneau »)…"
                                                     className="flex-1 bg-gray-50 border border-gray-100 rounded-lg py-2 px-3 text-xs focus:ring-2 focus:ring-harx-500/20 focus:border-harx-200 outline-none transition-all"
                                                     value={resNotes[slot._id!] || ''}
                                                     onChange={(e) => setResNotes(prev => ({ ...prev, [slot._id!]: e.target.value }))}
