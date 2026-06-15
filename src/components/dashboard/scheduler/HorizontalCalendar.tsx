@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { format, startOfWeek, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { TimeSlot } from '../../../types/scheduler';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -13,7 +14,7 @@ interface HorizontalCalendarProps {
 export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selectedGigId }: HorizontalCalendarProps) {
     const [baseDate, setBaseDate] = useState(new Date());
     const today = new Date();
-    const startDate = startOfWeek(baseDate);
+    const startDate = startOfWeek(baseDate, { weekStartsOn: 1 });
     const weekDays = Array.from({ length: 14 }, (_, i) => addDays(startDate, i));
 
     const nextPeriod = () => setBaseDate(addWeeks(baseDate, 2));
@@ -27,19 +28,19 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                         <CalendarIcon className="w-5 h-5 text-harx-600" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-black text-gray-900">Schedule</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">14-day outlook</p>
+                        <h2 className="text-lg font-black text-gray-900">Calendrier</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Aperçu sur 14 jours</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
                     <div className="hidden md:flex space-x-3 bg-harx-50/30 p-1 rounded-xl border border-harx-100">
                         <div className="flex items-center text-[10px] font-bold text-gray-500 px-3">
                             <div className="w-2 h-2 rounded-full bg-harx-600 mr-2 shadow-sm"></div>
-                            Booked
+                            Réservés
                         </div>
                         <div className="flex items-center text-[10px] font-bold text-gray-500 px-3 border-l border-gray-200">
                             <div className="w-2 h-2 rounded-full bg-harx-300 mr-2 shadow-sm"></div>
-                            Open
+                            Disponibles
                         </div>
                     </div>
 
@@ -85,7 +86,7 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                             )}
 
                             <span className={`text-[10px] font-black uppercase mb-1.5 tracking-tighter ${isSelected ? 'text-harx-100' : 'text-gray-400 group-hover:text-gray-500'}`}>
-                                {format(day, 'EEE')}
+                                {format(day, 'EEE', { locale: fr })}
                             </span>
                             <span className={`text-2xl font-black mb-2 tabular-nums ${isSelected ? 'text-white' : 'text-gray-900'}`}>
                                 {format(day, 'd')}
@@ -114,7 +115,7 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                             </div>
 
                             <span className={`text-[9px] font-black mt-1.5 uppercase tracking-tighter ${isSelected ? 'text-harx-100' : 'text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'}`}>
-                                {daySlots.length} slots
+                                {daySlots.length} créneau{daySlots.length !== 1 ? 'x' : ''}
                             </span>
                         </button>
                     );

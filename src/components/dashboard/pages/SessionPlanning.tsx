@@ -3,8 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HorizontalCalendar } from '../scheduler/HorizontalCalendar';
 import { TimeSlot, Gig, WeeklyStats, Rep, UserRole, Company } from '../../../types/scheduler';
-import { Building, Clock, Briefcase, AlertCircle, Users, Brain } from 'lucide-react';
+import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles } from 'lucide-react';
 import { CompanyView } from '../scheduler/CompanyView';
+import { WalletFilterSelect } from '../ui/WalletFilterSelect';
 import { WorkloadPredictionComponent as WorkloadPrediction } from '../scheduler/WorkloadPrediction';
 import { AttendanceReport } from '../scheduler/AttendanceReport';
 import { initializeAI } from '../../../services/schedulerAiService';
@@ -622,16 +623,18 @@ export function SessionPlanning() {
 
             <div className="max-w-[1600px] mx-auto space-y-4">
                 {/* Page title + stats */}
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-gray-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-harx-500/5 blur-[80px] -mr-24 -mt-24"></div>
-                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 p-6 shadow-lg shadow-slate-900/20">
+                    <div className="absolute -top-16 -right-10 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl pointer-events-none"></div>
+                    <div className="absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-harx-alt-500/10 blur-3xl pointer-events-none"></div>
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-5">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gradient-harx rounded-xl flex items-center justify-center shadow-lg shadow-harx-500/20">
-                                <Building className="w-6 h-6 text-white" />
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 shadow-lg">
+                                <CalendarRange className="h-6 w-6 text-harx-300" />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-black text-gray-900 tracking-tighter leading-none mb-1">{t('sessionPlanning.title')}</h1>
-                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Strategic Time Management & Reservation</p>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-harx-300">Planning des sessions</span>
+                                <h1 className="text-2xl font-black text-white tracking-tight leading-none mt-0.5">{t('sessionPlanning.title')}</h1>
+                                <p className="text-[11px] font-medium text-white/50 mt-1">Gérez et réservez vos créneaux d'appels en toute simplicité.</p>
                             </div>
                             {loadingGigs && (
                                 <div className="ml-2 flex items-center gap-1.5">
@@ -639,23 +642,32 @@ export function SessionPlanning() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl border border-gray-100 shadow-sm shadow-gray-200/50">
-                                <div className="w-9 h-9 bg-harx-50 rounded-lg flex items-center justify-center">
-                                    <Clock className="w-4.5 h-4.5 text-harx-600" />
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-harx-500/20">
+                                    <Clock className="h-4.5 w-4.5 text-harx-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Weekly Commitment</p>
-                                    <p className="text-xl font-black text-gray-900 tracking-tight">{weeklyStats.totalHours}<span className="text-sm text-gray-400 ml-1">h</span></p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Engagement hebdo</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.totalHours}<span className="text-sm text-white/40 ml-1">h</span></p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl border border-gray-100 shadow-sm shadow-gray-200/50">
-                                <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center">
-                                    <Briefcase className="w-4.5 h-4.5 text-indigo-600" />
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20">
+                                    <CheckCircle2 className="h-4.5 w-4.5 text-emerald-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Active Projects</p>
-                                    <p className="text-xl font-black text-gray-900 tracking-tight">{Object.keys(weeklyStats.gigBreakdown).length}</p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Réservés</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.reservedSlots}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20">
+                                    <Briefcase className="h-4.5 w-4.5 text-indigo-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Projets actifs</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{Object.keys(weeklyStats.gigBreakdown).length}</p>
                                 </div>
                             </div>
                         </div>
@@ -722,20 +734,21 @@ export function SessionPlanning() {
                         </div>
                     ) : userRole === 'rep' ? (
                         <div className="space-y-3">
-                            <div className="bg-white rounded-xl border border-harx-100 p-3.5 shadow-sm">
-                                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                    Enrolled gig
-                                </label>
-                                <select
-                                    className="w-full md:max-w-[420px] bg-gray-50/70 border border-harx-100 rounded-lg text-[11px] font-black uppercase tracking-widest text-gray-700 py-2.5 px-3.5 focus:ring-2 focus:ring-harx-500/20 focus:border-harx-200 outline-none"
+                            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+                                <div className="flex items-center gap-1.5 mb-3 text-slate-400">
+                                    <Briefcase className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Projet sélectionné</span>
+                                </div>
+                                <WalletFilterSelect
+                                    label="Gig inscrit"
                                     value={selectedGigId || ''}
-                                    onChange={(e) => setSelectedGigId(e.target.value === '' ? null : e.target.value)}
-                                >
-                                    <option value="">Choose a strategic project...</option>
-                                    {gigs.map((gig: Gig) => (
-                                        <option key={gig.id} value={gig.id}>{gig.name.toUpperCase()}</option>
-                                    ))}
-                                </select>
+                                    onChange={(v) => setSelectedGigId(v === '' ? null : v)}
+                                    options={[
+                                        { value: '', label: 'Choisir un projet…', tone: 'neutral' as const },
+                                        ...gigs.map((gig: Gig) => ({ value: gig.id, label: gig.name, tone: 'brand' as const })),
+                                    ]}
+                                    className="w-full md:max-w-[460px]"
+                                />
                             </div>
 
                             <HorizontalCalendar
@@ -752,8 +765,14 @@ export function SessionPlanning() {
                                     onReservationMade={refreshData}
                                 />
                             ) : (
-                                <div className="bg-white p-8 rounded-2xl border border-dashed border-gray-200 text-center text-gray-500 text-sm">
-                                    Select a gig to see available slots.
+                                <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
+                                    <div className="h-14 w-14 rounded-2xl bg-harx-50 flex items-center justify-center mb-4">
+                                        <Sparkles className="w-7 h-7 text-harx-400" />
+                                    </div>
+                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">Sélectionnez un projet</p>
+                                    <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
+                                        Choisissez un gig ci-dessus pour afficher les créneaux disponibles à la réservation.
+                                    </p>
                                 </div>
                             )}
                         </div>
