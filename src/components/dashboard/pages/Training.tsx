@@ -3162,19 +3162,46 @@ export function Training() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (
-                          atLastFormationSlideSection &&
-                          currentFormationViewerSlide?.kind === 'section'
-                        ) {
+                        const slide = currentFormationViewerSlide;
+                        if (slide?.kind === 'section') {
                           void completeSectionProgressAtLeave({
-                            moduleIndex: currentFormationViewerSlide.moduleIndex,
-                            section: currentFormationViewerSlide.section,
+                            moduleIndex: slide.moduleIndex,
+                            section: slide.section,
                           });
-                          return;
                         }
-                        setFormationViewerSlideIndex((i) =>
-                          Math.min(formationViewerSlides.length - 1, i + 1)
+                        if (atLastFormationSlideSection) return;
+                        const nextIndex = Math.min(
+                          formationViewerSlides.length - 1,
+                          formationViewerSlideIndex + 1
                         );
+                        setFormationViewerSlideIndex(nextIndex);
+                        const nextSlide = formationViewerSlides[nextIndex];
+                        if (
+                          nextSlide?.kind === 'section' &&
+                          selectedJourneyId &&
+                          selectedJourney
+                        ) {
+                          const modules = extractModules(selectedJourney);
+                          const moduleRow = modules[nextSlide.moduleIndex];
+                          const moduleId =
+                            normalizeMongoId((moduleRow as any)?._id) ||
+                            normalizeMongoId((moduleRow as any)?.id) ||
+                            '';
+                          const sectionMongoId =
+                            normalizeMongoId((nextSlide.section as any)?._id) ||
+                            normalizeMongoId((nextSlide.section as any)?.id) ||
+                            '';
+                          if (
+                            /^[a-f\d]{24}$/i.test(moduleId) &&
+                            /^[a-f\d]{24}$/i.test(sectionMongoId)
+                          ) {
+                            void ensureSectionStarted({
+                              courseId: selectedJourneyId,
+                              moduleId,
+                              sectionId: sectionMongoId,
+                            });
+                          }
+                        }
                       }}
                       disabled={
                         blockFormationNextByEndPosition ||
