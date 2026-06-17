@@ -690,7 +690,7 @@ export function CallRecords({
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-white text-slate-500 border border-slate-200">
                             <Clock className="w-3 h-3 animate-pulse" />
-                            En cours
+                            Pending analyse
                           </span>
                         )}
                       </div>
