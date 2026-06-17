@@ -27,7 +27,7 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
 
 const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string }> = [
   { key: 'RDV', label: 'RDV', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-  { key: 'A plus tard', label: 'Rappel', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'A plus tard', label: 'Plus tard', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'PAS INTÉRESSÉS', label: 'Pas intéressé', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'PAS AU COURANT', label: 'Pas au courant', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
   { key: 'DÉJÀ ÉQUIPÉS', label: 'Déjà équipé', tone: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -37,39 +37,64 @@ export function getProspectStatusBadge(
   aiCallScore?: Record<string, { passed?: boolean; score?: number }> | null
 ): StatusBadge | null {
   if (!aiCallScore) return null;
+
+  let best: { rubric: typeof PROSPECT_RUBRICS[number]; score: number } | null = null;
+
   for (const rubric of PROSPECT_RUBRICS) {
     const metric = aiCallScore[rubric.key];
     if (!metric) continue;
     const passed = typeof metric.passed === 'boolean' ? metric.passed : (metric.score ?? 0) >= 50;
-    if (passed) {
-      return { label: rubric.label, tone: rubric.tone, title: rubric.key };
+    if (!passed) continue;
+    const score = metric.score ?? 0;
+    if (!best || score >= best.score) {
+      best = { rubric, score };
     }
   }
-  return null;
+
+  if (!best) return null;
+  return { label: best.rubric.label, tone: best.rubric.tone, title: best.rubric.key };
 }
 
-type CallLike = {
+const PRIORITY_CALLOUTCOMES = new Set([
+  'transaction',
+  'fraud',
+  'refusal',
+  'voicemail',
+  'no_answer',
+  'busy',
+  'wrong_number',
+  'too_short',
+]);
+
+export type CallLike = {
+  validByAI?: boolean | null;
+  valid?: boolean | null;
   callOutcome?: string | null;
   ai_call_score?: Record<string, { passed?: boolean; score?: number }> | null;
   transaction?: { validByCompany?: boolean | null; validByAI?: boolean | null } | null;
 };
 
-export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
-  if (call.transaction?.validByCompany === false) {
-    return {
-      label: 'Refusé entreprise',
-      tone: 'bg-rose-50 text-rose-700 border-rose-200',
-      title: 'Décision entreprise : refusé',
-    };
-  }
+export const CALL_REJECTED_BADGE: StatusBadge = {
+  label: 'Appel refusé',
+  tone: 'bg-rose-50 text-rose-700 border-rose-200',
+  title: 'L\'appel n\'a pas été validé par l\'IA — aucune transaction à traiter',
+};
 
-  const outcome = callOutcomeBadge(call.callOutcome);
-  if (outcome) {
-    return { ...outcome, title: `Résultat appel : ${call.callOutcome}` };
+export function resolveCallDispositionStatus(call: CallLike): StatusBadge {
+  const outcome = call.callOutcome;
+
+  if (outcome && PRIORITY_CALLOUTCOMES.has(outcome)) {
+    const badge = callOutcomeBadge(outcome);
+    if (badge) return { ...badge, title: `Résultat appel : ${outcome}` };
   }
 
   const prospect = getProspectStatusBadge(call.ai_call_score);
   if (prospect) return prospect;
+
+  const outcomeBadge = callOutcomeBadge(outcome);
+  if (outcomeBadge) {
+    return { ...outcomeBadge, title: `Résultat appel : ${outcome}` };
+  }
 
   if (call.transaction?.validByAI === false) {
     return {
@@ -84,4 +109,20 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
     tone: 'bg-blue-50 text-blue-600 border-blue-200',
     title: 'En attente validation entreprise',
   };
+}
+
+export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
+  if (call.transaction?.validByCompany === false) {
+    return {
+      label: 'Refusé entreprise',
+      tone: 'bg-rose-50 text-rose-700 border-rose-200',
+      title: 'Décision entreprise : refusé',
+    };
+  }
+
+  if (call.validByAI === false || call.valid === false) {
+    return CALL_REJECTED_BADGE;
+  }
+
+  return resolveCallDispositionStatus(call);
 }

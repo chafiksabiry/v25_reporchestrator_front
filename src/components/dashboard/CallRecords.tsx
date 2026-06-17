@@ -29,7 +29,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, getProspectStatusBadge, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -231,12 +231,12 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
-/** Map `callOutcome` to a short label + tone for the disposition pill. */
-function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'status'>
-): { label: string; tone: string } | null {
-  return callOutcomeBadge(record.callOutcome ?? null)
-    ?? getProspectStatusBadge(record.ai_call_score);
+/** Disposition pill — rubriques prospect (RDV, plus tard…) avant argued_interested. */
+function dispositionBadge(record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid'>): { label: string; tone: string } | null {
+  if (record.validByAI === false || record.valid === false) return null;
+  const status = resolveCallDispositionStatus(record);
+  if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
+  return status;
 }
 
 export function CallRecords({
@@ -704,7 +704,20 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveTransactionRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : record.validByAI === true || record.validByAI === false ? (
+                        ) : record.validByAI === false ? (
+                          (() => {
+                            const txStatus = resolveUnvalidatedTransactionStatus(record);
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${txStatus.tone}`}
+                                title={txStatus.title}
+                              >
+                                <X className="w-3 h-3" />
+                                {txStatus.label}
+                              </span>
+                            );
+                          })()
+                        ) : record.validByAI === true ? (
                           (() => {
                             const txStatus = resolveUnvalidatedTransactionStatus(record);
                             return (
@@ -861,7 +874,9 @@ export function CallRecords({
                         className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${txStatus.tone}`}
                         title={txStatus.title}
                       >
-                        {hasDetectedTransactionSale(selectedCall) && selectedCall.transaction?.validByCompany !== false ? (
+                        {selectedCall.validByAI === false ? (
+                          <X className="w-3 h-3" />
+                        ) : hasDetectedTransactionSale(selectedCall) && selectedCall.transaction?.validByCompany !== false ? (
                           <Clock className="w-3 h-3 animate-pulse" />
                         ) : null}
                         {txStatus.label}
