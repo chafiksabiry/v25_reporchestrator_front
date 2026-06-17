@@ -25,7 +25,7 @@ import {
 import api from '../../utils/client';
 import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
-  hasValidatedTransactionSale,
+  hasDetectedTransactionSale,
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
@@ -699,15 +699,15 @@ export function CallRecords({
 
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
-                        {record.transaction?.validByReps === true ? (
+                        {record.transaction?.validByCompany === true || record.transaction?.validByReps === true ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <Check className="w-3 h-3" />
                             +{resolveTransactionRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : hasValidatedTransactionSale(record) ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-harx-50 text-harx-700 border border-harx-100">
-                            <Check className="w-3 h-3" />
-                            +{resolveTransactionRepCommission(record).toFixed(2)}€
+                        ) : hasDetectedTransactionSale(record) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-100" title="En attente de validation entreprise">
+                            <Clock className="w-3 h-3 animate-pulse" />
+                            Attente
                           </span>
                         ) : record.transaction?.validByAI === false ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100">
