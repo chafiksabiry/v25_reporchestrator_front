@@ -38,7 +38,7 @@ export function hasDetectedTransactionSale(record: CommissionCall): boolean {
 
 /** Vente confirmée — entreprise a validé (`validByCompany === true`). */
 export function hasValidatedTransactionSale(record: CommissionCall): boolean {
-  return hasDetectedTransactionSale(record) && record.transaction?.validByCompany === true;
+  return !!record.transaction && record.transaction.validByCompany === true;
 }
 
 export function resolveCallRepCommission(record: CommissionCall): number {

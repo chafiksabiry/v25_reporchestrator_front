@@ -29,6 +29,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
+import { callOutcomeBadge, getProspectStatusBadge, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -231,27 +232,11 @@ function isAnalysisStale(record: CallRecord): boolean {
 }
 
 /** Map `callOutcome` to a short label + tone for the disposition pill. */
-function callOutcomeBadge(
-  outcome: CallRecord['callOutcome'] | undefined
+function dispositionBadge(
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'status'>
 ): { label: string; tone: string } | null {
-  if (!outcome) return null;
-  const map: Record<string, { label: string; tone: string }> = {
-    transaction:        { label: 'Transaction',  tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    appointment:        { label: 'RDV',          tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-    callback_requested: { label: 'Rappel',       tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-    argued_interested:  { label: 'Argumenté',    tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    refusal:            { label: 'Refus',        tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-    not_interested:     { label: 'Pas intéressé', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-    already_equipped:   { label: 'Déjà équipé',  tone: 'bg-blue-50 text-blue-700 border-blue-200' },
-    voicemail:          { label: 'Messagerie',   tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    no_answer:          { label: 'Non décroché', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    busy:               { label: 'Occupé',       tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    wrong_number:       { label: 'Faux numéro',  tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-    fraud:              { label: 'Fraude',       tone: 'bg-rose-100 text-rose-800 border-rose-300' },
-    too_short:          { label: 'Trop court',   tone: 'bg-slate-50 text-slate-500 border-slate-200' },
-    connected_no_sale:  { label: 'Sans suite',   tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-  };
-  return map[outcome] || null;
+  return callOutcomeBadge(record.callOutcome ?? null)
+    ?? getProspectStatusBadge(record.ai_call_score);
 }
 
 export function CallRecords({
@@ -575,7 +560,7 @@ export function CallRecords({
             const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
             const showValidationSection =
               status === 'completed' || record.validByAI != null || isUnansweredStatus;
-            const outcomeBadge = callOutcomeBadge(record.callOutcome);
+            const outcomeBadge = dispositionBadge(record);
 
             return (
               <div
@@ -669,19 +654,34 @@ export function CallRecords({
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
                         ) : record.validByAI === false ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100"
-                            title={record.ai_refusal_reason || undefined}
-                          >
-                            <X className="w-3 h-3" />
-                            {isUnansweredStatus
-                              ? status === 'busy'
-                                ? 'Occupé'
-                                : status === 'no-answer' || status === 'noanswer'
-                                  ? 'Non décroché'
-                                  : 'Annulé'
-                              : 'Refusé'}
-                          </span>
+                          (() => {
+                            const disp = dispositionBadge(record);
+                            if (disp) {
+                              return (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${disp.tone}`}
+                                  title={record.ai_refusal_reason || record.callOutcome || undefined}
+                                >
+                                  {disp.label}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100"
+                                title={record.ai_refusal_reason || undefined}
+                              >
+                                <X className="w-3 h-3" />
+                                {isUnansweredStatus
+                                  ? status === 'busy'
+                                    ? 'Occupé'
+                                    : status === 'no-answer' || status === 'noanswer'
+                                      ? 'Non décroché'
+                                      : 'Annulé'
+                                  : 'Refusé'}
+                              </span>
+                            );
+                          })()
                         ) : record.ai_call_status === 'error' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100">
                             <X className="w-3 h-3" />
@@ -699,21 +699,28 @@ export function CallRecords({
 
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
-                        {record.transaction?.validByCompany === true || record.transaction?.validByReps === true ? (
+                        {record.transaction?.validByCompany === true ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <Check className="w-3 h-3" />
                             +{resolveTransactionRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : hasDetectedTransactionSale(record) ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-100" title="En attente de validation entreprise">
-                            <Clock className="w-3 h-3 animate-pulse" />
-                            Attente
-                          </span>
-                        ) : record.transaction?.validByAI === false ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100">
-                            <X className="w-3 h-3" />
-                            Refusé
-                          </span>
+                        ) : record.validByAI === true || record.validByAI === false ? (
+                          (() => {
+                            const txStatus = resolveUnvalidatedTransactionStatus(record);
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${txStatus.tone}`}
+                                title={txStatus.title}
+                              >
+                                {record.transaction?.validByCompany === false || !hasDetectedTransactionSale(record) ? (
+                                  <Clock className="w-3 h-3" />
+                                ) : (
+                                  <Clock className="w-3 h-3 animate-pulse" />
+                                )}
+                                {txStatus.label}
+                              </span>
+                            );
+                          })()
                         ) : (
                           <span className="text-slate-300 font-bold text-sm">—</span>
                         )}
@@ -842,19 +849,25 @@ export function CallRecords({
                     <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="En attente">
                       <Clock className="w-3 h-3" />
                     </span>
-                  ) : selectedCall.transaction?.validByAI === true ? (
-                    <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100/40 shadow-sm" title="Wait for Company Validation">
-                      <Clock className="w-3 h-3 animate-pulse" />
+                  ) : selectedCall.transaction?.validByCompany === true ? (
+                    <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                      <Check className="w-3 h-3" />
+                      +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€
                     </span>
-                  ) : selectedCall.transaction?.validByAI === false ? (
-                    <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100/40 shadow-sm" title="Refusé AI">
-                      <X className="w-3 h-3" />
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="Aucune vente">
-                      <Clock className="w-3 h-3" />
-                    </span>
-                  )}
+                  ) : (() => {
+                    const txStatus = resolveUnvalidatedTransactionStatus(selectedCall);
+                    return (
+                      <span
+                        className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${txStatus.tone}`}
+                        title={txStatus.title}
+                      >
+                        {hasDetectedTransactionSale(selectedCall) && selectedCall.transaction?.validByCompany !== false ? (
+                          <Clock className="w-3 h-3 animate-pulse" />
+                        ) : null}
+                        {txStatus.label}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-1.5">
