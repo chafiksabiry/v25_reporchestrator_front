@@ -69,10 +69,21 @@ const PRIORITY_CALLOUTCOMES = new Set([
 export type CallLike = {
   validByAI?: boolean | null;
   valid?: boolean | null;
+  ai_call_status?: string | null;
   callOutcome?: string | null;
   ai_call_score?: Record<string, { passed?: boolean; score?: number }> | null;
   transaction?: { validByCompany?: boolean | null; validByAI?: boolean | null } | null;
 };
+
+export function isCallRejectedByAI(call: CallLike): boolean {
+  if (call.validByAI === false || call.valid === false) return true;
+  if (call.ai_call_status === 'auto_refused') return true;
+  return false;
+}
+
+export function isCallApprovedByAI(call: CallLike): boolean {
+  return call.validByAI === true || call.valid === true;
+}
 
 export const CALL_REJECTED_BADGE: StatusBadge = {
   label: 'Appel refusé',
@@ -114,13 +125,13 @@ export function resolveCallDispositionStatus(call: CallLike): StatusBadge {
 export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
   if (call.transaction?.validByCompany === false) {
     return {
-      label: 'Refusé entreprise',
+      label: 'Call refused',
       tone: 'bg-rose-50 text-rose-700 border-rose-200',
       title: 'Décision entreprise : refusé',
     };
   }
 
-  if (call.validByAI === false || call.valid === false) {
+  if (isCallRejectedByAI(call)) {
     return CALL_REJECTED_BADGE;
   }
 

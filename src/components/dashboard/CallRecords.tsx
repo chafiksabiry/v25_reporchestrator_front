@@ -29,7 +29,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { isCallApprovedByAI, isCallRejectedByAI, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -232,8 +232,8 @@ function isAnalysisStale(record: CallRecord): boolean {
 }
 
 /** Disposition pill — rubriques prospect (RDV, plus tard…) avant argued_interested. */
-function dispositionBadge(record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid'>): { label: string; tone: string } | null {
-  if (record.validByAI === false || record.valid === false) return null;
+function dispositionBadge(record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status'>): { label: string; tone: string } | null {
+  if (isCallRejectedByAI(record)) return null;
   const status = resolveCallDispositionStatus(record);
   if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
   return status;
@@ -559,7 +559,7 @@ export function CallRecords({
             const status = record.status?.toLowerCase() || '';
             const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
             const showValidationSection =
-              status === 'completed' || record.validByAI != null || isUnansweredStatus;
+              status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
             const outcomeBadge = dispositionBadge(record);
 
             return (
@@ -653,7 +653,7 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : record.validByAI === false ? (
+                        ) : isCallRejectedByAI(record) ? (
                           (() => {
                             const disp = dispositionBadge(record);
                             if (disp) {
@@ -704,7 +704,7 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveTransactionRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : record.validByAI === false ? (
+                        ) : (isCallRejectedByAI(record) || isCallApprovedByAI(record)) ? (
                           (() => {
                             const txStatus = resolveUnvalidatedTransactionStatus(record);
                             return (
@@ -712,20 +712,9 @@ export function CallRecords({
                                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${txStatus.tone}`}
                                 title={txStatus.title}
                               >
-                                <X className="w-3 h-3" />
-                                {txStatus.label}
-                              </span>
-                            );
-                          })()
-                        ) : record.validByAI === true ? (
-                          (() => {
-                            const txStatus = resolveUnvalidatedTransactionStatus(record);
-                            return (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${txStatus.tone}`}
-                                title={txStatus.title}
-                              >
-                                {record.transaction?.validByCompany === false || !hasDetectedTransactionSale(record) ? (
+                                {isCallRejectedByAI(record) ? (
+                                  <X className="w-3 h-3" />
+                                ) : record.transaction?.validByCompany === false || !hasDetectedTransactionSale(record) ? (
                                   <Clock className="w-3 h-3" />
                                 ) : (
                                   <Clock className="w-3 h-3 animate-pulse" />
@@ -874,7 +863,7 @@ export function CallRecords({
                         className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${txStatus.tone}`}
                         title={txStatus.title}
                       >
-                        {selectedCall.validByAI === false ? (
+                        {isCallRejectedByAI(selectedCall) ? (
                           <X className="w-3 h-3" />
                         ) : hasDetectedTransactionSale(selectedCall) && selectedCall.transaction?.validByCompany !== false ? (
                           <Clock className="w-3 h-3 animate-pulse" />
