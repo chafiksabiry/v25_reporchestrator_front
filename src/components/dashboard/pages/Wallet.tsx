@@ -39,7 +39,7 @@ import {
 
 // Minimum withdrawal amount enforced by the backend
 // (see `requestAgentWithdrawal` in escrowController.js).
-const MIN_WITHDRAWAL_AMOUNT = 250;
+const MIN_WITHDRAWAL_AMOUNT = 1;
 
 export function WalletPage() {
   const { t } = useTranslation();
