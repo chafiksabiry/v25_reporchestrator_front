@@ -23,25 +23,22 @@ type CommissionCall = {
 
 const REP_SHARE = 0.7;
 
-/** Same sale-detection rule as escrow `callHasValidatedTransactionSale`. */
-export function hasValidatedTransactionSale(record: CommissionCall): boolean {
+/** IA a détecté une vente — en attente validation entreprise. */
+export function hasDetectedTransactionSale(record: CommissionCall): boolean {
   if (record.validByAI !== true) return false;
 
-  const repTxShare = Number(
-    record.transaction?.repTransactionCommission ??
-      record.repTransactionCommission ??
-      0
-  );
-  if (repTxShare > 0) return true;
-
   if (record.transaction?.validByAI === true) return true;
-  if (record.transaction?.validByCompany === true) return true;
   if (record.transaction?.validByReps === true) return true;
   if (record.transactionOccurred === true) return true;
   if (record.callOutcome === 'transaction') return true;
   if (record.flags?.transactionDetected === true) return true;
   if (record.ai_call_score?.transaction_detected === true) return true;
   return false;
+}
+
+/** Vente confirmée — entreprise a validé (`validByCompany === true`). */
+export function hasValidatedTransactionSale(record: CommissionCall): boolean {
+  return hasDetectedTransactionSale(record) && record.transaction?.validByCompany === true;
 }
 
 export function resolveCallRepCommission(record: CommissionCall): number {
