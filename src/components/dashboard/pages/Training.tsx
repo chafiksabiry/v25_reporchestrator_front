@@ -29,6 +29,7 @@ import { GigScriptReaderModal } from '../GigScriptReaderModal';
 import {
   gigIdFromJourney,
   isScriptRequirementModule,
+  journeyHasScriptModule,
   markScriptReadLocal,
   scriptModuleMeta,
   scriptModuleStillPending,
@@ -177,65 +178,37 @@ function extractModules(j: JourneyRow): ModuleRow[] {
   return Array.isArray(raw) ? (raw as ModuleRow[]) : [];
 }
 
-function CompletedTrainingRequirementsWarning({
+function ScriptReadStatus({
   scriptPending,
   onOpenScript,
-  onCertify,
 }: {
   scriptPending: boolean;
   onOpenScript?: () => void;
-  onCertify?: () => void;
 }) {
-  return (
-    <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/95 p-3 text-amber-950">
-      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-      <div className="min-w-0 space-y-2 text-xs leading-relaxed">
-        <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
-          Étapes obligatoires avant le cockpit
-        </p>
-        {scriptPending ? (
-          <p>
-            <span className="inline-flex items-center gap-1 font-bold text-amber-900">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Script d&apos;appel :
-            </span>{' '}
-            la lecture du script est <strong>obligatoire</strong>. Lisez-le jusqu&apos;au bout puis
-            cliquez sur <strong>Terminer</strong>.
-            {onOpenScript ? (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  onClick={onOpenScript}
-                  className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
-                >
-                  Lire le script
-                </button>
-              </>
-            ) : null}
-          </p>
+  if (scriptPending) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-amber-900">
+          <MessageSquare className="h-3.5 w-3.5" />
+          Script : <span className="font-black text-amber-700">non lu</span>
+        </span>
+        {onOpenScript ? (
+          <button
+            type="button"
+            onClick={onOpenScript}
+            className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950 shrink-0"
+          >
+            Lire
+          </button>
         ) : null}
-        <p>
-          <span className="inline-flex items-center gap-1 font-bold text-amber-900">
-            <Award className="h-3.5 w-3.5" />
-            Certification :
-          </span>{' '}
-          obtenez votre <strong>certificat</strong> pour valider officiellement la formation et débloquer l&apos;accès au
-          cockpit.
-          {onCertify ? (
-            <>
-              {' '}
-              <button
-                type="button"
-                onClick={onCertify}
-                className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
-              >
-                Obtenir le certificat
-              </button>
-            </>
-          ) : null}
-        </p>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800">
+      <CheckCircle className="h-3.5 w-3.5" />
+      Script : <span className="font-black">lu</span>
     </div>
   );
 }
@@ -2563,11 +2536,10 @@ export function Training() {
                   )}
                 </div>
                 </div>
-                {isCompleted && (
-                  <CompletedTrainingRequirementsWarning
+                {isCompleted && (journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
+                  <ScriptReadStatus
                     scriptPending={scriptPending}
                     onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
-                    onCertify={() => openCertificate(j)}
                   />
                 )}
               </li>
@@ -2640,11 +2612,12 @@ export function Training() {
                       </div>
                     </div>
                   </div>
-                  <CompletedTrainingRequirementsWarning
-                    scriptPending={scriptPending}
-                    onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
-                    onCertify={() => openCertificate(j)}
-                  />
+                  {(journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
+                    <ScriptReadStatus
+                      scriptPending={scriptPending}
+                      onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => openCertificate(j)}
