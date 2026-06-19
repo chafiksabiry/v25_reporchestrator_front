@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -27,11 +27,12 @@ import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/cli
 import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
   hasDetectedTransactionSale,
+  isCallPendingClientValidation,
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
 import { formatRetractionEndsLabel, isCallApprovedByAI, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
-import { indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
+import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -269,10 +270,29 @@ export function CallRecords({
   const [error, setError] = useState<string | null>(null);
   const [analyzingCallId, setAnalyzingCallId] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ callId: string; message: string } | null>(null);
-  const [repLedgerByCallId, setRepLedgerByCallId] = useState<Map<string, RepTransactionRow>>(new Map());
+  const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
 
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
+
+  const repLedgerByCallId = useMemo(
+    () => indexSaleLedgerByCallId(repLedgerRows),
+    [repLedgerRows]
+  );
+
+  const { ledgerCallIds, bookedTxSourceIds } = useMemo(() => {
+    const activeLedger = (row: RepTransactionRow) =>
+      row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
+    const ledgerForPipeline = dedupeSaleLedgerRows(repLedgerRows);
+    const callIds = new Set<string>();
+    const booked = new Set<string>();
+    ledgerForPipeline.forEach((row) => {
+      if (!activeLedger(row)) return;
+      if (row.callId) callIds.add(String(row.callId));
+      if (row.type === 'transaction' && row.sourceId) booked.add(String(row.sourceId));
+    });
+    return { ledgerCallIds: callIds, bookedTxSourceIds: booked };
+  }, [repLedgerRows]);
 
   const getLedgerTxStatus = (record: CallRecord) =>
     repLedgerByCallId.get(resolveCallId(record))?.status ?? null;
@@ -284,7 +304,7 @@ export function CallRecords({
       const response = await repTransactionsApi.list(agentId, { limit: 500 });
       if (!response?.success || !Array.isArray(response.data)) return;
 
-      setRepLedgerByCallId(indexSaleLedgerByCallId(response.data));
+      setRepLedgerRows(response.data);
     } catch (err) {
       console.error('Failed to fetch rep ledger for call records:', err);
     }
@@ -652,8 +672,17 @@ export function CallRecords({
       }
       if (isTransactionInRetraction(record, ledgerStatus)) return false;
     }
-    if (transactionValidationFilter === 'refused' && record.transaction?.validByReps !== false) return false;
-    if (transactionValidationFilter === 'pending' && record.transaction?.validByReps != null) return false;
+    if (transactionValidationFilter === 'refused') {
+      const companyRefused = record.transaction?.validByCompany === false;
+      const ledgerRefused = ledgerStatus === 'refused';
+      if (!companyRefused && !ledgerRefused) return false;
+    }
+    if (transactionValidationFilter === 'pending') {
+      const callId = resolveCallId(record);
+      if (!isCallPendingClientValidation(record, ledgerCallIds, bookedTxSourceIds, callId)) {
+        return false;
+      }
+    }
 
     return true;
   });

@@ -132,6 +132,8 @@ export function resolveClientValidationPendingAmount(
   // Seules les ventes détectées en attente de validByCompany comptent ici.
   if (!hasDetectedTransactionSale(record)) return 0;
 
+  if (record.transaction?.validByCompany === false) return 0;
+
   const txSourceId = String(record.transaction?._id || callId);
   if (bookedTxSourceIds.has(txSourceId) || record.transaction?.validByCompany === true) {
     return 0;
