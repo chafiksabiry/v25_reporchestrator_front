@@ -63,10 +63,6 @@ export function WalletPage() {
   const [transactionValidationFilter, setTransactionValidationFilter] = useState<
     'all' | 'approved' | 'validated' | 'refused' | 'pending' | 'retraction'
   >('all');
-  type LedgerTxFilter = 'all' | 'earned' | 'pending_retraction' | 'paid' | 'refused';
-  type CommissionTypeFilter = 'all' | 'call' | 'sale' | 'bonus';
-  const [ledgerTransactionFilter, setLedgerTransactionFilter] = useState<LedgerTxFilter>('all');
-  const [commissionTypeFilter, setCommissionTypeFilter] = useState<CommissionTypeFilter>('all');
 
   // Dynamic state metrics for real payouts
   const [availableBalance, setAvailableBalance] = useState(0);
@@ -83,7 +79,7 @@ export function WalletPage() {
   // Maps the backend rep ledger to a display row. We deliberately drop the
   // gross amount and the HARX share so the rep never sees the 70/30 split —
   // that info is confidential.
-  const mapRepLedgerToDisplay = (rows: RepTransactionRow[], resolveDate?: (row: RepTransactionRow) => string) =>
+  const mapRepLedgerToDisplay = (rows: RepTransactionRow[]) =>
     rows.map((row) => {
       const typeLabel =
         row.type === 'call_validated'
@@ -92,12 +88,10 @@ export function WalletPage() {
             ? 'Vente validée'
             : 'Bonus';
       const gigTitle = row.gig?.title || 'Projet';
-      const activityDate = resolveDate ? resolveDate(row) : row.createdAt;
       return {
         id: `rep-${row._id}`,
         type: typeLabel,
         ledgerType: row.type,
-        ledgerStatus: row.status,
         amount: row.repShare,
         status:
           row.status === 'earned'
@@ -107,12 +101,11 @@ export function WalletPage() {
               : row.status === 'pending_retraction'
                 ? 'Retraction'
                 : 'Refused',
-        date: activityDate,
+        date: row.createdAt,
         method: 'Wallet',
         reference: row.callId || row.sourceId,
         description: `${typeLabel} — ${gigTitle}`,
-        gigId: row.gigId,
-        raw: row,
+        gigId: row.gigId
       };
     });
 
@@ -194,6 +187,17 @@ export function WalletPage() {
     []
   );
 
+  const transactionSaleOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Toutes les ventes', tone: 'brand' as const },
+      { value: 'validated', label: 'Ventes validées', tone: 'success' as const },
+      { value: 'retraction', label: 'Rétractation (14j)', tone: 'warning' as const },
+      { value: 'pending', label: 'Ventes en attente', tone: 'warning' as const },
+      { value: 'refused', label: 'Ventes refusées', tone: 'danger' as const },
+    ],
+    []
+  );
+
   const callValidationOptions = useMemo(
     () => [
       { value: 'all', label: 'Tous les appels', tone: 'brand' as const },
@@ -249,8 +253,7 @@ export function WalletPage() {
 
   const resetTransactionFilters = () => {
     setSelectedGigId('all');
-    setLedgerTransactionFilter('all');
-    setCommissionTypeFilter('all');
+    setTransactionValidationFilter('all');
   };
 
   const resetCallFilters = () => {
@@ -262,7 +265,7 @@ export function WalletPage() {
   const hasActiveTabFilters =
     selectedGigId !== 'all'
     || (activeTab === 'transactions'
-      ? ledgerTransactionFilter !== 'all' || commissionTypeFilter !== 'all'
+      ? transactionValidationFilter !== 'all'
       : callValidationFilter !== 'all' || transactionValidationFilter !== 'all');
 
   // Rep keeps 70% of every commission; HARX keeps 30%. We only display the rep share.
@@ -631,21 +634,48 @@ export function WalletPage() {
 
     let retractionAmount = 0;
     let retractionCount = 0;
+    let validatedCallsAmount = 0;
+    let validatedCallsCount = 0;
+    let validatedSalesAmount = 0;
+    let validatedSalesCount = 0;
+    let availableCallsAmount = 0;
+    let availableSalesAmount = 0;
+
+    const matchGig = (row: RepTransactionRow) => {
+      if (selectedGigId === 'all') return true;
+      return !row.gigId || row.gigId === selectedGigId;
+    };
+
+    repLedgerRows.forEach((row) => {
+      if (!matchGig(row)) return;
+      const share = row.repShare || 0;
+      const activityDate = ledgerActivityDate(row);
+
+      if (row.status === 'earned' || row.status === 'paid') {
+        if (row.type === 'call_validated') availableCallsAmount += share;
+        if (row.type === 'transaction') availableSalesAmount += share;
+      }
+
+      if (!activeLedger(row) || !inPeriod(activityDate)) return;
+
+      if (row.type === 'call_validated') {
+        validatedCallsAmount += share;
+        validatedCallsCount += 1;
+      } else if (row.type === 'transaction') {
+        validatedSalesAmount += share;
+        validatedSalesCount += 1;
+      }
+    });
 
     repLedgerRows.forEach((row) => {
       if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
-      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return;
+      if (!matchGig(row)) return;
       if (!inPeriod(ledgerActivityDate(row))) return;
       retractionAmount += row.repShare || 0;
       retractionCount += 1;
     });
 
-    const validatedInPeriod = repLedgerRows.reduce((sum, row) => {
-      if (!activeLedger(row)) return sum;
-      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return sum;
-      if (!inPeriod(ledgerActivityDate(row))) return sum;
-      return sum + (row.repShare || 0);
-    }, 0);
+    const validatedInPeriod = validatedCallsAmount + validatedSalesAmount;
 
     const totalGains = validatedInPeriod + clientValidationAmount;
 
@@ -657,6 +687,12 @@ export function WalletPage() {
       clientValidationCount,
       totalGains,
       validatedInPeriod,
+      validatedCallsAmount,
+      validatedCallsCount,
+      validatedSalesAmount,
+      validatedSalesCount,
+      availableCallsAmount,
+      availableSalesAmount,
     };
   }, [
     selectedDateRange,
@@ -669,8 +705,7 @@ export function WalletPage() {
 
   const focusRetractionTransactions = () => {
     setActiveTab('transactions');
-    setLedgerTransactionFilter('pending_retraction');
-    setCommissionTypeFilter('sale');
+    setTransactionValidationFilter('retraction');
   };
 
   const focusClientValidationPending = () => {
@@ -679,138 +714,37 @@ export function WalletPage() {
     setTransactionValidationFilter('pending');
   };
 
-  const resolveLedgerActivityDate = (row: RepTransactionRow): string => {
-    if (row.callId) {
-      const fromCall = callActivityDateById.get(String(row.callId));
-      if (fromCall) return fromCall;
+  const filteredTransactions = transactions.filter((tx) => {
+    if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
+    const periodStart = getWalletPeriodStart(selectedDateRange);
+    const periodEnd = getWalletPeriodEnd(selectedDateRange);
+    if (periodStart > 0) {
+      const ts = new Date(tx.date).getTime();
+      if (!ts || ts < periodStart || ts > periodEnd) return false;
     }
-    if (row.call?.startTime) return row.call.startTime;
-    return row.createdAt;
-  };
-
-  const filteredLedgerRows = useMemo(() => {
-    const periodStart = getWalletPeriodStart(selectedDateRange);
-    const periodEnd = getWalletPeriodEnd(selectedDateRange);
-    return repLedgerRows.filter((row) => {
-      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return false;
-      const ts = new Date(resolveLedgerActivityDate(row)).getTime();
-      if (periodStart > 0 && (!ts || ts < periodStart || ts > periodEnd)) return false;
-      return true;
-    });
-  }, [repLedgerRows, selectedGigId, selectedDateRange, callActivityDateById]);
-
-  const transactionStats = useMemo(() => {
-    const acc = {
-      all: { count: 0, total: 0 },
-      paid: { count: 0, total: 0 },
-      earned: { count: 0, total: 0 },
-      pending_retraction: { count: 0, total: 0 },
-      refused: { count: 0, total: 0 },
-      calls: { count: 0, total: 0 },
-      sales: { count: 0, total: 0 },
-    };
-    filteredLedgerRows.forEach((row) => {
-      const share = row.repShare || 0;
-      acc.all.count += 1;
-      acc.all.total += share;
-      if (row.type === 'call_validated') {
-        acc.calls.count += 1;
-        acc.calls.total += share;
+    if (transactionValidationFilter !== 'all') {
+      if (transactionValidationFilter === 'approved' || transactionValidationFilter === 'validated') {
+        if (tx.type === 'Payout') return false;
+        if (tx.status !== 'Completed' && tx.status !== 'Paid') return false;
       }
-      if (row.type === 'transaction') {
-        acc.sales.count += 1;
-        acc.sales.total += share;
-      }
-      if (row.status === 'paid') {
-        acc.paid.count += 1;
-        acc.paid.total += share;
-      } else if (row.status === 'earned') {
-        acc.earned.count += 1;
-        acc.earned.total += share;
-      } else if (row.status === 'pending_retraction') {
-        acc.pending_retraction.count += 1;
-        acc.pending_retraction.total += share;
-      } else if (row.status === 'refused') {
-        acc.refused.count += 1;
-        acc.refused.total += share;
-      }
-    });
-    return acc;
-  }, [filteredLedgerRows]);
+      if (transactionValidationFilter === 'pending' && tx.status !== 'Processing' && tx.status !== 'Pending') return false;
+      if (transactionValidationFilter === 'retraction' && tx.status !== 'Retraction') return false;
+      if (transactionValidationFilter === 'refused' && tx.status !== 'Refused') return false;
+    }
+    return true;
+  });
 
-  const visibleLedgerRows = useMemo(() => {
-    return filteredLedgerRows
-      .filter((row) => {
-        if (ledgerTransactionFilter !== 'all' && row.status !== ledgerTransactionFilter) return false;
-        if (commissionTypeFilter === 'call' && row.type !== 'call_validated') return false;
-        if (commissionTypeFilter === 'sale' && row.type !== 'transaction') return false;
-        if (commissionTypeFilter === 'bonus' && row.type !== 'bonus') return false;
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          new Date(resolveLedgerActivityDate(b)).getTime() -
-          new Date(resolveLedgerActivityDate(a)).getTime()
-      );
-  }, [filteredLedgerRows, ledgerTransactionFilter, commissionTypeFilter, callActivityDateById]);
-
-  const filteredPayouts = useMemo(() => {
-    const periodStart = getWalletPeriodStart(selectedDateRange);
-    const periodEnd = getWalletPeriodEnd(selectedDateRange);
-    return backendWithdrawals.filter((w) => {
-      const ts = new Date(w.date).getTime();
-      if (periodStart > 0 && (!ts || ts < periodStart || ts > periodEnd)) return false;
-      return true;
-    });
-  }, [backendWithdrawals, selectedDateRange]);
-
-  const filteredTransactions = useMemo(() => {
-    const commissions = mapRepLedgerToDisplay(visibleLedgerRows, resolveLedgerActivityDate);
-    const showPayouts =
-      ledgerTransactionFilter === 'all' &&
-      commissionTypeFilter === 'all';
-    if (!showPayouts) return commissions;
-    return [...commissions, ...filteredPayouts].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [
-    visibleLedgerRows,
-    filteredPayouts,
-    ledgerTransactionFilter,
-    commissionTypeFilter,
-    callActivityDateById,
-  ]);
-
-  const getTxVisual = (type: string, ledgerType?: string) => {
+  const getTxVisual = (type: string) => {
     if (type === 'Payout') {
       return { iconBg: 'bg-amber-50', iconText: 'text-amber-600', cardBorder: 'border-amber-100/60', label: 'Retrait' };
     }
-    if (type === 'Bonus' || ledgerType === 'bonus') {
+    if (type === 'Bonus') {
       return { iconBg: 'bg-violet-50', iconText: 'text-violet-600', cardBorder: 'border-violet-100/60', label: 'Bonus' };
     }
-    if (type === 'Vente validée' || ledgerType === 'transaction') {
+    if (type === 'Vente validée') {
       return { iconBg: 'bg-harx-50', iconText: 'text-harx-600', cardBorder: 'border-harx-100/60', label: 'Vente' };
     }
-    if (type === 'Appel validé' || ledgerType === 'call_validated') {
-      return { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600', cardBorder: 'border-emerald-100/60', label: 'Appel' };
-    }
     return { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600', cardBorder: 'border-emerald-100/60', label: 'Commission' };
-  };
-
-  const getLedgerStatusBadge = (ledgerStatus: string) => {
-    if (ledgerStatus === 'earned') {
-      return { label: 'Payé', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    }
-    if (ledgerStatus === 'paid') {
-      return { label: 'Versé', className: 'bg-blue-50 text-blue-700 border-blue-200' };
-    }
-    if (ledgerStatus === 'pending_retraction') {
-      return { label: 'Rétractation', className: 'bg-amber-50 text-amber-800 border-amber-200' };
-    }
-    if (ledgerStatus === 'refused') {
-      return { label: 'Refusé', className: 'bg-rose-50 text-rose-700 border-rose-200' };
-    }
-    return { label: ledgerStatus, className: 'bg-slate-50 text-slate-600 border-slate-200' };
   };
 
   const getTxStatusBadge = (status: string) => {
@@ -909,6 +843,17 @@ export function WalletPage() {
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
                   Prêt au retrait
                 </p>
+                <p className="text-[10px] font-semibold text-slate-500 mt-1.5 normal-case tracking-normal leading-relaxed">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone size={10} className="text-emerald-500" />
+                    {fmtMoney(earningsPipeline.availableCallsAmount)} € appels
+                  </span>
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <CreditCard size={10} className="text-emerald-500" />
+                    {fmtMoney(earningsPipeline.availableSalesAmount)} € ventes
+                  </span>
+                </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                 <Wallet className="w-4 h-4" />
@@ -926,7 +871,7 @@ export function WalletPage() {
             onClick={focusRetractionTransactions}
             disabled={earningsPipeline.retractionCount === 0}
             className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-orange-50/40 text-left transition-all w-full ${
-              ledgerTransactionFilter === 'pending_retraction'
+              transactionValidationFilter === 'retraction'
                 ? 'ring-2 ring-orange-400 ring-inset shadow-inner'
                 : earningsPipeline.retractionCount > 0
                   ? 'hover:bg-orange-50/70 cursor-pointer'
@@ -1007,10 +952,20 @@ export function WalletPage() {
                 <p className="text-2xl font-black text-white tracking-tighter mt-2">
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50 leading-relaxed">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone size={10} className="text-emerald-400" />
+                    {fmtMoney(earningsPipeline.validatedCallsAmount)} €
+                    {earningsPipeline.validatedCallsCount > 0 ? ` (${earningsPipeline.validatedCallsCount} appel${earningsPipeline.validatedCallsCount > 1 ? 's' : ''})` : ''}
+                  </span>
+                  <span className="mx-1 text-white/30">+</span>
+                  <span className="inline-flex items-center gap-1">
+                    <CreditCard size={10} className="text-emerald-400" />
+                    {fmtMoney(earningsPipeline.validatedSalesAmount)} €
+                    {earningsPipeline.validatedSalesCount > 0 ? ` (${earningsPipeline.validatedSalesCount} vente${earningsPipeline.validatedSalesCount > 1 ? 's' : ''})` : ''}
+                  </span>
                   {earningsPipeline.clientValidationAmount > 0
-                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
+                    ? ` · +${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
                     : ''}
                 </p>
               </div>
@@ -1133,34 +1088,28 @@ export function WalletPage() {
                       </span>
                     </div>
                     <h2 className="text-base font-black text-slate-900 tracking-tight">
-                      Commissions & retraits
+                      Retraits & Commissions
                     </h2>
                     <p className="text-xs text-slate-500 font-medium mt-1">
-                      Appels validés, ventes (rétractation ou payées) et demandes de retrait.
+                      Suivez vos commissions validées et vos demandes de retrait.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-emerald-600 text-white">
-                      {transactionStats.all.total.toFixed(2)} €
-                      <span className="text-[9px] font-bold text-white/60 uppercase tracking-wider">
-                        commissions
-                      </span>
-                    </span>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
                       {filteredTransactions.length}
                       <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
-                        ligne{filteredTransactions.length !== 1 ? 's' : ''}
+                        opération{filteredTransactions.length !== 1 ? 's' : ''}
                       </span>
                     </span>
                   </div>
                 </div>
 
-                {/* ── Filtres statut & type (alignés Dashboard) ── */}
-                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between">
+                {/* ── Filtres gig & ventes ── */}
+                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <Filter className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Statut</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
                     </div>
                     {hasActiveTabFilters && (
                       <button
@@ -1172,80 +1121,21 @@ export function WalletPage() {
                       </button>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { key: 'all', label: 'Tous', accent: 'slate', count: transactionStats.all.count },
-                      { key: 'earned', label: 'Payé', accent: 'emerald', count: transactionStats.earned.count },
-                      { key: 'pending_retraction', label: 'Rétractation', accent: 'amber', count: transactionStats.pending_retraction.count },
-                      { key: 'paid', label: 'Versé', accent: 'blue', count: transactionStats.paid.count },
-                      { key: 'refused', label: 'Refusé', accent: 'rose', count: transactionStats.refused.count },
-                    ] as { key: LedgerTxFilter; label: string; accent: string; count: number }[]).map((tab) => {
-                      const active = ledgerTransactionFilter === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          type="button"
-                          onClick={() => setLedgerTransactionFilter(tab.key)}
-                          className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                            active
-                              ? tab.accent === 'slate'
-                                ? 'bg-slate-900 text-white shadow-md'
-                                : tab.accent === 'emerald'
-                                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                                  : tab.accent === 'amber'
-                                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                                    : tab.accent === 'blue'
-                                      ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
-                                      : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                              : 'bg-white text-slate-500 hover:bg-white hover:text-slate-800 border border-slate-200/80'
-                          }`}
-                        >
-                          {tab.label}
-                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'}`}>
-                            {tab.count}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <WalletFilterSelect
+                      label="Filtrer par gig"
+                      value={selectedGigId}
+                      onChange={setSelectedGigId}
+                      options={gigSelectOptions}
+                      accent="purple"
+                    />
+                    <WalletFilterSelect
+                      label="Ventes"
+                      value={transactionValidationFilter}
+                      onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
+                      options={transactionSaleOptions}
+                    />
                   </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Type</span>
-                    <div className="flex flex-wrap gap-2">
-                      {([
-                        { key: 'all', label: 'Tous', count: transactionStats.all.count },
-                        { key: 'call', label: 'Appels', count: transactionStats.calls.count },
-                        { key: 'sale', label: 'Ventes', count: transactionStats.sales.count },
-                      ] as { key: CommissionTypeFilter; label: string; count: number }[]).map((tab) => {
-                        const active = commissionTypeFilter === tab.key;
-                        return (
-                          <button
-                            key={tab.key}
-                            type="button"
-                            onClick={() => setCommissionTypeFilter(tab.key)}
-                            className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                              active
-                                ? 'bg-harx-600 text-white shadow-md'
-                                : 'bg-white text-slate-500 border border-slate-200/80 hover:text-slate-800'
-                            }`}
-                          >
-                            {tab.label}
-                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${active ? 'bg-white/25' : 'bg-slate-100'}`}>
-                              {tab.count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <WalletFilterSelect
-                    label="Filtrer par gig"
-                    value={selectedGigId}
-                    onChange={setSelectedGigId}
-                    options={gigSelectOptions}
-                    accent="purple"
-                  />
                 </div>
 
                 <div className="p-4 sm:p-6 bg-slate-50/40">
@@ -1256,20 +1146,16 @@ export function WalletPage() {
                       </div>
                       <p className="text-sm font-black text-slate-700 uppercase tracking-wider">Aucune transaction</p>
                       <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
-                        Les appels validés et les ventes apparaissent ici dès qu&apos;ils sont crédités au ledger.
+                        Ajustez les filtres ou effectuez des appels validés pour voir vos commissions ici.
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {filteredTransactions.map((transaction) => {
-                        const visual = getTxVisual(transaction.type, transaction.ledgerType);
-                        const statusBadge = transaction.ledgerStatus
-                          ? getLedgerStatusBadge(transaction.ledgerStatus)
-                          : getTxStatusBadge(transaction.status);
+                        const visual = getTxVisual(transaction.type);
+                        const statusBadge = getTxStatusBadge(transaction.status);
                         const isPayout = transaction.type === 'Payout';
                         const title = isPayout ? 'Retrait demandé' : transaction.type;
-                        const isCall = transaction.ledgerType === 'call_validated';
-                        const isSale = transaction.ledgerType === 'transaction';
 
                         return (
                           <button
@@ -1285,10 +1171,6 @@ export function WalletPage() {
                                 <div className={`p-3 rounded-2xl shrink-0 shadow-sm ${visual.iconBg} ${visual.iconText}`}>
                                   {isPayout ? (
                                     <ArrowUpRight className="w-5 h-5" />
-                                  ) : isCall ? (
-                                    <Phone className="w-5 h-5" />
-                                  ) : isSale ? (
-                                    <CreditCard className="w-5 h-5" />
                                   ) : (
                                     <ArrowDownRight className="w-5 h-5" />
                                   )}
