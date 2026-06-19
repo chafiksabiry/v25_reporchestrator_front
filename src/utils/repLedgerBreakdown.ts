@@ -1,5 +1,62 @@
 import type { RepTransactionRow } from './client';
 
+/**
+ * Date de référence pour le filtre période wallet :
+ * - ventes / rétractation → date de réservation (createdAt), alignée sur la liste transactions ;
+ * - appels validés → date d'activité de l'appel.
+ */
+export function resolveLedgerPeriodDate(
+  row: RepTransactionRow,
+  callActivityDateById: Map<string, string>
+): string | undefined {
+  if (row.type === 'transaction') {
+    return row.createdAt;
+  }
+  if (row.callId) {
+    const fromCall = callActivityDateById.get(String(row.callId));
+    if (fromCall) return fromCall;
+  }
+  if (row.call?.startTime) return row.call.startTime;
+  return row.createdAt;
+}
+
+const SALE_STATUS_RANK: Record<string, number> = {
+  pending_retraction: 4,
+  earned: 3,
+  paid: 2,
+  refused: 1,
+  reversed: 0,
+};
+
+/** Une vente = une ligne ledger (évite double comptage earned + pending_retraction). */
+export function dedupeSaleLedgerRows(rows: RepTransactionRow[]): RepTransactionRow[] {
+  const saleByKey = new Map<string, RepTransactionRow>();
+  const others: RepTransactionRow[] = [];
+
+  const saleKey = (row: RepTransactionRow) => {
+    if (row.callId) return `call:${row.callId}`;
+    if (row.sourceId) return `src:${row.sourceId}`;
+    if (row.transactionDocId) return `tx:${row.transactionDocId}`;
+    return `id:${row._id}`;
+  };
+
+  for (const row of rows) {
+    if (row.type !== 'transaction') {
+      others.push(row);
+      continue;
+    }
+    const key = saleKey(row);
+    const prev = saleByKey.get(key);
+    const rowRank = SALE_STATUS_RANK[row.status] ?? 0;
+    const prevRank = prev ? (SALE_STATUS_RANK[prev.status] ?? 0) : -1;
+    if (!prev || rowRank > prevRank) {
+      saleByKey.set(key, row);
+    }
+  }
+
+  return [...others, ...saleByKey.values()];
+}
+
 export type ValidatedLedgerBreakdown = {
   validatedCallsAmount: number;
   validatedCallsCount: number;
@@ -10,10 +67,11 @@ export type ValidatedLedgerBreakdown = {
   validatedInPeriod: number;
 };
 
-const isActiveLedgerRow = (row: RepTransactionRow) =>
-  row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
+/** Commission définitivement créditée — exclut les ventes encore en rétractation 14j. */
+const isValidatedNonRetractedRow = (row: RepTransactionRow) =>
+  row.status === 'earned' || row.status === 'paid';
 
-/** Somme des commissions validées sur la période, ventilées appels / ventes / bonus. */
+/** Somme des commissions validées et non rétractées sur la période (appels / ventes / bonus). */
 export function computeValidatedLedgerBreakdown(
   rows: RepTransactionRow[],
   opts: {
@@ -30,7 +88,7 @@ export function computeValidatedLedgerBreakdown(
   let validatedBonusCount = 0;
 
   for (const row of rows) {
-    if (!isActiveLedgerRow(row)) continue;
+    if (!isValidatedNonRetractedRow(row)) continue;
     if (opts.selectedGigId && opts.selectedGigId !== 'all' && row.gigId && row.gigId !== opts.selectedGigId) {
       continue;
     }
