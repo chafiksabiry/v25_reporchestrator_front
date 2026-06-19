@@ -1,6 +1,6 @@
-import { Fragment } from 'react';
-import { Listbox, Transition } from '@headlessui/react';
-import { Check, ChevronDown } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown } from 'lucide-react';
 
 export type WalletFilterTone =
   | 'neutral'
@@ -16,39 +16,75 @@ export type WalletFilterOption = {
   tone?: WalletFilterTone;
 };
 
-const TONE_STYLES: Record<
+export type WalletFilterAccent = 'blue' | 'purple' | 'harx';
+
+const TONE_PILL: Record<
   WalletFilterTone,
-  { dot: string; activeText: string; idleText: string; activeBg: string }
+  { selected: string; dot: string; dotIdle: string }
 > = {
   neutral: {
-    dot: 'bg-slate-300',
-    activeText: 'text-slate-900',
-    idleText: 'text-slate-700',
-    activeBg: 'bg-slate-50',
+    selected: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80 shadow-sm',
+    dot: 'bg-slate-500',
+    dotIdle: 'bg-slate-300',
   },
   success: {
+    selected: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 shadow-sm',
     dot: 'bg-emerald-500',
-    activeText: 'text-emerald-700',
-    idleText: 'text-slate-700',
-    activeBg: 'bg-emerald-50',
+    dotIdle: 'bg-slate-300',
   },
   danger: {
+    selected: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200/80 shadow-sm',
     dot: 'bg-rose-500',
-    activeText: 'text-rose-700',
-    idleText: 'text-slate-700',
-    activeBg: 'bg-rose-50',
+    dotIdle: 'bg-slate-300',
   },
   warning: {
+    selected: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200/80 shadow-sm',
     dot: 'bg-amber-500',
-    activeText: 'text-amber-700',
-    idleText: 'text-slate-700',
-    activeBg: 'bg-amber-50',
+    dotIdle: 'bg-slate-300',
   },
   brand: {
+    selected: 'bg-harx-50 text-harx-800 ring-1 ring-harx-200/80 shadow-sm',
     dot: 'bg-harx-500',
-    activeText: 'text-harx-800',
-    idleText: 'text-slate-700',
-    activeBg: 'bg-harx-50',
+    dotIdle: 'bg-slate-300',
+  },
+};
+
+const ACCENT_TRIGGER: Record<
+  WalletFilterAccent,
+  { hoverBorder: string; focusRing: string; chevronOpen: string }
+> = {
+  blue: {
+    hoverBorder: 'hover:border-blue-200',
+    focusRing: 'focus:ring-blue-500/20',
+    chevronOpen: 'text-blue-500',
+  },
+  purple: {
+    hoverBorder: 'hover:border-purple-200',
+    focusRing: 'focus:ring-purple-500/20',
+    chevronOpen: 'text-purple-500',
+  },
+  harx: {
+    hoverBorder: 'hover:border-harx-300',
+    focusRing: 'focus:ring-harx-500/20',
+    chevronOpen: 'text-harx-500',
+  },
+};
+
+const ACCENT_PILL: Record<WalletFilterAccent, { selected: string; dot: string; dotIdle: string }> = {
+  blue: {
+    selected: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200/80 shadow-sm',
+    dot: 'bg-blue-500',
+    dotIdle: 'bg-slate-300',
+  },
+  purple: {
+    selected: 'bg-purple-100 text-purple-700 ring-1 ring-purple-200/80 shadow-sm',
+    dot: 'bg-purple-500',
+    dotIdle: 'bg-slate-300',
+  },
+  harx: {
+    selected: 'bg-harx-50 text-harx-800 ring-1 ring-harx-200/80 shadow-sm',
+    dot: 'bg-harx-500',
+    dotIdle: 'bg-slate-300',
   },
 };
 
@@ -58,6 +94,7 @@ type WalletFilterSelectProps = {
   onChange: (value: string) => void;
   options: WalletFilterOption[];
   className?: string;
+  accent?: WalletFilterAccent;
 };
 
 export function WalletFilterSelect({
@@ -66,98 +103,148 @@ export function WalletFilterSelect({
   onChange,
   options,
   className = '',
+  accent = 'harx',
 }: WalletFilterSelectProps) {
   const selected = options.find((o) => o.value === value) ?? options[0];
-  const selectedTone = TONE_STYLES[selected?.tone ?? 'neutral'];
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerAccent = ACCENT_TRIGGER[accent];
+
+  const readDropdownPos = () => {
+    const rect = triggerRef.current!.getBoundingClientRect();
+    return {
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.max(rect.width, 200),
+    };
+  };
+
+  const closeDropdown = () => {
+    setIsOpen(false);
+    setDropdownPos(null);
+  };
+
+  const openDropdown = () => {
+    if (!triggerRef.current) return;
+    setDropdownPos(readDropdownPos());
+    setIsOpen(true);
+  };
+
+  const toggleDropdown = () => {
+    if (isOpen) closeDropdown();
+    else openDropdown();
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+      setDropdownPos(readDropdownPos());
+    };
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
+  const getOptionPill = (option: WalletFilterOption, isSelected: boolean) => {
+    if (option.tone) {
+      const tone = TONE_PILL[option.tone];
+      return isSelected
+        ? tone.selected
+        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900';
+    }
+    return isSelected
+      ? ACCENT_PILL[accent].selected
+      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900';
+  };
+
+  const getOptionDot = (option: WalletFilterOption, isSelected: boolean) => {
+    if (option.tone) {
+      const tone = TONE_PILL[option.tone];
+      return isSelected ? tone.dot : tone.dotIdle;
+    }
+    return isSelected ? ACCENT_PILL[accent].dot : ACCENT_PILL[accent].dotIdle;
+  };
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <Listbox value={value} onChange={onChange}>
-        {({ open }) => (
-          <>
-            <Listbox.Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">
-              {label}
-            </Listbox.Label>
-            <div className="relative">
-              <Listbox.Button
-                className={`relative w-full cursor-pointer rounded-xl border bg-white py-2.5 pl-3.5 pr-10 text-left shadow-sm transition-all hover:border-slate-300 focus:outline-none ${
-                  open
-                    ? 'border-harx-400 ring-2 ring-harx-500/20'
-                    : 'border-slate-200'
-                }`}
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  {selected?.tone && selected.tone !== 'neutral' && (
-                    <span className={`h-2 w-2 rounded-full shrink-0 ${selectedTone.dot}`} />
-                  )}
-                  <span className="block truncate text-xs font-bold text-slate-800" title={selected?.label}>
-                    {selected?.label}
-                  </span>
-                </span>
-                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <ChevronDown
-                    className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
-                      open ? 'rotate-180 text-harx-500' : ''
-                    }`}
-                  />
-                </span>
-              </Listbox.Button>
+      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">
+        {label}
+      </span>
+      <div className="relative">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={toggleDropdown}
+          className={`relative w-full flex items-center justify-between gap-2 cursor-pointer rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-10 text-left shadow-sm transition-all ${triggerAccent.hoverBorder} focus:outline-none focus:ring-2 ${triggerAccent.focusRing}`}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="block truncate text-xs font-bold text-slate-800 normal-case" title={selected?.label}>
+              {selected?.label}
+            </span>
+          </span>
+          <ChevronDown
+            className={`absolute right-3 h-4 w-4 text-slate-400 transition-transform duration-200 ${
+              isOpen ? `rotate-180 ${triggerAccent.chevronOpen}` : ''
+            }`}
+          />
+        </button>
 
-              <Transition
-                as={Fragment}
-                leave="transition ease-in duration-100"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Listbox.Options className="absolute z-[100] mt-1.5 max-h-64 w-full overflow-auto rounded-xl border border-slate-100 bg-white py-1.5 shadow-xl shadow-slate-300/25 focus:outline-none">
-                  {options.map((option) => {
-                    const tone = TONE_STYLES[option.tone ?? 'neutral'];
-                    return (
-                      <Listbox.Option
-                        key={option.value}
-                        value={option.value}
-                        className={({ active, selected: isSelected }) =>
-                          `relative cursor-pointer select-none px-3 py-2.5 transition-colors ${
-                            active || isSelected ? tone.activeBg : 'hover:bg-slate-50'
-                          }`
-                        }
-                      >
-                        {({ selected: isSelected }) => (
-                          <div className="flex items-start justify-between gap-2 pr-6">
-                            <div className="flex items-start gap-2 min-w-0">
-                              <span
-                                className={`h-2 w-2 rounded-full shrink-0 mt-1.5 ${tone.dot}`}
-                              />
-                              <div className="min-w-0">
-                                <p
-                                  className={`text-xs leading-snug ${
-                                    isSelected
-                                      ? `font-bold ${tone.activeText}`
-                                      : `font-medium ${tone.idleText}`
-                                  }`}
-                                  title={option.label}
-                                >
-                                  {option.label}
-                                </p>
-                                {option.hint && (
-                                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">{option.hint}</p>
-                                )}
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <Check className={`absolute right-3 top-2.5 h-4 w-4 shrink-0 ${tone.activeText}`} />
-                            )}
-                          </div>
+        {isOpen && dropdownPos && createPortal(
+          <>
+            <div className="fixed inset-0 z-[9998]" onClick={closeDropdown} aria-hidden />
+            <div
+              className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
+              style={{
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                minWidth: dropdownPos.width,
+                maxWidth: 'min(420px, calc(100vw - 2rem))',
+              }}
+              role="listbox"
+              aria-label={label}
+            >
+              {options.map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.value);
+                      closeDropdown();
+                    }}
+                    className="block w-full text-left px-1 py-0.5"
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <span
+                      className={`inline-flex items-start gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-semibold leading-snug normal-case transition-all ${getOptionPill(option, isSelected)}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${getOptionDot(option, isSelected)}`} />
+                      <span className="text-left">
+                        {option.label}
+                        {option.hint && (
+                          <span className="block text-[10px] font-medium text-slate-400 mt-0.5">{option.hint}</span>
                         )}
-                      </Listbox.Option>
-                    );
-                  })}
-                </Listbox.Options>
-              </Transition>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </>
+          </>,
+          document.body
         )}
-      </Listbox>
+      </div>
     </div>
   );
 }
