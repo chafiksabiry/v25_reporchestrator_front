@@ -207,11 +207,15 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(secs);
-      if (secs >= MAX_DURATION) stopRecording();
+      if (secs >= MAX_DURATION) stopRecording(true);
     }, 500);
   };
 
-  const stopRecording = () => {
+  const stopRecording = (force = false) => {
+    const secs = startTimeRef.current
+      ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+      : elapsed;
+    if (!force && isRecording && secs < MIN_DURATION) return;
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -230,8 +234,16 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     if (elapsed < MIN_DURATION && !faceAbsenceInvalid) {
       setAnalyzeError(
         isFr
-          ? `Enregistrement trop court (${formatTime(elapsed)}). Minimum 1 min 30 requis.`
-          : `Recording too short (${formatTime(elapsed)}). Minimum 1:30 required.`
+          ? `Durée invalide (${formatTime(elapsed)}). L’enregistrement doit durer entre 1 min 30 et 3 min.`
+          : `Invalid duration (${formatTime(elapsed)}). Recording must be between 1:30 and 3 minutes.`
+      );
+      return;
+    }
+    if (elapsed > MAX_DURATION && !faceAbsenceInvalid) {
+      setAnalyzeError(
+        isFr
+          ? `Durée invalide (${formatTime(elapsed)}). Maximum 3 min.`
+          : `Invalid duration (${formatTime(elapsed)}). Maximum 3 minutes.`
       );
       return;
     }
@@ -285,7 +297,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     if (!isRecording || faceAbsenceInvalid) return;
     if (noFaceStreak >= ABSENCE_CUT_TICKS) {
       setFaceAbsenceInvalid(true);
-      stopRecording();
+      stopRecording(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noFaceStreak, isRecording, faceAbsenceInvalid]);
@@ -293,7 +305,9 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
   if (!isOpen) return null;
 
   const timeRemaining = MAX_DURATION - elapsed;
-  const progressPct = (elapsed / MAX_DURATION) * 100;
+  const timeUntilMin = MIN_DURATION - elapsed;
+  const canStopRecording = elapsed >= MIN_DURATION;
+  const progressPct = Math.min(100, (elapsed / MAX_DURATION) * 100);
   const showVideoControls = !!recordedBlob && !isRecording;
   const assessment = result?.assessment;
   const languageMatched = assessment?.languageMatch?.matches === true;
@@ -348,6 +362,18 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 </div>
               )}
 
+              {isRecording && (
+                <div className="absolute top-3 right-3 bg-black/60 px-3 py-1.5 rounded-full text-xs font-black text-white">
+                  {canStopRecording
+                    ? isFr
+                      ? `${formatTime(timeRemaining)} restantes`
+                      : `${formatTime(timeRemaining)} left`
+                    : isFr
+                      ? `Min 1:30 · ${formatTime(timeUntilMin)}`
+                      : `Min 1:30 · ${formatTime(timeUntilMin)}`}
+                </div>
+              )}
+
               {faceMatchActive && faceMatchStatus === 'no-face' && noFaceStreak >= ABSENCE_THREAT_TICKS && (
                 <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-600/90 text-white text-xs font-black">
@@ -372,8 +398,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <>
                   <p className="text-xs text-slate-400 text-center leading-relaxed">
                     {isFr
-                      ? `Parlez en ${languageName} pendant 1 min 30 à 3 min. Présentez-vous — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
-                      : `Speak in ${languageName} for 1:30 to 3 minutes. Introduce yourself — AI will verify the language and ${expectedProficiency} level.`}
+                      ? `Parlez en ${languageName} entre 1 min 30 et 3 min. Présentez-vous — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
+                      : `Speak in ${languageName} between 1:30 and 3 minutes. Introduce yourself — AI will verify the language and ${expectedProficiency} level.`}
                   </p>
                   <button
                     onClick={startRecording}
@@ -387,13 +413,25 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
               )}
 
               {isRecording && (
-                <button
-                  onClick={stopRecording}
-                  className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl text-sm font-black"
-                >
-                  <Square className="w-4 h-4 fill-white" />
-                  {isFr ? 'Arrêter' : 'Stop'}
-                </button>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-center font-semibold text-slate-400">
+                    {canStopRecording
+                      ? isFr
+                        ? 'Vous pouvez arrêter — durée valide (1 min 30 à 3 min).'
+                        : 'You can stop — valid window (1:30 to 3 min).'
+                      : isFr
+                        ? `Continuez encore ${formatTime(timeUntilMin)} pour atteindre le minimum (1 min 30).`
+                        : `Keep going ${formatTime(timeUntilMin)} more to reach the 1:30 minimum.`}
+                  </p>
+                  <button
+                    onClick={() => stopRecording()}
+                    disabled={!canStopRecording}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black"
+                  >
+                    <Square className="w-4 h-4 fill-white" />
+                    {isFr ? 'Arrêter' : 'Stop'}
+                  </button>
+                </div>
               )}
 
               {recordedBlob && !analyzing && (
@@ -539,8 +577,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <Globe className="w-12 h-12 mx-auto mb-3 opacity-40" />
                 <p className="text-sm font-semibold">
                   {isFr
-                    ? `Enregistrez une vidéo en ${languageName} pour valider votre niveau ${expectedProficiency}.`
-                    : `Record a video in ${languageName} to validate your ${expectedProficiency} level.`}
+                    ? `Enregistrez entre 1 min 30 et 3 min en ${languageName} pour valider votre niveau ${expectedProficiency}.`
+                    : `Record between 1:30 and 3 minutes in ${languageName} to validate your ${expectedProficiency} level.`}
                 </p>
               </div>
             )}
