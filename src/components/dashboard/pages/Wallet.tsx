@@ -838,235 +838,161 @@ export function WalletPage() {
         </div>
       </div>
 
-      {/* ── Gains pipeline : Départ → Disponible → Validés → Rétractation → Validation → Total ── */}
-      <div className="rounded-3xl bg-white/50 backdrop-blur-xl border border-white/60 shadow-xl shadow-slate-200/20 overflow-hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
-          {/* 1. Solde de départ (début de période) */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 lg:border-r 2xl:border-r border-white/60 bg-slate-50/50">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">
-                  Solde de départ
-                </p>
-                {earningsPipeline.periodStartDateLabel && (
-                  <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                    {earningsPipeline.periodStartDateLabel}
-                  </p>
-                )}
-                <p className="text-2xl font-black text-slate-900 tracking-tighter mt-2">
-                  {fmtMoney(earningsPipeline.periodStartBalance)} €
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-500">
-                  {earningsPipeline.periodStartHint}
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-slate-200/60 text-slate-500 flex items-center justify-center shrink-0">
-                <CalendarDays className="w-4 h-4" />
-              </div>
+      {/* ── Gains pipeline ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
+        {/* 1. Solde de départ */}
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              Solde de départ
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+              <CalendarDays className="w-3.5 h-3.5" />
             </div>
           </div>
-
-          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 2. Solde disponible */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-white/60">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">
-                  Solde disponible
-                </p>
-                <p className="text-2xl font-black text-slate-900 tracking-tighter mt-2">
-                  {fmtMoney(earningsPipeline.availableBalance)} €
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
-                  Prêt au retrait
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                <Wallet className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 3. Gains validés — appels & ventes */}
-          <button
-            type="button"
-            onClick={focusValidatedEarnings}
-            disabled={earningsPipeline.validatedInPeriod === 0}
-            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-emerald-50/40 text-left transition-all w-full ${
-              transactionValidationFilter === 'validated'
-                ? 'ring-2 ring-emerald-400 ring-inset shadow-inner'
-                : earningsPipeline.validatedInPeriod > 0
-                  ? 'hover:bg-emerald-50/70 cursor-pointer'
-                  : 'cursor-default opacity-90'
-            }`}
-            aria-label="Voir les commissions validées"
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700 truncate">
-                  Gains validés
-                </p>
-                <p className="text-[10px] font-semibold text-emerald-600/80 mt-0.5">
-                  Hors rétractation (14j)
-                </p>
-                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2 whitespace-nowrap">
-                  +{fmtMoney(earningsPipeline.validatedInPeriod)} €
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="space-y-1.5 mt-auto">
-              <p className="text-[10px] font-bold text-emerald-700/90 flex items-center gap-1.5">
-                <Phone className="w-3 h-3 shrink-0" />
-                +{fmtMoney(earningsPipeline.validatedCallsAmount)} €
-                <span className="text-emerald-600/70 font-semibold">
-                  · {earningsPipeline.validatedCallsCount} appel{earningsPipeline.validatedCallsCount !== 1 ? 's' : ''}
-                </span>
-              </p>
-              <p className="text-[10px] font-bold text-emerald-700/90 flex items-center gap-1.5">
-                <Briefcase className="w-3 h-3 shrink-0" />
-                +{fmtMoney(earningsPipeline.validatedSalesAmount)} €
-                <span className="text-emerald-600/70 font-semibold">
-                  · {earningsPipeline.validatedSalesCount} vente{earningsPipeline.validatedSalesCount !== 1 ? 's' : ''}
-                </span>
-              </p>
-              {earningsPipeline.validatedBonusCount > 0 && (
-                <p className="text-[10px] font-bold text-violet-700/90 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 shrink-0" />
-                  +{fmtMoney(earningsPipeline.validatedBonusAmount)} €
-                  <span className="text-violet-600/70 font-semibold">
-                    · {earningsPipeline.validatedBonusCount} bonus
-                  </span>
-                </p>
-              )}
-            </div>
-          </button>
-
-          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 4. Rétractation (14 jours) */}
-          <button
-            type="button"
-            onClick={focusRetractionTransactions}
-            disabled={earningsPipeline.retractionCount === 0}
-            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-orange-50/40 text-left transition-all w-full ${
-              transactionValidationFilter === 'retraction'
-                ? 'ring-2 ring-orange-400 ring-inset shadow-inner'
-                : earningsPipeline.retractionCount > 0
-                  ? 'hover:bg-orange-50/70 cursor-pointer'
-                  : 'cursor-default opacity-90'
-            }`}
-            aria-label="Voir les ventes en période de rétractation"
-          >
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-orange-700 truncate">
-                  Rétractation
-                </p>
-                <p className="text-2xl font-black text-orange-700 tracking-tighter mt-2">
-                  {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-orange-600/80">
-                  {earningsPipeline.retractionCount > 0
-                    ? `${earningsPipeline.retractionCount} vente(s) — 14 jours`
-                    : 'Aucune vente sous rétractation'}
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
-                <RotateCcw className="w-4 h-4" />
-              </div>
-            </div>
-          </button>
-
-          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 5. Validation client */}
-          <button
-            type="button"
-            onClick={focusClientValidationPending}
-            disabled={earningsPipeline.clientValidationCount === 0}
-            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-white/60 bg-amber-50/40 text-left transition-all w-full ${
-              transactionValidationFilter === 'pending' || callValidationFilter === 'pending'
-                ? 'ring-2 ring-amber-400 ring-inset shadow-inner'
-                : earningsPipeline.clientValidationCount > 0
-                  ? 'hover:bg-amber-50/70 cursor-pointer'
-                  : 'cursor-default opacity-90'
-            }`}
-            aria-label="Voir les commissions en attente de validation entreprise"
-          >
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-amber-700 truncate">
-                  Validation client
-                </p>
-                <p className="text-2xl font-black text-amber-700 tracking-tighter mt-2">
-                  +{fmtMoney(earningsPipeline.clientValidationAmount)} €
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-amber-600/80">
-                  {earningsPipeline.clientValidationCount > 0
-                    ? `${earningsPipeline.clientValidationCount} vente(s) — cliquer pour voir`
-                    : 'Aucune vente en attente entreprise'}
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </div>
-            </div>
-          </button>
-
-          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 6. Total sur la période */}
-          <div className="p-5 sm:p-6 flex flex-col bg-slate-950 text-white relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl pointer-events-none" />
-            <div className="relative z-10 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-widest text-white/50 truncate">
-                  Total période
-                </p>
-                <p className="text-2xl font-black text-white tracking-tighter mt-2">
-                  {fmtMoney(earningsPipeline.totalGains)} €
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {fmtMoney(earningsPipeline.periodStartBalance)} départ
-                  {' + '}
-                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
-                  {' + '}
-                  {fmtMoney(earningsPipeline.retractionAmount)} rétractation
-                  {' + '}
-                  {fmtMoney(earningsPipeline.clientValidationAmount)} attente
-                </p>
-              </div>
-              <div className="h-9 w-9 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">
-                <Trophy className="w-4 h-4" />
-              </div>
-            </div>
-            {weeklyEarnings > 0 && (
-              <span className="relative z-10 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 mt-3 self-start">
-                <ArrowDownRight className="w-3 h-3" />
-                +{fmtMoney(weeklyEarnings)}€ cette semaine
-              </span>
-            )}
-          </div>
+          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.periodStartBalance)} €
+          </p>
+          {earningsPipeline.periodStartDateLabel && (
+            <p className="text-[10px] text-slate-400 mt-auto pt-2">
+              {earningsPipeline.periodStartDateLabel}
+            </p>
+          )}
         </div>
 
-        {/* Solde disponible + seuil de retrait */}
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+        {/* 2. Solde disponible */}
+        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[118px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              Solde disponible
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <Wallet className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.availableBalance)} €
+          </p>
+          <p className="text-[10px] font-semibold text-emerald-600 mt-auto pt-2">
+            Prêt au retrait
+          </p>
+        </div>
+
+        {/* 3. Gains validés */}
+        <button
+          type="button"
+          onClick={focusValidatedEarnings}
+          disabled={earningsPipeline.validatedInPeriod === 0}
+          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
+            transactionValidationFilter === 'validated'
+              ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
+              : 'border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 hover:border-emerald-300 hover:shadow-md'
+          } ${earningsPipeline.validatedInPeriod === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
+          aria-label="Voir les commissions validées"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
+              Gains validés
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl font-black text-emerald-700 tracking-tight mt-2">
+            +{fmtMoney(earningsPipeline.validatedInPeriod)} €
+          </p>
+          <p className="text-[10px] text-emerald-600/80 mt-auto pt-2 truncate">
+            {earningsPipeline.validatedCallsCount} appel{earningsPipeline.validatedCallsCount !== 1 ? 's' : ''}
+            {' · '}
+            {earningsPipeline.validatedSalesCount} vente{earningsPipeline.validatedSalesCount !== 1 ? 's' : ''}
+          </p>
+        </button>
+
+        {/* 4. Rétractation */}
+        <button
+          type="button"
+          onClick={focusRetractionTransactions}
+          disabled={earningsPipeline.retractionCount === 0}
+          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
+            transactionValidationFilter === 'retraction'
+              ? 'border-orange-400 bg-orange-50 ring-2 ring-orange-400/30'
+              : 'border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 hover:border-orange-300 hover:shadow-md'
+          } ${earningsPipeline.retractionCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
+          aria-label="Voir les ventes en période de rétractation"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
+              Rétractation
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
+              <RotateCcw className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl font-black text-orange-700 tracking-tight mt-2">
+            {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
+          </p>
+          <p className="text-[10px] text-orange-600/80 mt-auto pt-2">
+            {earningsPipeline.retractionCount > 0
+              ? `${earningsPipeline.retractionCount} vente(s) · 14 jours`
+              : 'Aucune vente'}
+          </p>
+        </button>
+
+        {/* 5. Validation client */}
+        <button
+          type="button"
+          onClick={focusClientValidationPending}
+          disabled={earningsPipeline.clientValidationCount === 0}
+          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
+            transactionValidationFilter === 'pending' || callValidationFilter === 'pending'
+              ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-400/30'
+              : 'border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 hover:border-amber-300 hover:shadow-md'
+          } ${earningsPipeline.clientValidationCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
+          aria-label="Voir les commissions en attente de validation entreprise"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
+              Validation client
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl font-black text-amber-700 tracking-tight mt-2">
+            +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+          </p>
+          <p className="text-[10px] text-amber-600/80 mt-auto pt-2">
+            {earningsPipeline.clientValidationCount > 0
+              ? `${earningsPipeline.clientValidationCount} en attente`
+              : 'Rien en attente'}
+          </p>
+        </button>
+
+        {/* 6. Total période */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[118px] flex flex-col relative overflow-hidden col-span-2 md:col-span-1">
+          <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 leading-tight">
+              Total période
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
+              <Trophy className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.totalGains)} €
+          </p>
+          {weeklyEarnings > 0 && (
+            <span className="relative z-10 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 mt-auto pt-2 self-start">
+              <ArrowDownRight className="w-3 h-3" />
+              +{fmtMoney(weeklyEarnings)}€ cette semaine
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 overflow-hidden">
+        <div className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-3 shrink-0">
             <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
               <Wallet className="w-4 h-4 text-slate-600" />
