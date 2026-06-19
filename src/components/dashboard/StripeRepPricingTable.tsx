@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { getRepStripeConfig } from '../../utils/profileUtils';
 
 const STRIPE_PRICING_SCRIPT = 'https://js.stripe.com/v3/pricing-table.js';
 
@@ -36,6 +37,8 @@ declare global {
         React.HTMLAttributes<HTMLElement> & {
           'pricing-table-id'?: string;
           'publishable-key'?: string;
+          'client-reference-id'?: string;
+          'customer-email'?: string;
         },
         HTMLElement
       >;
@@ -45,17 +48,42 @@ declare global {
 
 export type StripeRepPricingTableProps = {
   className?: string;
+  /** ID profil rep — transmis à Stripe (client_reference_id) pour le webhook. */
+  agentId?: string;
+  customerEmail?: string;
 };
 
 /** Tableau de prix Stripe — plans représentants (Freemium, Standard, Pro, Elite). */
-export function StripeRepPricingTable({ className = '' }: StripeRepPricingTableProps) {
+export function StripeRepPricingTable({
+  className = '',
+  agentId,
+  customerEmail,
+}: StripeRepPricingTableProps) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricingTableId, setPricingTableId] = useState(
+    import.meta.env.VITE_STRIPE_REP_PRICING_TABLE_ID || DEFAULT_PRICING_TABLE_ID
+  );
+  const [publishableKey, setPublishableKey] = useState(
+    import.meta.env.VITE_STRIPE_REP_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY
+  );
 
-  const pricingTableId =
-    import.meta.env.VITE_STRIPE_REP_PRICING_TABLE_ID || DEFAULT_PRICING_TABLE_ID;
-  const publishableKey =
-    import.meta.env.VITE_STRIPE_REP_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY;
+  useEffect(() => {
+    let cancelled = false;
+    void getRepStripeConfig()
+      .then((cfg) => {
+        if (cancelled) return;
+        const fromApi = cfg?.stripe;
+        if (fromApi?.pricingTableId) setPricingTableId(fromApi.pricingTableId);
+        if (fromApi?.publishableKey) setPublishableKey(fromApi.publishableKey);
+      })
+      .catch(() => {
+        /* fallback env / defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +122,8 @@ export function StripeRepPricingTable({ className = '' }: StripeRepPricingTableP
       <stripe-pricing-table
         pricing-table-id={pricingTableId}
         publishable-key={publishableKey}
+        {...(agentId ? { 'client-reference-id': agentId } : {})}
+        {...(customerEmail ? { 'customer-email': customerEmail } : {})}
       />
     </div>
   );

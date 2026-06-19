@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
@@ -145,6 +145,20 @@ export const ProfileView: React.FC<{
   const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
   const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const closePlanModal = useCallback(async () => {
+    setIsPlanModalOpen(false);
+    if (!profile?._id) return;
+    try {
+      const data = await getProfilePlan(profile._id);
+      setPlanData({
+        _id: String(data._id),
+        userId: String(data.userId),
+        plan: data.plan,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [profile?._id]);
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [publicInfoDraft, setPublicInfoDraft] = useState({
     country: '',
@@ -1386,7 +1400,7 @@ export const ProfileView: React.FC<{
       {isPlanModalOpen && (
         <div
           className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setIsPlanModalOpen(false)}
+          onClick={() => void closePlanModal()}
         >
           <div
             className="w-full max-w-5xl max-h-[92vh] rounded-3xl border border-harx-100 bg-white shadow-2xl overflow-hidden flex flex-col"
@@ -1401,14 +1415,17 @@ export const ProfileView: React.FC<{
               </div>
               <button
                 type="button"
-                onClick={() => setIsPlanModalOpen(false)}
+                onClick={() => void closePlanModal()}
                 className="p-1.5 rounded-lg bg-harx-50 text-harx-700 hover:bg-harx-100"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-              <StripeRepPricingTable />
+              <StripeRepPricingTable
+                agentId={profile?._id ? String(profile._id) : undefined}
+                customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
+              />
             </div>
           </div>
         </div>
