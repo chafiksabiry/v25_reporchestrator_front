@@ -109,6 +109,22 @@ export function scriptNotificationId(journeyId: string): string {
   return `script-required-${journeyId}`;
 }
 
+export function journeyHasScriptModule(j: JourneyRowLite): boolean {
+  return extractModules(j).some(isScriptRequirementModule);
+}
+
+/** Clé slide viewer formation (`m{mi}-s{si}`) pour la section script. */
+export function scriptModuleSlideKey(j: JourneyRowLite): string | null {
+  const modules = extractModules(j);
+  const mi = modules.findIndex(isScriptRequirementModule);
+  if (mi < 0) return null;
+  const sections = Array.isArray(modules[mi]?.sections) ? modules[mi].sections! : [];
+  const si = sections.findIndex(
+    (s) => String((s as Record<string, unknown>)?.type || '').toLowerCase() === 'script'
+  );
+  return `m${mi}-s${si >= 0 ? si : 0}`;
+}
+
 export function gigIdFromJourney(j: JourneyRowLite): string {
   if (j.__gigId) return String(j.__gigId);
   return normalizeMongoId(j.gigId);
