@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Star, Globe, Plus, X, Video, AlertTriangle, CheckCircle2, Trash2, ExternalLink, Briefcase } from 'lucide-react';
+import { Star, Globe, Plus, X, Video, AlertTriangle, CheckCircle2, Trash2, PlayCircle, Briefcase } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { resolveLanguageMedia, type LanguageMediaContext } from '../languageVideoUtils';
+import { LanguageAnalysisModal } from '../LanguageAnalysisModal';
 
 interface LanguagesTabProps {
   profile: any;
@@ -35,14 +37,6 @@ const isLanguageVerified = (lang: any): boolean => {
   const ar = lang?.assessmentResults;
   if (!ar || ar.source === 'cv') return false;
   return !needsReVerification(lang);
-};
-
-const getLanguageVideoUrl = (lang: any): string | null => {
-  const ar = lang?.assessmentResults;
-  if (!ar) return null;
-  if (ar.source === 'language' && ar.videoUrl) return ar.videoUrl;
-  if (ar.source === 'experience' && ar.experienceVideoUrl) return ar.experienceVideoUrl;
-  return ar.videoUrl || ar.experienceVideoUrl || null;
 };
 
 // CEFR level → badge color, so the proficiency pill reads at a glance.
@@ -81,6 +75,11 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   const [draftLanguage, setDraftLanguage] = useState('');
   const [draftProficiency, setDraftProficiency] = useState('B1');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [analysisView, setAnalysisView] = useState<{
+    languageName: string;
+    proficiency: string;
+    media: LanguageMediaContext;
+  } | null>(null);
 
   const existingNames = new Set(
     (profile.personalInfo?.languages || [])
@@ -287,10 +286,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               const ar = lang.assessmentResults;
               const isVerified = isLanguageVerified(lang);
               const isCvEstimate = !!ar && ar.source === 'cv';
-              const isExperienceSource = !!ar && ar.source === 'experience' && isVerified;
+              const languageMedia = isVerified ? resolveLanguageMedia(lang, profile) : null;
+              const isExperienceSource = isVerified && languageMedia?.source === 'experience';
               const mustReVerify = needsReVerification(lang);
               const hasScores = !!ar && ar.source !== 'cv';
-              const videoUrl = getLanguageVideoUrl(lang);
               const cefrStyle = CEFR_STYLES[String(lang.proficiency || '').toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200';
 
               const badge = (languageCode || languageName || '?').slice(0, 2).toUpperCase();
@@ -425,25 +424,30 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                     )}
 
                     <div className="mt-4 flex flex-col gap-2">
-                      {videoUrl && isVerified && (
-                        <a
-                          href={videoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-2 rounded-xl border border-slate-200 bg-white text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1.5"
+                      {languageMedia && isVerified && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAnalysisView({
+                              languageName,
+                              proficiency: String(lang.proficiency || '').toUpperCase(),
+                              media: languageMedia,
+                            })
+                          }
+                          className="w-full py-2.5 rounded-xl border border-harx-200 bg-harx-50 text-xs font-black uppercase tracking-widest text-harx-700 hover:bg-harx-100 inline-flex items-center justify-center gap-1.5 transition-all"
                         >
-                          {isExperienceSource ? (
+                          {languageMedia.source === 'experience' ? (
                             <>
                               <Briefcase className="w-3.5 h-3.5" />
-                              {isFr ? 'Vidéo expérience' : 'Experience video'}
+                              {isFr ? 'Voir vidéo expérience & analyse' : 'View experience video & analysis'}
                             </>
                           ) : (
                             <>
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              {isFr ? 'Vidéo langue' : 'Language video'}
+                              <PlayCircle className="w-3.5 h-3.5" />
+                              {isFr ? 'Voir vidéo & analyse' : 'View video & analysis'}
                             </>
                           )}
-                        </a>
+                        </button>
                       )}
                       <div className="flex items-center gap-2.5">
                       {!isVerified && (
@@ -499,6 +503,16 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
           )}
         </div>
       </div>
+
+      {analysisView && (
+        <LanguageAnalysisModal
+          isOpen
+          onClose={() => setAnalysisView(null)}
+          languageName={analysisView.languageName}
+          proficiency={analysisView.proficiency}
+          media={analysisView.media}
+        />
+      )}
     </div>
   );
 };
