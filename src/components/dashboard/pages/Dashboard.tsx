@@ -123,7 +123,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   const gigTriggerRef = useRef<HTMLButtonElement>(null);
-  const [gigDropdownPos, setGigDropdownPos] = useState({ top: 0, left: 0, width: 280 });
+  const [gigDropdownPos, setGigDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   type CallFilter = 'all' | 'valid' | 'invalid';
@@ -560,26 +560,46 @@ export function Dashboard({ profile }: DashboardProps) {
     return gigsData.find((g) => g._id === selectedGigId)?.title || 'Gig';
   }, [selectedGigId, gigsData]);
 
+  const readGigDropdownPos = () => {
+    const rect = gigTriggerRef.current!.getBoundingClientRect();
+    return {
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.max(rect.width, 280),
+    };
+  };
+
+  const openGigDropdown = () => {
+    if (!gigTriggerRef.current) return;
+    setGigDropdownPos(readGigDropdownPos());
+    setIsGigDropdownOpen(true);
+  };
+
+  const closeGigDropdown = () => {
+    setIsGigDropdownOpen(false);
+    setGigDropdownPos(null);
+  };
+
+  const toggleGigDropdown = () => {
+    if (isGigDropdownOpen) closeGigDropdown();
+    else openGigDropdown();
+  };
+
   useLayoutEffect(() => {
     if (!isGigDropdownOpen || !gigTriggerRef.current) return;
 
     const updatePosition = () => {
-      const rect = gigTriggerRef.current!.getBoundingClientRect();
-      setGigDropdownPos({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: Math.max(rect.width, 280),
-      });
+      if (!gigTriggerRef.current) return;
+      setGigDropdownPos(readGigDropdownPos());
     };
 
-    updatePosition();
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [isGigDropdownOpen, gigsData.length]);
+  }, [isGigDropdownOpen]);
 
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">
@@ -603,22 +623,22 @@ export function Dashboard({ profile }: DashboardProps) {
                 <button
                   ref={gigTriggerRef}
                   type="button"
-                  onClick={() => setIsGigDropdownOpen((open) => !open)}
+                  onClick={toggleGigDropdown}
                   className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-purple-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all duration-300"
                 >
                   <span className="truncate text-left normal-case">{selectedGigLabel}</span>
                   <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isGigDropdownOpen ? 'rotate-180 text-purple-500' : ''}`} />
                 </button>
 
-                {isGigDropdownOpen && createPortal(
+                {isGigDropdownOpen && gigDropdownPos && createPortal(
                   <>
                     <div
                       className="fixed inset-0 z-[9998]"
-                      onClick={() => setIsGigDropdownOpen(false)}
+                      onClick={closeGigDropdown}
                       aria-hidden
                     />
                     <div
-                      className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 animate-in fade-in slide-in-from-top-1 duration-200 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
+                      className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
                       style={{
                         top: gigDropdownPos.top,
                         left: gigDropdownPos.left,
@@ -632,7 +652,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         type="button"
                         onClick={() => {
                           setSelectedGigId('all');
-                          setIsGigDropdownOpen(false);
+                          closeGigDropdown();
                         }}
                         className="block w-full text-left px-1 py-0.5"
                         role="option"
@@ -661,7 +681,7 @@ export function Dashboard({ profile }: DashboardProps) {
                             type="button"
                             onClick={() => {
                               setSelectedGigId(gigId);
-                              setIsGigDropdownOpen(false);
+                              closeGigDropdown();
                             }}
                             className="block w-full text-left px-1 py-0.5"
                             role="option"
