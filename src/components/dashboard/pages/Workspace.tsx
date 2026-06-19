@@ -1035,7 +1035,6 @@ export function WorkspaceContent() {
         return (
           <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
-              gigId={activeEnrolledGigId}
               leadId={urlLeadId || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
               onAutoOpenHandled={() => setPendingOpenCallSid(null)}
