@@ -57,6 +57,18 @@ export function dedupeSaleLedgerRows(rows: RepTransactionRow[]): RepTransactionR
   return [...others, ...saleByKey.values()];
 }
 
+/** Index ventes ledger par callId (après déduplication). */
+export function indexSaleLedgerByCallId(
+  rows: RepTransactionRow[]
+): Map<string, RepTransactionRow> {
+  const map = new Map<string, RepTransactionRow>();
+  for (const row of dedupeSaleLedgerRows(rows)) {
+    if (row.type !== 'transaction' || !row.callId) continue;
+    map.set(String(row.callId), row);
+  }
+  return map;
+}
+
 export type ValidatedLedgerBreakdown = {
   validatedCallsAmount: number;
   validatedCallsCount: number;
