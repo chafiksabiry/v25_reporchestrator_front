@@ -62,8 +62,8 @@ export interface LanguageVideoModalProps {
   onAnalysisComplete?: () => void;
 }
 
-const MAX_DURATION = 90;
-const MIN_DURATION = 15;
+const MAX_DURATION = 180; // 3 min max
+const MIN_DURATION = 90; // 1 min 30 minimum
 const ABSENCE_THREAT_TICKS = 2;
 const ABSENCE_CUT_TICKS = 4;
 
@@ -230,8 +230,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     if (elapsed < MIN_DURATION && !faceAbsenceInvalid) {
       setAnalyzeError(
         isFr
-          ? `Enregistrement trop court (${elapsed}s). Minimum ${MIN_DURATION}s requis.`
-          : `Recording too short (${elapsed}s). Minimum ${MIN_DURATION}s required.`
+          ? `Enregistrement trop court (${formatTime(elapsed)}). Minimum 1 min 30 requis.`
+          : `Recording too short (${formatTime(elapsed)}). Minimum 1:30 required.`
       );
       return;
     }
@@ -372,8 +372,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <>
                   <p className="text-xs text-slate-400 text-center leading-relaxed">
                     {isFr
-                      ? `Parlez en ${languageName} pendant ${MIN_DURATION} à ${MAX_DURATION} secondes. Présentez-vous brièvement — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
-                      : `Speak in ${languageName} for ${MIN_DURATION}–${MAX_DURATION} seconds. Introduce yourself briefly — AI will verify the language and ${expectedProficiency} level.`}
+                      ? `Parlez en ${languageName} pendant 1 min 30 à 3 min. Présentez-vous — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
+                      : `Speak in ${languageName} for 1:30 to 3 minutes. Introduce yourself — AI will verify the language and ${expectedProficiency} level.`}
                   </p>
                   <button
                     onClick={startRecording}
