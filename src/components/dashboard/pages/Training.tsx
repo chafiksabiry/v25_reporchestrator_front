@@ -14,7 +14,8 @@ import {
   ChevronRight,
   CheckCircle,
   Award,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { useRepTrainingNav } from '../../../contexts/RepTrainingNavContext';
@@ -2840,6 +2841,12 @@ export function Training() {
                               >
                                 {cfs.modTitle}
                               </p>
+                              {String(cfs.section?.type || '').toLowerCase() === 'script' && (
+                                <p className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-200">
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  Exigence — Script (certification & cockpit)
+                                </p>
+                              )}
                               <h3 className="mb-3 text-lg font-bold text-white sm:text-xl">
                                 {String(cfs.section?.title || 'Section')}
                               </h3>
