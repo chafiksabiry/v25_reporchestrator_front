@@ -13,6 +13,8 @@ interface LanguagesTabProps {
     proficiency?: string,
     languageId?: string
   ) => void;
+  /** Remove the dedicated language verification video (keeps the language row). */
+  onDeleteLanguageVideo: (index: number) => void;
   onAddItemClick: (item: { language: string; proficiency: string; languageId?: string }) => void;
   onDeleteItemClick: (index: number) => void;
 }
@@ -32,6 +34,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   availableLanguages,
   getProficiencyStars,
   onRecordLanguageVideo,
+  onDeleteLanguageVideo,
   onAddItemClick,
   onDeleteItemClick,
 }) => {
@@ -65,14 +68,16 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
     (lang) => !existingNames.has(String(lang.name || '').toLowerCase())
   );
 
-  // A language is "verified" only when its scores come from a video/assessment.
-  // CV-imported estimates (source 'cv') still need to be confirmed by a video.
-  const isVideoVerified = (lang: any) =>
-    !!lang?.assessmentResults && lang.assessmentResults.source !== 'cv';
+  // Verified only by a dedicated language-tab video (not experience onboarding).
+  const isLanguageVideoVerified = (lang: any) =>
+    !!lang?.languageVideoUrl || lang?.assessmentResults?.source === 'language';
+
+  const isCvEstimate = (lang: any) =>
+    !!lang?.assessmentResults && lang.assessmentResults.source === 'cv';
 
   const languagesList = profile.personalInfo?.languages || [];
   const totalCount = languagesList.length;
-  const verifiedCount = languagesList.filter(isVideoVerified).length;
+  const verifiedCount = languagesList.filter(isLanguageVideoVerified).length;
   const unverifiedCount = totalCount - verifiedCount;
   const hasUnverified = unverifiedCount > 0;
 
@@ -90,7 +95,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
     setShowAddForm(false);
   };
 
-  const firstUnverified = languagesList.find((lang: any) => !isVideoVerified(lang));
+  const firstUnverified = languagesList.find((lang: any) => !isLanguageVideoVerified(lang));
   const openAssessmentForLang = (lang: any) => {
     const languageName =
       typeof lang.language === 'object' && lang.language ? lang.language.name : String(lang.language || '');
@@ -257,9 +262,9 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               const languageName = typeof lang.language === 'object' && lang.language ? lang.language.name : 'Unknown Language';
               const languageCode = typeof lang.language === 'object' && lang.language ? lang.language.code : '';
               const ar = lang.assessmentResults;
-              const isVerified = !!ar && ar.source !== 'cv';
-              const isCvEstimate = !!ar && ar.source === 'cv';
-              const hasScores = !!ar;
+              const isVerified = isLanguageVideoVerified(lang);
+              const isCv = isCvEstimate(lang);
+              const hasScores = !!ar && (isVerified || isCv);
               const cefrStyle = CEFR_STYLES[String(lang.proficiency || '').toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200';
 
               const badge = (languageCode || languageName || '?').slice(0, 2).toUpperCase();
@@ -303,7 +308,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
                           isVerified
                             ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                            : isCvEstimate
+                            : isCv
                               ? 'bg-sky-50 text-sky-600 border border-sky-200'
                               : 'bg-yellow-50 text-yellow-600 border border-yellow-200'
                         }`}
@@ -311,7 +316,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         {isVerified ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                         {isVerified
                           ? (isFr ? 'Vérifié' : 'Verified')
-                          : isCvEstimate
+                          : isCv
                             ? (isFr ? 'Estimé (CV)' : 'CV estimate')
                             : (isFr ? 'À valider' : 'To verify')}
                       </span>
@@ -349,11 +354,18 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                             </div>
                           ))}
                         </div>
-                        {isCvEstimate && (
+                        {isCv && (
                           <p className="mt-2.5 text-[11px] font-medium text-sky-600 leading-snug">
                             {isFr
-                              ? 'Estimation à partir du CV — enregistrez ici pour valider avec l’IA.'
-                              : 'Estimated from your CV — record here to validate with AI.'}
+                              ? 'Estimation à partir du CV — enregistrez une vidéo dédiée ici pour valider.'
+                              : 'Estimated from your CV — record a dedicated video here to validate.'}
+                          </p>
+                        )}
+                        {isVerified && lang.languageVideoUrl && (
+                          <p className="mt-2.5 text-[11px] font-medium text-emerald-600 leading-snug">
+                            {isFr
+                              ? 'Vidéo de vérification enregistrée (distincte de l’expérience).'
+                              : 'Verification video saved (separate from experience).'}
                           </p>
                         )}
                       </>
@@ -368,7 +380,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       </div>
                     )}
 
-                    <div className="mt-4 flex items-center gap-2.5">
+                    <div className="mt-4 flex flex-wrap items-center gap-2.5">
                       {!isVerified && (
                         <button
                           type="button"
@@ -376,22 +388,43 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                           title={isFr
                             ? 'Enregistrez et laissez l’IA vérifier cette langue'
                             : 'Record and let AI verify this language'}
-                          className="flex-1 py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-harx-500/25 active:scale-95 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
+                          className="flex-1 min-w-[140px] py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-harx-500/25 active:scale-95 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
                         >
                           <Video className="w-3.5 h-3.5" />
                           {isFr ? 'Enregistrer la vidéo' : 'Record video'}
                         </button>
                       )}
+                      {isVerified && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openAssessmentForLang(lang)}
+                            className="flex-1 min-w-[120px] py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 inline-flex items-center justify-center gap-1.5"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            {isFr ? 'Refaire' : 'Re-record'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteLanguageVideo(index)}
+                            className="flex-1 min-w-[120px] py-2.5 bg-white text-rose-600 border border-rose-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-50 inline-flex items-center justify-center gap-1.5"
+                            title={isFr ? 'Supprimer uniquement la vidéo de vérification' : 'Delete verification video only'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {isFr ? 'Suppr. vidéo' : 'Delete video'}
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => onDeleteItemClick(index)}
                         className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-95 ${
-                          isVerified ? 'flex-1' : 'px-3.5'
+                          isVerified ? 'px-3.5' : 'px-3.5'
                         }`}
-                        title={isFr ? 'Supprimer la langue' : 'Delete language'}
+                        title={isFr ? 'Supprimer la langue du profil' : 'Remove language from profile'}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span className={isVerified ? 'inline' : 'hidden sm:inline'}>{isFr ? 'Supprimer' : 'Delete'}</span>
+                        <span className="hidden sm:inline">{isFr ? 'Langue' : 'Language'}</span>
                       </button>
                     </div>
                   </div>
