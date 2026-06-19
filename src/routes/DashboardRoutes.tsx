@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
+import { ScriptRequirementNotificationsSync } from '../components/dashboard/ScriptRequirementNotificationsSync';
 import { Sidebar } from '../components/dashboard/Sidebar';
 import { TopBar } from '../components/dashboard/TopBar';
 import { Dashboard } from '../components/dashboard/pages/Dashboard';
@@ -82,6 +83,7 @@ function DashboardAppContent() {
   return (
     <RepTrainingNavProvider>
       <NotificationsProvider>
+        <ScriptRequirementNotificationsSync />
         <DashboardRoutingWrapper
           userProfile={userProfile}
           loading={loading}

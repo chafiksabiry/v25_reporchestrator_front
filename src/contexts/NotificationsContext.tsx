@@ -10,33 +10,50 @@ import { connectRepEnrollmentSocket } from '../lib/enrollmentSocket';
 import { getAgentId } from '../utils/authUtils';
 import i18n from '../i18n';
 
+export type RepNotificationKind = 'enrollment' | 'script_required' | 'certification_required' | 'general';
+
 export type RepNotification = {
   id: string;
-  /** Enrollment outcome that triggered the notification. */
-  status: 'enrolled' | 'rejected' | string;
+  kind: RepNotificationKind;
+  /** Legacy enrollment status (enrolled / rejected). */
+  status?: string;
   gigId?: string;
+  journeyId?: string;
   title: string;
   message: string;
   createdAt: number;
   read: boolean;
+  actionPath?: string;
+};
+
+export type UpsertNotificationInput = {
+  id: string;
+  kind: RepNotificationKind;
+  title: string;
+  message: string;
+  gigId?: string;
+  journeyId?: string;
+  actionPath?: string;
+  /** Play chime when creating a new notification (default true). */
+  playSound?: boolean;
 };
 
 type NotificationsContextValue = {
   notifications: RepNotification[];
   unreadCount: number;
+  upsertNotification: (input: UpsertNotificationInput) => void;
+  addEnrollmentNotification: (status: string, gigId?: string) => void;
+  markAsRead: (id: string) => void;
+  markAsUnread: (id: string) => void;
   markAllRead: () => void;
+  removeNotification: (id: string) => void;
   clearAll: () => void;
 };
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
-const MAX_NOTIFICATIONS = 50;
+const MAX_NOTIFICATIONS = 100;
 
-/**
- * Play a short two-tone chime via the Web Audio API (no audio asset needed).
- * Wrapped in try/catch because browsers may block audio before any user
- * interaction; in that case we simply stay silent.
- */
 function playNotificationSound() {
   try {
     const Ctor =
@@ -50,7 +67,6 @@ function playNotificationSound() {
     master.gain.value = 0.0001;
     master.connect(ctx.destination);
 
-    // Two ascending notes (G5 then C6) for a pleasant "ding-dong".
     const notes = [
       { freq: 784, start: 0, dur: 0.18 },
       { freq: 1047, start: 0.16, dur: 0.28 },
@@ -72,10 +88,9 @@ function playNotificationSound() {
     });
 
     master.gain.setValueAtTime(1, now);
-    // Close the context shortly after to free resources.
     window.setTimeout(() => ctx.close().catch(() => {}), 900);
   } catch {
-    /* audio not available / blocked — ignore */
+    /* ignore */
   }
 }
 
@@ -84,18 +99,51 @@ function storageKey(): string {
   return `rep_notifications_${agentId}`;
 }
 
+function normalizeStoredNotification(raw: unknown): RepNotification | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const id = String(row.id || '').trim();
+  if (!id) return null;
+  const kindRaw = String(row.kind || row.status || 'general');
+  const kind: RepNotificationKind =
+    kindRaw === 'script_required' ||
+    kindRaw === 'certification_required' ||
+    kindRaw === 'enrollment' ||
+    kindRaw === 'general'
+      ? kindRaw
+      : row.status === 'enrolled' || row.status === 'rejected'
+        ? 'enrollment'
+        : 'general';
+
+  return {
+    id,
+    kind,
+    status: row.status != null ? String(row.status) : undefined,
+    gigId: row.gigId != null ? String(row.gigId) : undefined,
+    journeyId: row.journeyId != null ? String(row.journeyId) : undefined,
+    title: String(row.title || ''),
+    message: String(row.message || ''),
+    createdAt: Number(row.createdAt) || Date.now(),
+    read: Boolean(row.read),
+    actionPath: row.actionPath != null ? String(row.actionPath) : undefined,
+  };
+}
+
 function loadFromStorage(): RepNotification[] {
   try {
     const raw = localStorage.getItem(storageKey());
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizeStoredNotification)
+      .filter((n): n is RepNotification => n != null);
   } catch {
     return [];
   }
 }
 
-function buildMessage(status: string): { title: string; message: string } {
+function buildEnrollmentMessage(status: string): { title: string; message: string } {
   const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
   if (status === 'enrolled') {
     return isFr
@@ -115,57 +163,118 @@ function buildMessage(status: string): { title: string; message: string } {
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<RepNotification[]>(() => loadFromStorage());
 
-  // Persist on every change.
   useEffect(() => {
     try {
       localStorage.setItem(storageKey(), JSON.stringify(notifications));
     } catch {
-      /* ignore quota errors */
+      /* ignore */
     }
   }, [notifications]);
 
-  const addNotification = useCallback((status: string, gigId?: string) => {
-    const { title, message } = buildMessage(status);
-    const notif: RepNotification = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      status,
-      gigId,
+  const upsertNotification = useCallback((input: UpsertNotificationInput) => {
+    setNotifications((prev) => {
+      const idx = prev.findIndex((n) => n.id === input.id);
+      if (idx >= 0) {
+        const existing = prev[idx];
+        const updated: RepNotification = {
+          ...existing,
+          kind: input.kind,
+          title: input.title,
+          message: input.message,
+          gigId: input.gigId,
+          journeyId: input.journeyId,
+          actionPath: input.actionPath,
+        };
+        const next = [...prev];
+        next[idx] = updated;
+        return next;
+      }
+
+      if (input.playSound !== false) playNotificationSound();
+
+      const notif: RepNotification = {
+        id: input.id,
+        kind: input.kind,
+        gigId: input.gigId,
+        journeyId: input.journeyId,
+        title: input.title,
+        message: input.message,
+        actionPath: input.actionPath,
+        createdAt: Date.now(),
+        read: false,
+      };
+      return [notif, ...prev].slice(0, MAX_NOTIFICATIONS);
+    });
+  }, []);
+
+  const addEnrollmentNotification = useCallback((status: string, gigId?: string) => {
+    const { title, message } = buildEnrollmentMessage(status);
+    upsertNotification({
+      id: `enrollment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: 'enrollment',
       title,
       message,
-      createdAt: Date.now(),
-      read: false,
-    };
-    setNotifications((prev) => [notif, ...prev].slice(0, MAX_NOTIFICATIONS));
-    playNotificationSound();
+      gigId,
+      playSound: true,
+    });
+  }, [upsertNotification]);
+
+  const markAsRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id && !n.read ? { ...n, read: true } : n))
+    );
+  }, []);
+
+  const markAsUnread = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id && n.read ? { ...n, read: false } : n))
+    );
   }, []);
 
   const markAllRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => (n.read ? n : { ...n, read: true })));
   }, []);
 
+  const removeNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
   const clearAll = useCallback(() => {
     setNotifications([]);
   }, []);
 
-  // Listen to enrollment outcomes (approve/reject) in real time, globally.
   useEffect(() => {
     const dispose = connectRepEnrollmentSocket((data) => {
       const status = String(data?.status || '');
       if (status === 'enrolled' || status === 'rejected') {
-        addNotification(status, data?.gigId ? String(data.gigId) : undefined);
+        addEnrollmentNotification(status, data?.gigId ? String(data.gigId) : undefined);
       }
     });
     return dispose;
-  }, [addNotification]);
+  }, [addEnrollmentNotification]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({
       notifications,
       unreadCount: notifications.filter((n) => !n.read).length,
+      upsertNotification,
+      addEnrollmentNotification,
+      markAsRead,
+      markAsUnread,
       markAllRead,
+      removeNotification,
       clearAll,
     }),
-    [notifications, markAllRead, clearAll]
+    [
+      notifications,
+      upsertNotification,
+      addEnrollmentNotification,
+      markAsRead,
+      markAsUnread,
+      markAllRead,
+      removeNotification,
+      clearAll,
+    ]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
@@ -174,8 +283,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 export function useNotifications(): NotificationsContextValue {
   const ctx = useContext(NotificationsContext);
   if (!ctx) {
-    // Safe fallback so the bell never crashes if used outside the provider.
-    return { notifications: [], unreadCount: 0, markAllRead: () => {}, clearAll: () => {} };
+    return {
+      notifications: [],
+      unreadCount: 0,
+      upsertNotification: () => {},
+      addEnrollmentNotification: () => {},
+      markAsRead: () => {},
+      markAsUnread: () => {},
+      markAllRead: () => {},
+      removeNotification: () => {},
+      clearAll: () => {},
+    };
   }
   return ctx;
 }
