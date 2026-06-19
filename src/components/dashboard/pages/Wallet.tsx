@@ -728,35 +728,7 @@ export function WalletPage() {
 
             {activeTab === 'transactions' ? (
               <>
-                {/* ── Title zone ── */}
-                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
-                        <Wallet className="w-3.5 h-3.5 text-harx-600" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-                        Historique financier
-                      </span>
-                    </div>
-                    <h2 className="text-base font-black text-slate-900 tracking-tight">
-                      Retraits & Commissions
-                    </h2>
-                    <p className="text-xs text-slate-500 font-medium mt-1">
-                      Suivez vos commissions validées et vos demandes de retrait.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
-                      {filteredTransactions.length}
-                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
-                        opération{filteredTransactions.length !== 1 ? 's' : ''}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* ── Filter zone ── */}
+                {/* ── Filter zone (en haut) ── */}
                 <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5 text-slate-400">
@@ -794,6 +766,34 @@ export function WalletPage() {
                       options={dateRangeOptions}
                       accent="blue"
                     />
+                  </div>
+                </div>
+
+                {/* ── Title zone ── */}
+                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
+                        <Wallet className="w-3.5 h-3.5 text-harx-600" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                        Historique financier
+                      </span>
+                    </div>
+                    <h2 className="text-base font-black text-slate-900 tracking-tight">
+                      Retraits & Commissions
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Suivez vos commissions validées et vos demandes de retrait.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
+                      {filteredTransactions.length}
+                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
+                        opération{filteredTransactions.length !== 1 ? 's' : ''}
+                      </span>
+                    </span>
                   </div>
                 </div>
 
@@ -881,43 +881,7 @@ export function WalletPage() {
               </>
             ) : (
               <>
-                {/* ── Title zone ── */}
-                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
-                        <Phone className="w-3.5 h-3.5 text-harx-600" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-                        Suivi des appels
-                      </span>
-                    </div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">
-                      Appels éligibles aux commissions
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium mt-1">
-                      Chaque appel validé par l'entreprise crédite votre solde de gains.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
-                      {getCallCountForGig('all')}
-                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
-                        appels
-                      </span>
-                    </span>
-                    {selectedGigId !== 'all' && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-harx-50 text-harx-700 border border-harx-100">
-                        {getCallCountForGig(selectedGigId)}
-                        <span className="text-[9px] font-bold text-harx-400 uppercase tracking-wider">
-                          ce gig
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Filter zone ── */}
+                {/* ── Filter zone (en haut) ── */}
                 <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5 text-slate-400">
@@ -954,6 +918,42 @@ export function WalletPage() {
                       onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
                       options={callTxValidationOptions}
                     />
+                  </div>
+                </div>
+
+                {/* ── Title zone ── */}
+                <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-harx-50 flex items-center justify-center">
+                        <Phone className="w-3.5 h-3.5 text-harx-600" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-harx-600">
+                        Suivi des appels
+                      </span>
+                    </div>
+                    <h3 className="text-base font-black text-slate-900 tracking-tight">
+                      Appels éligibles aux commissions
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      Chaque appel validé par l'entreprise crédite votre solde de gains.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-slate-900 text-white">
+                      {getCallCountForGig('all')}
+                      <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">
+                        appels
+                      </span>
+                    </span>
+                    {selectedGigId !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black tracking-tight bg-harx-50 text-harx-700 border border-harx-100">
+                        {getCallCountForGig(selectedGigId)}
+                        <span className="text-[9px] font-bold text-harx-400 uppercase tracking-wider">
+                          ce gig
+                        </span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
