@@ -244,14 +244,28 @@ export function WalletPage() {
   const getPeriodStartTitle = (range: string): string => {
     switch (range) {
       case 'today':
-        return 'Début journée';
+        return 'Solde de départ';
       case 'this-week':
-        return 'Début semaine';
+        return 'Solde de départ';
       case 'last-month':
       case 'this-month':
-        return 'Début mois';
+        return 'Solde de départ';
       default:
-        return 'Début période';
+        return 'Solde de départ';
+    }
+  };
+
+  const getPeriodStartHint = (range: string): string => {
+    switch (range) {
+      case 'today':
+        return 'Déjà dans le portefeuille ce matin';
+      case 'this-week':
+        return 'Déjà dans le portefeuille lundi matin';
+      case 'last-month':
+      case 'this-month':
+        return 'Déjà dans le portefeuille au 1er du mois';
+      default:
+        return 'Avant les nouveaux gains de la période';
     }
   };
 
@@ -772,7 +786,9 @@ export function WalletPage() {
               {fmtMoney(periodEarningsBreakdown.periodStartBalance)}
               <span className="text-lg text-slate-300 ml-0.5">€</span>
             </p>
-            <p className="text-[10px] font-semibold text-slate-400 mt-2">Solde reporté</p>
+            <p className="text-[10px] font-semibold text-slate-400 mt-2 leading-relaxed">
+              {getPeriodStartHint(selectedDateRange)}
+            </p>
           </div>
 
           <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
