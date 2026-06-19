@@ -4,18 +4,28 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { connectRepEnrollmentSocket } from '../lib/enrollmentSocket';
 import { getAgentId } from '../utils/authUtils';
 import i18n from '../i18n';
+import {
+  fetchNotifications,
+  upsertNotificationApi,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  clearAllNotifications,
+  type ApiNotification,
+} from '../services/api/notificationsApi';
 
 export type RepNotificationKind = 'enrollment' | 'script_required' | 'certification_required' | 'general';
 
 export type RepNotification = {
   id: string;
+  notificationKey?: string;
   kind: RepNotificationKind;
-  /** Legacy enrollment status (enrolled / rejected). */
   status?: string;
   gigId?: string;
   journeyId?: string;
@@ -34,13 +44,15 @@ export type UpsertNotificationInput = {
   gigId?: string;
   journeyId?: string;
   actionPath?: string;
-  /** Play chime when creating a new notification (default true). */
   playSound?: boolean;
+  status?: string;
 };
 
 type NotificationsContextValue = {
   notifications: RepNotification[];
   unreadCount: number;
+  loading: boolean;
+  refreshNotifications: () => Promise<void>;
   upsertNotification: (input: UpsertNotificationInput) => void;
   addEnrollmentNotification: (status: string, gigId?: string) => void;
   markAsRead: (id: string) => void;
@@ -52,7 +64,7 @@ type NotificationsContextValue = {
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
-const MAX_NOTIFICATIONS = 100;
+export const NOTIFICATIONS_REFRESH_EVENT = 'NOTIFICATIONS_REFRESH';
 
 function playNotificationSound() {
   try {
@@ -94,53 +106,20 @@ function playNotificationSound() {
   }
 }
 
-function storageKey(): string {
-  const agentId = getAgentId() || 'anon';
-  return `rep_notifications_${agentId}`;
-}
-
-function normalizeStoredNotification(raw: unknown): RepNotification | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const row = raw as Record<string, unknown>;
-  const id = String(row.id || '').trim();
-  if (!id) return null;
-  const kindRaw = String(row.kind || row.status || 'general');
-  const kind: RepNotificationKind =
-    kindRaw === 'script_required' ||
-    kindRaw === 'certification_required' ||
-    kindRaw === 'enrollment' ||
-    kindRaw === 'general'
-      ? kindRaw
-      : row.status === 'enrolled' || row.status === 'rejected'
-        ? 'enrollment'
-        : 'general';
-
+function mapApiRow(row: ApiNotification): RepNotification {
   return {
-    id,
-    kind,
-    status: row.status != null ? String(row.status) : undefined,
-    gigId: row.gigId != null ? String(row.gigId) : undefined,
-    journeyId: row.journeyId != null ? String(row.journeyId) : undefined,
-    title: String(row.title || ''),
-    message: String(row.message || ''),
-    createdAt: Number(row.createdAt) || Date.now(),
-    read: Boolean(row.read),
-    actionPath: row.actionPath != null ? String(row.actionPath) : undefined,
+    id: row.id,
+    notificationKey: row.notificationKey,
+    kind: row.kind,
+    status: row.status,
+    gigId: row.gigId,
+    journeyId: row.journeyId,
+    title: row.title,
+    message: row.message,
+    createdAt: row.createdAt,
+    read: row.read,
+    actionPath: row.actionPath,
   };
-}
-
-function loadFromStorage(): RepNotification[] {
-  try {
-    const raw = localStorage.getItem(storageKey());
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeStoredNotification)
-      .filter((n): n is RepNotification => n != null);
-  } catch {
-    return [];
-  }
 }
 
 function buildEnrollmentMessage(status: string): { title: string; message: string } {
@@ -161,87 +140,125 @@ function buildEnrollmentMessage(status: string): { title: string; message: strin
 }
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState<RepNotification[]>(() => loadFromStorage());
+  const [notifications, setNotifications] = useState<RepNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const knownKeysRef = useRef<Set<string>>(new Set());
+
+  const refreshNotifications = useCallback(async () => {
+    const agentId = getAgentId();
+    if (!agentId) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const rows = await fetchNotifications();
+      const mapped = rows.map(mapApiRow);
+      const prevKeys = knownKeysRef.current;
+      const hasNew = mapped.some(
+        (n) => n.notificationKey && !prevKeys.has(n.notificationKey) && !n.read
+      );
+      if (hasNew) playNotificationSound();
+      knownKeysRef.current = new Set(
+        mapped.map((n) => n.notificationKey).filter((k): k is string => Boolean(k))
+      );
+      setNotifications(mapped);
+    } catch (err) {
+      console.warn('[Notifications] fetch failed', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey(), JSON.stringify(notifications));
-    } catch {
-      /* ignore */
-    }
-  }, [notifications]);
+    void refreshNotifications();
+    const onRefresh = () => void refreshNotifications();
+    window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+  }, [refreshNotifications]);
 
   const upsertNotification = useCallback((input: UpsertNotificationInput) => {
-    setNotifications((prev) => {
-      const idx = prev.findIndex((n) => n.id === input.id);
-      if (idx >= 0) {
-        const existing = prev[idx];
-        const updated: RepNotification = {
-          ...existing,
+    void (async () => {
+      try {
+        const created = await upsertNotificationApi({
+          notificationKey: input.id,
           kind: input.kind,
           title: input.title,
           message: input.message,
           gigId: input.gigId,
           journeyId: input.journeyId,
           actionPath: input.actionPath,
-        };
-        const next = [...prev];
-        next[idx] = updated;
-        return next;
+          status: input.status,
+        });
+        if (created && input.playSound !== false) playNotificationSound();
+        await refreshNotifications();
+      } catch (err) {
+        console.warn('[Notifications] upsert failed', err);
       }
+    })();
+  }, [refreshNotifications]);
 
-      if (input.playSound !== false) playNotificationSound();
-
-      const notif: RepNotification = {
-        id: input.id,
-        kind: input.kind,
-        gigId: input.gigId,
-        journeyId: input.journeyId,
-        title: input.title,
-        message: input.message,
-        actionPath: input.actionPath,
-        createdAt: Date.now(),
-        read: false,
-      };
-      return [notif, ...prev].slice(0, MAX_NOTIFICATIONS);
-    });
-  }, []);
-
-  const addEnrollmentNotification = useCallback((status: string, gigId?: string) => {
-    const { title, message } = buildEnrollmentMessage(status);
-    upsertNotification({
-      id: `enrollment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      kind: 'enrollment',
-      title,
-      message,
-      gigId,
-      playSound: true,
-    });
-  }, [upsertNotification]);
+  const addEnrollmentNotification = useCallback(
+    (status: string, gigId?: string) => {
+      const { title, message } = buildEnrollmentMessage(status);
+      const key = `enrollment-${gigId || 'general'}-${status}`;
+      upsertNotification({
+        id: key,
+        kind: 'enrollment',
+        status,
+        title,
+        message,
+        gigId,
+        playSound: true,
+      });
+    },
+    [upsertNotification]
+  );
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id && !n.read ? { ...n, read: true } : n))
     );
-  }, []);
+    void markNotificationRead(id, true).catch((err) => {
+      console.warn('[Notifications] mark read failed', err);
+      void refreshNotifications();
+    });
+  }, [refreshNotifications]);
 
   const markAsUnread = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id && n.read ? { ...n, read: false } : n))
     );
-  }, []);
+    void markNotificationRead(id, false).catch((err) => {
+      console.warn('[Notifications] mark unread failed', err);
+      void refreshNotifications();
+    });
+  }, [refreshNotifications]);
 
   const markAllRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => (n.read ? n : { ...n, read: true })));
-  }, []);
+    void markAllNotificationsRead().catch((err) => {
+      console.warn('[Notifications] mark all read failed', err);
+      void refreshNotifications();
+    });
+  }, [refreshNotifications]);
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+    void deleteNotification(id).catch((err) => {
+      console.warn('[Notifications] delete failed', err);
+      void refreshNotifications();
+    });
+  }, [refreshNotifications]);
 
   const clearAll = useCallback(() => {
     setNotifications([]);
-  }, []);
+    void clearAllNotifications().catch((err) => {
+      console.warn('[Notifications] clear all failed', err);
+      void refreshNotifications();
+    });
+  }, [refreshNotifications]);
 
   useEffect(() => {
     const dispose = connectRepEnrollmentSocket((data) => {
@@ -257,6 +274,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     () => ({
       notifications,
       unreadCount: notifications.filter((n) => !n.read).length,
+      loading,
+      refreshNotifications,
       upsertNotification,
       addEnrollmentNotification,
       markAsRead,
@@ -267,6 +286,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }),
     [
       notifications,
+      loading,
+      refreshNotifications,
       upsertNotification,
       addEnrollmentNotification,
       markAsRead,
@@ -286,6 +307,8 @@ export function useNotifications(): NotificationsContextValue {
     return {
       notifications: [],
       unreadCount: 0,
+      loading: false,
+      refreshNotifications: async () => {},
       upsertNotification: () => {},
       addEnrollmentNotification: () => {},
       markAsRead: () => {},

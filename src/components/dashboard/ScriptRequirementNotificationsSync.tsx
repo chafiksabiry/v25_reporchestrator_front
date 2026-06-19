@@ -1,8 +1,12 @@
 import { useEffect, useRef } from 'react';
 import axios from 'axios';
 import i18n from '../../i18n';
-import { useNotifications } from '../../contexts/NotificationsContext';
+import { NOTIFICATIONS_REFRESH_EVENT } from '../../contexts/NotificationsContext';
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
+import {
+  deleteNotificationByKey,
+  upsertNotificationApi,
+} from '../../services/api/notificationsApi';
 import {
   fetchEnrolledGigsForAgent,
   gigIdFromJourney,
@@ -76,10 +80,10 @@ function buildScriptNotificationCopy(
 }
 
 /**
- * Synchronise les notifications « script obligatoire » avec l'état réel des formations du rep.
+ * Synchronise les notifications « script obligatoire » côté API (dash_rep_back),
+ * puis rafraîchit la cloche.
  */
 export function ScriptRequirementNotificationsSync() {
-  const { upsertNotification, removeNotification } = useNotifications();
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -133,9 +137,10 @@ export function ScriptRequirementNotificationsSync() {
 
         const progressByJourney: Record<string, RepProgressRowLite> = {};
         try {
-          const pr = await axios.get<{ success?: boolean; data?: Array<RepProgressRowLite & { journeyId?: string }> }>(
-            `${base}/training_journeys/rep/${encodeURIComponent(repId)}/trainings-progress`
-          );
+          const pr = await axios.get<{
+            success?: boolean;
+            data?: Array<RepProgressRowLite & { journeyId?: string }>;
+          }>(`${base}/training_journeys/rep/${encodeURIComponent(repId)}/trainings-progress`);
           const rows = Array.isArray(pr.data?.data) ? pr.data.data : [];
           for (const row of rows) {
             const cid = String(row.journeyId || '').trim();
@@ -178,26 +183,27 @@ export function ScriptRequirementNotificationsSync() {
 
           const completed = isJourneyCompleted(jid, slideJourneys, progress, structured);
           const scriptPending = scriptModuleStillPending(journey, structured, progress);
-          const notifId = scriptNotificationId(jid);
+          const notifKey = scriptNotificationId(jid);
 
           if (completed && scriptPending) {
             const title = journeyTitle(journey);
             const { title: nTitle, message } = buildScriptNotificationCopy(title, isFr);
             const gigId = gigIdFromJourney(journey);
-            upsertNotification({
-              id: notifId,
+            await upsertNotificationApi({
+              notificationKey: notifKey,
               kind: 'script_required',
               title: nTitle,
               message,
               gigId: gigId || undefined,
               journeyId: jid,
               actionPath: gigId ? `/training?gigId=${encodeURIComponent(gigId)}` : '/training',
-              playSound: true,
             });
           } else {
-            removeNotification(notifId);
+            await deleteNotificationByKey(notifKey).catch(() => {});
           }
         }
+
+        window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
       } finally {
         syncingRef.current = false;
       }
@@ -212,7 +218,7 @@ export function ScriptRequirementNotificationsSync() {
       window.clearInterval(interval);
       window.removeEventListener('TRAINING_PROGRESS_UPDATED', onTrainingUpdate);
     };
-  }, [upsertNotification, removeNotification]);
+  }, []);
 
   return null;
 }
