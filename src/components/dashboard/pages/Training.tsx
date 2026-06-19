@@ -25,11 +25,10 @@ import {
   getViewerThemeTokens,
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
+import { GigScriptReaderModal } from '../GigScriptReaderModal';
 import {
-  enrichJourneyWithScriptModule,
+  gigIdFromJourney,
   isScriptRequirementModule,
-  journeyHasScriptModule,
-  scriptModuleSlideKey,
   scriptModuleStillPending,
   trainingApiBase,
 } from '../../../utils/trainingScriptRequirement';
@@ -764,8 +763,6 @@ export function Training() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [journeys, setJourneys] = useState<JourneyRow[]>([]);
-  /** Parcours enrichis avec le module script (si absent de l'API). */
-  const [scriptEnrichedById, setScriptEnrichedById] = useState<Record<string, JourneyRow>>({});
   const [enrolledGigs, setEnrolledGigs] = useState<{ gigId: string; title: string }[]>([]);
   const [gigFilter, setGigFilter] = useState<string>('__all__');
   const [routeGigApplied, setRouteGigApplied] = useState(false);
@@ -826,53 +823,15 @@ export function Training() {
   const quizOutcomeSentRef = useRef<Set<string>>(new Set());
   /** POST /quiz/start déjà réussi pour cette clé (réinitialisé en quittant le slide quiz). */
   const quizStartSentRef = useRef<Set<string>>(new Set());
-  const pendingScriptJumpRef = useRef<string | null>(null);
+  const [scriptReader, setScriptReader] = useState<{ gigId: string; title: string } | null>(null);
 
   const displayJourneys = useMemo(() => {
-    const base =
-      gigFilter === '__all__'
-        ? journeys
-        : dedupeAndSort([
-            ...gigFetchedJourneys,
-            ...journeys.filter((j) => String(j.__gigId || '') === gigFilter),
-          ]);
-    return base.map((j) => {
-      const id = journeyKey(j);
-      return id && scriptEnrichedById[id] ? scriptEnrichedById[id] : j;
-    });
-  }, [journeys, gigFilter, gigFetchedJourneys, scriptEnrichedById]);
+    if (gigFilter === '__all__') return journeys;
+    const fromGlobal = journeys.filter((j) => String(j.__gigId || '') === gigFilter);
+    return dedupeAndSort([...gigFetchedJourneys, ...fromGlobal]);
+  }, [journeys, gigFilter, gigFetchedJourneys]);
 
   const listLoading = loading || (gigFilter !== '__all__' && gigFetchLoading);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const base =
-        gigFilter === '__all__'
-          ? journeys
-          : dedupeAndSort([
-              ...gigFetchedJourneys,
-              ...journeys.filter((j) => String(j.__gigId || '') === gigFilter),
-            ]);
-      const updates: Record<string, JourneyRow> = {};
-      await Promise.all(
-        base.map(async (j) => {
-          const id = journeyKey(j);
-          if (!id || journeyHasScriptModule(j)) return;
-          const enriched = await enrichJourneyWithScriptModule(j);
-          if (journeyHasScriptModule(enriched)) {
-            updates[id] = enriched as JourneyRow;
-          }
-        })
-      );
-      if (!cancelled && Object.keys(updates).length > 0) {
-        setScriptEnrichedById((prev) => ({ ...prev, ...updates }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [journeys, gigFetchedJourneys, gigFilter]);
 
   useEffect(() => {
     const base = trainingApiBase();
@@ -1180,44 +1139,11 @@ export function Training() {
     [formationViewerSlideIndexByKey]
   );
 
-  useEffect(() => {
-    const key = pendingScriptJumpRef.current;
-    if (!key || !selectedJourney) return;
-    const idx = formationViewerSlideIndexByKey.get(key);
-    if (typeof idx !== 'number') return;
-    pendingScriptJumpRef.current = null;
-    setFormationViewerSlideIndex(idx);
-  }, [selectedJourney, formationViewerSlideIndexByKey]);
-
-  const openScriptForJourney = useCallback(
-    (j: JourneyRow, opts?: { switchTab?: boolean }) => {
-      void (async () => {
-        const id = journeyKey(j);
-        if (!id) return;
-        let row: JourneyRow = scriptEnrichedById[id] || j;
-        if (!journeyHasScriptModule(row)) {
-          const enriched = await enrichJourneyWithScriptModule(row);
-          if (journeyHasScriptModule(enriched)) {
-            row = enriched as JourneyRow;
-            setScriptEnrichedById((prev) => ({ ...prev, [id]: row }));
-          }
-        }
-        const slideKey = scriptModuleSlideKey(row);
-        if (opts?.switchTab !== false) setTrainingTab('trainings');
-        if (slideKey) {
-          pendingScriptJumpRef.current = slideKey;
-          setSelectedJourneyId(id);
-          setFormationViewerSlideIndex(0);
-          setActiveSlide(0);
-          return;
-        }
-        setSelectedJourneyId(id);
-        setFormationViewerSlideIndex(0);
-        setActiveSlide(0);
-      })();
-    },
-    [scriptEnrichedById]
-  );
+  const openScriptForJourney = useCallback((j: JourneyRow) => {
+    const gigId = gigIdFromJourney(j);
+    if (!gigId) return;
+    setScriptReader({ gigId, title: journeyTitle(j) });
+  }, []);
 
   const currentFormationViewerSlide = formationViewerSlides[formationViewerSlideIndex];
   const isNextModuleLocked = useMemo(() => {
@@ -2473,7 +2399,7 @@ export function Training() {
               Number(progress?.progressPercentage) >= 100;
             const structured = id ? structuredProgressByJourney[id] : undefined;
             const scriptPending = isCompleted && scriptModuleStillPending(j, structured, progress);
-            const hasScriptModule = journeyHasScriptModule(j);
+            const hasScriptModule = Boolean(gigIdFromJourney(j));
 
             const openFormation = () => {
               if (!id) return;
@@ -2629,7 +2555,7 @@ export function Training() {
               const progress = id ? progressByJourney[id] : undefined;
               const structured = id ? structuredProgressByJourney[id] : undefined;
               const scriptPending = scriptModuleStillPending(j, structured, progress);
-              const hasScriptModule = journeyHasScriptModule(j);
+              const hasScriptModule = Boolean(gigIdFromJourney(j));
               return (
                 <li
                   key={`cert-${id || journeyTitle(j)}`}
@@ -2827,12 +2753,10 @@ export function Training() {
                                     type="button"
                                     disabled={!!modLocked}
                                     onClick={() => {
-                                      if (scriptMod && selectedJourney) {
-                                        const key = scriptModuleSlideKey(selectedJourney);
-                                        if (key) {
-                                          jumpToFormationSlide(key);
-                                          return;
-                                        }
+                                      const gid = selectedJourney ? gigIdFromJourney(selectedJourney) : '';
+                                      if (scriptMod && gid) {
+                                        setScriptReader({ gigId: gid, title: journeyTitle(selectedJourney!) });
+                                        return;
                                       }
                                       jumpToFormationSlide(`m${mod.moduleIndex}-intro`);
                                     }}
@@ -3476,6 +3400,13 @@ export function Training() {
           </div>
         </div>
       )}
+      {scriptReader ? (
+        <GigScriptReaderModal
+          gigId={scriptReader.gigId}
+          title={scriptReader.title}
+          onClose={() => setScriptReader(null)}
+        />
+      ) : null}
     </div>
   );
 }
