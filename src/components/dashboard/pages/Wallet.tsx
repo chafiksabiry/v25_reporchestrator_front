@@ -238,27 +238,19 @@ export function WalletPage() {
   const resetTransactionFilters = () => {
     setSelectedGigId('all');
     setTransactionValidationFilter('all');
-    setSelectedDateRange('this-month');
   };
 
   const resetCallFilters = () => {
     setSelectedGigId('all');
     setCallValidationFilter('all');
     setTransactionValidationFilter('all');
-    setSelectedDateRange('this-month');
   };
 
-  const hasActiveFilters =
+  const hasActiveTabFilters =
     selectedGigId !== 'all'
-    || selectedDateRange !== 'this-month'
     || (activeTab === 'transactions'
       ? transactionValidationFilter !== 'all'
       : callValidationFilter !== 'all' || transactionValidationFilter !== 'all');
-
-  const handleResetFilters = () => {
-    if (activeTab === 'transactions') resetTransactionFilters();
-    else resetCallFilters();
-  };
 
   // Rep keeps 70% of every commission; HARX keeps 30%. We only display the rep share.
   const REP_SHARE = 0.7;
@@ -618,62 +610,25 @@ export function WalletPage() {
         </div>
       </div>
 
-      {/* Filtres globaux — sous le titre, au-dessus des cartes solde */}
-      <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Filter className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
-          </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="text-[10px] font-black uppercase tracking-wider text-harx-600 hover:text-harx-700 transition-colors"
-            >
-              Réinitialiser
-            </button>
-          )}
-        </div>
-        <div className={`grid grid-cols-1 gap-3 ${activeTab === 'transactions' ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'}`}>
-          <WalletFilterSelect
-            label="Filtrer par gig"
-            value={selectedGigId}
-            onChange={setSelectedGigId}
-            options={gigSelectOptions}
-            accent="purple"
-          />
-          <WalletFilterSelect
-            label="Période"
-            value={selectedDateRange}
-            onChange={setSelectedDateRange}
-            options={dateRangeOptions}
-            accent="blue"
-          />
-          {activeTab === 'transactions' ? (
-            <WalletFilterSelect
-              label="Ventes"
-              value={transactionValidationFilter}
-              onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
-              options={transactionSaleOptions}
-            />
-          ) : (
-            <>
-              <WalletFilterSelect
-                label="Appels"
-                value={callValidationFilter}
-                onChange={(v) => setCallValidationFilter(v as typeof callValidationFilter)}
-                options={callValidationOptions}
-              />
-              <WalletFilterSelect
-                label="Transactions"
-                value={transactionValidationFilter}
-                onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
-                options={callTxValidationOptions}
-              />
-            </>
-          )}
-        </div>
+      {/* Période uniquement — sous le titre */}
+      <div className="flex flex-wrap items-end gap-3">
+        <WalletFilterSelect
+          label="Période"
+          value={selectedDateRange}
+          onChange={setSelectedDateRange}
+          options={dateRangeOptions}
+          accent="blue"
+          className="w-full sm:w-auto sm:min-w-[220px] sm:max-w-[280px]"
+        />
+        {selectedDateRange !== 'this-month' && (
+          <button
+            type="button"
+            onClick={() => setSelectedDateRange('this-month')}
+            className="text-[10px] font-black uppercase tracking-wider text-blue-600 hover:text-blue-700 transition-colors pb-2.5"
+          >
+            Réinitialiser la période
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -866,6 +821,40 @@ export function WalletPage() {
                   </div>
                 </div>
 
+                {/* ── Filtres gig & ventes ── */}
+                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Filter className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
+                    </div>
+                    {hasActiveTabFilters && (
+                      <button
+                        type="button"
+                        onClick={resetTransactionFilters}
+                        className="text-[10px] font-black uppercase tracking-wider text-harx-600 hover:text-harx-700 transition-colors"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <WalletFilterSelect
+                      label="Filtrer par gig"
+                      value={selectedGigId}
+                      onChange={setSelectedGigId}
+                      options={gigSelectOptions}
+                      accent="purple"
+                    />
+                    <WalletFilterSelect
+                      label="Ventes"
+                      value={transactionValidationFilter}
+                      onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
+                      options={transactionSaleOptions}
+                    />
+                  </div>
+                </div>
+
                 <div className="p-4 sm:p-6 bg-slate-50/40">
                   {filteredTransactions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
@@ -983,6 +972,46 @@ export function WalletPage() {
                         </span>
                       </span>
                     )}
+                  </div>
+                </div>
+
+                {/* ── Filtres gig, appels & transactions ── */}
+                <div className="px-5 sm:px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Filter className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Filtres</span>
+                    </div>
+                    {hasActiveTabFilters && (
+                      <button
+                        type="button"
+                        onClick={resetCallFilters}
+                        className="text-[10px] font-black uppercase tracking-wider text-harx-600 hover:text-harx-700 transition-colors"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <WalletFilterSelect
+                      label="Filtrer par gig"
+                      value={selectedGigId}
+                      onChange={setSelectedGigId}
+                      options={gigSelectOptions}
+                      accent="purple"
+                    />
+                    <WalletFilterSelect
+                      label="Appels"
+                      value={callValidationFilter}
+                      onChange={(v) => setCallValidationFilter(v as typeof callValidationFilter)}
+                      options={callValidationOptions}
+                    />
+                    <WalletFilterSelect
+                      label="Transactions"
+                      value={transactionValidationFilter}
+                      onChange={(v) => setTransactionValidationFilter(v as typeof transactionValidationFilter)}
+                      options={callTxValidationOptions}
+                    />
                   </div>
                 </div>
 

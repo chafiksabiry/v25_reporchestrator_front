@@ -211,11 +211,12 @@ export function WalletFilterSelect({
           ref={triggerRef}
           type="button"
           onClick={toggleDropdown}
-          className={`relative w-full flex items-center justify-between gap-2 cursor-pointer rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-10 text-left shadow-sm transition-all ${triggerAccent.hoverBorder} focus:outline-none focus:ring-2 ${triggerAccent.focusRing}`}
+          className={`relative w-full flex items-center justify-between gap-2 cursor-pointer rounded-2xl border border-slate-100 bg-white/90 py-2.5 pl-3.5 pr-10 text-left shadow-sm transition-all duration-200 ${triggerAccent.hoverBorder} focus:outline-none focus:ring-2 ${triggerAccent.focusRing}`}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
         >
           <span className="flex items-center gap-2 min-w-0">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ACCENT_PILL[accent].dot}`} />
             <span className="block truncate text-xs font-bold text-slate-800 normal-case" title={selected?.label}>
               {selected?.label}
             </span>
@@ -231,7 +232,7 @@ export function WalletFilterSelect({
           <>
             <div className="fixed inset-0 z-[9998]" onClick={closeDropdown} aria-hidden />
             <div
-              className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
+              className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 space-y-0.5 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
               style={{
                 ...(dropdownPos.placement === 'above'
                   ? { bottom: dropdownPos.bottom }
@@ -253,18 +254,18 @@ export function WalletFilterSelect({
                       onChange(option.value);
                       closeDropdown();
                     }}
-                    className="block w-full text-left px-1 py-0.5"
+                    className="block w-full text-left"
                     role="option"
                     aria-selected={isSelected}
                   >
                     <span
-                      className={`inline-flex items-start gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-semibold leading-snug normal-case transition-all ${getOptionPill(option, isSelected)}`}
+                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 rounded-xl text-[11px] font-semibold leading-snug normal-case transition-all duration-150 ${getOptionPill(option, isSelected)}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${getOptionDot(option, isSelected)}`} />
-                      <span className="text-left">
+                      <span className="text-left flex-1 min-w-0">
                         {option.label}
                         {option.hint && (
-                          <span className="block text-[10px] font-medium text-slate-400 mt-0.5">{option.hint}</span>
+                          <span className="block text-[10px] font-medium text-slate-400 mt-0.5 leading-snug">{option.hint}</span>
                         )}
                       </span>
                     </span>
