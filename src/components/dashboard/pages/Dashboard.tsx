@@ -393,28 +393,50 @@ export function Dashboard({ profile }: DashboardProps) {
 
     let retractionAmount = 0;
     let retractionCount = 0;
+    let validatedCallsAmount = 0;
+    let validatedCallsCount = 0;
+    let validatedSalesAmount = 0;
+    let validatedSalesCount = 0;
+    let availableCallsAmount = 0;
+    let availableSalesAmount = 0;
+
+    const matchGig = (row: RepTransactionRow) => {
+      if (selectedGigId === 'all') return true;
+      const rGigId = typeof row.gigId === 'object' ? (row.gigId as { _id?: string })?._id : row.gigId;
+      return rGigId === selectedGigId;
+    };
+
+    repLedger.forEach((row) => {
+      if (!matchGig(row)) return;
+      const share = row.repShare || 0;
+      const activityDate = ledgerActivityDate(row);
+
+      if (row.status === 'earned' || row.status === 'paid') {
+        if (row.type === 'call_validated') availableCallsAmount += share;
+        if (row.type === 'transaction') availableSalesAmount += share;
+      }
+
+      if (!activeLedger(row) || !inPeriod(activityDate)) return;
+
+      if (row.type === 'call_validated') {
+        validatedCallsAmount += share;
+        validatedCallsCount += 1;
+      } else if (row.type === 'transaction') {
+        validatedSalesAmount += share;
+        validatedSalesCount += 1;
+      }
+    });
 
     repLedger.forEach((row) => {
       if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
       const activityDate = ledgerActivityDate(row);
       if (!inPeriod(activityDate)) return;
-      if (selectedGigId !== 'all') {
-        const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
-        if (rGigId !== selectedGigId) return;
-      }
+      if (!matchGig(row)) return;
       retractionAmount += row.repShare || 0;
       retractionCount += 1;
     });
 
-    const validatedInPeriod = repLedger.reduce((sum, row) => {
-      if (!activeLedger(row)) return sum;
-      if (selectedGigId !== 'all') {
-        const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
-        if (rGigId !== selectedGigId) return sum;
-      }
-      if (!inPeriod(ledgerActivityDate(row))) return sum;
-      return sum + (row.repShare || 0);
-    }, 0);
+    const validatedInPeriod = validatedCallsAmount + validatedSalesAmount;
 
     const totalGains = validatedInPeriod + clientValidationAmount;
 
@@ -426,6 +448,12 @@ export function Dashboard({ profile }: DashboardProps) {
       clientValidationCount,
       totalGains,
       validatedInPeriod,
+      validatedCallsAmount,
+      validatedCallsCount,
+      validatedSalesAmount,
+      validatedSalesCount,
+      availableCallsAmount,
+      availableSalesAmount,
       pendingClientValidationCallIds,
     };
   }, [
@@ -1012,6 +1040,17 @@ export function Dashboard({ profile }: DashboardProps) {
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
                   Prêt au retrait
                 </p>
+                <p className="text-[10px] font-semibold text-slate-500 mt-1.5 normal-case tracking-normal leading-relaxed">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone size={10} className="text-emerald-500" />
+                    {fmtMoney(earningsPipeline.availableCallsAmount)} € appels
+                  </span>
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Briefcase size={10} className="text-emerald-500" />
+                    {fmtMoney(earningsPipeline.availableSalesAmount)} € ventes
+                  </span>
+                </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                 <WalletIcon size={16} />
@@ -1098,10 +1137,20 @@ export function Dashboard({ profile }: DashboardProps) {
                 <p className="text-2xl font-black text-white tracking-tighter mt-2">
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50 leading-relaxed">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone size={10} className="text-emerald-400" />
+                    {fmtMoney(earningsPipeline.validatedCallsAmount)} €
+                    {earningsPipeline.validatedCallsCount > 0 ? ` (${earningsPipeline.validatedCallsCount} appel${earningsPipeline.validatedCallsCount > 1 ? 's' : ''})` : ''}
+                  </span>
+                  <span className="mx-1 text-white/30">+</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Briefcase size={10} className="text-emerald-400" />
+                    {fmtMoney(earningsPipeline.validatedSalesAmount)} €
+                    {earningsPipeline.validatedSalesCount > 0 ? ` (${earningsPipeline.validatedSalesCount} vente${earningsPipeline.validatedSalesCount > 1 ? 's' : ''})` : ''}
+                  </span>
                   {earningsPipeline.clientValidationAmount > 0
-                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
+                    ? ` · +${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
                     : ''}
                 </p>
               </div>
