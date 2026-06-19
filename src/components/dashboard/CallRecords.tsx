@@ -24,6 +24,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
+import { getAgentId } from '../../utils/authUtils';
 import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
   hasDetectedTransactionSale,
@@ -275,6 +276,21 @@ export function CallRecords({
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
 
+  const normalizeMongoId = (value: unknown): string | null => {
+    if (value == null) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    if (typeof value === 'object') {
+      const obj = value as { _id?: unknown; $oid?: string };
+      if (obj.$oid) return String(obj.$oid);
+      if (obj._id != null) return normalizeMongoId(obj._id);
+    }
+    const asString = String(value).trim();
+    return asString.length > 0 ? asString : null;
+  };
+
   const repLedgerByCallId = useMemo(
     () => indexSaleLedgerByCallId(repLedgerRows),
     [repLedgerRows]
@@ -299,7 +315,7 @@ export function CallRecords({
 
   const fetchRepLedger = async () => {
     try {
-      const agentId = localStorage.getItem('agentId');
+      const agentId = getAgentId();
       if (!agentId) return;
       const response = await repTransactionsApi.list(agentId, { limit: 500 });
       if (!response?.success || !Array.isArray(response.data)) return;
@@ -440,7 +456,7 @@ export function CallRecords({
   };
   const fetchCallRecords = async (silent = false) => {
     try {
-      const agentId = localStorage.getItem('agentId');
+      const agentId = getAgentId();
       if (!agentId) throw new Error('Agent ID not found');
 
       const response = await api.calls.getByAgentId(agentId);
@@ -645,13 +661,14 @@ export function CallRecords({
   }, [overlayOpenCallId, callRecords]);
 
   const filteredRecords = callRecords.filter(record => {
-    if (leadId && record.lead?._id !== leadId) return false;
+    if (leadId) {
+      const recordLeadId = normalizeMongoId(record.lead?._id ?? record.lead);
+      if (recordLeadId && recordLeadId !== leadId) return false;
+      if (!recordLeadId) return false;
+    }
     if (gigId) {
-      const recordGig = record.lead?.gigId;
-      const idStr = typeof recordGig === 'object'
-        ? (recordGig?._id || (recordGig as any)?.$oid)
-        : recordGig;
-      if (idStr !== gigId) return false;
+      const recordGigId = normalizeMongoId(record.lead?.gigId);
+      if (recordGigId && recordGigId !== gigId) return false;
     }
 
     // Call Validation Filter
@@ -760,8 +777,14 @@ export function CallRecords({
           <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
             <Phone className="w-8 h-8 text-slate-300" />
           </div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{t('calls.noCalls')}</h3>
-          <p className="text-xs text-slate-500 mt-2 max-w-sm font-medium">{t('calls.noCallsDetail')}</p>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+            {callRecords.length > 0 ? t('calls.noCallsFiltered', 'Aucun appel pour ce filtre') : t('calls.noCalls')}
+          </h3>
+          <p className="text-xs text-slate-500 mt-2 max-w-sm font-medium">
+            {callRecords.length > 0
+              ? t('calls.noCallsFilteredDetail', 'Des appels existent mais sont masqués par le filtre actuel.')
+              : t('calls.noCallsDetail')}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
