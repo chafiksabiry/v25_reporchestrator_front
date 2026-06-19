@@ -167,7 +167,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
   const periodTriggerRef = useRef<HTMLButtonElement>(null);
   const [periodDropdownPos, setPeriodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
+  type TransactionFilter = 'all' | 'paid' | 'earned' | 'pending_retraction' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   type CallFilter = 'all' | 'valid' | 'invalid' | 'pending_client';
   const [callFilter, setCallFilter] = useState<CallFilter>('all');
@@ -539,6 +539,7 @@ export function Dashboard({ profile }: DashboardProps) {
       all: { count: 0, total: 0 },
       paid: { count: 0, total: 0 },
       earned: { count: 0, total: 0 },
+      pending_retraction: { count: 0, total: 0 },
       refused: { count: 0, total: 0 },
     };
     filteredTransactions.forEach((row: RepTransactionRow) => {
@@ -551,6 +552,9 @@ export function Dashboard({ profile }: DashboardProps) {
       } else if (row.status === 'earned') {
         acc.earned.count += 1;
         acc.earned.total += share;
+      } else if (row.status === 'pending_retraction') {
+        acc.pending_retraction.count += 1;
+        acc.pending_retraction.total += share;
       } else if (row.status === 'refused') {
         acc.refused.count += 1;
         acc.refused.total += share;
@@ -1136,6 +1140,7 @@ export function Dashboard({ profile }: DashboardProps) {
               {([
                 { key: 'all', label: 'Tous', accent: 'slate', count: transactionStats.all.count },
                 { key: 'earned', label: 'Payé', accent: 'emerald', count: transactionStats.earned.count },
+                { key: 'pending_retraction', label: 'Rétractation', accent: 'amber', count: transactionStats.pending_retraction.count },
                 { key: 'paid', label: 'Versé', accent: 'blue', count: transactionStats.paid.count },
                 { key: 'refused', label: 'Refusé', accent: 'rose', count: transactionStats.refused.count },
               ] as { key: TransactionFilter; label: string; accent: string; count: number }[]).map((tab) => {
@@ -1151,6 +1156,8 @@ export function Dashboard({ profile }: DashboardProps) {
                           ? 'bg-slate-900 text-white shadow-md'
                           : tab.accent === 'emerald'
                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                          : tab.accent === 'amber'
+                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
                           : tab.accent === 'blue'
                           ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
                           : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
@@ -1187,6 +1194,8 @@ export function Dashboard({ profile }: DashboardProps) {
                       ? { label: 'Payé', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
                       : tx.status === 'paid'
                       ? { label: 'Versé', cls: 'bg-blue-50 text-blue-700 border-blue-100' }
+                      : tx.status === 'pending_retraction'
+                      ? { label: 'Rétractation', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
                       : { label: 'Refusé', cls: 'bg-rose-50 text-rose-700 border-rose-100' };
                   const typeLabel =
                     tx.type === 'call_validated' ? 'Appel validé'
@@ -1717,7 +1726,17 @@ export function Dashboard({ profile }: DashboardProps) {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Statut</span>
-                  <span className="text-xs font-bold text-slate-700 capitalize">{selectedTransaction.status}</span>
+                  <span className="text-xs font-bold text-slate-700 capitalize">
+                    {selectedTransaction.status === 'pending_retraction'
+                      ? 'Rétractation (14 jours)'
+                      : selectedTransaction.status === 'earned'
+                        ? 'Payé'
+                        : selectedTransaction.status === 'paid'
+                          ? 'Versé'
+                          : selectedTransaction.status === 'refused'
+                            ? 'Refusé'
+                            : selectedTransaction.status}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Gig</span>

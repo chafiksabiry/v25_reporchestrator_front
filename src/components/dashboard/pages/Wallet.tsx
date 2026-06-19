@@ -92,7 +92,14 @@ export function WalletPage() {
         type: typeLabel,
         ledgerType: row.type,
         amount: row.repShare,
-        status: row.status === 'earned' ? 'Completed' : row.status === 'paid' ? 'Paid' : 'Refused',
+        status:
+          row.status === 'earned'
+            ? 'Completed'
+            : row.status === 'paid'
+              ? 'Paid'
+              : row.status === 'pending_retraction'
+                ? 'Retraction'
+                : 'Refused',
         date: row.createdAt,
         method: 'Wallet',
         reference: row.callId || row.sourceId,
@@ -690,6 +697,9 @@ export function WalletPage() {
   const getTxStatusBadge = (status: string) => {
     if (status === 'Completed' || status === 'Paid') {
       return { label: 'Complété', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+    if (status === 'Retraction') {
+      return { label: 'Rétractation', className: 'bg-amber-50 text-amber-800 border-amber-200' };
     }
     if (status === 'Refused' || status === 'Failed') {
       return { label: 'Refusé', className: 'bg-rose-50 text-rose-700 border-rose-200' };

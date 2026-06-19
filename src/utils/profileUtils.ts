@@ -319,6 +319,26 @@ export const getRepresentativePlans = async (): Promise<Plan[]> => {
   }
 };
 
+export type RepStripeConfig = {
+  success?: boolean;
+  stripe?: {
+    enabled?: boolean;
+    mode?: string;
+    publishableKey?: string;
+    pricingTableId?: string;
+  };
+};
+
+export const getRepStripeConfig = async (): Promise<RepStripeConfig> => {
+  try {
+    const response = await profileApi.getRepStripeConfig();
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching rep Stripe config:', error);
+    throw error;
+  }
+};
+
 export const updateProfilePlan = async (profileId: string, planId: string) => {
   try {
     const response = await profileApi.updatePlan(profileId, planId);

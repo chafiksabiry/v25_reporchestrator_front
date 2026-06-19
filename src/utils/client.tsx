@@ -361,6 +361,7 @@ export const profileApi = {
   getPlan: (profileId: string) => repApiClient.get(`/api/profiles/${profileId}/plan`),
   updatePlan: (profileId: string, planId: string) => repApiClient.put(`/api/profiles/${profileId}/plan`, { planId }),
   getRepresentativePlans: () => repApiClient.get('/api/profiles/plans/representative'),
+  getRepStripeConfig: () => repApiClient.get('/api/stripe/rep/config'),
 };
 
 // Export the API client for direct use
