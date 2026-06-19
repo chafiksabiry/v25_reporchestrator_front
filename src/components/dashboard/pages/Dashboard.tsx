@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
 import { repApiUrl } from '../../../utils/repApiUrl';
+import { CallRecords } from '../CallRecords';
 
 interface DashboardProps {
   profile?: any;
@@ -68,6 +70,23 @@ function mergeGigOptions(...lists: any[][]): GigFilterOption[] {
   return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }
 
+function resolveCallRefId(call: any): string | null {
+  if (!call) return null;
+  const id = call._id;
+  if (typeof id === 'object' && id?.$oid) return String(id.$oid);
+  return call.sid || (id ? String(id) : null);
+}
+
+function resolveTransactionCallId(tx: RepTransactionRow): string | null {
+  return tx.callId || tx.call?._id || tx.call?.sid || null;
+}
+
+const clickableRowClass =
+  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-emerald-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.99]';
+
+const clickableCallRowClass =
+  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-[0.99]';
+
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
@@ -115,6 +134,7 @@ const getPeriodStart = (period: PeriodKey): number => {
 };
 
 export function Dashboard({ profile }: DashboardProps) {
+  const navigate = useNavigate();
   const [callsData, setCallsData] = useState<any[]>([]);
   const [gigsData, setGigsData] = useState<any[]>([]);
   const [reservationsData, setReservationsData] = useState<Reservation[]>([]);
@@ -139,6 +159,8 @@ export function Dashboard({ profile }: DashboardProps) {
     lifetimeEarnings: number;
   }>({ availableBalance: 0, pendingCommissions: 0, lifetimeEarnings: 0 });
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
+  const [overlayCallId, setOverlayCallId] = useState<string | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<RepTransactionRow | null>(null);
 
   useEffect(() => {
     const agentId = profile?._id || localStorage.getItem('agentId') || localStorage.getItem('userId');
@@ -620,6 +642,20 @@ export function Dashboard({ profile }: DashboardProps) {
     else openPeriodDropdown();
   };
 
+  const openCallDetails = (call: any) => {
+    const callId = resolveCallRefId(call);
+    if (callId) setOverlayCallId(callId);
+  };
+
+  const openTransactionDetails = (tx: RepTransactionRow) => {
+    const callId = resolveTransactionCallId(tx);
+    if (callId) {
+      setOverlayCallId(callId);
+      return;
+    }
+    setSelectedTransaction(tx);
+  };
+
   useLayoutEffect(() => {
     if (!isGigDropdownOpen || !gigTriggerRef.current) return;
 
@@ -980,26 +1016,34 @@ export function Dashboard({ profile }: DashboardProps) {
                     : 'Bonus';
                   const gigTitle = tx.gig?.title || (gigsData.find((g: any) => (g._id || g.id) === tx.gigId)?.title) || 'Gig';
                   return (
-                    <li key={tx._id} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-emerald-200/60 hover:bg-white transition-all duration-200">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                          <DollarSign size={16} />
+                    <li key={tx._id}>
+                      <button
+                        type="button"
+                        onClick={() => openTransactionDetails(tx)}
+                        className={clickableRowClass}
+                        aria-label={`Voir la transaction ${typeLabel}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <DollarSign size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-slate-900 truncate">{typeLabel} · {gigTitle}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate">{typeLabel} · {gigTitle}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${statusMeta.cls}`}>
+                            {statusMeta.label}
+                          </span>
+                          <span className="text-sm font-black text-slate-900 tracking-tighter">
+                            +{(tx.repShare || 0).toFixed(2)} €
+                          </span>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${statusMeta.cls}`}>
-                          {statusMeta.label}
-                        </span>
-                        <span className="text-sm font-black text-slate-900 tracking-tighter">
-                          +{(tx.repShare || 0).toFixed(2)} €
-                        </span>
-                      </div>
+                      </button>
                     </li>
                   );
                 })}
@@ -1088,34 +1132,44 @@ export function Dashboard({ profile }: DashboardProps) {
                   const cGigId = typeof call.gigId === 'object' ? (call.gigId?._id || call.gigId?.id) : call.gigId;
                   const gigTitle = (typeof call.gigId === 'object' && call.gigId?.title) || (gigsData.find((g: any) => (g._id || g.id) === cGigId)?.title) || '';
                   return (
-                    <li key={call._id || call.sid || `${contact}-${dateStr}`} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/60 hover:bg-white transition-all duration-200">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          isValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                        }`}>
-                          {isValid ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                    <li key={call._id || call.sid || `${contact}-${dateStr}`}>
+                      <button
+                        type="button"
+                        onClick={() => openCallDetails(call)}
+                        className={clickableCallRowClass}
+                        aria-label={`Voir l'appel ${contact}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                            isValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                          }`}>
+                            {isValid ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
+                              <span>{contact}</span>
+                              {hasLeadName && phoneNum && (
+                                <span className="text-[11px] font-normal text-slate-400">({phoneNum})</span>
+                              )}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                              {dateStr ? new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
+                              {billedMin > 0 && ` · ${billedMin} min`}
+                              {gigTitle && ` · ${gigTitle}`}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
-                            <span>{contact}</span>
-                            {hasLeadName && phoneNum && (
-                              <span className="text-[11px] font-normal text-slate-400">({phoneNum})</span>
-                            )}
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                            {dateStr ? new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
-                            {billedMin > 0 && ` · ${billedMin} min`}
-                            {gigTitle && ` · ${gigTitle}`}
-                          </p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
+                            isValid
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-rose-50 text-rose-700 border-rose-100'
+                          }`}>
+                            {isValid ? 'Validé' : 'Non validé'}
+                          </span>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
                         </div>
-                      </div>
-                      <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border shrink-0 ${
-                        isValid
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                          : 'bg-rose-50 text-rose-700 border-rose-100'
-                      }`}>
-                        {isValid ? 'Validé' : 'Non validé'}
-                      </span>
+                      </button>
                     </li>
                   );
                 })}
@@ -1216,21 +1270,33 @@ export function Dashboard({ profile }: DashboardProps) {
                 const d = new Date(dateStr);
                 const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || 'Gig') : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || 'Gig');
                 return (
-                  <li key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/60 border border-white/60">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
-                        <CalendarClock size={16} />
+                  <li key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
+                        if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`);
+                      }}
+                      className="group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/60 border border-white/60 hover:border-violet-200 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/20 active:scale-[0.99]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <CalendarClock size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-slate-900 truncate">{gigTitle}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-900 truncate">{gigTitle}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          {d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
-                        </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          {r.duration}h
+                        </span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
                       </div>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                      {r.duration}h
-                    </span>
+                    </button>
                   </li>
                 );
               })}
@@ -1405,6 +1471,80 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         )}
       </div>
+
+      {overlayCallId && (
+        <CallRecords
+          overlayOpenCallId={overlayCallId}
+          onOverlayClose={() => setOverlayCallId(null)}
+        />
+      )}
+
+      {selectedTransaction && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[9998] bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setSelectedTransaction(null)}
+            aria-hidden
+          />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-md bg-white rounded-[28px] border border-slate-200 shadow-2xl overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Détail transaction</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                    {selectedTransaction.type === 'bonus' ? 'Bonus' : selectedTransaction.type === 'transaction' ? 'Vente' : 'Commission'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTransaction(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  aria-label="Fermer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Montant rep</span>
+                  <span className="text-xl font-black text-emerald-600">+{(selectedTransaction.repShare || 0).toFixed(2)} €</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Statut</span>
+                  <span className="text-xs font-bold text-slate-700 capitalize">{selectedTransaction.status}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Gig</span>
+                  <span className="text-xs font-semibold text-slate-700 text-right">
+                    {selectedTransaction.gig?.title || gigsData.find((g) => g._id === selectedTransaction.gigId)?.title || '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Date</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {new Date(selectedTransaction.createdAt).toLocaleString('fr-FR')}
+                  </span>
+                </div>
+                {selectedTransaction.description && (
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    {selectedTransaction.description}
+                  </p>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTransaction(null)}
+                  className="w-full py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
 
     </div>
   );
