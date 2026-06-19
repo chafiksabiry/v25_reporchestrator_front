@@ -7,6 +7,8 @@ export type GigScriptReaderModalProps = {
   gigId: string;
   title?: string;
   onClose: () => void;
+  /** Appelé sur « Terminer » (dernière étape) — valide la lecture du script. */
+  onFinish?: () => void;
 };
 
 const THEME_STORAGE_KEY = 'harx_script_reader_theme';
@@ -21,7 +23,7 @@ function readStoredTheme(): ScriptReaderTheme {
 }
 
 /** Lecteur script plein écran — 2 colonnes, sans scroll page, thème clair/sombre. */
-export function GigScriptReaderModal({ gigId, title, onClose }: GigScriptReaderModalProps) {
+export function GigScriptReaderModal({ gigId, title, onClose, onFinish }: GigScriptReaderModalProps) {
   const [theme, setTheme] = useState<ScriptReaderTheme>(() => readStoredTheme());
 
   useEffect(() => {
@@ -112,7 +114,7 @@ export function GigScriptReaderModal({ gigId, title, onClose }: GigScriptReaderM
           gigTitle={title}
           theme={theme}
           className="h-full"
-          onFinish={onClose}
+          onFinish={onFinish ?? onClose}
         />
       </main>
 
