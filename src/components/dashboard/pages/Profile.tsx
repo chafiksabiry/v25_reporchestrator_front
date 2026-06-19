@@ -342,10 +342,18 @@ export function Profile() {
     const currentLanguages = profile.personalInfo?.languages || [];
     if (index < 0 || index >= currentLanguages.length) return;
 
+    const deleted = currentLanguages[index];
+    const deletedId =
+      typeof deleted?.language === 'object' && deleted.language?._id
+        ? String(deleted.language._id)
+        : typeof deleted?.language === 'string' && /^[a-f0-9]{24}$/i.test(deleted.language)
+          ? deleted.language
+          : null;
+
     const normalizeLanguageEntry = (lang: any) => ({
       language: typeof lang.language === 'object' ? lang.language?._id : lang.language,
       proficiency: lang.proficiency,
-      assessmentResults: lang.assessmentResults
+      assessmentResults: lang.assessmentResults,
     });
 
     const updatedLanguages = currentLanguages
@@ -353,12 +361,54 @@ export function Profile() {
       .map(normalizeLanguageEntry)
       .filter((entry: any) => !!entry.language);
 
+    const excludedLanguageIds = [
+      ...(Array.isArray((profile.personalInfo as any)?.excludedLanguageIds)
+        ? (profile.personalInfo as any).excludedLanguageIds
+        : []),
+    ].map(String);
+    if (deletedId && !excludedLanguageIds.includes(deletedId)) {
+      excludedLanguageIds.push(deletedId);
+    }
+
     try {
-      await updateBasicInfo(profile._id, { languages: updatedLanguages });
+      await updateBasicInfo(profile._id, {
+        languages: updatedLanguages,
+        excludedLanguageIds,
+      } as any);
       const refreshed = await getProfileData();
       updateProfileStateAndStorage(refreshed);
     } catch (error) {
       console.error('Error deleting language:', error);
+    }
+  };
+
+  const handleUpdateLanguageProficiency = async (index: number, proficiency: string) => {
+    if (!profile?._id) return;
+    const currentLanguages = Array.isArray(profile.personalInfo?.languages)
+      ? [...profile.personalInfo.languages]
+      : [];
+    if (index < 0 || index >= currentLanguages.length) return;
+
+    const nextProficiency = String(proficiency || 'B1').trim().toUpperCase();
+    currentLanguages[index] = {
+      ...currentLanguages[index],
+      proficiency: nextProficiency,
+    };
+
+    const normalizeLanguageEntry = (lang: any) => ({
+      language: typeof lang.language === 'object' ? lang.language?._id : lang.language,
+      proficiency: lang.proficiency,
+      assessmentResults: lang.assessmentResults,
+    });
+
+    try {
+      await updateBasicInfo(profile._id, {
+        languages: currentLanguages.map(normalizeLanguageEntry).filter((entry: any) => !!entry.language),
+      });
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
+    } catch (error) {
+      console.error('Error updating language proficiency:', error);
     }
   };
 
@@ -654,6 +704,7 @@ export function Profile() {
             onAddSkill={handleAddSkill}
             onDeleteLanguage={handleDeleteLanguage}
             onAddLanguage={handleAddLanguage}
+            onUpdateLanguageProficiency={handleUpdateLanguageProficiency}
             onDeleteExperience={handleDeleteExperience}
             onAddExperience={handleAddExperience}
             onUpdateExperience={handleUpdateExperience}

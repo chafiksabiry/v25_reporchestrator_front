@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
 import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
-import { repApiUrl, dashRepApiUrl } from '../../utils/repApiUrl';
+import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
 import { fetchAllLanguages, Language as LanguageOption } from '../../services/api/languages';
@@ -73,7 +73,8 @@ export const ProfileView: React.FC<{
   onDeleteSkill?: (type: 'technical' | 'professional' | 'soft', index: number) => void,
   onAddSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
   onDeleteLanguage?: (index: number) => void,
-  onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string }) => void,
+  onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string; code?: string }) => void | Promise<void>,
+  onUpdateLanguageProficiency?: (index: number, proficiency: string) => void | Promise<void>,
   onDeleteExperience?: (index: number) => void,
   onAddExperience?: (item: {
     title: string;
@@ -93,7 +94,7 @@ export const ProfileView: React.FC<{
   onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
-}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
   const { t, i18n } = useTranslation();
   const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
@@ -407,7 +408,8 @@ export const ProfileView: React.FC<{
     // 2. Video-verified language scores already merged into the profile.
     (profile.personalInfo?.languages || []).forEach((lang: any) => {
       const ar = lang?.assessmentResults;
-      if (!ar || ar.source !== 'language') return;
+      if (!ar || ar.source === 'cv') return;
+      if (ar.source !== 'video' && ar.source !== 'language' && ar.source !== 'experience') return;
       if (typeof ar.overall?.score === 'number') {
         scores.push(Math.round(ar.overall.score));
         return;
@@ -523,51 +525,6 @@ export const ProfileView: React.FC<{
       if (onProfileUpdate && updated) onProfileUpdate(updated);
     } catch (e) {
       console.error('Error refreshing profile after language video:', e);
-    }
-  };
-
-  const handleDeleteLanguageVideo = async (index: number) => {
-    if (!profile?._id) return;
-    const lang = profile.personalInfo?.languages?.[index];
-    if (!lang) return;
-
-    const languageName =
-      typeof lang.language === 'object' && lang.language ? lang.language.name : String(lang.language || '');
-    const languageCode =
-      (typeof lang.language === 'object' && lang.language ? lang.language.code : '') ||
-      lang.iso639_1 ||
-      '';
-    const languageId =
-      (typeof lang.language === 'object' && lang.language ? lang.language._id : '') ||
-      (typeof lang.language === 'string' && /^[a-f0-9]{24}$/i.test(lang.language) ? lang.language : '') ||
-      '';
-
-    const confirmed = window.confirm(
-      isFr
-        ? `Supprimer la vidéo de vérification pour ${languageName} ? La langue restera dans votre profil.`
-        : `Delete the verification video for ${languageName}? The language will remain on your profile.`
-    );
-    if (!confirmed) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(dashRepApiUrl(`/profiles/${profile._id}/language/delete-video`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ languageName, languageCode, languageId }),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Delete failed');
-      }
-      const updated = await fetchProfileFromAPI();
-      if (onProfileUpdate && updated) onProfileUpdate(updated);
-    } catch (e) {
-      console.error('Error deleting language video:', e);
-      window.alert(isFr ? 'Impossible de supprimer la vidéo.' : 'Could not delete the video.');
     }
   };
 
@@ -921,8 +878,16 @@ export const ProfileView: React.FC<{
           availableLanguages={availableLanguages}
           getProficiencyStars={getProficiencyStars}
           onRecordLanguageVideo={takeLanguageAssessment}
-          onDeleteLanguageVideo={handleDeleteLanguageVideo}
-          onAddItemClick={(item) => onAddLanguage?.(item)}
+          onAddItemClick={async (item) => {
+            await onAddLanguage?.(item);
+            takeLanguageAssessment(
+              item.language,
+              undefined,
+              item.proficiency,
+              item.languageId
+            );
+          }}
+          onUpdateProficiency={(index, proficiency) => onUpdateLanguageProficiency?.(index, proficiency)}
           onDeleteItemClick={(index) => onDeleteLanguage?.(index)}
         />
       );
@@ -1061,11 +1026,12 @@ export const ProfileView: React.FC<{
             activeTab={activeTab}
             onTabChange={setActiveTab}
             warningTabs={[
-              ...((profile?.personalInfo?.languages || []).some(
-                (l: any) =>
-                  !l?.languageVideoUrl &&
-                  (!l?.assessmentResults || l.assessmentResults.source !== 'language')
-              )
+              ...((profile?.personalInfo?.languages || []).some((l: any) => {
+                const ar = l?.assessmentResults;
+                if (!ar || ar.source === 'cv') return true;
+                const verified = String(ar.verifiedProficiency || l.proficiency || '').toUpperCase();
+                return String(l.proficiency || '').toUpperCase() !== verified;
+              })
                 ? ['languages']
                 : []),
               ...(((profile?.professionalSummary?.industries?.length || 0) === 0 ||
