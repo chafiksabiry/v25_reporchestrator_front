@@ -124,6 +124,9 @@ export function Dashboard({ profile }: DashboardProps) {
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   const gigTriggerRef = useRef<HTMLButtonElement>(null);
   const [gigDropdownPos, setGigDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+  const periodTriggerRef = useRef<HTMLButtonElement>(null);
+  const [periodDropdownPos, setPeriodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   type CallFilter = 'all' | 'valid' | 'invalid';
@@ -560,6 +563,11 @@ export function Dashboard({ profile }: DashboardProps) {
     return gigsData.find((g) => g._id === selectedGigId)?.title || 'Gig';
   }, [selectedGigId, gigsData]);
 
+  const selectedPeriodLabel = useMemo(
+    () => PERIOD_OPTIONS.find((p) => p.key === selectedPeriod)?.label || 'Ce mois',
+    [selectedPeriod]
+  );
+
   const readGigDropdownPos = () => {
     const rect = gigTriggerRef.current!.getBoundingClientRect();
     return {
@@ -569,10 +577,13 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   };
 
-  const openGigDropdown = () => {
-    if (!gigTriggerRef.current) return;
-    setGigDropdownPos(readGigDropdownPos());
-    setIsGigDropdownOpen(true);
+  const readPeriodDropdownPos = () => {
+    const rect = periodTriggerRef.current!.getBoundingClientRect();
+    return {
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.max(rect.width, 200),
+    };
   };
 
   const closeGigDropdown = () => {
@@ -580,9 +591,33 @@ export function Dashboard({ profile }: DashboardProps) {
     setGigDropdownPos(null);
   };
 
+  const closePeriodDropdown = () => {
+    setIsPeriodDropdownOpen(false);
+    setPeriodDropdownPos(null);
+  };
+
+  const openGigDropdown = () => {
+    if (!gigTriggerRef.current) return;
+    closePeriodDropdown();
+    setGigDropdownPos(readGigDropdownPos());
+    setIsGigDropdownOpen(true);
+  };
+
+  const openPeriodDropdown = () => {
+    if (!periodTriggerRef.current) return;
+    closeGigDropdown();
+    setPeriodDropdownPos(readPeriodDropdownPos());
+    setIsPeriodDropdownOpen(true);
+  };
+
   const toggleGigDropdown = () => {
     if (isGigDropdownOpen) closeGigDropdown();
     else openGigDropdown();
+  };
+
+  const togglePeriodDropdown = () => {
+    if (isPeriodDropdownOpen) closePeriodDropdown();
+    else openPeriodDropdown();
   };
 
   useLayoutEffect(() => {
@@ -600,6 +635,22 @@ export function Dashboard({ profile }: DashboardProps) {
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [isGigDropdownOpen]);
+
+  useLayoutEffect(() => {
+    if (!isPeriodDropdownOpen || !periodTriggerRef.current) return;
+
+    const updatePosition = () => {
+      if (!periodTriggerRef.current) return;
+      setPeriodDropdownPos(readPeriodDropdownPos());
+    };
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isPeriodDropdownOpen]);
 
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">
@@ -710,21 +761,67 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="relative flex items-center gap-2.5">
               <CalendarDays size={16} className="text-blue-600" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Période :</span>
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value as PeriodKey)}
-                className="appearance-none bg-white/80 border border-slate-100 hover:border-blue-200 px-4 py-2.5 pr-10 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 min-w-[180px]"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1rem',
-                  backgroundRepeat: 'no-repeat'
-                }}
-              >
-                {PERIOD_OPTIONS.map((opt) => (
-                  <option key={opt.key} value={opt.key}>{opt.label}</option>
-                ))}
-              </select>
+              <div className="relative min-w-[180px] max-w-[240px]">
+                <button
+                  ref={periodTriggerRef}
+                  type="button"
+                  onClick={togglePeriodDropdown}
+                  className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-blue-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-300"
+                >
+                  <span className="truncate text-left">{selectedPeriodLabel}</span>
+                  <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isPeriodDropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
+                </button>
+
+                {isPeriodDropdownOpen && periodDropdownPos && createPortal(
+                  <>
+                    <div
+                      className="fixed inset-0 z-[9998]"
+                      onClick={closePeriodDropdown}
+                      aria-hidden
+                    />
+                    <div
+                      className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
+                      style={{
+                        top: periodDropdownPos.top,
+                        left: periodDropdownPos.left,
+                        minWidth: periodDropdownPos.width,
+                        maxWidth: 'min(320px, calc(100vw - 2rem))',
+                      }}
+                      role="listbox"
+                      aria-label="Filtrer par période"
+                    >
+                      {PERIOD_OPTIONS.map((opt) => {
+                        const isSelected = selectedPeriod === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPeriod(opt.key);
+                              closePeriodDropdown();
+                            }}
+                            className="block w-full text-left px-1 py-0.5"
+                            role="option"
+                            aria-selected={isSelected}
+                          >
+                            <span
+                              className={`inline-flex items-center gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
+                                isSelected
+                                  ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-200/80 shadow-sm'
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                              {opt.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>,
+                  document.body
+                )}
+              </div>
             </div>
           </div>
         </div>
