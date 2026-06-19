@@ -1,21 +1,53 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { Bot, User, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useGigScript } from '../../copilot/hooks/useGigScript';
 
 type ReplicaPair = { agent?: { replica?: string }; lead?: { replica?: string } };
 
+export type ScriptReaderTheme = 'dark' | 'light';
+
 export type ScriptCockpitPanelProps = {
   gigId: string;
   gigTitle?: string;
+  theme?: ScriptReaderTheme;
   className?: string;
 };
 
-export function ScriptCockpitPanel({ gigId, gigTitle, className = '' }: ScriptCockpitPanelProps) {
+function themeClasses(theme: ScriptReaderTheme) {
+  const dark = theme === 'dark';
+  return {
+    muted: dark ? 'text-slate-400' : 'text-slate-500',
+    border: dark ? 'border-white/10' : 'border-slate-200',
+    panel: dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm',
+    agentAccent: dark ? 'text-indigo-400' : 'text-indigo-600',
+    agentBg: dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-600',
+    leadAccent: dark ? 'text-emerald-400' : 'text-emerald-600',
+    leadBg: dark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-50 text-emerald-600',
+    body: dark ? 'text-slate-200' : 'text-slate-800',
+    nav: dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200',
+    btnGhost: dark
+      ? 'border-white/10 text-slate-300 hover:bg-white/10 disabled:opacity-30'
+      : 'border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30',
+    btnPrimary: 'bg-gradient-to-r from-indigo-500 to-pink-500 text-white disabled:opacity-30',
+    optionActive: dark ? 'bg-indigo-500/25 border-indigo-400' : 'bg-indigo-50 border-indigo-400',
+    optionIdle: dark ? 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06]' : 'bg-slate-50 border-slate-200 hover:bg-slate-100',
+    phaseActive: dark ? 'bg-indigo-500/30 border-indigo-400/50 text-white' : 'bg-indigo-100 border-indigo-300 text-indigo-900',
+    phaseIdle: dark ? 'bg-white/5 border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500',
+    response: dark ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-100' : 'bg-emerald-50 border-emerald-200 text-emerald-900',
+  };
+}
+
+export function ScriptCockpitPanel({
+  gigId,
+  gigTitle,
+  theme = 'dark',
+  className = '',
+}: ScriptCockpitPanelProps) {
+  const t = themeClasses(theme);
   const { activeScript, loading: scriptLoading } = useGigScript(gigId);
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
   const [activeReplicaIndex, setActiveReplicaIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const interactiveStages = activeScript?.playbook?.stages || [];
@@ -67,6 +99,9 @@ export function ScriptCockpitPanel({ gigId, gigTitle, className = '' }: ScriptCo
     return pairs;
   }, [rawReplicas]);
 
+  const stepCount = hasInteractiveStages ? interactiveStages.length : replicas.length;
+  const stepIndex = hasInteractiveStages ? activePhaseIndex : activeReplicaIndex;
+
   useEffect(() => {
     setActivePhaseIndex(0);
     setActiveReplicaIndex(0);
@@ -83,241 +118,204 @@ export function ScriptCockpitPanel({ gigId, gigTitle, className = '' }: ScriptCo
     window.setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const goPrev = () => {
+    if (hasInteractiveStages) setActivePhaseIndex((p) => Math.max(0, p - 1));
+    else setActiveReplicaIndex((p) => Math.max(0, p - 1));
+  };
+
+  const goNext = () => {
+    if (hasInteractiveStages) setActivePhaseIndex((p) => Math.min(interactiveStages.length - 1, p + 1));
+    else setActiveReplicaIndex((p) => Math.min(replicas.length - 1, p + 1));
+  };
+
   if (scriptLoading) {
     return (
-      <div className={`flex flex-col items-center justify-center py-20 text-slate-400 ${className}`}>
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-400 mb-3" />
-        <p className="text-xs font-bold uppercase tracking-widest">Chargement du script…</p>
+      <div className={`flex h-full items-center justify-center ${t.muted} ${className}`}>
+        <Loader2 className={`h-7 w-7 animate-spin ${t.agentAccent}`} />
+        <p className="text-xs font-bold uppercase tracking-widest ml-3">Chargement…</p>
       </div>
     );
   }
 
   if (!activeScript) {
     return (
-      <div className={`rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-400 ${className}`}>
+      <div className={`flex h-full items-center justify-center rounded-2xl border p-8 ${t.panel} ${t.muted} ${className}`}>
         <p className="text-sm font-semibold">Aucun script actif pour ce projet.</p>
       </div>
     );
   }
 
+  const currentStage = hasInteractiveStages ? interactiveStages[activePhaseIndex] : null;
+  const currentPair = !hasInteractiveStages ? replicas[activeReplicaIndex] : null;
+
+  const agentTitle =
+    currentStage?.introTitle ||
+    (activePhase && !hasInteractiveStages ? activePhase : 'Conseiller (vous)');
+  const agentText = currentStage?.introReplica || currentPair?.agent?.replica || '';
+  const options = currentStage?.options || [];
+
   return (
-    <div className={`flex flex-col gap-4 ${className}`}>
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping shrink-0" />
-          <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse shrink-0" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
-            Script d&apos;appel
-          </span>
-          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider truncate">
-            • {gigTitle || activeScript.targetClient || 'Guide de conversation'}
-          </span>
+    <div className={`flex flex-col h-full min-h-0 gap-2 sm:gap-3 ${className}`}>
+      {/* Phase pills — compact, no wrap scroll */}
+      {(hasInteractiveStages && interactiveStages.length > 1) || (!hasInteractiveStages && phases.length > 1) ? (
+        <div className="shrink-0 flex gap-1.5 overflow-x-auto scrollbar-none">
+          {(hasInteractiveStages ? interactiveStages : phases).map((item: unknown, idx: number) => {
+            const label = hasInteractiveStages
+              ? String((item as { introTitle?: string }).introTitle || `Étape ${idx + 1}`)
+              : String(item);
+            return (
+              <button
+                key={`phase-${idx}`}
+                type="button"
+                onClick={() => (hasInteractiveStages ? setActivePhaseIndex(idx) : setActivePhaseIndex(idx))}
+                className={`shrink-0 px-2.5 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wider border transition-all ${
+                  idx === activePhaseIndex ? t.phaseActive : t.phaseIdle
+                }`}
+              >
+                {label.length > 28 ? `${label.slice(0, 28)}…` : label}
+              </button>
+            );
+          })}
         </div>
+      ) : null}
+
+      {/* Two columns — fills remaining height, no page scroll */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+        {/* LEFT — Agent */}
+        <section
+          className={`relative flex flex-col min-h-0 rounded-2xl border p-4 pl-5 overflow-hidden ${t.panel}`}
+        >
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500" />
+          <div className="shrink-0 flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`p-2 rounded-lg shrink-0 ${t.agentBg}`}>
+                <Bot className="w-4 h-4" />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest truncate ${t.agentAccent}`}>
+                {agentTitle}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopy(agentText, 'agent_replica')}
+              className={`shrink-0 px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase ${t.btnGhost}`}
+            >
+              {copiedField === 'agent_replica' ? 'Copié' : 'Copier'}
+            </button>
+          </div>
+          <div className={`flex-1 min-h-0 overflow-hidden ${t.body}`}>
+            <p className="text-xs sm:text-sm leading-snug h-full overflow-hidden">
+              {agentText}
+            </p>
+          </div>
+        </section>
+
+        {/* RIGHT — Prospect / options */}
+        <section className={`relative flex flex-col min-h-0 rounded-2xl border p-4 overflow-hidden ${t.panel}`}>
+          {hasInteractiveStages && options.length > 0 ? (
+            <>
+              <div className="shrink-0 flex items-center gap-2 mb-2">
+                <div className={`p-2 rounded-lg shrink-0 ${t.leadBg}`}>
+                  <User className="w-4 h-4" />
+                </div>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${t.leadAccent}`}>
+                  {currentStage?.optionsTitle || 'Réaction du prospect'}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
+                {options.map((opt: { id: string; label?: string; subtext?: string; recommendedResponse?: string }) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedOptionId(opt.id)}
+                    className={`shrink-0 text-left p-2.5 rounded-xl border transition-all ${
+                      selectedOptionId === opt.id ? t.optionActive : t.optionIdle
+                    }`}
+                  >
+                    <span className={`block text-[10px] font-black leading-tight ${t.body}`}>{opt.label}</span>
+                    {opt.subtext ? (
+                      <span className={`block text-[9px] mt-0.5 leading-snug ${t.muted}`}>{opt.subtext}</span>
+                    ) : null}
+                  </button>
+                ))}
+                {selectedOptionId ? (
+                  <div className={`mt-1 p-2.5 rounded-xl border shrink-0 ${t.response}`}>
+                    <p className="text-[9px] font-black uppercase tracking-wider mb-1 opacity-80">
+                      Réponse recommandée
+                    </p>
+                    <p className="text-[10px] sm:text-xs leading-relaxed italic">
+                      {options.find((o: { id: string }) => o.id === selectedOptionId)?.recommendedResponse}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : currentPair?.lead ? (
+            <>
+              <div className="absolute md:relative left-0 top-0 bottom-0 w-1 md:hidden bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-2xl" />
+              <div className="shrink-0 flex items-center justify-between gap-2 mb-2 pl-2 md:pl-0">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${t.leadBg}`}>
+                    <User className="w-4 h-4" />
+                  </div>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${t.leadAccent}`}>
+                    Prospect (réponse attendue)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(currentPair.lead!.replica || '', 'lead_replica')}
+                  className={`px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase ${t.btnGhost}`}
+                >
+                  {copiedField === 'lead_replica' ? 'Copié' : 'Copier'}
+                </button>
+              </div>
+              <div className={`flex-1 min-h-0 overflow-hidden ${t.body}`}>
+                <p className="text-xs sm:text-sm leading-snug h-full overflow-hidden">
+                  {currentPair.lead.replica}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className={`flex-1 flex items-center justify-center text-center px-4 ${t.muted}`}>
+              <p className="text-xs font-semibold">
+                {hasInteractiveStages
+                  ? 'Sélectionnez une réaction prospect à gauche.'
+                  : 'Pas de réplique prospect pour cette étape.'}
+              </p>
+            </div>
+          )}
+        </section>
       </div>
 
-      {activeScript.details?.trim() ? (
-        <p className="text-sm text-slate-300 leading-relaxed text-left whitespace-pre-wrap border border-white/5 rounded-xl p-4 bg-white/[0.02]">
-          {activeScript.details.trim()}
-        </p>
+      {/* Navigation — fixed height */}
+      {stepCount > 0 ? (
+        <nav
+          className={`shrink-0 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 ${t.nav}`}
+        >
+          <button
+            type="button"
+            disabled={stepIndex === 0}
+            onClick={goPrev}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase ${t.btnGhost}`}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Précédent
+          </button>
+          <span className={`text-[9px] font-extrabold uppercase tracking-wider text-center ${t.muted}`}>
+            Étape {stepIndex + 1} / {stepCount}
+          </span>
+          <button
+            type="button"
+            disabled={stepIndex >= stepCount - 1}
+            onClick={goNext}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase ${t.btnPrimary}`}
+          >
+            Suivant
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </nav>
       ) : null}
-
-      {!hasInteractiveStages && phases.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
-          {phases.map((phase, idx) => (
-            <button
-              key={phase}
-              type="button"
-              onClick={() => setActivePhaseIndex(idx)}
-              className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                idx === activePhaseIndex
-                  ? 'bg-indigo-500/30 border-indigo-400/50 text-white'
-                  : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-              }`}
-            >
-              {phase}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {hasInteractiveStages ? (
-        (() => {
-          const currentStage = interactiveStages[activePhaseIndex];
-          if (!currentStage) return null;
-          return (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-5">
-                <div className="relative overflow-hidden rounded-[1.25rem] border p-5 pl-7 bg-white/[0.02] border-white/5">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
-                  <div className="flex gap-4 items-start">
-                    <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300">
-                      <Bot className="w-5 h-5" />
-                    </div>
-                    <div className="space-y-1.5 flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
-                          {currentStage.introTitle || 'CONSEILLER (VOUS)'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(currentStage.introReplica || '', 'agent_replica')}
-                          className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-[8px] font-black uppercase text-slate-400"
-                        >
-                          {copiedField === 'agent_replica' ? 'Copié' : 'Copier'}
-                        </button>
-                      </div>
-                      <p className="text-sm leading-relaxed text-slate-200">{currentStage.introReplica}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {currentStage.options?.length > 0 ? (
-                  <div className="space-y-2 text-left">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                      {currentStage.optionsTitle || 'Gérer la réaction du prospect'}
-                    </span>
-                    <div className="grid gap-1.5">
-                      {currentStage.options.map((opt: { id: string; label?: string; subtext?: string; recommendedResponse?: string }) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setSelectedOptionId(opt.id)}
-                          className={`p-3 rounded-2xl border text-left ${
-                            selectedOptionId === opt.id
-                              ? 'bg-indigo-500/20 border-indigo-400'
-                              : 'bg-white/[0.03] border-white/5'
-                          }`}
-                        >
-                          <span className="text-[10px] font-black text-slate-100">{opt.label}</span>
-                          {opt.subtext ? (
-                            <span className="block text-[9px] text-slate-400 mt-0.5">{opt.subtext}</span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                    {selectedOptionId ? (
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-left">
-                        <p className="text-[10px] text-emerald-100 italic">
-                          {currentStage.options.find((o: { id: string }) => o.id === selectedOptionId)?.recommendedResponse}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={activePhaseIndex === 0}
-                  onClick={() => setActivePhaseIndex((p) => Math.max(0, p - 1))}
-                  className="px-4 py-2 rounded-xl text-[9px] font-black uppercase text-slate-300 disabled:opacity-30 border border-white/10"
-                >
-                  ← Précédent
-                </button>
-                <span className="text-[9px] text-slate-400 font-extrabold uppercase">
-                  Étape {activePhaseIndex + 1} / {interactiveStages.length}
-                </span>
-                <button
-                  type="button"
-                  disabled={activePhaseIndex >= interactiveStages.length - 1}
-                  onClick={() => setActivePhaseIndex((p) => Math.min(interactiveStages.length - 1, p + 1))}
-                  className="px-4 py-2 rounded-xl text-[9px] font-black uppercase text-white bg-gradient-to-r from-indigo-500 to-pink-500 disabled:opacity-30"
-                >
-                  Suivant →
-                </button>
-              </div>
-            </div>
-          );
-        })()
-      ) : replicas.length > 0 ? (
-        (() => {
-          const currentPair = replicas[activeReplicaIndex];
-          if (!currentPair) return null;
-          return (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-5">
-                {currentPair.agent ? (
-                  <div className="relative overflow-hidden rounded-[1.25rem] border p-5 pl-7 bg-white/[0.02] border-white/5">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500" />
-                    <div className="flex gap-4 items-start">
-                      <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300">
-                        <Bot className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
-                            Conseiller (vous)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(currentPair.agent!.replica || '', 'agent_replica')}
-                            className="text-[8px] font-black uppercase text-slate-400"
-                          >
-                            {copiedField === 'agent_replica' ? 'Copié' : 'Copier'}
-                          </button>
-                        </div>
-                        <p className="text-sm leading-relaxed text-slate-200">{currentPair.agent.replica}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {currentPair.lead ? (
-                  <div className="relative overflow-hidden rounded-[1.25rem] border p-5 pl-7 bg-white/[0.02] border-white/5">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600" />
-                    <div className="flex gap-4 items-start">
-                      <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300">
-                        <User className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
-                            Prospect (réponse attendue)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(currentPair.lead!.replica || '', 'lead_replica')}
-                            className="text-[8px] font-black uppercase text-slate-400"
-                          >
-                            {copiedField === 'lead_replica' ? 'Copié' : 'Copier'}
-                          </button>
-                        </div>
-                        <p className="text-sm leading-relaxed text-slate-200">{currentPair.lead.replica}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={activeReplicaIndex === 0}
-                  onClick={() => setActiveReplicaIndex((p) => Math.max(0, p - 1))}
-                  className="px-4 py-2 rounded-xl text-[9px] font-black uppercase text-slate-300 disabled:opacity-30 border border-white/10"
-                >
-                  ← Précédent
-                </button>
-                <span className="text-[9px] text-slate-400 font-extrabold uppercase">
-                  Conversation {activeReplicaIndex + 1} / {replicas.length}
-                  {activePhase ? ` • ${activePhase}` : ''}
-                </span>
-                <button
-                  type="button"
-                  disabled={activeReplicaIndex >= replicas.length - 1}
-                  onClick={() => setActiveReplicaIndex((p) => Math.min(replicas.length - 1, p + 1))}
-                  className="px-4 py-2 rounded-xl text-[9px] font-black uppercase text-white bg-gradient-to-r from-indigo-500 to-pink-500 disabled:opacity-30"
-                >
-                  Suivant →
-                </button>
-              </div>
-            </div>
-          );
-        })()
-      ) : (
-        <p className="text-sm text-slate-400 text-center py-8">Script sans répliques configurées.</p>
-      )}
     </div>
   );
 }
