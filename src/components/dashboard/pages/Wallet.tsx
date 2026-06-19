@@ -44,7 +44,7 @@ import {
 import {
   resolveClientValidationPendingAmount,
 } from '../../../utils/commissionUtils';
-import { computeValidatedLedgerBreakdown } from '../../../utils/repLedgerBreakdown';
+import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
 
 // Minimum withdrawal amount enforced by the backend
 // (see `requestAgentWithdrawal` in escrowController.js).
@@ -458,7 +458,7 @@ export function WalletPage() {
   // RepTransaction ledger is the sole source of truth (70% repShare).
   // Withdrawals come from the agent withdrawal collection.
   useEffect(() => {
-    const ledgerTxs = mapRepLedgerToDisplay(repLedgerRows);
+    const ledgerTxs = mapRepLedgerToDisplay(dedupeSaleLedgerRows(repLedgerRows));
     setTransactions(
       [...backendWithdrawals, ...ledgerTxs].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -617,26 +617,22 @@ export function WalletPage() {
     const activeLedger = (row: RepTransactionRow) =>
       row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
 
+    const ledgerForPipeline = dedupeSaleLedgerRows(repLedgerRows);
+
     const ledgerCallIds = new Set<string>();
-    repLedgerRows.forEach((row) => {
+    ledgerForPipeline.forEach((row) => {
       if (!activeLedger(row)) return;
       if (row.callId) ledgerCallIds.add(String(row.callId));
     });
 
     const bookedTxSourceIds = new Set(
-      repLedgerRows
+      ledgerForPipeline
         .filter((row) => activeLedger(row) && row.type === 'transaction' && row.sourceId)
         .map((row) => String(row.sourceId))
     );
 
-    const ledgerActivityDate = (row: RepTransactionRow): string | undefined => {
-      if (row.callId) {
-        const fromCall = callActivityDateById.get(String(row.callId));
-        if (fromCall) return fromCall;
-      }
-      if (row.call?.startTime) return row.call.startTime;
-      return row.createdAt;
-    };
+    const periodDate = (row: RepTransactionRow) =>
+      resolveLedgerPeriodDate(row, callActivityDateById);
 
     let clientValidationAmount = 0;
     let clientValidationCount = 0;
@@ -661,31 +657,35 @@ export function WalletPage() {
     let retractionAmount = 0;
     let retractionCount = 0;
 
-    repLedgerRows.forEach((row) => {
+    ledgerForPipeline.forEach((row) => {
       if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
       if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return;
-      if (!inPeriod(ledgerActivityDate(row))) return;
+      if (!inPeriod(periodDate(row))) return;
       retractionAmount += row.repShare || 0;
       retractionCount += 1;
     });
 
-    const ledgerBreakdown = computeValidatedLedgerBreakdown(repLedgerRows, {
+    const ledgerBreakdown = computeValidatedLedgerBreakdown(ledgerForPipeline, {
       inPeriod,
-      activityDate: ledgerActivityDate,
+      activityDate: periodDate,
       selectedGigId,
     });
 
     /** Commissions passées en « earned » sur la période → créditées au solde disponible. */
-    const earnedInPeriod = repLedgerRows.reduce((sum, row) => {
+    const earnedInPeriod = ledgerForPipeline.reduce((sum, row) => {
       if (row.status !== 'earned') return sum;
       if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return sum;
-      if (!inPeriod(ledgerActivityDate(row))) return sum;
+      if (!inPeriod(periodDate(row))) return sum;
       return sum + (row.repShare || 0);
     }, 0);
 
     const periodStartBalance = Math.max(0, availableBalance - earnedInPeriod);
+    /** Total = départ + gains validés + rétractation + validation en attente (buckets disjoints). */
     const totalGains =
-      periodStartBalance + ledgerBreakdown.validatedInPeriod + clientValidationAmount;
+      periodStartBalance +
+      ledgerBreakdown.validatedInPeriod +
+      retractionAmount +
+      clientValidationAmount;
 
     return {
       availableBalance,
@@ -913,7 +913,10 @@ export function WalletPage() {
                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700 truncate">
                   Gains validés
                 </p>
-                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2">
+                <p className="text-[10px] font-semibold text-emerald-600/80 mt-0.5">
+                  Hors rétractation (14j)
+                </p>
+                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2 whitespace-nowrap">
                   +{fmtMoney(earningsPipeline.validatedInPeriod)} €
                 </p>
               </div>
@@ -1042,10 +1045,11 @@ export function WalletPage() {
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
                   {fmtMoney(earningsPipeline.periodStartBalance)} départ
                   {' + '}
-                  {fmtMoney(earningsPipeline.validatedInPeriod)} gains
-                  {earningsPipeline.clientValidationAmount > 0
-                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
-                    : ''}
+                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
+                  {' + '}
+                  {fmtMoney(earningsPipeline.retractionAmount)} rétractation
+                  {' + '}
+                  {fmtMoney(earningsPipeline.clientValidationAmount)} attente
                 </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">

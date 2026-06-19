@@ -10,7 +10,7 @@ import { CallRecords } from '../CallRecords';
 import {
   resolveClientValidationPendingAmount,
 } from '../../../utils/commissionUtils';
-import { computeValidatedLedgerBreakdown } from '../../../utils/repLedgerBreakdown';
+import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
 
 interface DashboardProps {
   profile?: any;
@@ -349,27 +349,23 @@ export function Dashboard({ profile }: DashboardProps) {
     const activeLedger = (row: RepTransactionRow) =>
       row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
 
+    const ledgerForPipeline = dedupeSaleLedgerRows(repLedger);
+
     const ledgerCallIds = new Set<string>();
-    repLedger.forEach((row) => {
+    ledgerForPipeline.forEach((row) => {
       if (!activeLedger(row)) return;
       const id = normalizeRecordId(row.callId) || normalizeRecordId(row.call?._id);
       if (id) ledgerCallIds.add(id);
     });
 
     const bookedTxSourceIds = new Set(
-      repLedger
+      ledgerForPipeline
         .filter((row) => activeLedger(row) && row.type === 'transaction' && row.sourceId)
         .map((row) => String(row.sourceId))
     );
 
-    const ledgerActivityDate = (row: RepTransactionRow): string | undefined => {
-      if (row.callId) {
-        const fromCall = callActivityDateById.get(String(row.callId));
-        if (fromCall) return fromCall;
-      }
-      if (row.call?.startTime) return row.call.startTime;
-      return row.createdAt;
-    };
+    const periodDate = (row: RepTransactionRow) =>
+      resolveLedgerPeriodDate(row, callActivityDateById);
 
     let clientValidationAmount = 0;
     let clientValidationCount = 0;
@@ -396,9 +392,9 @@ export function Dashboard({ profile }: DashboardProps) {
     let retractionAmount = 0;
     let retractionCount = 0;
 
-    repLedger.forEach((row) => {
+    ledgerForPipeline.forEach((row) => {
       if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
-      const activityDate = ledgerActivityDate(row);
+      const activityDate = periodDate(row);
       if (!inPeriod(activityDate)) return;
       if (selectedGigId !== 'all') {
         const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
@@ -408,13 +404,15 @@ export function Dashboard({ profile }: DashboardProps) {
       retractionCount += 1;
     });
 
-    const ledgerBreakdown = computeValidatedLedgerBreakdown(repLedger, {
+    const ledgerBreakdown = computeValidatedLedgerBreakdown(ledgerForPipeline, {
       inPeriod,
-      activityDate: ledgerActivityDate,
+      activityDate: periodDate,
       selectedGigId: selectedGigId !== 'all' ? selectedGigId : undefined,
     });
 
-    const totalGains = ledgerBreakdown.validatedInPeriod + clientValidationAmount;
+    /** Total = gains validés + rétractation + validation en attente (buckets disjoints). */
+    const totalGains =
+      ledgerBreakdown.validatedInPeriod + retractionAmount + clientValidationAmount;
 
     return {
       availableBalance: walletStats.availableBalance,
@@ -525,7 +523,7 @@ export function Dashboard({ profile }: DashboardProps) {
 
   // Transactions filtered by gig + period
   const filteredTransactions = useMemo(() => {
-    return repLedger.filter((row: any) => {
+    return dedupeSaleLedgerRows(repLedger).filter((row: any) => {
       if (selectedGigId !== 'all') {
         const rGigId = typeof row.gigId === 'object' ? (row.gigId?._id || row.gigId?.id) : row.gigId;
         if (rGigId !== selectedGigId) return false;
@@ -1045,7 +1043,10 @@ export function Dashboard({ profile }: DashboardProps) {
                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700 truncate">
                   Gains validés
                 </p>
-                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2">
+                <p className="text-[10px] font-semibold text-emerald-600/80 mt-0.5">
+                  Hors rétractation (14j)
+                </p>
+                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2 whitespace-nowrap">
                   +{fmtMoney(earningsPipeline.validatedInPeriod)} €
                 </p>
               </div>
@@ -1151,9 +1152,10 @@ export function Dashboard({ profile }: DashboardProps) {
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {fmtMoney(earningsPipeline.validatedCallsAmount)} appels
-                  {' + '}
-                  {fmtMoney(earningsPipeline.validatedSalesAmount)} ventes
+                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés hors rétract.
+                  {earningsPipeline.retractionAmount > 0
+                    ? ` + ${fmtMoney(earningsPipeline.retractionAmount)} rétractation`
+                    : ''}
                   {earningsPipeline.clientValidationAmount > 0
                     ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
                     : ''}
