@@ -856,7 +856,7 @@ export function CallRecords({
                     {selectedCall.validByAI === true ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
-                        +{((selectedCall.lead?.gigId?.commission?.commission_per_call || selectedCall.lead?.gigId?.rewardPerCall || 4) * 0.7).toFixed(2)}€
+                        +{resolveCallRepCommission(selectedCall).toFixed(2)}€
                       </div>
                     ) : selectedCall.validByAI === false ? (
                       <X className="w-3 h-3" />
@@ -909,7 +909,7 @@ export function CallRecords({
                     {selectedCall.transaction?.validByReps === true ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
-                        +{(selectedCall.transaction?.repTransactionCommission !== undefined ? selectedCall.transaction.repTransactionCommission : (selectedCall.lead?.gigId?.commission?.transactionCommission || selectedCall.lead?.gigId?.rewardPerSale || 30) * 0.7).toFixed(2)}€
+                        +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€
                       </div>
                     ) : selectedCall.transaction?.validByReps === false ? (
                       <X className="w-3 h-3" />

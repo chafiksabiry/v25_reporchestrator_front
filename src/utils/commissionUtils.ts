@@ -100,16 +100,18 @@ export function resolveCallRepCommission(record: CommissionCall): number {
   return base * REP_SHARE;
 }
 
+function readPositiveRepCommission(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  const n = Number(value);
+  return n > 0 ? n : null;
+}
+
 export function resolveTransactionRepCommission(record: CommissionCall): number {
-  if (record.repTransactionCommission !== undefined && record.repTransactionCommission !== null) {
-    return Number(record.repTransactionCommission);
-  }
-  if (
-    record.transaction?.repTransactionCommission !== undefined &&
-    record.transaction?.repTransactionCommission !== null
-  ) {
-    return Number(record.transaction.repTransactionCommission);
-  }
+  const stored =
+    readPositiveRepCommission(record.repTransactionCommission) ??
+    readPositiveRepCommission(record.transaction?.repTransactionCommission);
+  if (stored !== null) return stored;
+
   const base =
     record.lead?.gigId?.commission?.transactionCommission ??
     record.lead?.gigId?.rewardPerSale ??
