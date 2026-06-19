@@ -88,6 +88,14 @@ const ACCENT_PILL: Record<WalletFilterAccent, { selected: string; dot: string; d
   },
 };
 
+type DropdownPos = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  placement: 'below' | 'above';
+};
+
 type WalletFilterSelectProps = {
   label: string;
   value: string;
@@ -95,6 +103,8 @@ type WalletFilterSelectProps = {
   options: WalletFilterOption[];
   className?: string;
   accent?: WalletFilterAccent;
+  /** Where to open the menu relative to the trigger. Default: auto (prefers below). */
+  placement?: 'auto' | 'above' | 'below';
 };
 
 export function WalletFilterSelect({
@@ -104,19 +114,38 @@ export function WalletFilterSelect({
   options,
   className = '',
   accent = 'harx',
+  placement = 'auto',
 }: WalletFilterSelectProps) {
   const selected = options.find((o) => o.value === value) ?? options[0];
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<DropdownPos | null>(null);
   const triggerAccent = ACCENT_TRIGGER[accent];
 
-  const readDropdownPos = () => {
+  const readDropdownPos = (): DropdownPos => {
     const rect = triggerRef.current!.getBoundingClientRect();
+    const width = Math.max(rect.width, 200);
+    const estimatedMenuHeight = Math.min(options.length * 44 + 16, 320);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openAbove =
+      placement === 'above'
+      || (placement === 'auto' && spaceBelow < estimatedMenuHeight + 12 && spaceAbove > spaceBelow);
+
+    if (openAbove) {
+      return {
+        bottom: window.innerHeight - rect.top + 8,
+        left: rect.left,
+        width,
+        placement: 'above',
+      };
+    }
+
     return {
       top: rect.bottom + 8,
       left: rect.left,
-      width: Math.max(rect.width, 200),
+      width,
+      placement: 'below',
     };
   };
 
@@ -204,7 +233,9 @@ export function WalletFilterSelect({
             <div
               className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
               style={{
-                top: dropdownPos.top,
+                ...(dropdownPos.placement === 'above'
+                  ? { bottom: dropdownPos.bottom }
+                  : { top: dropdownPos.top }),
                 left: dropdownPos.left,
                 minWidth: dropdownPos.width,
                 maxWidth: 'min(420px, calc(100vw - 2rem))',
