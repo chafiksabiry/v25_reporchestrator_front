@@ -14,50 +14,8 @@ import 'react-image-crop/dist/ReactCrop.css';
 // Components
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
-import LanguageAssessment from '../assessments/LanguageAssessment';
-import { AssessmentProvider, useAssessment } from '../../contexts/AssessmentContext';
-import { getLanguageIsoCode } from '../../utils/assessmentAuthUtils';
-
-const mapScoreToCEFR = (score: number): string => {
-  if (score >= 95) return 'C2';
-  if (score >= 80) return 'C1';
-  if (score >= 65) return 'B2';
-  if (score >= 50) return 'B1';
-  if (score >= 35) return 'A2';
-  return 'A1';
-};
-
-// Wraps LanguageAssessment so it can persist results via the assessment context
-// (mirrors LanguageAssessmentPage.handleComplete) when rendered inline.
-const InlineLanguageAssessment: React.FC<{
-  language: string;
-  code: string;
-  onDone: () => void;
-  onExit: () => void;
-}> = ({ language, code, onDone, onExit }) => {
-  const { saveLanguageAssessment } = useAssessment() as any;
-
-  const handleComplete = async (results: any) => {
-    try {
-      const isoCode = code || getLanguageIsoCode(language) || results?.language_code;
-      const proficiency = mapScoreToCEFR(results?.overall?.score ?? 0);
-      await saveLanguageAssessment(language, proficiency, results, isoCode);
-    } catch (e) {
-      console.error('Error saving language assessment:', e);
-    } finally {
-      onDone();
-    }
-  };
-
-  return (
-    <LanguageAssessment
-      language={language}
-      displayName={language}
-      onComplete={handleComplete}
-      onExit={onExit}
-    />
-  );
-};
+import { AssessmentProvider } from '../../contexts/AssessmentContext';
+import { LanguageVideoModal } from './profile/LanguageVideoModal';
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -153,9 +111,14 @@ export const ProfileView: React.FC<{
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [inlineAssessment, setInlineAssessment] = useState<
     | { type: 'contact-center'; skillId: string; category: string; skillName: string }
-    | { type: 'language'; language: string; code: string }
     | null
   >(null);
+  const [languageVideoModal, setLanguageVideoModal] = useState<{
+    language: string;
+    code: string;
+    proficiency: string;
+    languageId: string;
+  } | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
@@ -538,12 +501,29 @@ export const ProfileView: React.FC<{
 
   }, [profile?.skills, skillNameById]);
 
-  const takeLanguageAssessment = (language: string, iso639_1Code?: string) => {
-    setInlineAssessment({
-      type: 'language',
+  const takeLanguageAssessment = (
+    language: string,
+    iso639_1Code?: string,
+    proficiency?: string,
+    languageId?: string
+  ) => {
+    setLanguageVideoModal({
       language,
       code: iso639_1Code || '',
+      proficiency: proficiency || 'B1',
+      languageId: languageId || '',
     });
+  };
+
+  const closeLanguageVideoModal = () => setLanguageVideoModal(null);
+
+  const handleLanguageVideoComplete = async () => {
+    try {
+      const updated = await fetchProfileFromAPI();
+      if (onProfileUpdate && updated) onProfileUpdate(updated);
+    } catch (e) {
+      console.error('Error refreshing profile after language video:', e);
+    }
   };
 
   const takeContactCenterSkillAssessment = (skillName: string, categoryName?: string) => {
@@ -895,7 +875,7 @@ export const ProfileView: React.FC<{
           profile={profile}
           availableLanguages={availableLanguages}
           getProficiencyStars={getProficiencyStars}
-          onGoToExperience={() => setActiveTab('experience')}
+          onRecordLanguageVideo={takeLanguageAssessment}
           onAddItemClick={(item) => onAddLanguage?.(item)}
           onDeleteItemClick={(index) => onDeleteLanguage?.(index)}
         />
@@ -990,35 +970,24 @@ export const ProfileView: React.FC<{
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
           >
             <ArrowRight size={16} className="rotate-180" />
-            Back to Profile
+            Back to {activeTab === 'languages' ? (isFr ? 'Langues' : 'Languages') : (isFr ? 'Profil' : 'Profile')}
           </button>
           <div className="glass-card rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="bg-gradient-harx px-10 py-8 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
               <h1 className="text-2xl lg:text-3xl font-black text-white tracking-widest uppercase relative z-10">
-                {inlineAssessment.type === 'language'
-                  ? `${inlineAssessment.language} Assessment`
-                  : `${inlineAssessment.category}: ${inlineAssessment.skillName} Assessment`}
+                {`${inlineAssessment.category}: ${inlineAssessment.skillName} Assessment`}
               </h1>
             </div>
             <div className="p-6">
               <AssessmentProvider>
-                {inlineAssessment.type === 'language' ? (
-                  <InlineLanguageAssessment
-                    language={inlineAssessment.language}
-                    code={inlineAssessment.code}
-                    onDone={handleInlineAssessmentComplete}
-                    onExit={closeInlineAssessment}
-                  />
-                ) : (
-                  <ContactCenterAssessment
-                    skillId={inlineAssessment.skillId}
-                    category={inlineAssessment.category}
-                    skillName={inlineAssessment.skillName}
-                    onComplete={handleInlineAssessmentComplete}
-                    onExit={closeInlineAssessment}
-                  />
-                )}
+                <ContactCenterAssessment
+                  skillId={inlineAssessment.skillId}
+                  category={inlineAssessment.category}
+                  skillName={inlineAssessment.skillName}
+                  onComplete={handleInlineAssessmentComplete}
+                  onExit={closeInlineAssessment}
+                />
               </AssessmentProvider>
             </div>
           </div>
@@ -1058,8 +1027,8 @@ export const ProfileView: React.FC<{
             ]}
             warningMessages={{
               languages: isFr
-                ? 'Niveaux de langue non vérifiés. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
-                : 'Language levels not verified. Record a video in the Experience tab to detect them.',
+                ? 'Niveaux de langue non vérifiés. Enregistrez une vidéo/audio dans l’onglet Langues — l’IA vérifie votre niveau.'
+                : 'Language levels not verified. Record video/audio in the Languages tab — AI verifies your level.',
               specialization: isFr
                 ? 'Industries/activités manquantes. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
                 : 'Missing industries/activities. Record a video in the Experience tab to detect them.',
@@ -1519,6 +1488,19 @@ export const ProfileView: React.FC<{
             </div>
           </div>
         </div>
+      )}
+      {languageVideoModal && profile?._id && (
+        <LanguageVideoModal
+          isOpen
+          onClose={closeLanguageVideoModal}
+          profileId={profile._id}
+          languageName={languageVideoModal.language}
+          languageCode={languageVideoModal.code}
+          languageId={languageVideoModal.languageId}
+          expectedProficiency={languageVideoModal.proficiency}
+          referencePhotoUrl={profile.personalInfo?.photo?.url}
+          onAnalysisComplete={handleLanguageVideoComplete}
+        />
       )}
     </div>
   );
