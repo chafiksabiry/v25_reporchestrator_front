@@ -253,6 +253,21 @@ export function WalletPage() {
     return new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime();
   };
 
+  const getPeriodStartTitle = (range: string): string => {
+    switch (range) {
+      case 'today':
+        return 'Début de journée';
+      case 'this-week':
+        return 'Début de semaine';
+      case 'this-month':
+        return 'Début de mois';
+      case 'last-month':
+        return 'Début du mois dernier';
+      default:
+        return 'Solde initial';
+    }
+  };
+
   const getPeriodStartHint = (range: string): string => {
     switch (range) {
       case 'today':
@@ -691,6 +706,7 @@ export function WalletPage() {
       availableBalance,
       periodStartBalance,
       earnedInPeriod,
+      periodStartTitle: getPeriodStartTitle(selectedDateRange),
       periodStartDateLabel: getPeriodStartDateLabel(selectedDateRange),
       periodStartHint: getPeriodStartHint(selectedDateRange),
       retractionAmount,
@@ -840,11 +856,11 @@ export function WalletPage() {
 
       {/* ── Gains pipeline ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
-        {/* 1. Solde de départ */}
+        {/* 1. Solde au début de la période */}
         <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              Solde de départ
+              {earningsPipeline.periodStartTitle}
             </p>
             <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
               <CalendarDays className="w-3.5 h-3.5" />
