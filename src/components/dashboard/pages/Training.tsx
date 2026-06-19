@@ -978,16 +978,6 @@ export function Training() {
     if (tab === 'certifications') setTrainingTab('certifications');
   }, [location.search]);
 
-  // Redirection vers la page certificat quand la formation est terminée
-  useEffect(() => {
-    if (selectedJourneyId && structuredProgressByJourney[selectedJourneyId]?.status === 'completed') {
-      const timer = setTimeout(() => {
-        navigate(`/certification/journey/${encodeURIComponent(selectedJourneyId)}`);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [selectedJourneyId, structuredProgressByJourney, navigate]);
-
   /** Formations terminées (= certifiées) pour la section Certifications. */
   const completedJourneys = useMemo(() => {
     return displayJourneys.filter((j) => {

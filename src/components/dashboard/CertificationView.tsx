@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Award, Download, Share2, CheckCircle, Star, Calendar, Trophy, X, Sparkles } from 'lucide-react';
+import { Award, Download, Share2, CheckCircle, Calendar, X } from 'lucide-react';
 import harxLogo from '../../assets/logo-pink.png';
 
 interface CertificationViewProps {
@@ -115,10 +115,8 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
     color: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .frame { position: absolute; inset: 9mm; border: 2px solid rgba(236,72,153,.5); border-radius: 14px; }
   .frame:before { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; }
-  .brand { letter-spacing: .5em; font-weight: 800; color: #ec4899; font-size: 14px; margin-top: 6mm; }
-  .seal { width: 90px; height: 90px; margin: 8mm auto 4mm; border-radius: 50%;
-    background: linear-gradient(135deg, #ff4d4d, #ec4899); display: flex; align-items: center; justify-content: center;
-    font-size: 42px; box-shadow: 0 10px 30px rgba(236,72,153,.4); }
+  .brand img { height: 52px; object-fit: contain; margin: 6mm auto 8mm; display: block; }
+  .seal { display: none; }
   .sub { text-transform: uppercase; letter-spacing: .35em; color: #94a3b8; font-size: 12px; }
   .name { font-size: 46px; font-weight: 900; margin: 6mm 0 2mm;
     background: linear-gradient(90deg,#ff6b6b,#ff4d4d,#ec4899); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -135,8 +133,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
 <body>
   <div class="cert">
     <div class="frame"></div>
-    <div class="brand"><img src="${harxLogo}" alt="HARX" style="height:42px;object-fit:contain;margin-bottom:4mm;" /></div>
-    <div class="seal">🏆</div>
+    <div class="brand"><img src="${harxLogo}" alt="HARX" /></div>
     <div class="sub">Certificat de réussite</div>
     <div class="name">${safe(traineeName)}</div>
     <div class="desc">a complété avec succès l'ensemble des modules et évaluations de la formation</div>
@@ -183,8 +180,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
         .cert-confetti { animation-name: cert-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
         @keyframes cert-shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
         .cert-shimmer { background-size: 200% auto; animation: cert-shimmer 4s linear infinite; }
-        @keyframes cert-ring { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .cert-ring { animation: cert-ring 18s linear infinite; }
       `}</style>
 
       <div className="relative z-[2] flex min-h-full items-center justify-center p-3 sm:p-4">
@@ -224,31 +219,12 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
             </div>
           )}
 
-          <div className="flex justify-center mb-5">
+          <div className="flex justify-center mb-6 pt-2">
             <img
               src={harxLogo}
               alt="HARX"
-              className="h-10 md:h-12 w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+              className="h-16 md:h-20 w-auto object-contain drop-shadow-[0_8px_24px_rgba(236,72,153,0.35)]"
             />
-          </div>
-
-          {/* Badge Image */}
-          <div className="relative inline-block mb-4 group">
-            <div className="absolute inset-0 bg-harx-500 rounded-full blur-3xl opacity-25 group-hover:opacity-45 transition-opacity duration-700"></div>
-            <div className="relative w-24 h-24 md:w-28 md:h-28 flex items-center justify-center">
-              {/* Rotating dashed ring */}
-              <div className="cert-ring absolute inset-0 rounded-full border-2 border-dashed border-harx-alt-400/40"></div>
-              <div className="w-[88%] h-[88%] rounded-full bg-gradient-to-tr from-harx-400 via-harx-alt-500 to-harx-alt-600 p-1 shadow-2xl transform group-hover:scale-105 transition-transform duration-700">
-                <div className="w-full h-full rounded-full bg-[#060a18] flex items-center justify-center">
-                  <Trophy className="w-12 h-12 md:w-14 md:h-14 text-harx-300 drop-shadow-[0_0_15px_rgba(255,77,77,0.55)]" />
-                </div>
-              </div>
-
-              {/* Floating Stars */}
-              <Star className="absolute top-1 right-1 w-4 h-4 text-harx-alt-300 fill-harx-alt-300 animate-bounce" style={{ animationDuration: '3s' }} />
-              <Star className="absolute bottom-6 -left-2 w-3.5 h-3.5 text-harx-300 fill-harx-300 animate-bounce" style={{ animationDuration: '2.5s' }} />
-              <Sparkles className="absolute top-1/2 -right-4 w-4 h-4 text-harx-alt-300 animate-pulse" />
-            </div>
           </div>
 
           {/* Achievement Text */}
