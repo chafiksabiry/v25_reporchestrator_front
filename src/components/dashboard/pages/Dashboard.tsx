@@ -1069,8 +1069,8 @@ export function Dashboard({ profile }: DashboardProps) {
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-amber-600/80">
                   {earningsPipeline.clientValidationCount > 0
-                    ? `${earningsPipeline.clientValidationCount} en attente entreprise — cliquer pour voir`
-                    : 'Rien en attente de validation'}
+                    ? `${earningsPipeline.clientValidationCount} vente(s) — cliquer pour voir`
+                    : 'Aucune vente en attente entreprise'}
                 </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
@@ -1265,7 +1265,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 { key: 'all', label: 'Tous', accent: 'slate', count: callStats.all },
                 { key: 'valid', label: 'Validés', accent: 'emerald', count: callStats.valid },
                 { key: 'invalid', label: 'Non validés', accent: 'rose', count: callStats.invalid },
-                { key: 'pending_client', label: 'En attente client', accent: 'amber', count: callStats.pending_client },
+                { key: 'pending_client', label: 'Ventes en attente', accent: 'amber', count: callStats.pending_client },
               ] as { key: CallFilter; label: string; accent: string; count: number }[]).map((tab) => {
                 const active = callFilter === tab.key;
                 return (
@@ -1362,7 +1362,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         <div className="flex items-center gap-2 shrink-0">
                           {callFilter === 'pending_client' || isPendingClient ? (
                             <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                              En attente client
+                              Vente en attente
                             </span>
                           ) : (
                             <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
