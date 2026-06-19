@@ -5,7 +5,7 @@ import {
   Phone, Mail, User,
   Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
-  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert
+  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -161,6 +161,7 @@ export function WorkspaceContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('1');
   const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
@@ -172,6 +173,7 @@ export function WorkspaceContent() {
   const [cockpitAccessDenied, setCockpitAccessDenied] = useState<string | null>(null);
   const [claimingCockpit, setClaimingCockpit] = useState(false);
   const prevTabRef = useRef(activeTab);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const myAgentId = getAgentId();
 
@@ -253,14 +255,23 @@ export function WorkspaceContent() {
 
   useEffect(() => {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
-      fetchLeads(currentPage);
+      fetchLeads(currentPage, searchQuery);
     }
   }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter]);
 
   useEffect(() => {
     setLeadStatusFilter('all');
     setCurrentPage(1);
+    setSearchQuery('');
   }, [activeEnrolledGigId]);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setPageInput(String(currentPage));
@@ -508,7 +519,17 @@ export function WorkspaceContent() {
     }
   };
 
-  const fetchLeads = async (page: number = 1) => {
+  const applyLeadStatusFilter = (leadList: Lead[]) => {
+    if (leadStatusFilter === 'called') {
+      return leadList.filter((lead) => lead.isCalledByMe);
+    }
+    if (leadStatusFilter === 'signed') {
+      return leadList.filter((lead) => lead.isSignedByMe);
+    }
+    return leadList;
+  };
+
+  const fetchLeads = async (page: number = 1, query: string = searchQuery) => {
     const activeGigId = activeEnrolledGigId;
 
     // Leads are scoped to an enrolled gig only. Never call /leads/user/:id (demo data).
@@ -519,13 +540,16 @@ export function WorkspaceContent() {
       return;
     }
 
-    console.log("🔍 Workspace: fetching leads", { activeGigId, page });
+    console.log("🔍 Workspace: fetching leads", { activeGigId, page, query });
     const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
     const limit = 50;
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
     const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
-    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
+    const trimmedQuery = query.trim();
+    const url = trimmedQuery
+      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}`
+      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
 
     try {
       setIsLoadingLeads(true);
@@ -539,9 +563,13 @@ export function WorkspaceContent() {
       console.log("✅ Leads data received:", responseData);
 
       if (responseData.success && Array.isArray(responseData.data)) {
-        setLeads(responseData.data);
-        setLeadsTotal(responseData.total ?? responseData.data.length);
-        if (responseData.totalPages) {
+        const leadResults = applyLeadStatusFilter(responseData.data);
+        setLeads(leadResults);
+        setLeadsTotal(trimmedQuery ? leadResults.length : (responseData.total ?? leadResults.length));
+        if (trimmedQuery) {
+          setTotalPages(1);
+          setCurrentPage(1);
+        } else if (responseData.totalPages) {
           setTotalPages(responseData.totalPages);
         } else {
           setTotalPages(1);
@@ -561,6 +589,19 @@ export function WorkspaceContent() {
     } finally {
       setIsLoadingLeads(false);
     }
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setCurrentPage(1);
+      fetchLeads(1, query);
+    }, 500);
   };
 
   const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
@@ -701,11 +742,28 @@ export function WorkspaceContent() {
 
               <div>
                 <div className="flex flex-col gap-3 mb-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t('workspaceGuard.recentLeads')}</h3>
-                    <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                      {leadsTotal} {t('sidebar.leads')}
-                    </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex justify-between items-center flex-1">
+                      <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t('workspaceGuard.recentLeads')}</h3>
+                      <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                        {leadsTotal} {t('sidebar.leads')}
+                        {searchQuery.trim() ? (
+                          <span className="text-emerald-500/80 font-medium normal-case tracking-normal"> · "{searchQuery.trim()}"</span>
+                        ) : null}
+                      </span>
+                    </div>
+                    {activeEnrolledGigId && (
+                      <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200/80 px-4 py-2 flex items-center gap-3 shadow-sm focus-within:ring-2 focus-within:ring-harx-500/20 transition-all min-w-[220px] sm:max-w-[280px]">
+                        <Search className="h-4 w-4 text-gray-400 shrink-0" />
+                        <input
+                          type="text"
+                          className="bg-transparent border-none outline-none text-sm font-medium text-gray-700 w-full placeholder:text-gray-400"
+                          placeholder={t('workspaceGuard.searchLeads')}
+                          value={searchQuery}
+                          onChange={(e) => handleSearch(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
                   {activeEnrolledGigId && (
                     <div className="flex flex-wrap items-center gap-2">
@@ -755,7 +813,9 @@ export function WorkspaceContent() {
                 ) : leads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
-                      {leadStatusFilter !== 'all'
+                      {searchQuery.trim()
+                        ? t('workspaceGuard.noSearchResults', 'No leads match your search.')
+                        : leadStatusFilter !== 'all'
                         ? t('workspaceGuard.noLeadsForFilter', 'Aucun prospect pour ce filtre.')
                         : enrolledGigs.length === 0
                         ? t(
@@ -846,7 +906,7 @@ export function WorkspaceContent() {
                         );
                       })}
                     </div>
-                    {totalPages > 1 && (
+                    {totalPages > 1 && !searchQuery.trim() && (
                       <div className="mt-8 flex justify-center items-center gap-6">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1123,7 +1183,7 @@ export function WorkspaceContent() {
       setCockpitAccessDenied(
         result.message || 'Impossible d’ouvrir le cockpit pour ce prospect.'
       );
-      fetchLeads(currentPage);
+      fetchLeads(currentPage, searchQuery);
       return;
     }
 

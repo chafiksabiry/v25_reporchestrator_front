@@ -149,7 +149,9 @@
     "checkSessionTitle": "Active Reservation Slot",
     "checkSessionDesc": "Plan and reserve a time slot for the gig in the schedule.",
     "understandButton": "Understood, I'll complete my steps",
-    "recentLeads": "Recent Leads"
+    "recentLeads": "Recent Leads",
+    "searchLeads": "Search leads...",
+    "noSearchResults": "No leads match your search."
   },
   "trainingAllGigsGuard": {
     "modalTitle": "Project Selection Required",

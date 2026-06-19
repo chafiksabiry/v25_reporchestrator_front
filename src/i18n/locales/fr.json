@@ -149,7 +149,9 @@
     "checkSessionTitle": "Créneau de Réservation Actif",
     "checkSessionDesc": "Planifier et réserver un créneau de temps pour la mission dans l'agenda.",
     "understandButton": "Compris, je finalise mes étapes",
-    "recentLeads": "Prospects Récents"
+    "recentLeads": "Prospects Récents",
+    "searchLeads": "Rechercher des leads...",
+    "noSearchResults": "Aucun prospect ne correspond à votre recherche."
   },
   "trainingAllGigsGuard": {
     "modalTitle": "Sélection de projet requise",
