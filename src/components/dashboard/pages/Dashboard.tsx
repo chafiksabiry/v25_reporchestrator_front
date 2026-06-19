@@ -3,9 +3,68 @@ import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCi
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
+import { repApiUrl } from '../../../utils/repApiUrl';
 
 interface DashboardProps {
   profile?: any;
+}
+
+type GigFilterOption = {
+  _id: string;
+  title: string;
+  commission?: any;
+  rewardBonus?: number;
+};
+
+function normalizeGigEntry(raw: any): GigFilterOption | null {
+  if (!raw) return null;
+
+  if (typeof raw === 'string') {
+    return { _id: raw, title: `Gig ${raw.slice(-6)}` };
+  }
+
+  if (raw.gigId || raw.gig) {
+    const nested = raw.gigId || raw.gig;
+    if (typeof nested === 'object') {
+      const id = String(nested._id || nested.id || nested.$oid || '');
+      if (!id) return null;
+      return {
+        _id: id,
+        title: nested.title || raw.gigTitle || `Gig ${id.slice(-6)}`,
+        commission: nested.commission || raw.commission,
+        rewardBonus: nested.rewardBonus || raw.rewardBonus,
+      };
+    }
+    return { _id: String(nested), title: raw.gigTitle || `Gig ${String(nested).slice(-6)}` };
+  }
+
+  const id = String(raw._id || raw.id || '');
+  if (!id) return null;
+  return {
+    _id: id,
+    title: raw.title || `Gig ${id.slice(-6)}`,
+    commission: raw.commission,
+    rewardBonus: raw.rewardBonus,
+  };
+}
+
+function mergeGigOptions(...lists: any[][]): GigFilterOption[] {
+  const map = new Map<string, GigFilterOption>();
+  for (const list of lists) {
+    for (const item of list) {
+      const gig = normalizeGigEntry(item);
+      if (!gig) continue;
+      const existing = map.get(gig._id);
+      map.set(gig._id, {
+        ...existing,
+        ...gig,
+        title: gig.title || existing?.title || `Gig ${gig._id.slice(-6)}`,
+        commission: gig.commission ?? existing?.commission,
+        rewardBonus: gig.rewardBonus ?? existing?.rewardBonus,
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }
 
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
@@ -84,17 +143,74 @@ export function Dashboard({ profile }: DashboardProps) {
 
     const fetchData = async () => {
       try {
-        const [callsRes, gigsRes, walletRes, ledgerRes, reservationsRes] = await Promise.all([
-          fetch(`https://v25dashboardbackend-production.up.railway.app/api/calls?agentId=${agentId}`),
-          fetch(`https://v25dashboardbackend-production.up.railway.app/api/calls/gigs?userId=${realUserId || agentId}`),
+        const token = localStorage.getItem('token') || '';
+        const dashboardApi = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
+        const gigsQuery = new URLSearchParams({
+          agentId: String(agentId),
+          ...(realUserId ? { userId: String(realUserId) } : {}),
+        });
+
+        const profileGigsPromise = (async () => {
+          const fromProp = Array.isArray(profile?.gigs)
+            ? profile.gigs.filter((g: any) => g.status === 'enrolled')
+            : [];
+          if (fromProp.length > 0) return fromProp;
+          if (!token) return [];
+          try {
+            const profileRes = await fetch(repApiUrl(`/profiles/${agentId}`), {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!profileRes.ok) return [];
+            const profileData = await profileRes.json();
+            return (Array.isArray(profileData.gigs) ? profileData.gigs : [])
+              .filter((g: any) => g.status === 'enrolled');
+          } catch {
+            return [];
+          }
+        })();
+
+        const matchingGigsPromise = (async () => {
+          const matchingUrl = import.meta.env.VITE_MATCHING_API_URL;
+          if (!matchingUrl || !token) return [];
+          try {
+            const res = await fetch(
+              `${matchingUrl}/gig-agents/agents/${encodeURIComponent(String(agentId))}/gigs?status=enrolled`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (!res.ok) return [];
+            const data = await res.json();
+            return Array.isArray(data.gigs) ? data.gigs.map((row: any) => row.gig).filter(Boolean) : [];
+          } catch {
+            return [];
+          }
+        })();
+
+        const [callsRes, gigsRes, walletRes, ledgerRes, reservationsRes, profileGigs, matchingGigs] = await Promise.all([
+          fetch(`${dashboardApi}/calls?agentId=${encodeURIComponent(String(agentId))}`),
+          fetch(`${dashboardApi}/calls/gigs?${gigsQuery.toString()}`),
           api.get(`/escrow/agent/wallet/${agentId}`).catch(() => null),
           repTransactionsApi.list(agentId, { limit: 300 }).catch(() => null),
-          slotApi.getReservations(agentId).catch(() => [])
+          slotApi.getReservations(agentId).catch(() => []),
+          profileGigsPromise,
+          matchingGigsPromise,
         ]);
 
         const [calls, gigs] = await Promise.all([callsRes.json(), gigsRes.json()]);
-        setCallsData(Array.isArray(calls.data) ? calls.data : []);
-        setGigsData(Array.isArray(gigs.data) ? gigs.data : []);
+        const callsList = Array.isArray(calls.data) ? calls.data : [];
+        const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
+
+        setCallsData(callsList);
+        setGigsData(mergeGigOptions(
+          Array.isArray(gigs.data) ? gigs.data : [],
+          profileGigs,
+          matchingGigs,
+          callsList.map((call: any) => call.gigId).filter(Boolean),
+          ledgerList.map((tx: RepTransactionRow) => tx.gig).filter(Boolean),
+          ledgerList.filter((tx: RepTransactionRow) => tx.gigId).map((tx: RepTransactionRow) => ({
+            _id: tx.gigId,
+            title: tx.gig?.title,
+          })),
+        ));
         setReservationsData(Array.isArray(reservationsRes) ? reservationsRes : []);
 
         if (walletRes?.data?.success && walletRes.data.data) {
