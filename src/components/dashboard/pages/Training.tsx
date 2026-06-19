@@ -15,7 +15,8 @@ import {
   CheckCircle,
   Award,
   X,
-  MessageSquare
+  MessageSquare,
+  AlertTriangle
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { useRepTrainingNav } from '../../../contexts/RepTrainingNavContext';
@@ -168,6 +169,115 @@ function journeyKey(j: Record<string, unknown>): string {
 function extractModules(j: JourneyRow): ModuleRow[] {
   const raw = (j.modules || []) as unknown[];
   return Array.isArray(raw) ? (raw as ModuleRow[]) : [];
+}
+
+const SCRIPT_REQUIREMENT_MARKER = '__harx_script_requirement__';
+
+function isScriptRequirementModule(mod: ModuleRow): boolean {
+  const row = mod as Record<string, unknown>;
+  if (row.harxRequirementType === SCRIPT_REQUIREMENT_MARKER) return true;
+  const title = String(mod.title || '').toLowerCase();
+  return title.includes("script d'appel") || title.includes('script d appel');
+}
+
+/** True si le gig a un module script et que le rep ne l'a pas encore validé. */
+function scriptModuleStillPending(
+  j: JourneyRow,
+  structured: StructuredProgressRow | undefined,
+  progress: RepProgressRow | undefined
+): boolean {
+  const modules = extractModules(j);
+  const scriptIdx = modules.findIndex(isScriptRequirementModule);
+  if (scriptIdx < 0) return false;
+
+  const scriptMod = modules[scriptIdx];
+  const moduleId =
+    normalizeMongoId((scriptMod as any)?._id) ||
+    normalizeMongoId((scriptMod as any)?.id) ||
+    String(scriptIdx);
+
+  const fromStructured = structured?.modules?.find(
+    (m) => m.moduleId === moduleId || m.moduleId === String(scriptIdx)
+  );
+  if (fromStructured?.status === 'completed') return false;
+
+  const mp = progress?.modules?.[moduleId] ?? progress?.modules?.[String(scriptIdx)];
+  if (mp && (String((mp as { status?: unknown }).status) === 'completed' || Number((mp as { progress?: unknown }).progress) >= 100)) {
+    return false;
+  }
+
+  return true;
+}
+
+function CompletedTrainingRequirementsWarning({
+  scriptPending,
+  onOpenScript,
+  onCertify,
+}: {
+  scriptPending: boolean;
+  onOpenScript?: () => void;
+  onCertify?: () => void;
+}) {
+  return (
+    <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/95 p-3 text-amber-950">
+      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+      <div className="min-w-0 space-y-2 text-xs leading-relaxed">
+        <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
+          Étapes obligatoires avant le cockpit
+        </p>
+        {scriptPending ? (
+          <p>
+            <span className="inline-flex items-center gap-1 font-bold text-amber-900">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Script d&apos;appel :
+            </span>{' '}
+            la lecture du script est <strong>obligatoire</strong>. Ouvrez la formation et validez le module script
+            (section + quiz).
+            {onOpenScript ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  onClick={onOpenScript}
+                  className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                >
+                  Lire le script
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : (
+          <p>
+            <span className="inline-flex items-center gap-1 font-bold text-amber-900">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Script d&apos;appel :
+            </span>{' '}
+            assurez-vous d&apos;avoir bien relu le module script — il est requis pour les appels en cockpit.
+          </p>
+        )}
+        <p>
+          <span className="inline-flex items-center gap-1 font-bold text-amber-900">
+            <Award className="h-3.5 w-3.5" />
+            Certification :
+          </span>{' '}
+          obtenez votre <strong>certificat</strong> pour valider officiellement la formation et débloquer l&apos;accès au
+          cockpit.
+          {onCertify ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onCertify}
+                className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
+              >
+                Obtenir le certificat
+              </button>
+            </>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function extractSlides(j: JourneyRow): SlideRow[] {
@@ -2293,11 +2403,48 @@ export function Training() {
               slidePercent >= 100 ||
               (id ? structuredProgressByJourney[id]?.status === 'completed' : false) ||
               Number(progress?.progressPercentage) >= 100;
+            const structured = id ? structuredProgressByJourney[id] : undefined;
+            const scriptPending = isCompleted && scriptModuleStillPending(j, structured, progress);
+
+            const openFormation = () => {
+              if (!id) return;
+              const slideCount = viewerSlideCountFromJourney(j);
+              const fromSummary =
+                slideRow != null &&
+                typeof slideRow.currentSlideIndex === 'number' &&
+                Number.isFinite(slideRow.currentSlideIndex)
+                  ? slideRow.currentSlideIndex
+                  : undefined;
+              const fromProgress =
+                progress != null &&
+                typeof progress.currentSlideIndex === 'number' &&
+                Number.isFinite(progress.currentSlideIndex)
+                  ? progress.currentSlideIndex
+                  : undefined;
+              const persisted =
+                typeof fromSummary === 'number'
+                  ? fromSummary
+                  : typeof fromProgress === 'number'
+                    ? fromProgress
+                    : undefined;
+              const resumeAt = mergeFormationResumeWithPersisted(
+                j,
+                progress,
+                slideCount,
+                persisted,
+                engagementPercent
+              );
+              setFormationViewerSlideIndex(resumeAt);
+              setSelectedJourneyId(id);
+              setActiveSlide(resumeAt);
+            };
+
             return (
               <li
                 key={id || journeyTitle(j)}
-                className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm flex flex-col gap-4"
               >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <h2 className="font-black text-gray-900 truncate">{journeyTitle(j)}</h2>
                   {j.description ? (
@@ -2333,38 +2480,7 @@ export function Training() {
                   <button
                     type="button"
                     disabled={!id}
-                    onClick={() => {
-                      if (!id) return;
-                      const slideCount = viewerSlideCountFromJourney(j);
-                      const fromSummary =
-                        slideRow != null &&
-                        typeof slideRow.currentSlideIndex === 'number' &&
-                        Number.isFinite(slideRow.currentSlideIndex)
-                          ? slideRow.currentSlideIndex
-                          : undefined;
-                      const fromProgress =
-                        progress != null &&
-                        typeof progress.currentSlideIndex === 'number' &&
-                        Number.isFinite(progress.currentSlideIndex)
-                          ? progress.currentSlideIndex
-                          : undefined;
-                      const persisted =
-                        typeof fromSummary === 'number'
-                          ? fromSummary
-                          : typeof fromProgress === 'number'
-                            ? fromProgress
-                            : undefined;
-                      const resumeAt = mergeFormationResumeWithPersisted(
-                        j,
-                        progress,
-                        slideCount,
-                        persisted,
-                        engagementPercent
-                      );
-                      setFormationViewerSlideIndex(resumeAt);
-                      setSelectedJourneyId(id);
-                      setActiveSlide(resumeAt);
-                    }}
+                    onClick={openFormation}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-harx-600 text-white px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors disabled:opacity-40"
                   >
                     Continue
@@ -2380,6 +2496,14 @@ export function Training() {
                     </button>
                   )}
                 </div>
+                </div>
+                {isCompleted && (
+                  <CompletedTrainingRequirementsWarning
+                    scriptPending={scriptPending}
+                    onOpenScript={openFormation}
+                    onCertify={() => openCertificate(j)}
+                  />
+                )}
               </li>
             );
           })}
@@ -2421,10 +2545,13 @@ export function Training() {
             {completedJourneys.map((j) => {
               const id = journeyKey(j);
               const gig = gigLabel(j);
+              const progress = id ? progressByJourney[id] : undefined;
+              const structured = id ? structuredProgressByJourney[id] : undefined;
+              const scriptPending = scriptModuleStillPending(j, structured, progress);
               return (
                 <li
                   key={`cert-${id || journeyTitle(j)}`}
-                  className="group relative overflow-hidden rounded-2xl border border-harx-100 bg-gradient-to-br from-harx-50/80 to-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                  className="group relative overflow-hidden rounded-2xl border border-harx-100 bg-gradient-to-br from-harx-50/80 to-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 flex flex-col gap-4"
                 >
                   <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-harx-500/10 blur-2xl" />
                   <div className="relative flex items-start gap-3">
@@ -2445,6 +2572,17 @@ export function Training() {
                       </div>
                     </div>
                   </div>
+                  <CompletedTrainingRequirementsWarning
+                    scriptPending={scriptPending}
+                    onOpenScript={() => {
+                      if (!id) return;
+                      setSelectedJourneyId(id);
+                      setFormationViewerSlideIndex(0);
+                      setActiveSlide(0);
+                      setTrainingTab('trainings');
+                    }}
+                    onCertify={() => openCertificate(j)}
+                  />
                   <button
                     type="button"
                     onClick={() => openCertificate(j)}
