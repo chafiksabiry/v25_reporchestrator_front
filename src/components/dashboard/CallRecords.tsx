@@ -196,6 +196,10 @@ interface CallRecordsProps {
    *  to deep-link the rep into the AI-insights modal right after they
    *  hang up. */
   autoOpenSid?: string;
+  /** Dashboard overlay: open this call's modal without rendering the list. */
+  overlayOpenCallId?: string | null;
+  /** Called when the overlay modal is closed. */
+  onOverlayClose?: () => void;
   /** Called once we've successfully opened the deep-linked modal so the
    *  parent can clear its `pendingOpenCallSid` state and avoid re-opening
    *  on subsequent renders. */
@@ -245,6 +249,8 @@ export function CallRecords({
   callValidationFilter = 'all',
   transactionValidationFilter = 'all',
   autoOpenSid,
+  overlayOpenCallId,
+  onOverlayClose,
   onAutoOpenHandled,
   onAnalysisSettled,
 }: CallRecordsProps) {
@@ -448,6 +454,20 @@ export function CallRecords({
     setAnalysisError(null);
   };
 
+  const closeCallModal = () => {
+    setSelectedCall(null);
+    if (overlayOpenCallId) onOverlayClose?.();
+  };
+
+  useEffect(() => {
+    if (!overlayOpenCallId) return;
+    const match = callRecords.find((r) => {
+      const id = typeof r._id === 'object' ? (r._id as any).$oid : r._id;
+      return id === overlayOpenCallId || r.sid === overlayOpenCallId;
+    });
+    if (match) openCallDetails(match, 'insights');
+  }, [overlayOpenCallId, callRecords]);
+
   const filteredRecords = callRecords.filter(record => {
     if (leadId && record.lead?._id !== leadId) return false;
     if (gigId) {
@@ -499,7 +519,9 @@ export function CallRecords({
     ) : null;
 
   return (
-    <div className="space-y-5 relative">
+    <div className={overlayOpenCallId ? 'contents' : 'space-y-5 relative'}>
+      {!overlayOpenCallId && (
+      <>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-harx-600 mb-1">
@@ -746,11 +768,13 @@ export function CallRecords({
         </div>
       )}
 
-      {/* Modal Detail View */}
+      </>
+      )}
+
       {/* Modal Detail View */}
       {selectedCall && createPortal(
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setSelectedCall(null)}></div>
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={closeCallModal}></div>
 
           <div className="relative bg-white w-full md:max-w-5xl h-[92vh] md:h-[88vh] max-h-[92vh] md:max-h-[88vh] rounded-[24px] md:rounded-[36px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-slate-100/80">
             {/* Modal Header */}
@@ -772,7 +796,7 @@ export function CallRecords({
                 {/* Close button on mobile */}
                 <div className="md:hidden">
                   <button
-                    onClick={() => setSelectedCall(null)}
+                    onClick={closeCallModal}
                     className="p-2 bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-900 rounded-xl border border-slate-100 transition-all shadow-sm"
                   >
                     <X className="w-4 h-4" />
@@ -792,7 +816,7 @@ export function CallRecords({
               {/* Close button on desktop */}
               <div className="hidden md:flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setSelectedCall(null)}
+                  onClick={closeCallModal}
                   className="p-2 bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-900 rounded-xl border border-slate-100 transition-all shadow-sm"
                 >
                   <X className="w-4 h-4" />
@@ -1204,7 +1228,7 @@ export function CallRecords({
 
             <div className="px-4 py-4 md:px-8 md:py-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 shrink-0">
               <button
-                onClick={() => setSelectedCall(null)}
+                onClick={closeCallModal}
                 className="px-6 py-2.5 sm:px-8 sm:py-3 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 shrink-0"
               >
                 {t('calls.closeDetails')}
