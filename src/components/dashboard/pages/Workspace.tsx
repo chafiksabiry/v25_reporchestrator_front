@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +15,11 @@ import { IframeWorkspace } from '../../../copilot/components/Dashboard/IframeWor
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { slotApi } from '../../../services/api/slotApi';
+import {
+  claimCockpit,
+  releaseCockpit,
+  isLeadCockpitLockedByOther,
+} from '../../../services/api/leadCockpitApi';
 
 interface Lead {
   _id?: string;
@@ -29,6 +34,13 @@ interface Lead {
     id: string;
     email: string;
   };
+  cockpitLockedBy?: string | null;
+  cockpitLockedAt?: string | null;
+  cockpitLockExpiresAt?: string | null;
+  signedByAgent?: string | null;
+  signedAt?: string | null;
+  isSignedByMe?: boolean;
+  isCalledByMe?: boolean;
 }
 
 interface EnrolledGig {
@@ -117,6 +129,12 @@ export function WorkspaceContent() {
       if (!sid) return;
       setPendingOpenCallSid(sid);
       setActiveTab('calls');
+      const agentId = getAgentId();
+      const claimedLeadId = sessionStorage.getItem('activeLeadId');
+      if (agentId && claimedLeadId) {
+        void releaseCockpit(claimedLeadId, agentId);
+        setCockpitClaimedLeadId(null);
+      }
       const params = new URLSearchParams(location.search);
       params.set('tab', 'calls');
       navigate(
@@ -145,6 +163,12 @@ export function WorkspaceContent() {
   // marketplace browsing would load demo leads for a gig the rep isn't enrolled in.
   const [selectedGigId, setSelectedGigId] = useState<string>('');
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
+  const [cockpitClaimedLeadId, setCockpitClaimedLeadId] = useState<string | null>(null);
+  const [cockpitAccessDenied, setCockpitAccessDenied] = useState<string | null>(null);
+  const [claimingCockpit, setClaimingCockpit] = useState(false);
+  const prevTabRef = useRef(activeTab);
+
+  const myAgentId = getAgentId();
 
   const activeEnrolledGigId = useMemo(
     () => (selectedGigId && enrolledGigs.some((g) => g._id === selectedGigId) ? selectedGigId : ''),
@@ -228,6 +252,20 @@ export function WorkspaceContent() {
     }
   }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded]);
 
+  // Release cockpit lock when leaving the COCKPIT tab
+  useEffect(() => {
+    if (prevTabRef.current === 'copilot' && activeTab !== 'copilot') {
+      const leadId = cockpitClaimedLeadId;
+      const agentId = getAgentId();
+      if (leadId && agentId) {
+        void releaseCockpit(leadId, agentId);
+        setCockpitClaimedLeadId(null);
+      }
+      setCockpitAccessDenied(null);
+    }
+    prevTabRef.current = activeTab;
+  }, [activeTab, cockpitClaimedLeadId]);
+
   const canUseCopilot = useMemo(
     () =>
       copilotGuard.isEnrolledInGig &&
@@ -235,6 +273,43 @@ export function WorkspaceContent() {
       copilotGuard.hasActiveReservationNow,
     [copilotGuard]
   );
+
+  // Claim cockpit when opening COCKPIT tab with an active lead
+  useEffect(() => {
+    if (activeTab !== 'copilot' || !canUseCopilot || copilotGuard.loading) return;
+    const leadId = selectedLead?._id || selectedLead?.id || urlLeadId;
+    if (!leadId || !myAgentId) return;
+    if (cockpitClaimedLeadId === leadId) return;
+
+    let cancelled = false;
+    (async () => {
+      const result = await claimCockpit(leadId, myAgentId, activeEnrolledGigId);
+      if (cancelled) return;
+      if (result.ok && result.success) {
+        setCockpitClaimedLeadId(leadId);
+        setCockpitAccessDenied(null);
+      } else {
+        setCockpitAccessDenied(
+          result.message || 'Ce prospect est déjà ouvert dans le cockpit d’un autre agent.'
+        );
+        setCockpitClaimedLeadId(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTab,
+    canUseCopilot,
+    copilotGuard.loading,
+    urlLeadId,
+    selectedLead?._id,
+    selectedLead?.id,
+    activeEnrolledGigId,
+    myAgentId,
+    cockpitClaimedLeadId,
+  ]);
 
   // Block access to copilot tab/url if any requirement is not met
   useEffect(() => {
@@ -422,7 +497,9 @@ export function WorkspaceContent() {
     console.log("🔍 Workspace: fetching leads", { activeGigId, page });
     const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
     const limit = 50;
-    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}`;
+    const agentId = getAgentId();
+    const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
+    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}`;
 
     try {
       setIsLoadingLeads(true);
@@ -627,7 +704,11 @@ export function WorkspaceContent() {
                 ) : (
                   <>
                     <div className="space-y-4">
-                      {leads.map((lead) => (
+                      {leads.map((lead) => {
+                        const leadLockedByOther = isLeadCockpitLockedByOther(lead, myAgentId);
+                        const isSignedByMe = Boolean(lead.isSignedByMe);
+                        const isCalledByMe = Boolean(lead.isCalledByMe) && !isSignedByMe;
+                        return (
                         <div
                           key={`${lead._id || lead.id}-${lead.Email_1}-${lead.Created_Time}`}
                           className="border border-gray-100 rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5"
@@ -647,6 +728,24 @@ export function WorkspaceContent() {
                               </div>
                             </div>
                             <div className="flex items-center space-x-4">
+                              {isSignedByMe && (
+                                <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Déjà signé
+                                </span>
+                              )}
+                              {isCalledByMe && (
+                                <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5">
+                                  <PhoneOutgoing className="w-3 h-3" />
+                                  Appelé
+                                </span>
+                              )}
+                              {leadLockedByOther && (
+                                <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1.5">
+                                  <Clock className="w-3 h-3" />
+                                  Occupé
+                                </span>
+                              )}
                               {lead.Stage && lead.Stage !== 'New' && (
                                 <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${lead.Stage === 'Respecte le planning' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
                                   lead.Stage === 'En retard' ? 'bg-harx-50 text-harx-600 border border-harx-100' :
@@ -656,21 +755,30 @@ export function WorkspaceContent() {
                                 </span>
                               )}
                               <button
-                                className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${canUseCopilot
+                                className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${canUseCopilot && !leadLockedByOther && !isSignedByMe
                                   ? 'bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/20 hover:-translate-y-0.5'
                                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                                   }`}
-                                disabled={!canUseCopilot || copilotGuard.loading}
+                                disabled={!canUseCopilot || copilotGuard.loading || leadLockedByOther || claimingCockpit || isSignedByMe}
                                 onClick={() => handleCallClick(lead)}
-                                title={!canUseCopilot && copilotGuard.reason ? copilotGuard.reason : ''}
+                                title={
+                                  isSignedByMe
+                                    ? 'Contrat déjà signé pour ce prospect'
+                                    : leadLockedByOther
+                                      ? 'Ce prospect est ouvert dans le cockpit d’un autre agent'
+                                      : !canUseCopilot && copilotGuard.reason
+                                        ? copilotGuard.reason
+                                        : ''
+                                }
                               >
                                 <Phone className="w-3.5 h-3.5" />
-                                <span>Call</span>
+                                <span>{claimingCockpit ? '...' : isSignedByMe ? 'Signé' : 'Call'}</span>
                               </button>
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {totalPages > 1 && (
                       <div className="mt-8 flex justify-center items-center gap-6">
@@ -871,6 +979,25 @@ export function WorkspaceContent() {
                   </p>
                 )}
               </div>
+            ) : cockpitAccessDenied ? (
+              <div className="flex flex-col items-center justify-center h-full pt-24 text-center px-8">
+                <AlertTriangle className="w-12 h-12 mb-4 text-amber-500" />
+                <p className="text-sm font-black uppercase tracking-widest text-gray-700">Prospect occupé</p>
+                <p className="text-xs mt-2 text-gray-500 max-w-xl">{cockpitAccessDenied}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCockpitAccessDenied(null);
+                    setActiveTab('voice');
+                    const params = new URLSearchParams(location.search);
+                    params.set('tab', 'voice');
+                    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+                  }}
+                  className="mt-6 px-6 py-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                >
+                  Retour aux leads
+                </button>
+              </div>
             ) : (selectedLead || urlLeadId) ? (
               <CopilotApp />
             ) : (
@@ -887,12 +1014,36 @@ export function WorkspaceContent() {
     }
   };
 
-  const handleCallClick = (lead: Lead) => {
+  const handleCallClick = async (lead: Lead) => {
     if (!canUseCopilot) {
       setShowWarningModal(true);
       return;
     }
+    if (lead.isSignedByMe) {
+      return;
+    }
+    if (isLeadCockpitLockedByOther(lead, myAgentId)) {
+      setCockpitAccessDenied('Ce prospect est déjà ouvert dans le cockpit d’un autre agent.');
+      return;
+    }
+
     const leadIdString = lead._id || lead.id;
+    if (!myAgentId) return;
+
+    setClaimingCockpit(true);
+    const result = await claimCockpit(leadIdString, myAgentId, activeEnrolledGigId);
+    setClaimingCockpit(false);
+
+    if (!result.ok || !result.success) {
+      setCockpitAccessDenied(
+        result.message || 'Impossible d’ouvrir le cockpit pour ce prospect.'
+      );
+      fetchLeads(currentPage);
+      return;
+    }
+
+    setCockpitAccessDenied(null);
+    setCockpitClaimedLeadId(leadIdString);
     sessionStorage.setItem('activeLeadId', leadIdString);
     if (activeEnrolledGigId) {
       sessionStorage.setItem('activeGigId', activeEnrolledGigId);
