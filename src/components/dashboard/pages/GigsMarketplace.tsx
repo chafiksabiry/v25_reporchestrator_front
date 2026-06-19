@@ -432,16 +432,67 @@ interface EnrolledGig {
   status: string;
 }
 
+// Interface pour les candidatures en attente
+interface RequestedGig {
+  id: string;
+  gig: PopulatedGig;
+  requestDate: string;
+  status: string;
+  matchStatus?: string;
+}
+
+function transformMatchingGigEntries(
+  entries: any[],
+  matchStatus: string
+): Array<{ id: string; gig: PopulatedGig; date: string; status: string; matchStatus: string }> {
+  const agentId = getAgentId();
+  return entries
+    .filter((row) => row?.gig)
+    .map((row) => {
+      const agentData = row.gig.agents?.find(
+        (agent: any) => agent.agentId === agentId || agent.agentId?.$oid === agentId
+      );
+      const enrollmentId =
+        agentData?.gigAgentId || agentData?.gigAgentId?.$oid || row.gigAgentId || row._id;
+      return {
+        id: String(enrollmentId),
+        gig: {
+          _id: row.gig._id,
+          title: row.gig.title,
+          description: row.gig.description,
+          category: row.gig.category,
+          destination_zone: row.gig.destination_zone,
+          ...row.gig,
+        },
+        date: row.enrollmentDate || row.updatedAt || row.invitationDate || new Date().toISOString(),
+        status: row.status,
+        matchStatus,
+      };
+    });
+}
+
+async function fetchMatchingGigsByStatus(status: string, token: string, agentId: string) {
+  const response = await fetch(
+    `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=${encodeURIComponent(status)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!response.ok) return [];
+  const data = await response.json();
+  if (!data?.gigs || !Array.isArray(data.gigs)) return [];
+  return data.gigs;
+}
+
 export function GigsMarketplace() {
   const { t, i18n } = useTranslation();
   const isFrMarket = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
   const agentId = getAgentId();
 
-  const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
+  const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
   const [invitedEnrollments, setInvitedEnrollments] = useState<InvitedEnrollment[]>([]);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
+  const [requestedGigs, setRequestedGigs] = useState<RequestedGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<string[]>([]); // IDs des gigs avec demandes en attente
   const [enrolledGigIds, setEnrolledGigIds] = useState<string[]>([]); // IDs des gigs inscrits depuis le profil
   const [loading, setLoading] = useState<boolean>(true);
@@ -575,6 +626,7 @@ export function GigsMarketplace() {
         fetchFavorites(),
         fetchInvitedEnrollments(),
         fetchEnrolledGigs(),
+        fetchRequestedGigs(),
         fetchPendingRequests()
       ]);
     }
@@ -746,10 +798,11 @@ export function GigsMarketplace() {
       // Rafraîchir tous les statuts pour mettre à jour l'UI
       console.log('🔄 Refreshing all statuses after acceptance...');
       await Promise.all([
-        fetchEnrolledGigs(),           // Recharger les gigs enrolled
-        fetchEnrolledGigIdsFromProfile(), // Mettre à jour les IDs du profil
-        fetchInvitedEnrollments(),     // Recharger les invitations (au cas où)
-        fetchPendingRequests()         // Mettre à jour les pending requests
+        fetchEnrolledGigs(),
+        fetchRequestedGigs(),
+        fetchEnrolledGigIdsFromProfile(),
+        fetchInvitedEnrollments(),
+        fetchPendingRequests()
       ]);
       console.log('✅ All statuses refreshed');
     } catch (error) {
@@ -903,6 +956,7 @@ export function GigsMarketplace() {
           // Rafraîchir tous les statuts
           await Promise.all([
             fetchPendingRequests(),
+            fetchRequestedGigs(),
             fetchEnrolledGigIdsFromProfile()
           ]);
 
@@ -932,6 +986,7 @@ export function GigsMarketplace() {
       // Rafraîchir tous les statuts pour mettre à jour l'UI
       await Promise.all([
         fetchPendingRequests(),
+        fetchRequestedGigs(),
         fetchEnrolledGigIdsFromProfile(),
         fetchInvitedEnrollments(),
         fetchEnrolledGigs()
@@ -947,6 +1002,7 @@ export function GigsMarketplace() {
               : 'Application sent!'),
         'success'
       );
+      setActiveTab('requested');
 
       // Effacer le message après 3 secondes
       setTimeout(() => {
@@ -1005,6 +1061,46 @@ export function GigsMarketplace() {
   };
 
   // Fonction pour récupérer les gigs inscrits avec données complètes
+  const fetchRequestedGigs = async () => {
+    const agentId = getAgentId();
+    const token = getAuthToken();
+    if (!agentId || !token) {
+      setRequestedGigs([]);
+      return;
+    }
+
+    try {
+      const [requestedRows, pendingRows, enrolledRows] = await Promise.all([
+        fetchMatchingGigsByStatus('requested', token, agentId),
+        fetchMatchingGigsByStatus('pending', token, agentId),
+        fetchMatchingGigsByStatus('enrolled', token, agentId),
+      ]);
+
+      const enrolledIds = new Set(
+        enrolledRows.map((row: any) => row?.gig?._id).filter(Boolean)
+      );
+
+      const byGigId = new Map<string, RequestedGig>();
+      for (const rows of [requestedRows, pendingRows]) {
+        for (const item of transformMatchingGigEntries(rows, 'pending')) {
+          if (enrolledIds.has(item.gig._id)) continue;
+          byGigId.set(item.gig._id, {
+            id: item.id,
+            gig: item.gig,
+            requestDate: item.date,
+            status: item.status,
+            matchStatus: item.matchStatus,
+          });
+        }
+      }
+
+      setRequestedGigs(Array.from(byGigId.values()));
+    } catch (error) {
+      console.error('❌ Error fetching requested gigs:', error);
+      setRequestedGigs([]);
+    }
+  };
+
   const fetchEnrolledGigs = async () => {
     const agentId = getAgentId();
     const token = getAuthToken();
@@ -1343,6 +1439,7 @@ export function GigsMarketplace() {
       fetchFavorites();
       fetchInvitedEnrollments();
       fetchEnrolledGigs();
+      fetchRequestedGigs();
       fetchPendingRequests();
       fetchEnrolledGigIdsFromProfile(); // Nouveau : récupérer les statuts depuis le profil
     }
@@ -1354,6 +1451,7 @@ export function GigsMarketplace() {
         fetchFavorites();
         fetchInvitedEnrollments();
         fetchEnrolledGigs();
+        fetchRequestedGigs();
         fetchPendingRequests();
         fetchEnrolledGigIdsFromProfile(); // Nouveau : rafraîchir aussi les statuts du profil
       }
@@ -1379,6 +1477,7 @@ export function GigsMarketplace() {
     const refreshStatuses = () => {
       fetchInvitedEnrollments();
       fetchEnrolledGigs();
+      fetchRequestedGigs();
       fetchPendingRequests();
       fetchEnrolledGigIdsFromProfile();
       // Re-derive publish / onboarding state from the freshest profile.
@@ -1397,6 +1496,7 @@ export function GigsMarketplace() {
         if (data?.gigId && data?.status === 'enrolled') {
           const gigId = String(data.gigId);
           setPendingRequests((prev) => prev.filter((id) => id !== gigId));
+          setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
           setEnrolledGigIds((prev) =>
             prev.includes(gigId) ? prev : [...prev, gigId]
           );
@@ -1406,6 +1506,7 @@ export function GigsMarketplace() {
         if (data?.gigId && data?.status === 'rejected') {
           const gigId = String(data.gigId);
           setPendingRequests((prev) => prev.filter((id) => id !== gigId));
+          setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
           setEnrolledGigIds((prev) => prev.filter((id) => id !== gigId));
         }
         refreshStatuses();
@@ -1486,15 +1587,18 @@ export function GigsMarketplace() {
           .sort((a, b) => {
             switch (sortBy) {
               case 'salary':
-                // Pour les gigs inscrits, utiliser les données de base
-                return 0; // Pas de tri par salaire pour les gigs inscrits
+                return 0;
               case 'experience':
-                return 0; // Pas de tri par expérience pour les gigs inscrits
+                return 0;
               case 'latest':
               default:
                 return new Date(a.enrollmentDate).getTime() - new Date(b.enrollmentDate).getTime();
             }
           });
+
+      case 'requested':
+        return requestedGigs
+          .sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
 
       case 'favorite':
         return gigs
@@ -1750,6 +1854,21 @@ export function GigsMarketplace() {
         >
           {t('gigsMarketplace.tabs.enrolled')}
           {activeTab === 'enrolled' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
+        </button>
+        <button
+          onClick={() => setActiveTab('requested')}
+          className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'requested'
+            ? 'text-harx-600'
+            : 'text-gray-400 hover:text-gray-600'
+            }`}
+        >
+          {t('gigsMarketplace.tabs.requested', isFrMarket ? 'En attente' : 'Requested')}
+          {requestedGigs.length > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-md">
+              {requestedGigs.length > 99 ? '99+' : requestedGigs.length}
+            </span>
+          )}
+          {activeTab === 'requested' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
           onClick={() => setActiveTab('favorite')}
@@ -2446,6 +2565,99 @@ export function GigsMarketplace() {
             </div>
           )}
         </div>
+      ) : activeTab === 'requested' ? (
+        <div>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            </div>
+          ) : requestedGigs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="bg-amber-50/50 rounded-3xl p-12 max-w-sm w-full border border-amber-100/50 backdrop-blur-sm">
+                <div className="text-4xl mb-4">⏳</div>
+                <h3 className="text-xl font-black text-gray-900 mb-2">
+                  {isFrMarket ? 'Aucune candidature en attente' : 'No pending applications'}
+                </h3>
+                <p className="text-sm text-gray-500 font-medium">
+                  {isFrMarket
+                    ? 'Postulez à une mission — elle apparaîtra ici en attente de validation entreprise.'
+                    : 'Apply to a gig and it will show here while waiting for company approval.'}
+                </p>
+                <button
+                  onClick={() => setActiveTab('available')}
+                  className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                >
+                  {isFrMarket ? 'Voir les missions' : 'Browse Available Gigs'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {(currentGigs as RequestedGig[]).map((requestedGig) => {
+                const gigStyle = getCardStyleForStatus('pending');
+                return (
+                  <div key={requestedGig.id} className={`${gigStyle.container} min-w-0`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <button
+                        type="button"
+                        onClick={() => goToCompanyProfile(requestedGig.gig)}
+                        disabled={!requestedGig.gig.companyId?._id}
+                        className="group/company flex items-center gap-2 flex-1 min-w-0 text-left rounded-xl -m-1 p-1 pr-2 border border-transparent cursor-pointer hover:bg-indigo-50/95 hover:border-indigo-200/70 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50 disabled:opacity-45 disabled:cursor-not-allowed transition-all duration-200"
+                      >
+                        <div className="w-10 h-10 rounded-xl border border-slate-100 flex items-center justify-center bg-white shadow-sm overflow-hidden shrink-0">
+                          {requestedGig.gig.companyId?.logo ? (
+                            <img src={requestedGig.gig.companyId.logo} alt={requestedGig.gig.companyId.name} className="w-full h-full object-contain p-1.5" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-400 font-bold text-base uppercase">
+                              {requestedGig.gig.companyId?.name?.[0] || '?'}
+                            </div>
+                          )}
+                        </div>
+                        {requestedGig.gig.companyId?.name && (
+                          <span className="text-[13px] font-extrabold text-slate-950 line-clamp-2 leading-tight flex-1">
+                            {requestedGig.gig.companyId.name}
+                          </span>
+                        )}
+                      </button>
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-400 shadow-sm ml-3 shrink-0">
+                        ⌛ {isFrMarket ? 'En attente' : 'Pending'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/gig/${requestedGig.gig._id}`)}
+                      className="text-left w-full text-lg font-bold text-indigo-950 mb-0.5 tracking-tight leading-tight line-clamp-2 hover:text-indigo-600 transition-colors bg-transparent border-0 p-0 cursor-pointer"
+                      title={requestedGig.gig.title}
+                    >
+                      {requestedGig.gig.title}
+                    </button>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${gigStyle.category} mb-3`}>
+                      {requestedGig.gig.category}
+                    </p>
+
+                    {renderCommissionInfo(requestedGig.gig)}
+
+                    <p className="mt-3 text-[11px] text-amber-700 font-medium bg-amber-50/80 border border-amber-100 rounded-xl px-3 py-2">
+                      {isFrMarket
+                        ? 'Candidature envoyée — en attente de validation par l’entreprise.'
+                        : 'Application sent — waiting for company approval.'}
+                    </p>
+
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => navigate(`/gig/${requestedGig.gig._id}`)}
+                        className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider"
+                      >
+                        {isFrMarket ? 'Détails' : 'Details'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       ) : activeTab === 'enrolled' ? (
         <div>
           {loading ? (
@@ -2681,8 +2893,8 @@ export function GigsMarketplace() {
         </div>
       )}
 
-      {/* Pagination Controls - Only show for Available Gigs */}
-      {activeTab === 'available' && totalPages > 1 && (
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
         <div className="flex justify-center items-center space-x-2 mt-12 bg-white/50 backdrop-blur-sm p-2 rounded-2xl border border-gray-100 w-fit mx-auto">
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
