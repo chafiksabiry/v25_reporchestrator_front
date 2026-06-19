@@ -242,7 +242,8 @@ export interface RepTransactionRow {
   amount: number;
   repShare: number;
   harxShare: number;
-  status: 'earned' | 'paid' | 'refused';
+  status: 'earned' | 'pending_retraction' | 'paid' | 'refused' | 'reversed';
+  withdrawableAt?: string;
   description?: string;
   createdAt: string;
   call?: {

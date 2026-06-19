@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { CallRecords } from '../CallRecords';
+import {
+  resolveCallRepCommission,
+  resolveTransactionRepCommission,
+  hasDetectedTransactionSale,
+} from '../../../utils/commissionUtils';
 
 interface DashboardProps {
   profile?: any;
@@ -98,6 +103,9 @@ const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
   { key: 'all', label: 'Tout' },
 ];
 
+const fmtMoney = (value: number) =>
+  value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
   switch (period) {
@@ -156,8 +164,9 @@ export function Dashboard({ profile }: DashboardProps) {
   const [walletStats, setWalletStats] = useState<{
     availableBalance: number;
     pendingCommissions: number;
+    pendingRetraction: number;
     lifetimeEarnings: number;
-  }>({ availableBalance: 0, pendingCommissions: 0, lifetimeEarnings: 0 });
+  }>({ availableBalance: 0, pendingCommissions: 0, pendingRetraction: 0, lifetimeEarnings: 0 });
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
   const [overlayCallId, setOverlayCallId] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<RepTransactionRow | null>(null);
@@ -248,6 +257,7 @@ export function Dashboard({ profile }: DashboardProps) {
           setWalletStats({
             availableBalance: available,
             pendingCommissions: Number(w.pendingCommissions || 0),
+            pendingRetraction: Number(w.pendingRetraction || 0),
             lifetimeEarnings: Number(w.lifetimeEarnings || 0)
           });
           // Sync to localStorage so TopBar shows the correct balance immediately
@@ -302,26 +312,118 @@ export function Dashboard({ profile }: DashboardProps) {
     });
   }, [reservationsData, selectedGigId, periodStartTs]);
 
-  // Earnings this week (last 7 days), 70% rep share from the ledger
-  const weeklyEarnings = useMemo(() => {
-    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    return repLedger.reduce((sum, row) => {
-      if (row.status !== 'earned') return sum;
-      const created = new Date(row.createdAt).getTime();
-      if (created < oneWeekAgo) return sum;
-      return sum + (row.repShare || 0);
-    }, 0);
-  }, [repLedger]);
+  const callActivityDateById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const call of callsData) {
+      const id = resolveCallRefId(call);
+      const date = call.startTime || call.createdAt || call.date;
+      if (id && date) map.set(id, date);
+    }
+    return map;
+  }, [callsData]);
 
-  // Earnings within the currently selected period
-  const periodEarnings = useMemo(() => {
-    return repLedger.reduce((sum, row) => {
-      if (row.status !== 'earned') return sum;
-      const created = new Date(row.createdAt).getTime();
-      if (periodStartTs > 0 && created < periodStartTs) return sum;
+  /** Pipeline: Solde disponible → Rétractation → Validation client → Total */
+  const earningsPipeline = useMemo(() => {
+    const inPeriod = (dateStr: string | undefined) => {
+      if (periodStartTs === 0) return true;
+      if (!dateStr) return false;
+      const ts = new Date(dateStr).getTime();
+      return Boolean(ts && ts >= periodStartTs);
+    };
+
+    const activeLedger = (row: RepTransactionRow) =>
+      row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
+
+    const bookedCallIds = new Set(
+      repLedger
+        .filter((row) => activeLedger(row) && row.type === 'call_validated' && row.callId)
+        .map((row) => String(row.callId))
+    );
+    const bookedTxSourceIds = new Set(
+      repLedger
+        .filter((row) => activeLedger(row) && row.type === 'transaction' && row.sourceId)
+        .map((row) => String(row.sourceId))
+    );
+
+    const ledgerActivityDate = (row: RepTransactionRow): string | undefined => {
+      if (row.callId) {
+        const fromCall = callActivityDateById.get(String(row.callId));
+        if (fromCall) return fromCall;
+      }
+      if (row.call?.startTime) return row.call.startTime;
+      return row.createdAt;
+    };
+
+    let clientValidationAmount = 0;
+    let clientValidationCount = 0;
+
+    filteredCalls.forEach((call) => {
+      const callId = resolveCallRefId(call);
+      if (!callId) return;
+
+      let pending = 0;
+
+      if (!bookedCallIds.has(callId) && call.validByAI !== false) {
+        pending += resolveCallRepCommission(call);
+      }
+
+      if (hasDetectedTransactionSale(call)) {
+        const txSourceId = String(call.transaction?._id || callId);
+        if (!bookedTxSourceIds.has(txSourceId) && call.transaction?.validByCompany !== true) {
+          pending += resolveTransactionRepCommission(call);
+        }
+      }
+
+      if (pending > 0) {
+        clientValidationAmount += pending;
+        clientValidationCount += 1;
+      }
+    });
+
+    let retractionAmount = 0;
+    let retractionCount = 0;
+
+    repLedger.forEach((row) => {
+      if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
+      const activityDate = ledgerActivityDate(row);
+      if (!inPeriod(activityDate)) return;
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
+        if (rGigId !== selectedGigId) return;
+      }
+      retractionAmount += row.repShare || 0;
+      retractionCount += 1;
+    });
+
+    const validatedInPeriod = repLedger.reduce((sum, row) => {
+      if (!activeLedger(row)) return sum;
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
+        if (rGigId !== selectedGigId) return sum;
+      }
+      if (!inPeriod(ledgerActivityDate(row))) return sum;
       return sum + (row.repShare || 0);
     }, 0);
-  }, [repLedger, periodStartTs]);
+
+    const totalGains = validatedInPeriod + clientValidationAmount;
+
+    return {
+      availableBalance: walletStats.availableBalance,
+      retractionAmount,
+      retractionCount,
+      clientValidationAmount,
+      clientValidationCount,
+      totalGains,
+      validatedInPeriod,
+    };
+  }, [
+    filteredCalls,
+    repLedger,
+    callActivityDateById,
+    periodStartTs,
+    selectedGigId,
+    walletStats.availableBalance,
+  ]);
 
   // Reservation statistics (work the rep has booked)
   const reservationStats = useMemo(() => {
@@ -863,72 +965,108 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Wallet strip — compact KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            label: 'Solde disponible',
-            value: `${walletStats.availableBalance.toFixed(2)} €`,
-            sub: 'Prêt au retrait',
-            icon: WalletIcon,
-            accent: 'emerald'
-          },
-          {
-            label: 'En attente',
-            value: `${walletStats.pendingCommissions.toFixed(2)} €`,
-            sub: 'Validation IA',
-            icon: Hourglass,
-            accent: 'amber'
-          },
-          {
-            label: selectedPeriod === 'all' ? 'Cette semaine' : `Gains — ${PERIOD_OPTIONS.find(p => p.key === selectedPeriod)?.label}`,
-            value: `${(selectedPeriod === 'all' ? weeklyEarnings : periodEarnings).toFixed(2)} €`,
-            sub: selectedPeriod === 'all' ? '7 derniers jours' : 'Filtré par période',
-            icon: TrendingUp,
-            accent: 'blue'
-          },
-          {
-            label: 'Gains totaux',
-            value: `${walletStats.lifetimeEarnings.toFixed(2)} €`,
-            sub: 'Depuis votre arrivée',
-            icon: Trophy,
-            accent: 'dark'
-          },
-        ].map((kpi, idx) => {
-          const isDark = kpi.accent === 'dark';
-          return (
-            <div
-              key={idx}
-              className={`relative overflow-hidden rounded-3xl p-5 shadow-xl transition-all duration-300 hover:-translate-y-0.5 ${
-                isDark
-                  ? 'bg-slate-950 text-white border border-slate-800 shadow-slate-900/20'
-                  : 'bg-white/50 backdrop-blur-xl border border-white/60 shadow-slate-200/20'
-              }`}
-            >
-              {isDark && <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl" />}
-              <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className={`text-[9px] font-black uppercase tracking-widest truncate ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
-                    {kpi.label}
-                  </p>
-                  <p className={`text-2xl font-black tracking-tighter mt-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {kpi.value}
-                  </p>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${
-                    isDark ? 'text-white/50' : `text-${kpi.accent}-600`
-                  }`}>
-                    {kpi.sub}
-                  </p>
-                </div>
-                <div className={`h-9 w-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                  isDark ? 'bg-white/10 text-white' : `bg-${kpi.accent}-500/10 text-${kpi.accent}-600`
-                }`}>
-                  <kpi.icon size={16} />
-                </div>
+      {/* Gains pipeline — Solde → Rétractation → Validation client → Total */}
+      <div className="rounded-3xl bg-white/50 backdrop-blur-xl border border-white/60 shadow-xl shadow-slate-200/20 overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
+          {/* 1. Solde disponible */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-white/60">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">
+                  Solde disponible
+                </p>
+                <p className="text-2xl font-black text-slate-900 tracking-tighter mt-2">
+                  {fmtMoney(earningsPipeline.availableBalance)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
+                  Prêt au retrait
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                <WalletIcon size={16} />
               </div>
             </div>
-          );
-        })}
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 2. Rétractation (14 jours) */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-orange-50/40">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-orange-700 truncate">
+                  Rétractation
+                </p>
+                <p className="text-2xl font-black text-orange-700 tracking-tighter mt-2">
+                  {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-orange-600/80">
+                  {earningsPipeline.retractionCount > 0
+                    ? `${earningsPipeline.retractionCount} vente(s) — 14 jours`
+                    : 'Aucune vente sous rétractation'}
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
+                <RotateCcw size={16} />
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 3. Validation client */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-white/60 bg-amber-50/40">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-700 truncate">
+                  Validation client
+                </p>
+                <p className="text-2xl font-black text-amber-700 tracking-tighter mt-2">
+                  +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-amber-600/80">
+                  {earningsPipeline.clientValidationCount > 0
+                    ? `${earningsPipeline.clientValidationCount} en attente entreprise`
+                    : 'Rien en attente de validation'}
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <Building2 size={16} />
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 4. Total des gains */}
+          <div className="p-5 sm:p-6 flex flex-col bg-slate-950 text-white relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-white/50 truncate">
+                  Total des gains
+                </p>
+                <p className="text-2xl font-black text-white tracking-tighter mt-2">
+                  {fmtMoney(earningsPipeline.totalGains)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
+                  {selectedPeriod === 'all'
+                    ? 'Validés + en attente client'
+                    : `${PERIOD_OPTIONS.find((p) => p.key === selectedPeriod)?.label} — filtré`}
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">
+                <Trophy size={16} />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Activité Récente — Transactions & Calls cards */}
