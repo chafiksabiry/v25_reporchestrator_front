@@ -253,6 +253,30 @@ export function WalletPage() {
     return new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime();
   };
 
+  const getPeriodStartHint = (range: string): string => {
+    switch (range) {
+      case 'today':
+        return 'Déjà dans le portefeuille ce matin';
+      case 'this-week':
+        return 'Déjà dans le portefeuille lundi matin';
+      case 'last-month':
+      case 'this-month':
+        return 'Déjà dans le portefeuille au 1er du mois';
+      default:
+        return 'Avant les nouveaux gains de la période';
+    }
+  };
+
+  const getPeriodStartDateLabel = (range: string): string => {
+    const start = getWalletPeriodStart(range);
+    if (!start) return '';
+    return new Date(start).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
   const resetTransactionFilters = () => {
     setSelectedGigId('all');
     setTransactionValidationFilter('all');
@@ -651,10 +675,24 @@ export function WalletPage() {
       selectedGigId,
     });
 
-    const totalGains = ledgerBreakdown.validatedInPeriod + clientValidationAmount;
+    /** Commissions passées en « earned » sur la période → créditées au solde disponible. */
+    const earnedInPeriod = repLedgerRows.reduce((sum, row) => {
+      if (row.status !== 'earned') return sum;
+      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return sum;
+      if (!inPeriod(ledgerActivityDate(row))) return sum;
+      return sum + (row.repShare || 0);
+    }, 0);
+
+    const periodStartBalance = Math.max(0, availableBalance - earnedInPeriod);
+    const totalGains =
+      periodStartBalance + ledgerBreakdown.validatedInPeriod + clientValidationAmount;
 
     return {
       availableBalance,
+      periodStartBalance,
+      earnedInPeriod,
+      periodStartDateLabel: getPeriodStartDateLabel(selectedDateRange),
+      periodStartHint: getPeriodStartHint(selectedDateRange),
       retractionAmount,
       retractionCount,
       clientValidationAmount,
@@ -800,10 +838,39 @@ export function WalletPage() {
         </div>
       </div>
 
-      {/* ── Gains pipeline : Solde → Validés → Rétractation → Validation → Total ── */}
+      {/* ── Gains pipeline : Départ → Disponible → Validés → Rétractation → Validation → Total ── */}
       <div className="rounded-3xl bg-white/50 backdrop-blur-xl border border-white/60 shadow-xl shadow-slate-200/20 overflow-hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
-          {/* 1. Solde disponible */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
+          {/* 1. Solde de départ (début de période) */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 lg:border-r 2xl:border-r border-white/60 bg-slate-50/50">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">
+                  Solde de départ
+                </p>
+                {earningsPipeline.periodStartDateLabel && (
+                  <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                    {earningsPipeline.periodStartDateLabel}
+                  </p>
+                )}
+                <p className="text-2xl font-black text-slate-900 tracking-tighter mt-2">
+                  {fmtMoney(earningsPipeline.periodStartBalance)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-slate-500">
+                  {earningsPipeline.periodStartHint}
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-slate-200/60 text-slate-500 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 2. Solde disponible */}
           <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-white/60">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
@@ -823,11 +890,11 @@ export function WalletPage() {
             </div>
           </div>
 
-          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 2. Gains validés — appels & ventes */}
+          {/* 3. Gains validés — appels & ventes */}
           <button
             type="button"
             onClick={focusValidatedEarnings}
@@ -881,11 +948,11 @@ export function WalletPage() {
             </div>
           </button>
 
-          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 3. Rétractation (14 jours) */}
+          {/* 4. Rétractation (14 jours) */}
           <button
             type="button"
             onClick={focusRetractionTransactions}
@@ -919,11 +986,11 @@ export function WalletPage() {
             </div>
           </button>
 
-          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 4. Validation client */}
+          {/* 5. Validation client */}
           <button
             type="button"
             onClick={focusClientValidationPending}
@@ -957,25 +1024,25 @@ export function WalletPage() {
             </div>
           </button>
 
-          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+          <div className="hidden 2xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 5. Total des gains */}
+          {/* 6. Total sur la période */}
           <div className="p-5 sm:p-6 flex flex-col bg-slate-950 text-white relative overflow-hidden">
             <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-widest text-white/50 truncate">
-                  Total des gains
+                  Total période
                 </p>
                 <p className="text-2xl font-black text-white tracking-tighter mt-2">
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {fmtMoney(earningsPipeline.validatedCallsAmount)} appels
+                  {fmtMoney(earningsPipeline.periodStartBalance)} départ
                   {' + '}
-                  {fmtMoney(earningsPipeline.validatedSalesAmount)} ventes
+                  {fmtMoney(earningsPipeline.validatedInPeriod)} gains
                   {earningsPipeline.clientValidationAmount > 0
                     ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
                     : ''}
