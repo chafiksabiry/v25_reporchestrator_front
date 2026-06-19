@@ -553,6 +553,17 @@ export function WalletPage() {
   const fmtMoney = (value: number) =>
     value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  /** Date d'activité d'une ligne ledger = date de l'appel, pas date d'écriture comptable. */
+  const callActivityDateById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const call of realCalls) {
+      const id = String(call._id?.$oid || call._id || call.sid || '');
+      const date = call.startTime || call.createdAt;
+      if (id && date) map.set(id, date);
+    }
+    return map;
+  }, [realCalls]);
+
   const weeklyEarnings = getWeeklyEarnings();
   const progressPct = Math.min(100, Math.round((availableBalance / MIN_WITHDRAWAL_AMOUNT) * 100));
   const remainingToMin = Math.max(0, MIN_WITHDRAWAL_AMOUNT - availableBalance);
@@ -569,9 +580,18 @@ export function WalletPage() {
       return true;
     };
 
+    const ledgerActivityDate = (row: RepTransactionRow): string | undefined => {
+      if (row.callId) {
+        const fromCall = callActivityDateById.get(String(row.callId));
+        if (fromCall) return fromCall;
+      }
+      if (row.call?.startTime) return row.call.startTime;
+      return row.createdAt;
+    };
+
     const validatedGains = repLedgerRows.reduce((sum, row) => {
       if (row.status !== 'earned') return sum;
-      if (!inPeriod(row.createdAt)) return sum;
+      if (!inPeriod(ledgerActivityDate(row))) return sum;
       return sum + (row.repShare || 0);
     }, 0);
 
@@ -609,21 +629,7 @@ export function WalletPage() {
       return sum + callPending;
     }, 0);
 
-    const earnedBeforePeriod = repLedgerRows.reduce((sum, row) => {
-      if (row.status !== 'earned') return sum;
-      const ts = new Date(row.createdAt).getTime();
-      if (!ts || ts >= periodStart) return sum;
-      return sum + (row.repShare || 0);
-    }, 0);
-
-    const withdrawnBeforePeriod = backendWithdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'Failed') return sum;
-      const ts = new Date(withdrawal.date).getTime();
-      if (!ts || ts >= periodStart) return sum;
-      return sum + Math.abs(withdrawal.amount || 0);
-    }, 0);
-
-    const periodStartBalance = Math.max(0, earnedBeforePeriod - withdrawnBeforePeriod);
+    const periodStartBalance = Math.max(0, availableBalance - validatedGains);
     const totalGains = periodStartBalance + validatedGains + pendingGains;
 
     return {
@@ -633,7 +639,7 @@ export function WalletPage() {
       totalGains,
       pendingCountInPeriod,
     };
-  }, [selectedDateRange, repLedgerRows, realCalls, backendWithdrawals]);
+  }, [selectedDateRange, repLedgerRows, realCalls, availableBalance, callActivityDateById]);
 
   const filteredTransactions = transactions.filter((tx) => {
     if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
@@ -815,7 +821,13 @@ export function WalletPage() {
               +{fmtMoney(periodEarningsBreakdown.pendingGains)}
               <span className="text-lg text-amber-300 ml-0.5">€</span>
             </p>
-            <p className="text-[10px] font-semibold text-amber-600/70 mt-2">Appels & ventes à valider</p>
+            <p className="text-[10px] font-semibold text-amber-600/70 mt-2">
+              {periodEarningsBreakdown.pendingGains > 0
+                ? 'Appels & ventes à valider'
+                : periodEarningsBreakdown.validatedGains > 0
+                  ? 'Commissions déjà créditées sur la période'
+                  : 'Appels & ventes à valider'}
+            </p>
           </div>
 
           <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
