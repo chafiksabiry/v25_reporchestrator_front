@@ -26,6 +26,9 @@ import {
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
 import {
+  isScriptRequirementModule,
+  journeyHasScriptModule,
+  scriptModuleSlideKey,
   scriptModuleStillPending,
   trainingApiBase,
 } from '../../../utils/trainingScriptRequirement';
@@ -173,10 +176,12 @@ function extractModules(j: JourneyRow): ModuleRow[] {
 
 function CompletedTrainingRequirementsWarning({
   scriptPending,
+  hasScriptModule,
   onOpenScript,
   onCertify,
 }: {
   scriptPending: boolean;
+  hasScriptModule: boolean;
   onOpenScript?: () => void;
   onCertify?: () => void;
 }) {
@@ -187,14 +192,21 @@ function CompletedTrainingRequirementsWarning({
         <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
           Étapes obligatoires avant le cockpit
         </p>
-        {scriptPending ? (
+        {hasScriptModule ? (
           <p>
             <span className="inline-flex items-center gap-1 font-bold text-amber-900">
               <MessageSquare className="h-3.5 w-3.5" />
               Script d&apos;appel :
             </span>{' '}
-            la lecture du script est <strong>obligatoire</strong>. Ouvrez la formation et validez le module script
-            (section + quiz).
+            {scriptPending ? (
+              <>
+                la lecture du script est <strong>obligatoire</strong>. Validez le module script (section + quiz).
+              </>
+            ) : (
+              <>
+                assurez-vous d&apos;avoir bien relu le module script — il est requis pour les appels en cockpit.
+              </>
+            )}
             {onOpenScript ? (
               <>
                 {' '}
@@ -203,20 +215,12 @@ function CompletedTrainingRequirementsWarning({
                   onClick={onOpenScript}
                   className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
                 >
-                  Lire le script
+                  {scriptPending ? 'Lire le script' : 'Relire le script'}
                 </button>
               </>
             ) : null}
           </p>
-        ) : (
-          <p>
-            <span className="inline-flex items-center gap-1 font-bold text-amber-900">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Script d&apos;appel :
-            </span>{' '}
-            assurez-vous d&apos;avoir bien relu le module script — il est requis pour les appels en cockpit.
-          </p>
-        )}
+        ) : null}
         <p>
           <span className="inline-flex items-center gap-1 font-bold text-amber-900">
             <Award className="h-3.5 w-3.5" />
@@ -792,6 +796,7 @@ export function Training() {
   const quizOutcomeSentRef = useRef<Set<string>>(new Set());
   /** POST /quiz/start déjà réussi pour cette clé (réinitialisé en quittant le slide quiz). */
   const quizStartSentRef = useRef<Set<string>>(new Set());
+  const pendingScriptJumpRef = useRef<string | null>(null);
 
   const displayJourneys = useMemo(() => {
     if (gigFilter === '__all__') return journeys;
@@ -1116,6 +1121,36 @@ export function Training() {
     },
     [formationViewerSlideIndexByKey]
   );
+
+  useEffect(() => {
+    const key = pendingScriptJumpRef.current;
+    if (!key || !selectedJourney) return;
+    const idx = formationViewerSlideIndexByKey.get(key);
+    if (typeof idx !== 'number') return;
+    pendingScriptJumpRef.current = null;
+    setFormationViewerSlideIndex(idx);
+  }, [selectedJourney, formationViewerSlideIndexByKey]);
+
+  const openScriptForJourney = useCallback(
+    (j: JourneyRow, opts?: { switchTab?: boolean }) => {
+      const id = journeyKey(j);
+      if (!id) return;
+      const slideKey = scriptModuleSlideKey(j);
+      if (opts?.switchTab !== false) setTrainingTab('trainings');
+      if (slideKey) {
+        pendingScriptJumpRef.current = slideKey;
+        setSelectedJourneyId(id);
+        setFormationViewerSlideIndex(0);
+        setActiveSlide(0);
+        return;
+      }
+      setSelectedJourneyId(id);
+      setFormationViewerSlideIndex(0);
+      setActiveSlide(0);
+    },
+    []
+  );
+
   const currentFormationViewerSlide = formationViewerSlides[formationViewerSlideIndex];
   const isNextModuleLocked = useMemo(() => {
     if (!selectedJourneyId || !currentFormationViewerSlide) return false;
@@ -2370,6 +2405,7 @@ export function Training() {
               Number(progress?.progressPercentage) >= 100;
             const structured = id ? structuredProgressByJourney[id] : undefined;
             const scriptPending = isCompleted && scriptModuleStillPending(j, structured, progress);
+            const hasScriptModule = journeyHasScriptModule(j);
 
             const openFormation = () => {
               if (!id) return;
@@ -2441,7 +2477,7 @@ export function Training() {
                     </div>
                   </div>
                 </div>
-                <div className="shrink-0 flex gap-2">
+                <div className="shrink-0 flex flex-wrap gap-2">
                   <button
                     type="button"
                     disabled={!id}
@@ -2450,6 +2486,17 @@ export function Training() {
                   >
                     Continue
                   </button>
+                  {hasScriptModule && (
+                    <button
+                      type="button"
+                      disabled={!id}
+                      onClick={() => openScriptForJourney(j)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-amber-100 transition-colors disabled:opacity-40"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Script
+                    </button>
+                  )}
                   {isCompleted && (
                     <button
                       type="button"
@@ -2465,7 +2512,8 @@ export function Training() {
                 {isCompleted && (
                   <CompletedTrainingRequirementsWarning
                     scriptPending={scriptPending}
-                    onOpenScript={openFormation}
+                    hasScriptModule={hasScriptModule}
+                    onOpenScript={() => openScriptForJourney(j)}
                     onCertify={() => openCertificate(j)}
                   />
                 )}
@@ -2513,6 +2561,7 @@ export function Training() {
               const progress = id ? progressByJourney[id] : undefined;
               const structured = id ? structuredProgressByJourney[id] : undefined;
               const scriptPending = scriptModuleStillPending(j, structured, progress);
+              const hasScriptModule = journeyHasScriptModule(j);
               return (
                 <li
                   key={`cert-${id || journeyTitle(j)}`}
@@ -2539,13 +2588,8 @@ export function Training() {
                   </div>
                   <CompletedTrainingRequirementsWarning
                     scriptPending={scriptPending}
-                    onOpenScript={() => {
-                      if (!id) return;
-                      setSelectedJourneyId(id);
-                      setFormationViewerSlideIndex(0);
-                      setActiveSlide(0);
-                      setTrainingTab('trainings');
-                    }}
+                    hasScriptModule={hasScriptModule}
+                    onOpenScript={() => openScriptForJourney(j)}
                     onCertify={() => openCertificate(j)}
                   />
                   <button
@@ -2687,6 +2731,10 @@ export function Training() {
                               return currentFormationViewerSlide.modules.map((mod) => {
                               const moduleTheme =
                                 moduleColorStyles[mod.moduleIndex % moduleColorStyles.length];
+                              const journeyModules = selectedJourney ? extractModules(selectedJourney) : [];
+                              const scriptMod =
+                                journeyModules[mod.moduleIndex] &&
+                                isScriptRequirementModule(journeyModules[mod.moduleIndex]);
                               const modLocked =
                                 selectedJourney &&
                                 isOverviewModuleCardLocked(
@@ -2710,7 +2758,16 @@ export function Training() {
                                   <button
                                     type="button"
                                     disabled={!!modLocked}
-                                    onClick={() => jumpToFormationSlide(`m${mod.moduleIndex}-intro`)}
+                                    onClick={() => {
+                                      if (scriptMod && selectedJourney) {
+                                        const key = scriptModuleSlideKey(selectedJourney);
+                                        if (key) {
+                                          jumpToFormationSlide(key);
+                                          return;
+                                        }
+                                      }
+                                      jumpToFormationSlide(`m${mod.moduleIndex}-intro`);
+                                    }}
                                     className={`group flex w-full items-start justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-white shadow-sm transition ${
                                       modLocked ? 'cursor-not-allowed' : 'hover:brightness-105'
                                     }`}
@@ -2719,11 +2776,16 @@ export function Training() {
                                     <span className="min-w-0">
                                       <span className="block text-[10px] font-bold uppercase tracking-wider text-white/90">
                                         Module {mod.moduleIndex + 1}
+                                        {scriptMod ? (
+                                          <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[9px] text-amber-100">
+                                            Script
+                                          </span>
+                                        ) : null}
                                       </span>
                                       <span className="mt-0.5 block truncate text-sm font-semibold">{mod.title}</span>
                                     </span>
                                     <span className="inline-flex shrink-0 items-center rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                                      {modLocked ? 'Verrouillé' : 'Ouvrir'}
+                                      {modLocked ? 'Verrouillé' : scriptMod ? 'Lire' : 'Ouvrir'}
                                     </span>
                                   </button>
                                   <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
