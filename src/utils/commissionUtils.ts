@@ -116,3 +116,35 @@ export function resolveTransactionRepCommission(record: CommissionCall): number 
     30;
   return base * REP_SHARE;
 }
+
+/** Montant en attente de validation entreprise pour un appel donné. */
+export function resolveClientValidationPendingAmount(
+  record: CommissionCall & { _id?: unknown; transaction?: { _id?: unknown } | null },
+  ledgerCallIds: Set<string>,
+  bookedTxSourceIds: Set<string>,
+  callId: string
+): number {
+  let pending = 0;
+
+  if (!ledgerCallIds.has(callId) && record.validByAI === true) {
+    pending += resolveCallRepCommission(record);
+  }
+
+  if (hasDetectedTransactionSale(record)) {
+    const txSourceId = String(record.transaction?._id || callId);
+    if (!bookedTxSourceIds.has(txSourceId) && record.transaction?.validByCompany !== true) {
+      pending += resolveTransactionRepCommission(record);
+    }
+  }
+
+  return pending;
+}
+
+export function isCallPendingClientValidation(
+  record: CommissionCall & { _id?: unknown; transaction?: { _id?: unknown } | null },
+  ledgerCallIds: Set<string>,
+  bookedTxSourceIds: Set<string>,
+  callId: string
+): boolean {
+  return resolveClientValidationPendingAmount(record, ledgerCallIds, bookedTxSourceIds, callId) > 0;
+}

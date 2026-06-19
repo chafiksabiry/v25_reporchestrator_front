@@ -8,9 +8,7 @@ import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { CallRecords } from '../CallRecords';
 import {
-  resolveCallRepCommission,
-  resolveTransactionRepCommission,
-  hasDetectedTransactionSale,
+  resolveClientValidationPendingAmount,
 } from '../../../utils/commissionUtils';
 
 interface DashboardProps {
@@ -171,8 +169,9 @@ export function Dashboard({ profile }: DashboardProps) {
   const [periodDropdownPos, setPeriodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
-  type CallFilter = 'all' | 'valid' | 'invalid';
+  type CallFilter = 'all' | 'valid' | 'invalid' | 'pending_client';
   const [callFilter, setCallFilter] = useState<CallFilter>('all');
+  const callsSectionRef = useRef<HTMLDivElement>(null);
 
   // Earnings & objectifs (RepTransaction-backed)
   const [walletStats, setWalletStats] = useState<{
@@ -372,29 +371,23 @@ export function Dashboard({ profile }: DashboardProps) {
 
     let clientValidationAmount = 0;
     let clientValidationCount = 0;
+    const pendingClientValidationCallIds = new Set<string>();
 
     filteredCalls.forEach((call) => {
       const callId = resolveCallRefId(call);
       if (!callId) return;
 
-      let pending = 0;
-
-      // Appel validé IA mais pas encore crédité au ledger (rare).
-      if (!ledgerCallIds.has(callId) && call.validByAI === true) {
-        pending += resolveCallRepCommission(call);
-      }
-
-      // Vente détectée — en attente validation entreprise uniquement.
-      if (hasDetectedTransactionSale(call)) {
-        const txSourceId = String(call.transaction?._id || callId);
-        if (!bookedTxSourceIds.has(txSourceId) && call.transaction?.validByCompany !== true) {
-          pending += resolveTransactionRepCommission(call);
-        }
-      }
+      const pending = resolveClientValidationPendingAmount(
+        call,
+        ledgerCallIds,
+        bookedTxSourceIds,
+        callId
+      );
 
       if (pending > 0) {
         clientValidationAmount += pending;
         clientValidationCount += 1;
+        pendingClientValidationCallIds.add(callId);
       }
     });
 
@@ -433,6 +426,7 @@ export function Dashboard({ profile }: DashboardProps) {
       clientValidationCount,
       totalGains,
       validatedInPeriod,
+      pendingClientValidationCallIds,
     };
   }, [
     filteredCalls,
@@ -442,6 +436,13 @@ export function Dashboard({ profile }: DashboardProps) {
     selectedGigId,
     walletStats.availableBalance,
   ]);
+
+  const focusClientValidationPending = () => {
+    setCallFilter('pending_client');
+    window.setTimeout(() => {
+      callsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
 
   // Reservation statistics (work the rep has booked)
   const reservationStats = useMemo(() => {
@@ -571,18 +572,26 @@ export function Dashboard({ profile }: DashboardProps) {
 
   // Call validation breakdown + visible list
   const callStats = useMemo(() => {
-    const acc = { all: 0, valid: 0, invalid: 0 };
+    const acc = { all: 0, valid: 0, invalid: 0, pending_client: 0 };
     filteredCalls.forEach((call: any) => {
       acc.all += 1;
       const isValid = call.valid === true || call.validByAI === true;
       if (isValid) acc.valid += 1;
       else acc.invalid += 1;
+      const callId = resolveCallRefId(call);
+      if (callId && earningsPipeline.pendingClientValidationCallIds.has(callId)) {
+        acc.pending_client += 1;
+      }
     });
     return acc;
-  }, [filteredCalls]);
+  }, [filteredCalls, earningsPipeline.pendingClientValidationCallIds]);
 
   const visibleCalls = useMemo(() => {
     const list = filteredCalls.filter((call: any) => {
+      if (callFilter === 'pending_client') {
+        const callId = resolveCallRefId(call);
+        return callId ? earningsPipeline.pendingClientValidationCallIds.has(callId) : false;
+      }
       if (callFilter === 'all') return true;
       const isValid = call.valid === true || call.validByAI === true;
       return callFilter === 'valid' ? isValid : !isValid;
@@ -593,8 +602,8 @@ export function Dashboard({ profile }: DashboardProps) {
         const tb = new Date(b.createdAt || b.startTime || 0).getTime();
         return tb - ta;
       })
-      .slice(0, 8);
-  }, [filteredCalls, callFilter]);
+      .slice(0, callFilter === 'pending_client' ? 20 : 8);
+  }, [filteredCalls, callFilter, earningsPipeline.pendingClientValidationCallIds]);
 
   // Multi-objectifs — daily / weekly / monthly call goals + reservation goal
   const multiObjectifs = useMemo(() => {
@@ -1036,8 +1045,20 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 3. Validation client */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-white/60 bg-amber-50/40">
+          {/* 3. Validation client — clic → filtre appels en attente */}
+          <button
+            type="button"
+            onClick={focusClientValidationPending}
+            disabled={earningsPipeline.clientValidationCount === 0}
+            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-white/60 bg-amber-50/40 text-left transition-all w-full ${
+              callFilter === 'pending_client'
+                ? 'ring-2 ring-amber-400 ring-inset shadow-inner'
+                : earningsPipeline.clientValidationCount > 0
+                  ? 'hover:bg-amber-50/70 cursor-pointer'
+                  : 'cursor-default opacity-90'
+            }`}
+            aria-label="Voir les commissions en attente de validation entreprise"
+          >
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-widest text-amber-700 truncate">
@@ -1048,7 +1069,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-amber-600/80">
                   {earningsPipeline.clientValidationCount > 0
-                    ? `${earningsPipeline.clientValidationCount} en attente entreprise`
+                    ? `${earningsPipeline.clientValidationCount} en attente entreprise — cliquer pour voir`
                     : 'Rien en attente de validation'}
                 </p>
               </div>
@@ -1056,7 +1077,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <Building2 size={16} />
               </div>
             </div>
-          </div>
+          </button>
 
           <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
@@ -1210,7 +1231,14 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* Calls card */}
-        <div className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col">
+        <div
+          ref={callsSectionRef}
+          className={`bg-white/50 backdrop-blur-xl border rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col transition-all ${
+            callFilter === 'pending_client'
+              ? 'border-amber-300 ring-2 ring-amber-200/80'
+              : 'border-white/60'
+          }`}
+        >
           <div className="px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
@@ -1220,7 +1248,9 @@ export function Dashboard({ profile }: DashboardProps) {
                 <div>
                   <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">Appels</h2>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    Historique & validation IA
+                    {callFilter === 'pending_client'
+                      ? 'En attente validation entreprise'
+                      : 'Historique & validation IA'}
                   </p>
                 </div>
               </div>
@@ -1235,6 +1265,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 { key: 'all', label: 'Tous', accent: 'slate', count: callStats.all },
                 { key: 'valid', label: 'Validés', accent: 'emerald', count: callStats.valid },
                 { key: 'invalid', label: 'Non validés', accent: 'rose', count: callStats.invalid },
+                { key: 'pending_client', label: 'En attente client', accent: 'amber', count: callStats.pending_client },
               ] as { key: CallFilter; label: string; accent: string; count: number }[]).map((tab) => {
                 const active = callFilter === tab.key;
                 return (
@@ -1248,6 +1279,8 @@ export function Dashboard({ profile }: DashboardProps) {
                           ? 'bg-slate-900 text-white shadow-md'
                           : tab.accent === 'emerald'
                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                          : tab.accent === 'amber'
+                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
                           : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
                         : 'bg-white/60 text-slate-500 hover:bg-white hover:text-slate-800'
                     }`}
@@ -1271,8 +1304,14 @@ export function Dashboard({ profile }: DashboardProps) {
                 <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
                   <Inbox size={22} />
                 </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aucun appel</p>
-                <p className="text-[11px] text-slate-400 mt-1">Aucun résultat pour ce filtre</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {callFilter === 'pending_client' ? 'Aucun en attente client' : 'Aucun appel'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {callFilter === 'pending_client'
+                    ? 'Aucune commission en attente de validation entreprise'
+                    : 'Aucun résultat pour ce filtre'}
+                </p>
               </div>
             ) : (
               <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
@@ -1288,6 +1327,10 @@ export function Dashboard({ profile }: DashboardProps) {
                   const dateStr = call.startTime || call.createdAt;
                   const cGigId = typeof call.gigId === 'object' ? (call.gigId?._id || call.gigId?.id) : call.gigId;
                   const gigTitle = (typeof call.gigId === 'object' && call.gigId?.title) || (gigsData.find((g: any) => (g._id || g.id) === cGigId)?.title) || '';
+                  const callId = resolveCallRefId(call);
+                  const isPendingClient = callId
+                    ? earningsPipeline.pendingClientValidationCallIds.has(callId)
+                    : false;
                   return (
                     <li key={call._id || call.sid || `${contact}-${dateStr}`}>
                       <button
@@ -1317,13 +1360,19 @@ export function Dashboard({ profile }: DashboardProps) {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
-                            isValid
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                              : 'bg-rose-50 text-rose-700 border-rose-100'
-                          }`}>
-                            {isValid ? 'Validé' : 'Non validé'}
-                          </span>
+                          {callFilter === 'pending_client' || isPendingClient ? (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                              En attente client
+                            </span>
+                          ) : (
+                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
+                              isValid
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-rose-50 text-rose-700 border-rose-100'
+                            }`}>
+                              {isValid ? 'Validé' : 'Non validé'}
+                            </span>
+                          )}
                           <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
                         </div>
                       </button>
