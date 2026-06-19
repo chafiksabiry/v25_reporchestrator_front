@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bot, User, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bot, User, Loader2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useGigScript } from '../../copilot/hooks/useGigScript';
 
 type ReplicaPair = { agent?: { replica?: string }; lead?: { replica?: string } };
@@ -11,6 +11,7 @@ export type ScriptCockpitPanelProps = {
   gigTitle?: string;
   theme?: ScriptReaderTheme;
   className?: string;
+  onFinish?: () => void;
 };
 
 function themeClasses(theme: ScriptReaderTheme) {
@@ -29,6 +30,7 @@ function themeClasses(theme: ScriptReaderTheme) {
       ? 'border-white/10 text-slate-300 hover:bg-white/10 disabled:opacity-30'
       : 'border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30',
     btnPrimary: 'bg-gradient-to-r from-indigo-500 to-pink-500 text-white disabled:opacity-30',
+    btnFinish: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-400 hover:to-teal-400',
     optionActive: dark ? 'bg-indigo-500/25 border-indigo-400' : 'bg-indigo-50 border-indigo-400',
     optionIdle: dark ? 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06]' : 'bg-slate-50 border-slate-200 hover:bg-slate-100',
     phaseActive: dark ? 'bg-indigo-500/30 border-indigo-400/50 text-white' : 'bg-indigo-100 border-indigo-300 text-indigo-900',
@@ -42,6 +44,7 @@ export function ScriptCockpitPanel({
   gigTitle,
   theme = 'dark',
   className = '',
+  onFinish,
 }: ScriptCockpitPanelProps) {
   const t = themeClasses(theme);
   const { activeScript, loading: scriptLoading } = useGigScript(gigId);
@@ -101,6 +104,7 @@ export function ScriptCockpitPanel({
 
   const stepCount = hasInteractiveStages ? interactiveStages.length : replicas.length;
   const stepIndex = hasInteractiveStages ? activePhaseIndex : activeReplicaIndex;
+  const isLastStep = stepCount > 0 && stepIndex >= stepCount - 1;
 
   useEffect(() => {
     setActivePhaseIndex(0);
@@ -303,17 +307,37 @@ export function ScriptCockpitPanel({
             Précédent
           </button>
           <span className={`text-[9px] font-extrabold uppercase tracking-wider text-center ${t.muted}`}>
-            Étape {stepIndex + 1} / {stepCount}
+            {isLastStep ? (
+              <>
+                <span className={theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}>
+                  Dernière étape
+                </span>
+                <span className="mx-1 opacity-50">·</span>
+                {stepIndex + 1} / {stepCount}
+              </>
+            ) : (
+              <>Étape {stepIndex + 1} / {stepCount}</>
+            )}
           </span>
-          <button
-            type="button"
-            disabled={stepIndex >= stepCount - 1}
-            onClick={goNext}
-            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase ${t.btnPrimary}`}
-          >
-            Suivant
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+          {isLastStep ? (
+            <button
+              type="button"
+              onClick={() => onFinish?.()}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase shadow-lg shadow-emerald-500/20 ${t.btnFinish}`}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Terminer
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={goNext}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase ${t.btnPrimary}`}
+            >
+              Suivant
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          )}
         </nav>
       ) : null}
     </div>
