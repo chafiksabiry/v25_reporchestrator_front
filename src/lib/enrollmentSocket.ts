@@ -47,7 +47,7 @@ export function connectRepEnrollmentSocket(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
-  const RELEVANT_TYPES = new Set(['enrollment_update']);
+  const RELEVANT_TYPES = new Set(['enrollment_update', 'request_cancelled']);
 
   const connect = () => {
     if (disposed) return;
