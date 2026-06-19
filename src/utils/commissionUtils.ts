@@ -67,6 +67,8 @@ export function isProspectRubricOnly(record: CommissionCall): boolean {
 
 /** IA a détecté une vente — en attente validation entreprise. */
 export function hasDetectedTransactionSale(record: CommissionCall): boolean {
+  if (record.transaction?.validByCompany === true) return true;
+
   if (record.validByAI !== true) return false;
 
   if (record.callOutcome === 'transaction') return true;

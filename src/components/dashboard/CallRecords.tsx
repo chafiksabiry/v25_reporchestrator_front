@@ -239,10 +239,13 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
-/** Disposition pill — rubriques prospect (RDV, plus tard…) avant argued_interested. */
-function dispositionBadge(record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status'>): { label: string; tone: string } | null {
+/** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
+function dispositionBadge(
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status'>,
+  ledgerTxStatus?: string | null
+): { label: string; tone: string } | null {
   if (isCallRejectedByAI(record)) return null;
-  const status = resolveCallDispositionStatus(record);
+  const status = resolveCallDispositionStatus(record, ledgerTxStatus);
   if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
   return status;
 }
@@ -744,7 +747,8 @@ export function CallRecords({
             const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
             const showValidationSection =
               status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
-            const outcomeBadge = dispositionBadge(record);
+            const ledgerStatus = getLedgerTxStatus(record);
+            const outcomeBadge = dispositionBadge(record, ledgerStatus);
 
             return (
               <div
@@ -783,7 +787,7 @@ export function CallRecords({
                             {outcomeBadge.label}
                           </span>
                         )}
-                        {isTransactionInRetraction(record, getLedgerTxStatus(record)) && (
+                        {isTransactionInRetraction(record, ledgerStatus) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-200">
                             <RotateCcw className="w-2.5 h-2.5" />
                             Rétractation 14j
@@ -845,7 +849,7 @@ export function CallRecords({
                           </span>
                         ) : isCallRejectedByAI(record) ? (
                           (() => {
-                            const disp = dispositionBadge(record);
+                            const disp = dispositionBadge(record, ledgerStatus);
                             if (disp) {
                               return (
                                 <span

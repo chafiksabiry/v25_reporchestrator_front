@@ -7,7 +7,7 @@ export interface StatusBadge {
 export function callOutcomeBadge(outcome: string | null | undefined): StatusBadge | null {
   if (!outcome) return null;
   const map: Record<string, StatusBadge> = {
-    transaction: { label: 'Transaction', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    transaction: { label: 'Vente', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     appointment: { label: 'RDV', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
     callback_requested: { label: 'Rappel', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
     argued_interested: { label: 'Argumenté', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -121,7 +121,39 @@ export const CALL_REJECTED_BADGE: StatusBadge = {
   title: 'L\'appel n\'a pas été validé par l\'IA — aucune transaction à traiter',
 };
 
-export function resolveCallDispositionStatus(call: CallLike): StatusBadge {
+/** Vente réservée au ledger ou validée entreprise — prime sur RDV / rubriques prospect. */
+export function hasBookedSaleCommission(
+  call: CallLike,
+  ledgerTxStatus?: string | null
+): boolean {
+  if (
+    ledgerTxStatus === 'pending_retraction' ||
+    ledgerTxStatus === 'earned' ||
+    ledgerTxStatus === 'paid'
+  ) {
+    return true;
+  }
+  if (call.transaction?.validByCompany === true) return true;
+  if (call.transaction?.retractionStatus === 'pending') return true;
+  return false;
+}
+
+export function resolveCallDispositionStatus(
+  call: CallLike,
+  ledgerTxStatus?: string | null
+): StatusBadge {
+  if (hasBookedSaleCommission(call, ledgerTxStatus)) {
+    const badge = callOutcomeBadge('transaction');
+    if (badge) {
+      return {
+        ...badge,
+        title: isTransactionInRetraction(call, ledgerTxStatus)
+          ? 'Vente validée — en rétractation 14j'
+          : 'Vente validée — commission transaction',
+      };
+    }
+  }
+
   const outcome = call.callOutcome;
 
   if (outcome && PRIORITY_CALLOUTCOMES.has(outcome)) {
