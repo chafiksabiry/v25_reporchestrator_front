@@ -1002,7 +1002,6 @@ export function GigsMarketplace() {
               : 'Application sent!'),
         'success'
       );
-      setActiveTab('requested');
 
       // Effacer le message après 3 secondes
       setTimeout(() => {
