@@ -6,9 +6,13 @@ interface LanguagesTabProps {
   profile: any;
   availableLanguages: Array<{ _id?: string; code?: string; name: string; nativeName?: string }>;
   getProficiencyStars: (proficiency: string) => number;
-  /** Navigate to the Experience tab so the rep can record a video (languages
-   *  are detected from the experience video instead of a dedicated assessment). */
-  onGoToExperience: () => void;
+  /** Start inline language video verification for a given language card. */
+  onRecordLanguageVideo: (
+    language: string,
+    code?: string,
+    proficiency?: string,
+    languageId?: string
+  ) => void;
   onAddItemClick: (item: { language: string; proficiency: string; languageId?: string }) => void;
   onDeleteItemClick: (index: number) => void;
 }
@@ -27,7 +31,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   profile,
   availableLanguages,
   getProficiencyStars,
-  onGoToExperience,
+  onRecordLanguageVideo,
   onAddItemClick,
   onDeleteItemClick,
 }) => {
@@ -84,6 +88,23 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
     });
     setDraftLanguage('');
     setShowAddForm(false);
+  };
+
+  const firstUnverified = languagesList.find((lang: any) => !isVideoVerified(lang));
+  const openAssessmentForLang = (lang: any) => {
+    const languageName =
+      typeof lang.language === 'object' && lang.language ? lang.language.name : String(lang.language || '');
+    const languageCode =
+      (typeof lang.language === 'object' && lang.language ? lang.language.code : '') ||
+      lang.iso639_1 ||
+      '';
+    const languageId =
+      (typeof lang.language === 'object' && lang.language ? lang.language._id : '') ||
+      (typeof lang.language === 'string' && /^[a-f0-9]{24}$/i.test(lang.language) ? lang.language : '') ||
+      '';
+    if (languageName) {
+      onRecordLanguageVideo(languageName, languageCode, String(lang.proficiency || 'B1'), languageId || undefined);
+    }
   };
 
   return (
@@ -190,19 +211,21 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                 </p>
                 <p className="text-xs font-medium text-yellow-700/90 mt-0.5">
                   {isFr
-                    ? 'Enregistrez une vidéo dans l’onglet Expérience pour détecter et valider vos niveaux.'
-                    : 'Record a video in the Experience tab to detect and validate your levels.'}
+                    ? 'Enregistrez ici une courte vidéo — l’IA vérifie que vous parlez bien dans cette langue et valide votre niveau.'
+                    : 'Record a short video here — AI verifies you speak this language and validates your level.'}
                 </p>
               </div>
             </div>
+            {firstUnverified && (
             <button
               type="button"
-              onClick={onGoToExperience}
+              onClick={() => openAssessmentForLang(firstUnverified)}
               className="px-5 py-2.5 rounded-xl bg-gradient-harx text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/25 active:scale-95 whitespace-nowrap"
             >
               <Video className="w-4 h-4" />
               {isFr ? 'Enregistrer' : 'Record'}
             </button>
+            )}
           </div>
         ) : totalCount > 0 ? (
           <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm">
@@ -217,12 +240,14 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               </p>
               <p className="text-xs font-medium text-emerald-700/90 mt-0.5">
                 {isFr
-                  ? 'Vos niveaux ont été validés par vidéo. Rien d’autre à faire ici.'
-                  : 'Your levels have been validated by video. Nothing else to do here.'}
+                  ? 'Vos niveaux ont été validés par l’IA. Rien d’autre à faire ici.'
+                  : 'Your levels have been validated by AI. Nothing else to do here.'}
               </p>
             </div>
           </div>
         ) : null}
+
+        {/* Cards grid */}
 
         {/* Cards grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -327,8 +352,8 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         {isCvEstimate && (
                           <p className="mt-2.5 text-[11px] font-medium text-sky-600 leading-snug">
                             {isFr
-                              ? 'Estimation à partir du CV — enregistrez une vidéo dans Expérience pour valider.'
-                              : 'Estimated from your CV — record a video in Experience to validate.'}
+                              ? 'Estimation à partir du CV — enregistrez ici pour valider avec l’IA.'
+                              : 'Estimated from your CV — record here to validate with AI.'}
                           </p>
                         )}
                       </>
@@ -337,8 +362,8 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                         <p className="text-xs font-semibold text-yellow-700 leading-snug">
                           {isFr
-                            ? 'Niveau non vérifié — enregistrez une vidéo dans Expérience.'
-                            : 'Level not verified — record a video in Experience.'}
+                            ? 'Niveau non vérifié — enregistrez ici pour lancer la vérification IA.'
+                            : 'Level not verified — record here to start AI verification.'}
                         </p>
                       </div>
                     )}
@@ -347,10 +372,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       {!isVerified && (
                         <button
                           type="button"
-                          onClick={onGoToExperience}
+                          onClick={() => openAssessmentForLang(lang)}
                           title={isFr
-                            ? 'Enregistrez une vidéo dans Expérience pour détecter vos langues'
-                            : 'Record a video in Experience to detect your languages'}
+                            ? 'Enregistrez et laissez l’IA vérifier cette langue'
+                            : 'Record and let AI verify this language'}
                           className="flex-1 py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-harx-500/25 active:scale-95 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
                         >
                           <Video className="w-3.5 h-3.5" />
