@@ -157,6 +157,7 @@ export function WorkspaceContent() {
   const [isLoadingLeads, setIsLoadingLeads] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageInput, setPageInput] = useState('1');
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
   // Do not hydrate from sessionStorage on first paint — a stale activeGigId from
@@ -251,6 +252,21 @@ export function WorkspaceContent() {
       fetchLeads(currentPage);
     }
   }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded]);
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const goToPage = (raw: string) => {
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      setPageInput(String(currentPage));
+      return;
+    }
+    const next = Math.min(Math.max(parsed, 1), totalPages);
+    setCurrentPage(next);
+    setPageInput(String(next));
+  };
 
   // Release cockpit lock when leaving the COCKPIT tab
   useEffect(() => {
@@ -793,9 +809,28 @@ export function WorkspaceContent() {
                           <ChevronLeft className="w-4 h-4 mr-2" />
                           Previous
                         </button>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                          Page <span className="text-gray-900">{currentPage}</span> of <span className="text-gray-900">{totalPages}</span>
-                        </span>
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          <span>Page</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={totalPages}
+                            value={pageInput}
+                            onChange={(e) => setPageInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                goToPage(pageInput);
+                              }
+                            }}
+                            onBlur={() => goToPage(pageInput)}
+                            className="w-14 px-2 py-1.5 text-center text-gray-900 font-black border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-harx-500 focus:border-harx-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            aria-label="Page number"
+                          />
+                          <span>
+                            of <span className="text-gray-900">{totalPages}</span>
+                          </span>
+                        </div>
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
