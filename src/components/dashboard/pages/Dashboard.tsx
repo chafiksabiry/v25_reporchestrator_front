@@ -82,6 +82,20 @@ function resolveCallRefId(call: any): string | null {
   return call.sid || (id ? String(id) : null);
 }
 
+function normalizeRecordId(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as { $oid?: string; _id?: unknown; toString?: () => string };
+    if (obj.$oid) return String(obj.$oid);
+    if (obj._id) return normalizeRecordId(obj._id);
+    if (typeof obj.toString === 'function' && obj.toString() !== Object.prototype.toString) {
+      const str = obj.toString();
+      if (str && str !== '[object Object]') return str;
+    }
+  }
+  return String(value);
+}
+
 function resolveTransactionCallId(tx: RepTransactionRow): string | null {
   return tx.callId || tx.call?._id || tx.call?.sid || null;
 }
@@ -337,7 +351,8 @@ export function Dashboard({ profile }: DashboardProps) {
     const bookedCallIds = new Set(
       repLedger
         .filter((row) => activeLedger(row) && row.type === 'call_validated' && row.callId)
-        .map((row) => String(row.callId))
+        .map((row) => normalizeRecordId(row.callId))
+        .filter(Boolean) as string[]
     );
     const bookedTxSourceIds = new Set(
       repLedger
@@ -363,10 +378,12 @@ export function Dashboard({ profile }: DashboardProps) {
 
       let pending = 0;
 
-      if (!bookedCallIds.has(callId) && call.validByAI !== false) {
+      // Appel validé IA mais pas encore crédité au ledger (rare).
+      if (!bookedCallIds.has(callId) && call.validByAI === true) {
         pending += resolveCallRepCommission(call);
       }
 
+      // Vente détectée — en attente validation entreprise uniquement.
       if (hasDetectedTransactionSale(call)) {
         const txSourceId = String(call.transaction?._id || callId);
         if (!bookedTxSourceIds.has(txSourceId) && call.transaction?.validByCompany !== true) {
@@ -1056,9 +1073,10 @@ export function Dashboard({ profile }: DashboardProps) {
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
-                  {selectedPeriod === 'all'
-                    ? 'Validés + en attente client'
-                    : `${PERIOD_OPTIONS.find((p) => p.key === selectedPeriod)?.label} — filtré`}
+                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
+                  {earningsPipeline.clientValidationAmount > 0
+                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
+                    : ''}
                 </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">
