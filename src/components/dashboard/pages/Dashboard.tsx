@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2 } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
@@ -10,6 +10,7 @@ import { CallRecords } from '../CallRecords';
 import {
   resolveClientValidationPendingAmount,
 } from '../../../utils/commissionUtils';
+import { computeValidatedLedgerBreakdown } from '../../../utils/repLedgerBreakdown';
 
 interface DashboardProps {
   profile?: any;
@@ -172,6 +173,7 @@ export function Dashboard({ profile }: DashboardProps) {
   type CallFilter = 'all' | 'valid' | 'invalid' | 'pending_client';
   const [callFilter, setCallFilter] = useState<CallFilter>('all');
   const callsSectionRef = useRef<HTMLDivElement>(null);
+  const transactionsSectionRef = useRef<HTMLDivElement>(null);
 
   // Earnings & objectifs (RepTransaction-backed)
   const [walletStats, setWalletStats] = useState<{
@@ -393,52 +395,26 @@ export function Dashboard({ profile }: DashboardProps) {
 
     let retractionAmount = 0;
     let retractionCount = 0;
-    let validatedCallsAmount = 0;
-    let validatedCallsCount = 0;
-    let validatedSalesAmount = 0;
-    let validatedSalesCount = 0;
-    let availableCallsAmount = 0;
-    let availableSalesAmount = 0;
-
-    const matchGig = (row: RepTransactionRow) => {
-      if (selectedGigId === 'all') return true;
-      const rGigId = typeof row.gigId === 'object' ? (row.gigId as { _id?: string })?._id : row.gigId;
-      return rGigId === selectedGigId;
-    };
-
-    repLedger.forEach((row) => {
-      if (!matchGig(row)) return;
-      const share = row.repShare || 0;
-      const activityDate = ledgerActivityDate(row);
-
-      if (row.status === 'earned' || row.status === 'paid') {
-        if (row.type === 'call_validated') availableCallsAmount += share;
-        if (row.type === 'transaction') availableSalesAmount += share;
-      }
-
-      if (!activeLedger(row) || !inPeriod(activityDate)) return;
-
-      if (row.type === 'call_validated') {
-        validatedCallsAmount += share;
-        validatedCallsCount += 1;
-      } else if (row.type === 'transaction') {
-        validatedSalesAmount += share;
-        validatedSalesCount += 1;
-      }
-    });
 
     repLedger.forEach((row) => {
       if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
       const activityDate = ledgerActivityDate(row);
       if (!inPeriod(activityDate)) return;
-      if (!matchGig(row)) return;
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof row.gigId === 'object' ? (row.gigId as any)?._id : row.gigId;
+        if (rGigId !== selectedGigId) return;
+      }
       retractionAmount += row.repShare || 0;
       retractionCount += 1;
     });
 
-    const validatedInPeriod = validatedCallsAmount + validatedSalesAmount;
+    const ledgerBreakdown = computeValidatedLedgerBreakdown(repLedger, {
+      inPeriod,
+      activityDate: ledgerActivityDate,
+      selectedGigId: selectedGigId !== 'all' ? selectedGigId : undefined,
+    });
 
-    const totalGains = validatedInPeriod + clientValidationAmount;
+    const totalGains = ledgerBreakdown.validatedInPeriod + clientValidationAmount;
 
     return {
       availableBalance: walletStats.availableBalance,
@@ -447,13 +423,7 @@ export function Dashboard({ profile }: DashboardProps) {
       clientValidationAmount,
       clientValidationCount,
       totalGains,
-      validatedInPeriod,
-      validatedCallsAmount,
-      validatedCallsCount,
-      validatedSalesAmount,
-      validatedSalesCount,
-      availableCallsAmount,
-      availableSalesAmount,
+      ...ledgerBreakdown,
       pendingClientValidationCallIds,
     };
   }, [
@@ -469,6 +439,13 @@ export function Dashboard({ profile }: DashboardProps) {
     setCallFilter('pending_client');
     window.setTimeout(() => {
       callsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
+
+  const focusValidatedEarnings = () => {
+    setTransactionFilter('all');
+    window.setTimeout(() => {
+      transactionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   };
 
@@ -1024,9 +1001,9 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Gains pipeline — Solde → Rétractation → Validation client → Total */}
+      {/* Gains pipeline — Solde → Validés → Rétractation → Validation client → Total */}
       <div className="rounded-3xl bg-white/50 backdrop-blur-xl border border-white/60 shadow-xl shadow-slate-200/20 overflow-hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
           {/* 1. Solde disponible */}
           <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-white/60">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -1040,17 +1017,6 @@ export function Dashboard({ profile }: DashboardProps) {
                 <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
                   Prêt au retrait
                 </p>
-                <p className="text-[10px] font-semibold text-slate-500 mt-1.5 normal-case tracking-normal leading-relaxed">
-                  <span className="inline-flex items-center gap-1">
-                    <Phone size={10} className="text-emerald-500" />
-                    {fmtMoney(earningsPipeline.availableCallsAmount)} € appels
-                  </span>
-                  <span className="mx-1.5 text-slate-300">·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Briefcase size={10} className="text-emerald-500" />
-                    {fmtMoney(earningsPipeline.availableSalesAmount)} € ventes
-                  </span>
-                </p>
               </div>
               <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                 <WalletIcon size={16} />
@@ -1062,7 +1028,54 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 2. Rétractation (14 jours) */}
+          {/* 2. Gains validés — appels & ventes */}
+          <button
+            type="button"
+            onClick={focusValidatedEarnings}
+            disabled={earningsPipeline.validatedInPeriod === 0}
+            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-emerald-50/40 text-left transition-all w-full ${
+              earningsPipeline.validatedInPeriod > 0
+                ? 'hover:bg-emerald-50/70 cursor-pointer'
+                : 'cursor-default opacity-90'
+            }`}
+            aria-label="Voir les commissions validées"
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700 truncate">
+                  Gains validés
+                </p>
+                <p className="text-2xl font-black text-emerald-700 tracking-tighter mt-2">
+                  +{fmtMoney(earningsPipeline.validatedInPeriod)} €
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                <ShieldCheck size={16} />
+              </div>
+            </div>
+            <div className="space-y-1.5 mt-auto">
+              <p className="text-[10px] font-bold text-emerald-700/90 flex items-center gap-1.5">
+                <Phone size={12} className="shrink-0" />
+                +{fmtMoney(earningsPipeline.validatedCallsAmount)} €
+                <span className="text-emerald-600/70 font-semibold">
+                  · {earningsPipeline.validatedCallsCount} appel{earningsPipeline.validatedCallsCount !== 1 ? 's' : ''}
+                </span>
+              </p>
+              <p className="text-[10px] font-bold text-emerald-700/90 flex items-center gap-1.5">
+                <Briefcase size={12} className="shrink-0" />
+                +{fmtMoney(earningsPipeline.validatedSalesAmount)} €
+                <span className="text-emerald-600/70 font-semibold">
+                  · {earningsPipeline.validatedSalesCount} vente{earningsPipeline.validatedSalesCount !== 1 ? 's' : ''}
+                </span>
+              </p>
+            </div>
+          </button>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 3. Rétractation (14 jours) */}
           <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-orange-50/40">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
@@ -1088,7 +1101,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 3. Validation client — clic → filtre appels en attente */}
+          {/* 4. Validation client — clic → filtre appels en attente */}
           <button
             type="button"
             onClick={focusClientValidationPending}
@@ -1126,7 +1139,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 4. Total des gains */}
+          {/* 5. Total des gains */}
           <div className="p-5 sm:p-6 flex flex-col bg-slate-950 text-white relative overflow-hidden">
             <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex items-start justify-between gap-3">
@@ -1137,20 +1150,12 @@ export function Dashboard({ profile }: DashboardProps) {
                 <p className="text-2xl font-black text-white tracking-tighter mt-2">
                   {fmtMoney(earningsPipeline.totalGains)} €
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50 leading-relaxed">
-                  <span className="inline-flex items-center gap-1">
-                    <Phone size={10} className="text-emerald-400" />
-                    {fmtMoney(earningsPipeline.validatedCallsAmount)} €
-                    {earningsPipeline.validatedCallsCount > 0 ? ` (${earningsPipeline.validatedCallsCount} appel${earningsPipeline.validatedCallsCount > 1 ? 's' : ''})` : ''}
-                  </span>
-                  <span className="mx-1 text-white/30">+</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Briefcase size={10} className="text-emerald-400" />
-                    {fmtMoney(earningsPipeline.validatedSalesAmount)} €
-                    {earningsPipeline.validatedSalesCount > 0 ? ` (${earningsPipeline.validatedSalesCount} vente${earningsPipeline.validatedSalesCount > 1 ? 's' : ''})` : ''}
-                  </span>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
+                  {fmtMoney(earningsPipeline.validatedCallsAmount)} appels
+                  {' + '}
+                  {fmtMoney(earningsPipeline.validatedSalesAmount)} ventes
                   {earningsPipeline.clientValidationAmount > 0
-                    ? ` · +${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
+                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
                     : ''}
                 </p>
               </div>
@@ -1165,7 +1170,7 @@ export function Dashboard({ profile }: DashboardProps) {
       {/* Activité Récente — Transactions & Calls cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Transactions card */}
-        <div className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col">
+        <div ref={transactionsSectionRef} className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col">
           <div className="px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
