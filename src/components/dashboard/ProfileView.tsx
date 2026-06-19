@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
-import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, getRepresentativePlans, updateProfilePlan } from '../../utils/profileUtils';
+import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan } from '../../utils/profileUtils';
 import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -25,6 +25,7 @@ import { LanguagesTab } from './profile/tabs/LanguagesTab';
 import { OnboardingTab } from './profile/tabs/OnboardingTab';
 import { SpecializationTab } from './profile/tabs/SpecializationTab';
 import { AvailabilityTab } from './profile/tabs/AvailabilityTab';
+import { StripeRepPricingTable } from './StripeRepPricingTable';
 
 // Shared Interface Redefinitions (if needed by tabs)
 export interface AssessmentResults {
@@ -122,7 +123,6 @@ export const ProfileView: React.FC<{
   } | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
-  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [planError, setPlanError] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [countryData, setCountryData] = useState<Timezone | null>(null);
@@ -145,7 +145,6 @@ export const ProfileView: React.FC<{
   const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
   const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
-  const [tempSelectedPlanId, setTempSelectedPlanId] = useState('');
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [publicInfoDraft, setPublicInfoDraft] = useState({
     country: '',
@@ -196,18 +195,6 @@ export const ProfileView: React.FC<{
     };
     fetchPlanData();
   }, [profile?._id]);
-
-  useEffect(() => {
-    const fetchAvailablePlans = async () => {
-      try {
-        const plans = await getRepresentativePlans();
-        setAvailablePlans(plans);
-      } catch (error) {
-        console.error('Error fetching representative plans:', error);
-      }
-    };
-    fetchAvailablePlans();
-  }, []);
 
   useEffect(() => {
     const loadLanguages = async () => {
@@ -625,7 +612,6 @@ export const ProfileView: React.FC<{
       phone: String(profile.personalInfo?.phone || ''),
       growthPlanId: currentPlanId
     });
-    setTempSelectedPlanId(currentPlanId);
     setIsEditingPublicInfo(true);
   };
 
@@ -1356,14 +1342,18 @@ export const ProfileView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors"
+                          className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors underline underline-offset-2"
                         >
-                          {(availablePlans.find((plan) => plan._id === publicInfoDraft.growthPlanId)?.name) || 'Select a plan'}
+                          {planData?.plan?.name || 'Choisir un plan'}
                         </button>
                       ) : (
-                        <div className="text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5">
-                          {planData?.plan?.name || "Standard Representative"}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsPlanModalOpen(true)}
+                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
+                        >
+                          {planData?.plan?.name || 'Standard Representative'}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1392,18 +1382,23 @@ export const ProfileView: React.FC<{
         </div>
       )}
 
-      {/* Plan Selection Modal */}
+      {/* Plan Selection Modal — Stripe Pricing Table */}
       {isPlanModalOpen && (
         <div
           className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setIsPlanModalOpen(false)}
         >
           <div
-            className="w-full max-w-xl rounded-3xl border border-harx-100 bg-white shadow-2xl overflow-hidden"
+            className="w-full max-w-5xl max-h-[92vh] rounded-3xl border border-harx-100 bg-white shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-harx-100 flex items-center justify-between">
-              <h3 className="text-lg font-black text-harx-900">Select Representative Plan</h3>
+            <div className="shrink-0 px-5 py-4 border-b border-harx-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-harx-900">Select Representative Plan</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Abonnement sécurisé via Stripe — choisissez votre formule ci-dessous.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsPlanModalOpen(false)}
@@ -1412,43 +1407,8 @@ export const ProfileView: React.FC<{
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 max-h-[55vh] overflow-y-auto space-y-2">
-              {availablePlans.map((plan) => {
-                const isSelected = tempSelectedPlanId === plan._id;
-                return (
-                  <button
-                    key={plan._id}
-                    type="button"
-                    onClick={() => setTempSelectedPlanId(plan._id)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${isSelected
-                        ? 'border-harx-400 bg-harx-50 shadow-sm'
-                        : 'border-slate-200 hover:border-harx-200 hover:bg-harx-50/40'
-                      }`}
-                  >
-                    <div className="text-sm font-black text-harx-900">{plan.name}</div>
-                    <div className="text-xs text-slate-600">${plan.price} / month</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="px-5 py-4 border-t border-harx-100 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsPlanModalOpen(false)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPublicInfoDraft((prev) => ({ ...prev, growthPlanId: tempSelectedPlanId }));
-                  setIsPlanModalOpen(false);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90"
-              >
-                Choose Plan
-              </button>
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+              <StripeRepPricingTable />
             </div>
           </div>
         </div>
