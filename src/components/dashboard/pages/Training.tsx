@@ -29,7 +29,10 @@ import { GigScriptReaderModal } from '../GigScriptReaderModal';
 import {
   gigIdFromJourney,
   isScriptRequirementModule,
+  markScriptReadLocal,
+  scriptModuleMeta,
   scriptModuleStillPending,
+  shouldShowScriptCta,
   trainingApiBase,
 } from '../../../utils/trainingScriptRequirement';
 
@@ -176,12 +179,10 @@ function extractModules(j: JourneyRow): ModuleRow[] {
 
 function CompletedTrainingRequirementsWarning({
   scriptPending,
-  hasScriptModule,
   onOpenScript,
   onCertify,
 }: {
   scriptPending: boolean;
-  hasScriptModule: boolean;
   onOpenScript?: () => void;
   onCertify?: () => void;
 }) {
@@ -192,21 +193,14 @@ function CompletedTrainingRequirementsWarning({
         <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
           Étapes obligatoires avant le cockpit
         </p>
-        {hasScriptModule ? (
+        {scriptPending ? (
           <p>
             <span className="inline-flex items-center gap-1 font-bold text-amber-900">
               <MessageSquare className="h-3.5 w-3.5" />
               Script d&apos;appel :
             </span>{' '}
-            {scriptPending ? (
-              <>
-                la lecture du script est <strong>obligatoire</strong>. Validez le module script (section + quiz).
-              </>
-            ) : (
-              <>
-                assurez-vous d&apos;avoir bien relu le module script — il est requis pour les appels en cockpit.
-              </>
-            )}
+            la lecture du script est <strong>obligatoire</strong>. Lisez-le jusqu&apos;au bout puis
+            cliquez sur <strong>Terminer</strong>.
             {onOpenScript ? (
               <>
                 {' '}
@@ -215,7 +209,7 @@ function CompletedTrainingRequirementsWarning({
                   onClick={onOpenScript}
                   className="font-black uppercase tracking-wider text-[10px] text-amber-800 underline underline-offset-2 hover:text-amber-950"
                 >
-                  {scriptPending ? 'Lire le script' : 'Relire le script'}
+                  Lire le script
                 </button>
               </>
             ) : null}
@@ -823,7 +817,12 @@ export function Training() {
   const quizOutcomeSentRef = useRef<Set<string>>(new Set());
   /** POST /quiz/start déjà réussi pour cette clé (réinitialisé en quittant le slide quiz). */
   const quizStartSentRef = useRef<Set<string>>(new Set());
-  const [scriptReader, setScriptReader] = useState<{ gigId: string; title: string } | null>(null);
+  const [scriptReader, setScriptReader] = useState<{
+    gigId: string;
+    title: string;
+    journeyId: string;
+  } | null>(null);
+  const [scriptReadTick, setScriptReadTick] = useState(0);
 
   const displayJourneys = useMemo(() => {
     if (gigFilter === '__all__') return journeys;
@@ -1142,7 +1141,7 @@ export function Training() {
   const openScriptForJourney = useCallback((j: JourneyRow) => {
     const gigId = gigIdFromJourney(j);
     if (!gigId) return;
-    setScriptReader({ gigId, title: journeyTitle(j) });
+    setScriptReader({ gigId, title: journeyTitle(j), journeyId: journeyKey(j) });
   }, []);
 
   const currentFormationViewerSlide = formationViewerSlides[formationViewerSlideIndex];
@@ -1697,6 +1696,66 @@ export function Training() {
       fetchStructuredProgress,
     ]
   );
+
+  const finishScriptRead = useCallback(async () => {
+    if (!scriptReader || !repId) {
+      setScriptReader(null);
+      return;
+    }
+    const { journeyId, gigId } = scriptReader;
+    markScriptReadLocal(journeyId, gigId);
+    setScriptReadTick((n) => n + 1);
+
+    const j = displayJourneys.find((row) => journeyKey(row) === journeyId);
+    const meta = j ? scriptModuleMeta(j) : null;
+    const base = trainingApiBase();
+
+    if (meta && base && journeyId) {
+      try {
+        await ensureSectionStarted({
+          courseId: journeyId,
+          moduleId: meta.moduleId,
+          sectionId: meta.sectionId,
+        });
+        await axios.post(`${base}/training_journeys/section/complete`, {
+          repId,
+          courseId: journeyId,
+          moduleId: meta.moduleId,
+          sectionId: meta.sectionId,
+        });
+        await axios.post(`${base}/training_journeys/quiz/start`, {
+          repId,
+          courseId: journeyId,
+          moduleId: meta.moduleId,
+          quizId: meta.quizId,
+        });
+        await axios.post(`${base}/training_journeys/quiz/submit`, {
+          repId,
+          courseId: journeyId,
+          moduleId: meta.moduleId,
+          quizId: meta.quizId,
+          answers: [0],
+        });
+        await Promise.all([
+          fetchTrainingProgressRows(),
+          fetchSlideProgressSummary(),
+          fetchStructuredProgress(journeyId),
+        ]);
+      } catch {
+        /* marquage local déjà appliqué */
+      }
+    }
+
+    setScriptReader(null);
+  }, [
+    scriptReader,
+    repId,
+    displayJourneys,
+    ensureSectionStarted,
+    fetchTrainingProgressRows,
+    fetchSlideProgressSummary,
+    fetchStructuredProgress,
+  ]);
 
   useEffect(() => {
     void fetchSlideProgressSummary();
@@ -2399,7 +2458,8 @@ export function Training() {
               Number(progress?.progressPercentage) >= 100;
             const structured = id ? structuredProgressByJourney[id] : undefined;
             const scriptPending = isCompleted && scriptModuleStillPending(j, structured, progress);
-            const hasScriptModule = Boolean(gigIdFromJourney(j));
+            const showScriptCta = shouldShowScriptCta(j, structured, progress);
+            void scriptReadTick;
 
             const openFormation = () => {
               if (!id) return;
@@ -2480,7 +2540,7 @@ export function Training() {
                   >
                     Continue
                   </button>
-                  {hasScriptModule && (
+                  {showScriptCta && (
                     <button
                       type="button"
                       disabled={!id}
@@ -2506,8 +2566,7 @@ export function Training() {
                 {isCompleted && (
                   <CompletedTrainingRequirementsWarning
                     scriptPending={scriptPending}
-                    hasScriptModule={hasScriptModule}
-                    onOpenScript={() => openScriptForJourney(j)}
+                    onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
                     onCertify={() => openCertificate(j)}
                   />
                 )}
@@ -2555,7 +2614,8 @@ export function Training() {
               const progress = id ? progressByJourney[id] : undefined;
               const structured = id ? structuredProgressByJourney[id] : undefined;
               const scriptPending = scriptModuleStillPending(j, structured, progress);
-              const hasScriptModule = Boolean(gigIdFromJourney(j));
+              const showScriptCta = shouldShowScriptCta(j, structured, progress);
+              void scriptReadTick;
               return (
                 <li
                   key={`cert-${id || journeyTitle(j)}`}
@@ -2582,8 +2642,7 @@ export function Training() {
                   </div>
                   <CompletedTrainingRequirementsWarning
                     scriptPending={scriptPending}
-                    hasScriptModule={hasScriptModule}
-                    onOpenScript={() => openScriptForJourney(j)}
+                    onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
                     onCertify={() => openCertificate(j)}
                   />
                   <button
@@ -2722,6 +2781,9 @@ export function Training() {
                                 ? structuredProgressByJourney[selectedJourneyId]
                                 : undefined;
                               const ovRow = selectedJourneyId ? progressByJourney[selectedJourneyId] : undefined;
+                              const showScriptCtaForJourney =
+                                selectedJourney &&
+                                shouldShowScriptCta(selectedJourney, ovStructured, ovRow);
                               return currentFormationViewerSlide.modules.map((mod) => {
                               const moduleTheme =
                                 moduleColorStyles[mod.moduleIndex % moduleColorStyles.length];
@@ -2754,8 +2816,12 @@ export function Training() {
                                     disabled={!!modLocked}
                                     onClick={() => {
                                       const gid = selectedJourney ? gigIdFromJourney(selectedJourney) : '';
-                                      if (scriptMod && gid) {
-                                        setScriptReader({ gigId: gid, title: journeyTitle(selectedJourney!) });
+                                      if (scriptMod && gid && showScriptCtaForJourney && selectedJourneyId) {
+                                        setScriptReader({
+                                          gigId: gid,
+                                          title: journeyTitle(selectedJourney!),
+                                          journeyId: selectedJourneyId,
+                                        });
                                         return;
                                       }
                                       jumpToFormationSlide(`m${mod.moduleIndex}-intro`);
@@ -3405,6 +3471,7 @@ export function Training() {
           gigId={scriptReader.gigId}
           title={scriptReader.title}
           onClose={() => setScriptReader(null)}
+          onFinish={() => void finishScriptRead()}
         />
       ) : null}
     </div>

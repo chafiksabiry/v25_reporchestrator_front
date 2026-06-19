@@ -78,14 +78,79 @@ export function isScriptRequirementModule(mod: JourneyModuleRow): boolean {
   );
 }
 
+const SCRIPT_READ_STORAGE_KEY = 'harx_script_read_ids';
+
+function readScriptReadSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SCRIPT_READ_STORAGE_KEY);
+    const arr = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Marque le script comme lu (lecteur cockpit) — persistance locale + sync API si possible. */
+export function markScriptReadLocal(journeyId: string, gigId?: string): void {
+  try {
+    const set = readScriptReadSet();
+    const jid = String(journeyId || '').trim();
+    const gid = String(gigId || '').trim();
+    if (jid) set.add(`j:${jid}`);
+    if (gid) set.add(`g:${gid}`);
+    localStorage.setItem(SCRIPT_READ_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isScriptReadLocal(journeyId: string, gigId?: string): boolean {
+  const set = readScriptReadSet();
+  const jid = String(journeyId || '').trim();
+  const gid = String(gigId || '').trim();
+  return (jid && set.has(`j:${jid}`)) || (gid && set.has(`g:${gid}`)) || false;
+}
+
+export type ScriptModuleMeta = {
+  moduleId: string;
+  sectionId: string;
+  quizId: string;
+};
+
+/** IDs Mongo du module script (section + quiz) pour validation API. */
+export function scriptModuleMeta(j: JourneyRowLite): ScriptModuleMeta | null {
+  const modules = extractModules(j);
+  const scriptIdx = modules.findIndex(isScriptRequirementModule);
+  if (scriptIdx < 0) return null;
+
+  const mod = modules[scriptIdx];
+  const moduleId = normalizeMongoId(mod._id) || normalizeMongoId(mod.id);
+  const sections = Array.isArray(mod.sections) ? mod.sections : [];
+  const section = sections[0] as Record<string, unknown> | undefined;
+  const sectionId = normalizeMongoId(section?._id) || normalizeMongoId(section?.id);
+  const quizzes = Array.isArray(mod.quizzes) ? mod.quizzes : [];
+  const quiz = quizzes[0] as Record<string, unknown> | undefined;
+  const quizId = normalizeMongoId(quiz?._id) || normalizeMongoId(quiz?.id);
+
+  if (!/^[a-f\d]{24}$/i.test(moduleId)) return null;
+  if (!/^[a-f\d]{24}$/i.test(sectionId) || !/^[a-f\d]{24}$/i.test(quizId)) return null;
+  return { moduleId, sectionId, quizId };
+}
+
 export function scriptModuleStillPending(
   j: JourneyRowLite,
   structured: StructuredProgressLite | undefined,
   progress: RepProgressRowLite | undefined
 ): boolean {
+  const journeyId = journeyKey(j as Record<string, unknown>);
+  const gigId = gigIdFromJourney(j);
+  if (isScriptReadLocal(journeyId, gigId)) return false;
+
   const modules = extractModules(j);
   const scriptIdx = modules.findIndex(isScriptRequirementModule);
-  if (scriptIdx < 0) return false;
+  if (scriptIdx < 0) {
+    return Boolean(gigId);
+  }
 
   const scriptMod = modules[scriptIdx];
   const moduleId =
@@ -108,6 +173,16 @@ export function scriptModuleStillPending(
   }
 
   return true;
+}
+
+/** Afficher le bouton / lien « Lire le script ». */
+export function shouldShowScriptCta(
+  j: JourneyRowLite,
+  structured: StructuredProgressLite | undefined,
+  progress: RepProgressRowLite | undefined
+): boolean {
+  if (!gigIdFromJourney(j)) return false;
+  return scriptModuleStillPending(j, structured, progress);
 }
 
 export function scriptNotificationId(journeyId: string): string {
