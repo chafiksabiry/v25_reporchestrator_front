@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
@@ -120,6 +120,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [, setLoading] = useState(true);
   const [selectedGigId, setSelectedGigId] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
+  const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   type CallFilter = 'all' | 'valid' | 'invalid';
@@ -551,6 +552,11 @@ export function Dashboard({ profile }: DashboardProps) {
 
   const displayName = profile?.personalInfo?.name ? profile.personalInfo.name.split(' ')[0] : 'User';
 
+  const selectedGigLabel = useMemo(() => {
+    if (selectedGigId === 'all') return 'Tous les Gigs';
+    return gigsData.find((g) => g._id === selectedGigId)?.title || 'Gig';
+  }, [selectedGigId, gigsData]);
+
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">
       {/* Dynamic Filter Header */}
@@ -569,24 +575,72 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="relative flex items-center gap-2.5">
               <Briefcase size={16} className="text-purple-600 animate-pulse" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gig :</span>
-              <select
-                value={selectedGigId}
-                onChange={(e) => setSelectedGigId(e.target.value)}
-                className="appearance-none bg-white/80 border border-slate-100 hover:border-purple-200 px-4 py-2.5 pr-10 rounded-2xl text-xs font-black uppercase tracking-wider text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all duration-300 min-w-[200px]"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1rem',
-                  backgroundRepeat: 'no-repeat'
-                }}
-              >
-                <option value="all">Tous les Gigs (All Gigs)</option>
-                {gigsData.map((gig) => (
-                  <option key={gig._id || gig.id} value={gig._id || gig.id}>
-                    {gig.title}
-                  </option>
-                ))}
-              </select>
+              <div className="relative min-w-[220px] max-w-[320px]">
+                <button
+                  type="button"
+                  onClick={() => setIsGigDropdownOpen((open) => !open)}
+                  className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-purple-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all duration-300"
+                >
+                  <span className="truncate text-left normal-case">{selectedGigLabel}</span>
+                  <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isGigDropdownOpen ? 'rotate-180 text-purple-500' : ''}`} />
+                </button>
+
+                {isGigDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsGigDropdownOpen(false)} aria-hidden />
+                    <div className="absolute top-full left-0 mt-2 z-50 min-w-full w-max max-w-[min(420px,calc(100vw-2rem))] bg-white/95 backdrop-blur-xl border border-slate-100 rounded-2xl shadow-xl shadow-purple-100/40 p-2 animate-in fade-in slide-in-from-top-1 duration-200 max-h-72 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedGigId('all');
+                          setIsGigDropdownOpen(false);
+                        }}
+                        className="block w-full text-left px-1 py-0.5"
+                      >
+                        <span
+                          className={`inline-flex items-center gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all ${
+                            selectedGigId === 'all'
+                              ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-200/80 shadow-sm'
+                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selectedGigId === 'all' ? 'bg-purple-500' : 'bg-slate-300'}`} />
+                          Tous les Gigs
+                        </span>
+                      </button>
+
+                      {gigsData.length > 0 && <div className="h-px bg-slate-100 my-1.5 mx-2" />}
+
+                      {gigsData.map((gig) => {
+                        const gigId = gig._id || gig.id;
+                        const isSelected = selectedGigId === gigId;
+                        return (
+                          <button
+                            key={gigId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedGigId(gigId);
+                              setIsGigDropdownOpen(false);
+                            }}
+                            className="block w-full text-left px-1 py-0.5"
+                          >
+                            <span
+                              className={`inline-flex items-start gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-semibold leading-snug normal-case transition-all ${
+                                isSelected
+                                  ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-200/80 shadow-sm'
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${isSelected ? 'bg-purple-500' : 'bg-slate-300'}`} />
+                              <span className="text-left">{gig.title}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="relative flex items-center gap-2.5">
