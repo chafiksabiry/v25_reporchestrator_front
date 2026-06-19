@@ -21,7 +21,8 @@ import {
   ShieldCheck,
   KeyRound,
   Sparkles,
-  Phone
+  Phone,
+  CalendarDays
 } from 'lucide-react';
 
 import { CallRecords } from '../CallRecords';
@@ -592,43 +593,49 @@ export function WalletPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+        <div className="min-w-0">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">{t('wallet.title')}</h1>
           <p className="text-sm text-slate-500 font-medium mt-1">
             Suivez vos gains, vos commissions et gérez vos retraits en toute sécurité.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 w-full lg:w-auto">
+          <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-white to-blue-50/40 px-4 py-3 shadow-sm shadow-blue-100/30 min-w-[240px] sm:min-w-[260px]">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                <CalendarDays size={14} className="text-blue-600" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Période</span>
+              {selectedDateRange !== 'this-month' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateRange('this-month')}
+                  className="ml-auto text-[9px] font-black uppercase tracking-wider text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <WalletFilterSelect
+              label="Période"
+              hideLabel
+              value={selectedDateRange}
+              onChange={setSelectedDateRange}
+              options={dateRangeOptions}
+              accent="blue"
+            />
+          </div>
+
           <button
             onClick={handleOpenWithdraw}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-bold shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 bg-gradient-harx text-white rounded-2xl text-xs font-bold shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 transition-all active:scale-95 whitespace-nowrap"
           >
             <ArrowUpRight className="w-4 h-4" />
             {t('wallet.withdrawFunds')}
           </button>
         </div>
-      </div>
-
-      {/* Période uniquement — sous le titre */}
-      <div className="flex flex-wrap items-end gap-3">
-        <WalletFilterSelect
-          label="Période"
-          value={selectedDateRange}
-          onChange={setSelectedDateRange}
-          options={dateRangeOptions}
-          accent="blue"
-          className="w-full sm:w-auto sm:min-w-[220px] sm:max-w-[280px]"
-        />
-        {selectedDateRange !== 'this-month' && (
-          <button
-            type="button"
-            onClick={() => setSelectedDateRange('this-month')}
-            className="text-[10px] font-black uppercase tracking-wider text-blue-600 hover:text-blue-700 transition-colors pb-2.5"
-          >
-            Réinitialiser la période
-          </button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

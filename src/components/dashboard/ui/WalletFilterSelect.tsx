@@ -105,6 +105,8 @@ type WalletFilterSelectProps = {
   accent?: WalletFilterAccent;
   /** Where to open the menu relative to the trigger. Default: auto (prefers below). */
   placement?: 'auto' | 'above' | 'below';
+  /** Hide the label row (use when label is rendered outside). */
+  hideLabel?: boolean;
 };
 
 export function WalletFilterSelect({
@@ -115,6 +117,7 @@ export function WalletFilterSelect({
   className = '',
   accent = 'harx',
   placement = 'auto',
+  hideLabel = false,
 }: WalletFilterSelectProps) {
   const selected = options.find((o) => o.value === value) ?? options[0];
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -202,10 +205,12 @@ export function WalletFilterSelect({
   };
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">
-        {label}
-      </span>
+    <div className={`flex flex-col ${hideLabel ? 'gap-0' : 'gap-1.5'} ${className}`}>
+      {!hideLabel && (
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 pl-1">
+          {label}
+        </span>
+      )}
       <div className="relative">
         <button
           ref={triggerRef}
