@@ -70,7 +70,12 @@ export function isScriptRequirementModule(mod: JourneyModuleRow): boolean {
   const row = mod as Record<string, unknown>;
   if (row.harxRequirementType === SCRIPT_REQUIREMENT_MARKER) return true;
   const title = String(mod.title || '').toLowerCase();
-  return title.includes("script d'appel") || title.includes('script d appel');
+  if (title.includes("script d'appel") || title.includes('script d appel')) return true;
+  if (title.includes('script') && (title.includes('appel') || title.includes('call'))) return true;
+  const sections = Array.isArray(mod.sections) ? mod.sections : [];
+  return sections.some(
+    (s) => String((s as Record<string, unknown>)?.type || '').toLowerCase() === 'script'
+  );
 }
 
 export function scriptModuleStillPending(
@@ -157,4 +162,124 @@ export async function fetchEnrolledGigsForAgent(
     }
   }
   return out;
+}
+
+type GigScriptPhase = { phase?: string; actor?: string; replica?: string };
+
+type GigScriptPayload = {
+  targetClient?: string;
+  details?: string;
+  script?: GigScriptPhase[];
+  isActive?: boolean;
+};
+
+function knowledgeBaseApiRoot(): string {
+  const raw =
+    import.meta.env.VITE_KNOWLEDGEBASE_API_URL ||
+    import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API ||
+    import.meta.env.VITE_DASHBOARD_KNOWLEDGEBASE_API_URL ||
+    'https://v25knowledgebasebackend-production.up.railway.app/api';
+  const base = String(raw).replace(/\/$/, '');
+  if (!base) return '';
+  return base.endsWith('/api') ? base : `${base}/api`;
+}
+
+function randomObjectIdLike(): string {
+  const hex = '0123456789abcdef';
+  let s = '';
+  for (let i = 0; i < 24; i += 1) s += hex[Math.floor(Math.random() * 16)];
+  return s;
+}
+
+function formatScriptMarkdown(script: GigScriptPayload): string {
+  const lines: string[] = [];
+  if (script.details?.trim()) {
+    lines.push(script.details.trim(), '');
+  }
+  lines.push('## Étapes du script', '');
+  const phases = Array.isArray(script.script) ? script.script : [];
+  phases.forEach((phase, index) => {
+    const actorLabel =
+      String(phase.actor || 'agent').toLowerCase() === 'lead' ? 'Prospect' : 'Agent';
+    const phaseLabel = phase.phase ? `**${phase.phase}** — ` : '';
+    lines.push(`${index + 1}. ${phaseLabel}*${actorLabel}* : ${String(phase.replica || '').trim()}`, '');
+  });
+  if (phases.length === 0) {
+    lines.push('_Script sans répliques configurées._', '');
+  }
+  lines.push(
+    '---',
+    '',
+    "**Exigence :** lisez l'intégralité du script avant de continuer. La certification et l'accès au cockpit nécessitent la validation de cette étape (module + quiz)."
+  );
+  return lines.join('\n');
+}
+
+function buildClientScriptModule(script: GigScriptPayload): JourneyModuleRow {
+  const moduleTitle = script.targetClient
+    ? `Script d'appel — ${script.targetClient}`
+    : "Script d'appel";
+  return {
+    _id: randomObjectIdLike(),
+    title: moduleTitle,
+    sections: [
+      {
+        _id: randomObjectIdLike(),
+        title: 'Script complet',
+        type: 'script',
+        content: formatScriptMarkdown(script),
+        duration: 15,
+      },
+    ],
+    quizzes: [
+      {
+        _id: randomObjectIdLike(),
+        title: 'Validation du script',
+        questions: [
+          {
+            question:
+              "Avez-vous lu et compris l'intégralité du script d'appel pour ce projet ?",
+            options: [
+              "Oui, j'ai étudié le script et je suis prêt(e) à l'appliquer en cockpit",
+              'Non, pas encore',
+            ],
+            correctAnswer: 0,
+          },
+        ],
+      },
+    ],
+    harxRequirementType: SCRIPT_REQUIREMENT_MARKER,
+  } as JourneyModuleRow;
+}
+
+export async function fetchActiveScriptForGig(gigId: string): Promise<GigScriptPayload | null> {
+  const gid = String(gigId || '').trim();
+  if (!gid) return null;
+  const api = knowledgeBaseApiRoot();
+  if (!api) return null;
+  try {
+    const res = await fetch(`${api}/scripts/gig/${encodeURIComponent(gid)}`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: GigScriptPayload[] };
+    const scripts = Array.isArray(json.data) ? json.data : [];
+    if (scripts.length === 0) return null;
+    return scripts.find((s) => s.isActive !== false) || scripts[0];
+  } catch {
+    return null;
+  }
+}
+
+/** Injecte le module script côté client si le parcours API ne l'inclut pas encore. */
+export async function enrichJourneyWithScriptModule(j: JourneyRowLite): Promise<JourneyRowLite> {
+  if (journeyHasScriptModule(j)) return j;
+  const gigId = gigIdFromJourney(j);
+  if (!gigId) return j;
+  const script = await fetchActiveScriptForGig(gigId);
+  if (!script) return j;
+  const scriptMod = buildClientScriptModule(script);
+  const others = extractModules(j).filter((m) => !isScriptRequirementModule(m));
+  return {
+    ...j,
+    modules: [scriptMod, ...others],
+  };
 }
