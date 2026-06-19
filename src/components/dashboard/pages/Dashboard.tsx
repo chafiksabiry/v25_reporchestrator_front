@@ -9,8 +9,10 @@ import { repApiUrl } from '../../../utils/repApiUrl';
 import { CallRecords } from '../CallRecords';
 import {
   resolveClientValidationPendingAmount,
+  resolveTransactionRepCommission,
 } from '../../../utils/commissionUtils';
-import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
+import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
 
 interface DashboardProps {
   profile?: any;
@@ -322,6 +324,11 @@ export function Dashboard({ profile }: DashboardProps) {
   }, [profile]);
 
   const periodStartTs = useMemo(() => getPeriodStart(selectedPeriod), [selectedPeriod]);
+
+  const repSaleLedgerByCallId = useMemo(
+    () => indexSaleLedgerByCallId(repLedger),
+    [repLedger]
+  );
 
   // Dynamic filter logic — apply gig + period
   const filteredCalls = React.useMemo(() => {
@@ -1427,6 +1434,9 @@ export function Dashboard({ profile }: DashboardProps) {
                   const isPendingClient = callId
                     ? earningsPipeline.pendingClientValidationCallIds.has(callId)
                     : false;
+                  const ledgerTxStatus = callId ? repSaleLedgerByCallId.get(callId)?.status ?? null : null;
+                  const inRetraction = isTransactionInRetraction(call, ledgerTxStatus);
+                  const txCommission = resolveTransactionRepCommission(call);
                   return (
                     <li key={call._id || call.sid || `${contact}-${dateStr}`}>
                       <button
@@ -1456,6 +1466,12 @@ export function Dashboard({ profile }: DashboardProps) {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          {inRetraction && (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-800 border-amber-200 inline-flex items-center gap-1">
+                              <RotateCcw size={10} />
+                              Rétractation · +{txCommission.toFixed(2)}€
+                            </span>
+                          )}
                           {callFilter === 'pending_client' || isPendingClient ? (
                             <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
                               Vente en attente
@@ -1840,6 +1856,11 @@ export function Dashboard({ profile }: DashboardProps) {
                 {selectedTransaction.description && (
                   <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     {selectedTransaction.description}
+                  </p>
+                )}
+                {selectedTransaction.status === 'pending_retraction' && (
+                  <p className="text-xs font-medium text-amber-800 leading-relaxed bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                    Commission en rétractation légale (14 jours). Elle sera créditée au solde après ce délai.
                   </p>
                 )}
               </div>

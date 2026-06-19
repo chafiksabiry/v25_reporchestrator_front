@@ -72,8 +72,38 @@ export type CallLike = {
   ai_call_status?: string | null;
   callOutcome?: string | null;
   ai_call_score?: Record<string, { passed?: boolean; score?: number }> | null;
-  transaction?: { validByCompany?: boolean | null; validByAI?: boolean | null } | null;
+  transaction?: {
+    validByCompany?: boolean | null;
+    validByAI?: boolean | null;
+    retractionStatus?: string | null;
+    retractionEndsAt?: string | Date | null;
+  } | null;
 };
+
+/** Vente encore dans la fenêtre légale de rétractation (14j). */
+export function isTransactionInRetraction(
+  call: CallLike,
+  ledgerTxStatus?: string | null
+): boolean {
+  if (ledgerTxStatus === 'pending_retraction') return true;
+  if (call.transaction?.retractionStatus === 'pending') return true;
+  return false;
+}
+
+export const RETRACTION_BADGE: StatusBadge = {
+  label: 'Rétractation 14j',
+  tone: 'bg-amber-50 text-amber-800 border-amber-200',
+  title: 'Commission en période de rétractation légale (14 jours)',
+};
+
+export function formatRetractionEndsLabel(
+  retractionEndsAt?: string | Date | null
+): string | null {
+  if (!retractionEndsAt) return null;
+  const ts = new Date(retractionEndsAt).getTime();
+  if (!Number.isFinite(ts)) return null;
+  return new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 export function isCallRejectedByAI(call: CallLike): boolean {
   if (call.validByAI === false || call.valid === false) return true;

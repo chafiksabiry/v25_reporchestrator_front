@@ -21,15 +21,17 @@ import {
   BookOpen,
   Clock,
   CreditCard,
+  RotateCcw,
 } from 'lucide-react';
-import api from '../../utils/client';
+import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
   hasDetectedTransactionSale,
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { isCallApprovedByAI, isCallRejectedByAI, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { formatRetractionEndsLabel, isCallApprovedByAI, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
 export interface CallRecord {
@@ -58,6 +60,8 @@ export interface CallRecord {
     validByAI?: boolean;
     validByCompany?: boolean;
     validByReps?: boolean | null;
+    retractionStatus?: string | null;
+    retractionEndsAt?: string | null;
     updatedAt?: string;
     valid?: boolean | null;
   } | null;
@@ -190,7 +194,7 @@ interface CallRecordsProps {
   gigId?: string;
   leadId?: string;
   callValidationFilter?: 'all' | 'approved' | 'pending';
-  transactionValidationFilter?: 'all' | 'approved' | 'refused' | 'pending';
+  transactionValidationFilter?: 'all' | 'approved' | 'refused' | 'pending' | 'retraction';
   /** Twilio CallSid of a call that should auto-open in the details modal
    *  as soon as it lands in the fetched records list. Used by Workspace
    *  to deep-link the rep into the AI-insights modal right after they
@@ -262,6 +266,141 @@ export function CallRecords({
   const [error, setError] = useState<string | null>(null);
   const [analyzingCallId, setAnalyzingCallId] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<{ callId: string; message: string } | null>(null);
+  const [repLedgerByCallId, setRepLedgerByCallId] = useState<Map<string, RepTransactionRow>>(new Map());
+
+  const resolveCallId = (record: CallRecord) =>
+    typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
+
+  const getLedgerTxStatus = (record: CallRecord) =>
+    repLedgerByCallId.get(resolveCallId(record))?.status ?? null;
+
+  const fetchRepLedger = async () => {
+    try {
+      const agentId = localStorage.getItem('agentId');
+      if (!agentId) return;
+      const response = await repTransactionsApi.list(agentId, { limit: 500 });
+      if (!response?.success || !Array.isArray(response.data)) return;
+
+      setRepLedgerByCallId(indexSaleLedgerByCallId(response.data));
+    } catch (err) {
+      console.error('Failed to fetch rep ledger for call records:', err);
+    }
+  };
+
+  const getRetractionEndsLabel = (record: CallRecord) => {
+    const ledgerRow = repLedgerByCallId.get(resolveCallId(record));
+    const endsAt =
+      ledgerRow?.withdrawableAt ||
+      (ledgerRow?.meta as { retractionEndsAt?: string } | undefined)?.retractionEndsAt ||
+      record.transaction?.retractionEndsAt;
+    return formatRetractionEndsLabel(endsAt);
+  };
+
+  const renderTransactionCommissionPill = (record: CallRecord, compact = false) => {
+    const ledgerStatus = getLedgerTxStatus(record);
+    const amount = resolveTransactionRepCommission(record).toFixed(2);
+    const endsLabel = getRetractionEndsLabel(record);
+    const pillClass = compact
+      ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border'
+      : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border';
+
+    if (isTransactionInRetraction(record, ledgerStatus)) {
+      return (
+        <span className={`inline-flex ${compact ? 'flex-row' : 'flex-col'} items-center gap-0.5`}>
+          <span
+            className={`${pillClass} bg-amber-50 text-amber-800 border-amber-200`}
+            title={endsLabel ? `Rétractation jusqu'au ${endsLabel}` : 'Rétractation légale 14 jours'}
+          >
+            <RotateCcw className="w-3 h-3" />
+            +{amount}€
+            {compact && <span className="normal-case tracking-normal font-bold">· 14j</span>}
+          </span>
+          {!compact && (
+            <span className="text-[7px] font-black uppercase tracking-wider text-amber-600 text-center">
+              Rétractation 14j{endsLabel ? ` · fin ${endsLabel}` : ''}
+            </span>
+          )}
+        </span>
+      );
+    }
+
+    if (record.transaction?.validByCompany === true || ledgerStatus === 'earned' || ledgerStatus === 'paid') {
+      return (
+        <span className={`${pillClass} bg-emerald-50 text-emerald-700 border-emerald-100`}>
+          <Check className="w-3 h-3" />
+          +{amount}€
+        </span>
+      );
+    }
+
+    if (isCallRejectedByAI(record) || isCallApprovedByAI(record)) {
+      const txStatus = resolveUnvalidatedTransactionStatus(record);
+      return (
+        <span className={`${pillClass} ${txStatus.tone}`} title={txStatus.title}>
+          {isCallRejectedByAI(record) ? (
+            <X className="w-3 h-3" />
+          ) : record.transaction?.validByCompany === false || !hasDetectedTransactionSale(record) ? (
+            <Clock className="w-3 h-3" />
+          ) : (
+            <Clock className="w-3 h-3 animate-pulse" />
+          )}
+          {txStatus.label}
+        </span>
+      );
+    }
+
+    return <span className="text-slate-300 font-bold text-sm">—</span>;
+  };
+
+  const renderModalCommissionsBanner = (record: CallRecord) => {
+    const ledgerStatus = getLedgerTxStatus(record);
+    const inRetraction = isTransactionInRetraction(record, ledgerStatus);
+    const endsLabel = getRetractionEndsLabel(record);
+    const showCall = record.validByAI === true || record.valid === true;
+    const showTx =
+      inRetraction ||
+      record.transaction?.validByCompany === true ||
+      ledgerStatus === 'earned' ||
+      ledgerStatus === 'paid' ||
+      hasDetectedTransactionSale(record);
+
+    if (!showCall && !showTx) return null;
+
+    return (
+      <div className={`px-4 md:px-8 py-4 border-b border-slate-100 ${inRetraction ? 'bg-amber-50/60' : 'bg-slate-50/80'}`}>
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-3">
+          Commissions sur cet appel
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {showCall && (
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-emerald-100 shadow-sm">
+              <Phone className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Appel</span>
+              <span className="text-sm font-black text-emerald-700">
+                +{resolveCallRepCommission(record).toFixed(2)}€
+              </span>
+            </div>
+          )}
+          {showTx && (
+            <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border shadow-sm ${
+              inRetraction ? 'border-amber-200' : 'border-emerald-100'
+            }`}>
+              <CreditCard className={`w-3.5 h-3.5 ${inRetraction ? 'text-amber-600' : 'text-emerald-600'}`} />
+              <span className="text-[10px] font-black uppercase text-slate-500">Vente</span>
+              {renderTransactionCommissionPill(record, true)}
+            </div>
+          )}
+        </div>
+        {inRetraction && (
+          <p className="mt-3 text-[11px] font-semibold text-amber-800 leading-relaxed">
+            <RotateCcw className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
+            Commission vente en rétractation légale (14 jours).
+            {endsLabel ? ` Disponible après le ${endsLabel}.` : ' Elle sera créditée au solde après ce délai.'}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const patchCallInLists = (callId: string, patch: Partial<CallRecord>) => {
     setCallRecords((prev) =>
@@ -338,6 +477,7 @@ export function CallRecords({
           setSelectedCall({ ...selectedCall, ...patch });
         }
         fetchCallRecords();
+        void fetchRepLedger();
         // A freshly validated call books commissions server-side — refresh wallet.
         if (response.validByAI === true || (response.data as any)?.validByAI === true) {
           onAnalysisSettled?.();
@@ -356,7 +496,17 @@ export function CallRecords({
 
   useEffect(() => {
     fetchCallRecords();
+    void fetchRepLedger();
   }, [gigId, leadId]);
+
+  useEffect(() => {
+    const handler = () => {
+      void fetchRepLedger();
+    };
+    window.addEventListener('REP_WALLET_REFRESH', handler);
+    return () => window.removeEventListener('REP_WALLET_REFRESH', handler);
+  }, []);
+
   const autoOpenHandledRef = React.useRef<string | null>(null);
   useEffect(() => {
     if (!autoOpenSid) return;
@@ -433,7 +583,10 @@ export function CallRecords({
     });
 
     prevPendingIdsRef.current = currentPending;
-    if (someSettled) onAnalysisSettled?.();
+    if (someSettled) {
+      void fetchRepLedger();
+      onAnalysisSettled?.();
+    }
   }, [callRecords, onAnalysisSettled]);
 
   useEffect(() => {
@@ -486,7 +639,16 @@ export function CallRecords({
     if (callValidationFilter === 'pending' && !isAnalysisPending(record)) return false;
 
     // Transaction Validation Filter
-    if (transactionValidationFilter === 'approved' && record.transaction?.validByReps !== true) return false;
+    const ledgerStatus = getLedgerTxStatus(record);
+    if (transactionValidationFilter === 'retraction' && !isTransactionInRetraction(record, ledgerStatus)) {
+      return false;
+    }
+    if (transactionValidationFilter === 'approved') {
+      if (record.transaction?.validByCompany !== true && ledgerStatus !== 'earned' && ledgerStatus !== 'paid') {
+        return false;
+      }
+      if (isTransactionInRetraction(record, ledgerStatus)) return false;
+    }
     if (transactionValidationFilter === 'refused' && record.transaction?.validByReps !== false) return false;
     if (transactionValidationFilter === 'pending' && record.transaction?.validByReps != null) return false;
 
@@ -621,6 +783,12 @@ export function CallRecords({
                             {outcomeBadge.label}
                           </span>
                         )}
+                        {isTransactionInRetraction(record, getLedgerTxStatus(record)) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-200">
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            Rétractation 14j
+                          </span>
+                        )}
                         {record.flags?.fraud === true && record.callOutcome !== 'fraud' && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
                             <ShieldAlert className="w-2.5 h-2.5" />
@@ -721,33 +889,7 @@ export function CallRecords({
 
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
-                        {record.transaction?.validByCompany === true ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            <Check className="w-3 h-3" />
-                            +{resolveTransactionRepCommission(record).toFixed(2)}€
-                          </span>
-                        ) : (isCallRejectedByAI(record) || isCallApprovedByAI(record)) ? (
-                          (() => {
-                            const txStatus = resolveUnvalidatedTransactionStatus(record);
-                            return (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${txStatus.tone}`}
-                                title={txStatus.title}
-                              >
-                                {isCallRejectedByAI(record) ? (
-                                  <X className="w-3 h-3" />
-                                ) : record.transaction?.validByCompany === false || !hasDetectedTransactionSale(record) ? (
-                                  <Clock className="w-3 h-3" />
-                                ) : (
-                                  <Clock className="w-3 h-3 animate-pulse" />
-                                )}
-                                {txStatus.label}
-                              </span>
-                            );
-                          })()
-                        ) : (
-                          <span className="text-slate-300 font-bold text-sm">—</span>
-                        )}
+                        {renderTransactionCommissionPill(record)}
                       </div>
                     </div>
                   )}
@@ -875,51 +1017,48 @@ export function CallRecords({
                     <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="En attente">
                       <Clock className="w-3 h-3" />
                     </span>
-                  ) : selectedCall.transaction?.validByCompany === true ? (
-                    <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-                      <Check className="w-3 h-3" />
-                      +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€
-                    </span>
-                  ) : (() => {
-                    const txStatus = resolveUnvalidatedTransactionStatus(selectedCall);
-                    return (
-                      <span
-                        className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${txStatus.tone}`}
-                        title={txStatus.title}
-                      >
-                        {isCallRejectedByAI(selectedCall) ? (
-                          <X className="w-3 h-3" />
-                        ) : hasDetectedTransactionSale(selectedCall) && selectedCall.transaction?.validByCompany !== false ? (
-                          <Clock className="w-3 h-3 animate-pulse" />
-                        ) : null}
-                        {txStatus.label}
-                      </span>
-                    );
-                  })()}
+                  ) : (
+                    renderTransactionCommissionPill(selectedCall, true)
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-1.5 text-slate-400" title="Validation Finale">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
-                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${selectedCall.transaction?.validByReps === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                    selectedCall.transaction?.validByReps === false ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
-                      'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={selectedCall.transaction?.validByReps === true ? 'Vente déclarée' : selectedCall.transaction?.validByReps === false ? 'Pas de vente' : 'En attente'}>
-                    {selectedCall.transaction?.validByReps === true ? (
-                      <div className="flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€
-                      </div>
-                    ) : selectedCall.transaction?.validByReps === false ? (
-                      <X className="w-3 h-3" />
-                    ) : (
-                      <Clock className="w-3 h-3" />
-                    )}
-                  </span>
+                  {(() => {
+                    const inRetraction = isTransactionInRetraction(selectedCall, getLedgerTxStatus(selectedCall));
+                    if (selectedCall.transaction?.validByReps === true) {
+                      return inRetraction ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-amber-500/10 text-amber-700 border-amber-500/20">
+                          <RotateCcw className="w-3 h-3" />
+                          +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€ · 14j
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                          <Check className="w-3 h-3" />
+                          +{resolveTransactionRepCommission(selectedCall).toFixed(2)}€
+                        </span>
+                      );
+                    }
+                    if (selectedCall.transaction?.validByReps === false) {
+                      return (
+                        <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-rose-500/10 text-rose-600 border-rose-500/20">
+                          <X className="w-3 h-3" />
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                        <Clock className="w-3 h-3" />
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
+
+            {renderModalCommissionsBanner(selectedCall)}
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-slate-50/20 custom-scrollbar">
