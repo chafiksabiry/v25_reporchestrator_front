@@ -509,6 +509,7 @@ export function GigsMarketplace() {
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
+  const [cancellingRequestId, setCancellingRequestId] = useState<string | null>(null);
   const [respondingInvitation, setRespondingInvitation] = useState<{ gigId: string; action: 'accept' | 'reject' } | null>(null);
   const [applicationMessage, setApplicationMessage] = useState<{ gigId: string; message: string; type: 'success' | 'error' } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -902,6 +903,61 @@ export function GigsMarketplace() {
       await rejectInvitation(enrollmentId);
     } finally {
       setRespondingInvitation(null);
+    }
+  };
+
+  // Rep annule sa candidature en attente (onglet Requested)
+  const cancelEnrollmentRequest = async (enrollmentId: string, gigId: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      showToast(isFrMarket ? 'Authentification requise.' : 'Authentication required.', 'error');
+      return;
+    }
+
+    setCancellingRequestId(enrollmentId);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/enrollment-requests/${enrollmentId}/cancel`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to cancel enrollment request:', errorText);
+        showToast(
+          isFrMarket ? 'Impossible d\'annuler la candidature.' : 'Could not cancel application.',
+          'error'
+        );
+        return;
+      }
+
+      setPendingRequests((prev) => prev.filter((id) => id !== gigId));
+      setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
+
+      showToast(
+        isFrMarket ? 'Candidature annulée.' : 'Application cancelled.',
+        'success'
+      );
+
+      await Promise.all([
+        fetchPendingRequests(),
+        fetchRequestedGigs(),
+        fetchEnrolledGigIdsFromProfile(),
+      ]);
+    } catch (error) {
+      console.error('❌ Error cancelling enrollment request:', error);
+      showToast(
+        isFrMarket ? 'Erreur lors de l\'annulation.' : 'Error while cancelling.',
+        'error'
+      );
+    } finally {
+      setCancellingRequestId(null);
     }
   };
 
@@ -1500,9 +1556,8 @@ export function GigsMarketplace() {
             prev.includes(gigId) ? prev : [...prev, gigId]
           );
         }
-        // Reject: drop from pending so the gig returns to "Available" and the
-        // rep can re-apply.
-        if (data?.gigId && data?.status === 'rejected') {
+        // Reject / cancel: drop from pending so the gig returns to "Available".
+        if (data?.gigId && (data?.status === 'rejected' || data?.status === 'cancelled')) {
           const gigId = String(data.gigId);
           setPendingRequests((prev) => prev.filter((id) => id !== gigId));
           setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
@@ -1523,6 +1578,11 @@ export function GigsMarketplace() {
               ? "Votre candidature n'a pas été retenue cette fois. Vous pouvez re-postuler."
               : 'Your application was not selected this time. You can re-apply.',
             'error'
+          );
+        } else if (data?.status === 'cancelled') {
+          showToast(
+            isFr ? 'Candidature annulée.' : 'Application cancelled.',
+            'success'
           );
         }
       },
@@ -2644,6 +2704,16 @@ export function GigsMarketplace() {
                     </p>
 
                     <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cancelEnrollmentRequest(requestedGig.id, requestedGig.gig._id)}
+                        disabled={cancellingRequestId === requestedGig.id}
+                        className="flex-1 bg-rose-50 text-rose-700 border border-rose-200 py-2.5 px-4 rounded-xl hover:bg-rose-100 transition-all font-black text-[11px] uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {cancellingRequestId === requestedGig.id
+                          ? (isFrMarket ? 'Annulation…' : 'Cancelling…')
+                          : (isFrMarket ? 'Annuler la demande' : 'Cancel request')}
+                      </button>
                       <button
                         onClick={() => navigate(`/gig/${requestedGig.gig._id}`)}
                         className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider"
