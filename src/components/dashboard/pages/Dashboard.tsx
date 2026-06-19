@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Hourglass, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
@@ -121,6 +122,8 @@ export function Dashboard({ profile }: DashboardProps) {
   const [selectedGigId, setSelectedGigId] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
+  const gigTriggerRef = useRef<HTMLButtonElement>(null);
+  const [gigDropdownPos, setGigDropdownPos] = useState({ top: 0, left: 0, width: 280 });
   type TransactionFilter = 'all' | 'paid' | 'earned' | 'refused';
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   type CallFilter = 'all' | 'valid' | 'invalid';
@@ -557,6 +560,27 @@ export function Dashboard({ profile }: DashboardProps) {
     return gigsData.find((g) => g._id === selectedGigId)?.title || 'Gig';
   }, [selectedGigId, gigsData]);
 
+  useLayoutEffect(() => {
+    if (!isGigDropdownOpen || !gigTriggerRef.current) return;
+
+    const updatePosition = () => {
+      const rect = gigTriggerRef.current!.getBoundingClientRect();
+      setGigDropdownPos({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: Math.max(rect.width, 280),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isGigDropdownOpen, gigsData.length]);
+
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">
       {/* Dynamic Filter Header */}
@@ -577,6 +601,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gig :</span>
               <div className="relative min-w-[220px] max-w-[320px]">
                 <button
+                  ref={gigTriggerRef}
                   type="button"
                   onClick={() => setIsGigDropdownOpen((open) => !open)}
                   className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-purple-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all duration-300"
@@ -585,10 +610,24 @@ export function Dashboard({ profile }: DashboardProps) {
                   <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isGigDropdownOpen ? 'rotate-180 text-purple-500' : ''}`} />
                 </button>
 
-                {isGigDropdownOpen && (
+                {isGigDropdownOpen && createPortal(
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsGigDropdownOpen(false)} aria-hidden />
-                    <div className="absolute top-full left-0 mt-2 z-50 min-w-full w-max max-w-[min(420px,calc(100vw-2rem))] bg-white/95 backdrop-blur-xl border border-slate-100 rounded-2xl shadow-xl shadow-purple-100/40 p-2 animate-in fade-in slide-in-from-top-1 duration-200 max-h-72 overflow-y-auto">
+                    <div
+                      className="fixed inset-0 z-[9998]"
+                      onClick={() => setIsGigDropdownOpen(false)}
+                      aria-hidden
+                    />
+                    <div
+                      className="fixed z-[9999] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/30 p-2 animate-in fade-in slide-in-from-top-1 duration-200 max-h-[min(320px,calc(100vh-6rem))] overflow-y-auto"
+                      style={{
+                        top: gigDropdownPos.top,
+                        left: gigDropdownPos.left,
+                        minWidth: gigDropdownPos.width,
+                        maxWidth: 'min(420px, calc(100vw - 2rem))',
+                      }}
+                      role="listbox"
+                      aria-label="Filtrer par gig"
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -596,6 +635,8 @@ export function Dashboard({ profile }: DashboardProps) {
                           setIsGigDropdownOpen(false);
                         }}
                         className="block w-full text-left px-1 py-0.5"
+                        role="option"
+                        aria-selected={selectedGigId === 'all'}
                       >
                         <span
                           className={`inline-flex items-center gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all ${
@@ -623,6 +664,8 @@ export function Dashboard({ profile }: DashboardProps) {
                               setIsGigDropdownOpen(false);
                             }}
                             className="block w-full text-left px-1 py-0.5"
+                            role="option"
+                            aria-selected={isSelected}
                           >
                             <span
                               className={`inline-flex items-start gap-2 max-w-full px-3 py-2 rounded-xl text-[11px] font-semibold leading-snug normal-case transition-all ${
@@ -638,7 +681,8 @@ export function Dashboard({ profile }: DashboardProps) {
                         );
                       })}
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
             </div>
