@@ -25,6 +25,10 @@ import {
   getViewerThemeTokens,
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
+import {
+  scriptModuleStillPending,
+  trainingApiBase,
+} from '../../../utils/trainingScriptRequirement';
 
 type JourneyRow = Record<string, unknown> & { __gigTitle?: string; __gigId?: string };
 type ModuleRow = { _id?: string; id?: string; title?: string; sections?: unknown[]; quizzes?: unknown[] };
@@ -121,12 +125,8 @@ type ViewerSlide =
 
 type ModulePlanItem = { durationMinutes?: unknown };
 
-function trainingApiBase(): string {
-  const raw =
-    import.meta.env.VITE_TRAINING_API_URL ||
-    import.meta.env.VITE_TRAINING_BACKEND_URL ||
-    '';
-  return String(raw).replace(/\/$/, '');
+function notifyTrainingProgressUpdated() {
+  window.dispatchEvent(new Event('TRAINING_PROGRESS_UPDATED'));
 }
 
 function normalizeStructuredProgress(raw: any): StructuredProgressRow | null {
@@ -169,44 +169,6 @@ function journeyKey(j: Record<string, unknown>): string {
 function extractModules(j: JourneyRow): ModuleRow[] {
   const raw = (j.modules || []) as unknown[];
   return Array.isArray(raw) ? (raw as ModuleRow[]) : [];
-}
-
-const SCRIPT_REQUIREMENT_MARKER = '__harx_script_requirement__';
-
-function isScriptRequirementModule(mod: ModuleRow): boolean {
-  const row = mod as Record<string, unknown>;
-  if (row.harxRequirementType === SCRIPT_REQUIREMENT_MARKER) return true;
-  const title = String(mod.title || '').toLowerCase();
-  return title.includes("script d'appel") || title.includes('script d appel');
-}
-
-/** True si le gig a un module script et que le rep ne l'a pas encore validé. */
-function scriptModuleStillPending(
-  j: JourneyRow,
-  structured: StructuredProgressRow | undefined,
-  progress: RepProgressRow | undefined
-): boolean {
-  const modules = extractModules(j);
-  const scriptIdx = modules.findIndex(isScriptRequirementModule);
-  if (scriptIdx < 0) return false;
-
-  const scriptMod = modules[scriptIdx];
-  const moduleId =
-    normalizeMongoId((scriptMod as any)?._id) ||
-    normalizeMongoId((scriptMod as any)?.id) ||
-    String(scriptIdx);
-
-  const fromStructured = structured?.modules?.find(
-    (m) => m.moduleId === moduleId || m.moduleId === String(scriptIdx)
-  );
-  if (fromStructured?.status === 'completed') return false;
-
-  const mp = progress?.modules?.[moduleId] ?? progress?.modules?.[String(scriptIdx)];
-  if (mp && (String((mp as { status?: unknown }).status) === 'completed' || Number((mp as { progress?: unknown }).progress) >= 100)) {
-    return false;
-  }
-
-  return true;
 }
 
 function CompletedTrainingRequirementsWarning({
@@ -1504,6 +1466,7 @@ export function Training() {
         if (key) map[key] = row;
       });
       setProgressByJourney(map);
+      notifyTrainingProgressUpdated();
     } catch {
       /* ignore */
     }
@@ -1523,6 +1486,7 @@ export function Training() {
         gigFilter === '__all__' ? {} : { params: { gigId: gigFilter } }
       );
       setSlideProgressSummary(r.data?.data ?? null);
+      notifyTrainingProgressUpdated();
     } catch {
       setSlideProgressSummary(null);
     }
@@ -1540,6 +1504,7 @@ export function Training() {
         const parsed = normalizeStructuredProgress(r.data?.data);
         if (parsed) {
           setStructuredProgressByJourney((prev) => ({ ...prev, [courseId]: parsed }));
+          notifyTrainingProgressUpdated();
           return parsed;
         }
       } catch {
