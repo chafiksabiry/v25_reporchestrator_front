@@ -37,6 +37,11 @@ import {
   resolveWalletTransactionEur,
   getBonusPillDisplay
 } from '../../../utils/gigCommissionDisplay';
+import {
+  resolveCallRepCommission,
+  resolveTransactionRepCommission,
+  hasDetectedTransactionSale,
+} from '../../../utils/commissionUtils';
 
 // Minimum withdrawal amount enforced by the backend
 // (see `requestAgentWithdrawal` in escrowController.js).
@@ -234,6 +239,30 @@ export function WalletPage() {
     if (range !== 'last-month') return Number.POSITIVE_INFINITY;
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime();
+  };
+
+  const getPeriodStartTitle = (range: string): string => {
+    switch (range) {
+      case 'today':
+        return 'Début journée';
+      case 'this-week':
+        return 'Début semaine';
+      case 'last-month':
+      case 'this-month':
+        return 'Début mois';
+      default:
+        return 'Début période';
+    }
+  };
+
+  const getPeriodStartDateLabel = (range: string): string => {
+    const start = getWalletPeriodStart(range);
+    if (!start) return '';
+    return new Date(start).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
   };
 
   const resetTransactionFilters = () => {
@@ -529,6 +558,83 @@ export function WalletPage() {
   const remainingToMin = Math.max(0, MIN_WITHDRAWAL_AMOUNT - availableBalance);
   const canWithdraw = availableBalance >= MIN_WITHDRAWAL_AMOUNT;
 
+  const periodEarningsBreakdown = useMemo(() => {
+    const periodStart = getWalletPeriodStart(selectedDateRange);
+    const periodEnd = getWalletPeriodEnd(selectedDateRange);
+
+    const inPeriod = (dateStr: string | undefined) => {
+      if (!dateStr) return false;
+      const ts = new Date(dateStr).getTime();
+      if (!ts || ts < periodStart || ts > periodEnd) return false;
+      return true;
+    };
+
+    const validatedGains = repLedgerRows.reduce((sum, row) => {
+      if (row.status !== 'earned') return sum;
+      if (!inPeriod(row.createdAt)) return sum;
+      return sum + (row.repShare || 0);
+    }, 0);
+
+    const bookedCallIds = new Set(
+      repLedgerRows
+        .filter((row) => row.type === 'call_validated' && row.callId)
+        .map((row) => String(row.callId))
+    );
+    const bookedTxSourceIds = new Set(
+      repLedgerRows
+        .filter((row) => row.type === 'transaction' && row.sourceId)
+        .map((row) => String(row.sourceId))
+    );
+
+    let pendingCountInPeriod = 0;
+    const pendingGains = realCalls.reduce((sum, call) => {
+      const ts = new Date(call.startTime || call.createdAt || 0).getTime();
+      if (!ts || ts < periodStart || ts > periodEnd) return sum;
+
+      let callPending = 0;
+      const callIdStr = String(call._id?.$oid || call._id || call.sid || '');
+
+      if (!bookedCallIds.has(callIdStr) && call.validByAI !== false) {
+        callPending += resolveCallRepCommission(call);
+      }
+
+      if (hasDetectedTransactionSale(call)) {
+        const txSourceId = String(call.transaction?._id || call._id?.$oid || call._id);
+        if (!bookedTxSourceIds.has(txSourceId) && call.transaction?.validByCompany !== false) {
+          callPending += resolveTransactionRepCommission(call);
+        }
+      }
+
+      if (callPending > 0) pendingCountInPeriod += 1;
+      return sum + callPending;
+    }, 0);
+
+    const earnedBeforePeriod = repLedgerRows.reduce((sum, row) => {
+      if (row.status !== 'earned') return sum;
+      const ts = new Date(row.createdAt).getTime();
+      if (!ts || ts >= periodStart) return sum;
+      return sum + (row.repShare || 0);
+    }, 0);
+
+    const withdrawnBeforePeriod = backendWithdrawals.reduce((sum, withdrawal) => {
+      if (withdrawal.status === 'Failed') return sum;
+      const ts = new Date(withdrawal.date).getTime();
+      if (!ts || ts >= periodStart) return sum;
+      return sum + Math.abs(withdrawal.amount || 0);
+    }, 0);
+
+    const periodStartBalance = Math.max(0, earnedBeforePeriod - withdrawnBeforePeriod);
+    const totalGains = periodStartBalance + validatedGains + pendingGains;
+
+    return {
+      periodStartBalance,
+      validatedGains,
+      pendingGains,
+      totalGains,
+      pendingCountInPeriod,
+    };
+  }, [selectedDateRange, repLedgerRows, realCalls, backendWithdrawals]);
+
   const filteredTransactions = transactions.filter((tx) => {
     if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
     const periodStart = getWalletPeriodStart(selectedDateRange);
@@ -638,121 +744,156 @@ export function WalletPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Hero: Available balance (premium dark card) ───────────────── */}
-        <div className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-7 text-white shadow-xl shadow-slate-900/25">
-          {/* Brand glow accents */}
-          <div className="absolute -top-16 -right-10 h-56 w-56 rounded-full bg-harx-500/20 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-harx-alt-500/15 blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                    {t('wallet.availableBalance')}
-                  </p>
-                  <p className="text-[11px] font-semibold text-white/40 mt-0.5">Solde retirable</p>
-                </div>
+      {/* ── Gains pipeline: début → validés → en attente → total ─────── */}
+      <div className="rounded-3xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
+          {/* 1. Début période */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-slate-100">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4 text-slate-500" />
               </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {getPeriodStartTitle(selectedDateRange)}
+                </p>
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                  {getPeriodStartDateLabel(selectedDateRange)}
+                </p>
+              </div>
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mt-auto">
+              {fmtMoney(periodEarningsBreakdown.periodStartBalance)}
+              <span className="text-lg text-slate-300 ml-0.5">€</span>
+            </p>
+            <p className="text-[10px] font-semibold text-slate-400 mt-2">Solde reporté</p>
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 2. Gains validés */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-slate-100 bg-emerald-50/30">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                Gains validés
+              </p>
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight leading-none mt-auto">
+              +{fmtMoney(periodEarningsBreakdown.validatedGains)}
+              <span className="text-lg text-emerald-300 ml-0.5">€</span>
+            </p>
+            <p className="text-[10px] font-semibold text-emerald-600/70 mt-2">Commissions créditées</p>
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 3. Gains en attente */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-slate-100 bg-amber-50/30">
+            <div className="flex items-start justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 leading-tight">
+                  En attente de validation
+                </p>
+              </div>
+              {periodEarningsBreakdown.pendingCountInPeriod > 0 && (
+                <span className="inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
+                  {periodEarningsBreakdown.pendingCountInPeriod}
+                </span>
+              )}
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight leading-none mt-auto">
+              +{fmtMoney(periodEarningsBreakdown.pendingGains)}
+              <span className="text-lg text-amber-300 ml-0.5">€</span>
+            </p>
+            <p className="text-[10px] font-semibold text-amber-600/70 mt-2">Appels & ventes à valider</p>
+          </div>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 4. Total */}
+          <div className="p-5 sm:p-6 flex flex-col bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/20 blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4 text-white" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/50">Total</p>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black tracking-tight leading-none mt-auto">
+                {fmtMoney(periodEarningsBreakdown.totalGains)}
+                <span className="text-lg text-white/40 ml-0.5">€</span>
+              </p>
+              <p className="text-[10px] font-semibold text-white/40 mt-2">Sur la période sélectionnée</p>
               {weeklyEarnings > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20">
+                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 mt-3 self-start">
                   <ArrowDownRight className="w-3 h-3" />
                   +{fmtMoney(weeklyEarnings)}€ cette semaine
                 </span>
               )}
             </div>
-
-            <div className="mt-6 mb-7">
-              <p className="text-4xl sm:text-5xl font-black tracking-tight leading-none">
-                {fmtMoney(availableBalance)}<span className="text-2xl sm:text-3xl text-white/40 ml-1">€</span>
-              </p>
-            </div>
-
-            {/* Withdrawal threshold progress */}
-            <div className="mt-auto">
-              <div className="flex items-center justify-between gap-3 mb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    canWithdraw ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70 border border-white/15'
-                  }`}>
-                    {canWithdraw ? <ShieldCheck className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                    Seuil de retrait · {MIN_WITHDRAWAL_AMOUNT.toLocaleString('fr-FR')}€
-                  </span>
-                </div>
-                <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
-                  canWithdraw ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 border border-white/15'
-                }`}>
-                  {progressPct}%
-                </span>
-              </div>
-
-              <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ease-out relative ${
-                    canWithdraw
-                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                      : 'bg-gradient-harx'
-                  }`}
-                  style={{ width: `${Math.max(progressPct, 2)}%` }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent rounded-full" />
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2">
-                {canWithdraw ? (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <p className="text-[11px] font-black text-emerald-300 uppercase tracking-wider">
-                      Retrait disponible
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-3.5 h-3.5 text-white/40 shrink-0" />
-                    <p className="text-[11px] font-semibold text-white/50">
-                      Encore <span className="font-black text-white">{fmtMoney(remainingToMin)}€</span> avant retrait
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* ── Pending earnings (clean white card) ───────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-white p-7 shadow-sm border border-slate-100 flex flex-col">
-          <div className="flex items-start justify-between">
-            <div className="h-11 w-11 rounded-2xl bg-amber-50 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-500" />
+        {/* Solde disponible + seuil de retrait */}
+        <div className="border-t border-slate-100 bg-slate-50/60 px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+              <Wallet className="w-4 h-4 text-slate-600" />
             </div>
-            <span className="inline-flex items-center text-[11px] font-black px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-              {pendingTransactionsCount} en attente
-            </span>
-          </div>
-
-          <div className="mt-6">
-            <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">
-              {fmtMoney(pendingEarnings)}<span className="text-xl text-slate-300 ml-1">€</span>
-            </p>
-            <p className="text-[10px] text-slate-400 font-black mt-2 uppercase tracking-widest">
-              {t('wallet.pendingEarnings')}
-            </p>
-          </div>
-
-          <div className="mt-auto pt-5">
-            <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <Shield className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                Les gains en attente sont crédités après validation des appels et ventes par l'entreprise.
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {t('wallet.availableBalance')}
+              </p>
+              <p className="text-xl font-black text-slate-900 leading-none mt-0.5">
+                {fmtMoney(availableBalance)}<span className="text-sm text-slate-300 ml-0.5">€</span>
               </p>
             </div>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <div className="flex items-center gap-2">
+                {canWithdraw ? (
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                )}
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Seuil de retrait · {MIN_WITHDRAWAL_AMOUNT.toLocaleString('fr-FR')}€
+                </span>
+              </div>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                canWithdraw ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+              }`}>
+                {progressPct}%
+              </span>
+            </div>
+            <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                  canWithdraw ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-harx'
+                }`}
+                style={{ width: `${Math.max(progressPct, 2)}%` }}
+              />
+            </div>
+            <p className="text-[10px] font-semibold text-slate-400 mt-1.5">
+              {canWithdraw
+                ? 'Retrait disponible'
+                : <>Encore <span className="font-black text-slate-600">{fmtMoney(remainingToMin)}€</span> avant retrait</>}
+            </p>
           </div>
         </div>
       </div>
