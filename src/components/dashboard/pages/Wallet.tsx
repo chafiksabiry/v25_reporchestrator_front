@@ -779,6 +779,7 @@ export function WalletPage() {
                       value={selectedGigId}
                       onChange={setSelectedGigId}
                       options={gigSelectOptions}
+                      accent="purple"
                     />
                     <WalletFilterSelect
                       label="Ventes"
@@ -791,6 +792,7 @@ export function WalletPage() {
                       value={selectedDateRange}
                       onChange={setSelectedDateRange}
                       options={dateRangeOptions}
+                      accent="blue"
                     />
                   </div>
                 </div>
@@ -938,6 +940,7 @@ export function WalletPage() {
                       value={selectedGigId}
                       onChange={setSelectedGigId}
                       options={gigSelectOptions}
+                      accent="purple"
                     />
                     <WalletFilterSelect
                       label="Appels"
