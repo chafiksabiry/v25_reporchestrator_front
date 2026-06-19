@@ -348,12 +348,13 @@ export function Dashboard({ profile }: DashboardProps) {
     const activeLedger = (row: RepTransactionRow) =>
       row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
 
-    const bookedCallIds = new Set(
-      repLedger
-        .filter((row) => activeLedger(row) && row.type === 'call_validated' && row.callId)
-        .map((row) => normalizeRecordId(row.callId))
-        .filter(Boolean) as string[]
-    );
+    const ledgerCallIds = new Set<string>();
+    repLedger.forEach((row) => {
+      if (!activeLedger(row)) return;
+      const id = normalizeRecordId(row.callId) || normalizeRecordId(row.call?._id);
+      if (id) ledgerCallIds.add(id);
+    });
+
     const bookedTxSourceIds = new Set(
       repLedger
         .filter((row) => activeLedger(row) && row.type === 'transaction' && row.sourceId)
@@ -379,7 +380,7 @@ export function Dashboard({ profile }: DashboardProps) {
       let pending = 0;
 
       // Appel validé IA mais pas encore crédité au ledger (rare).
-      if (!bookedCallIds.has(callId) && call.validByAI === true) {
+      if (!ledgerCallIds.has(callId) && call.validByAI === true) {
         pending += resolveCallRepCommission(call);
       }
 
