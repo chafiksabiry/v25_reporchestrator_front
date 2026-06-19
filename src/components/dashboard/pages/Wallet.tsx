@@ -22,7 +22,10 @@ import {
   KeyRound,
   Sparkles,
   Phone,
-  CalendarDays
+  CalendarDays,
+  RotateCcw,
+  Building2,
+  Trophy,
 } from 'lucide-react';
 
 import { CallRecords } from '../CallRecords';
@@ -38,9 +41,7 @@ import {
   getBonusPillDisplay
 } from '../../../utils/gigCommissionDisplay';
 import {
-  resolveCallRepCommission,
-  resolveTransactionRepCommission,
-  hasDetectedTransactionSale,
+  resolveClientValidationPendingAmount,
 } from '../../../utils/commissionUtils';
 
 // Minimum withdrawal amount enforced by the backend
@@ -60,7 +61,7 @@ export function WalletPage() {
   const [selectedGigId, setSelectedGigId] = useState('all');
   const [callValidationFilter, setCallValidationFilter] = useState<'all' | 'approved' | 'pending'>('all');
   const [transactionValidationFilter, setTransactionValidationFilter] = useState<
-    'all' | 'approved' | 'validated' | 'refused' | 'pending'
+    'all' | 'approved' | 'validated' | 'refused' | 'pending' | 'retraction'
   >('all');
 
   // Dynamic state metrics for real payouts
@@ -190,6 +191,7 @@ export function WalletPage() {
     () => [
       { value: 'all', label: 'Toutes les ventes', tone: 'brand' as const },
       { value: 'validated', label: 'Ventes validées', tone: 'success' as const },
+      { value: 'retraction', label: 'Rétractation (14j)', tone: 'warning' as const },
       { value: 'pending', label: 'Ventes en attente', tone: 'warning' as const },
       { value: 'refused', label: 'Ventes refusées', tone: 'danger' as const },
     ],
@@ -209,6 +211,7 @@ export function WalletPage() {
     () => [
       { value: 'all', label: 'Toutes les transactions', tone: 'brand' as const },
       { value: 'approved', label: 'Validées (Signées)', tone: 'success' as const },
+      { value: 'retraction', label: 'Rétractation (14j)', tone: 'warning' as const },
       { value: 'refused', label: 'Refusées', tone: 'danger' as const },
       { value: 'pending', label: 'À valider (En attente)', tone: 'warning' as const },
     ],
@@ -246,44 +249,6 @@ export function WalletPage() {
     if (range !== 'last-month') return Number.POSITIVE_INFINITY;
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime();
-  };
-
-  const getPeriodStartTitle = (range: string): string => {
-    switch (range) {
-      case 'today':
-        return 'Solde de départ';
-      case 'this-week':
-        return 'Solde de départ';
-      case 'last-month':
-      case 'this-month':
-        return 'Solde de départ';
-      default:
-        return 'Solde de départ';
-    }
-  };
-
-  const getPeriodStartHint = (range: string): string => {
-    switch (range) {
-      case 'today':
-        return 'Déjà dans le portefeuille ce matin';
-      case 'this-week':
-        return 'Déjà dans le portefeuille lundi matin';
-      case 'last-month':
-      case 'this-month':
-        return 'Déjà dans le portefeuille au 1er du mois';
-      default:
-        return 'Avant les nouveaux gains de la période';
-    }
-  };
-
-  const getPeriodStartDateLabel = (range: string): string => {
-    const start = getWalletPeriodStart(range);
-    if (!start) return '';
-    return new Date(start).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
   };
 
   const resetTransactionFilters = () => {
@@ -387,7 +352,7 @@ export function WalletPage() {
       const [walletRes, withdrawalsRes, ledgerRes] = await Promise.all([
         api.get(`/escrow/agent/wallet/${agentId}`),
         api.get(`/escrow/agent/withdrawals/${agentId}`),
-        repTransactionsApi.list(agentId, { status: 'earned', limit: 300 }).catch(() => null)
+        repTransactionsApi.list(agentId, { limit: 300 }).catch(() => null)
       ]);
 
       if (walletRes.data?.success) {
@@ -590,7 +555,29 @@ export function WalletPage() {
   const remainingToMin = Math.max(0, MIN_WITHDRAWAL_AMOUNT - availableBalance);
   const canWithdraw = availableBalance >= MIN_WITHDRAWAL_AMOUNT;
 
-  const periodEarningsBreakdown = useMemo(() => {
+  const resolveCallRefId = (call: any): string | null => {
+    if (!call) return null;
+    const id = call._id;
+    if (typeof id === 'object' && id?.$oid) return String(id.$oid);
+    return call.sid || (id ? String(id) : null);
+  };
+
+  const filteredCallsForPipeline = useMemo(() => {
+    const periodStart = getWalletPeriodStart(selectedDateRange);
+    const periodEnd = getWalletPeriodEnd(selectedDateRange);
+    return realCalls.filter((call) => {
+      if (selectedGigId !== 'all') {
+        const gigId = getGigIdFromCall(call);
+        if (gigId !== selectedGigId) return false;
+      }
+      const ts = new Date(call.startTime || call.createdAt || 0).getTime();
+      if (periodStart > 0 && (!ts || ts < periodStart || ts > periodEnd)) return false;
+      return true;
+    });
+  }, [realCalls, selectedGigId, selectedDateRange]);
+
+  /** Pipeline aligné Dashboard : Solde → Rétractation → Validation client → Total */
+  const earningsPipeline = useMemo(() => {
     const periodStart = getWalletPeriodStart(selectedDateRange);
     const periodEnd = getWalletPeriodEnd(selectedDateRange);
 
@@ -601,6 +588,21 @@ export function WalletPage() {
       return true;
     };
 
+    const activeLedger = (row: RepTransactionRow) =>
+      row.status === 'earned' || row.status === 'pending_retraction' || row.status === 'paid';
+
+    const ledgerCallIds = new Set<string>();
+    repLedgerRows.forEach((row) => {
+      if (!activeLedger(row)) return;
+      if (row.callId) ledgerCallIds.add(String(row.callId));
+    });
+
+    const bookedTxSourceIds = new Set(
+      repLedgerRows
+        .filter((row) => activeLedger(row) && row.type === 'transaction' && row.sourceId)
+        .map((row) => String(row.sourceId))
+    );
+
     const ledgerActivityDate = (row: RepTransactionRow): string | undefined => {
       if (row.callId) {
         const fromCall = callActivityDateById.get(String(row.callId));
@@ -610,57 +612,74 @@ export function WalletPage() {
       return row.createdAt;
     };
 
-    const validatedGains = repLedgerRows.reduce((sum, row) => {
-      if (row.status !== 'earned') return sum;
+    let clientValidationAmount = 0;
+    let clientValidationCount = 0;
+
+    filteredCallsForPipeline.forEach((call) => {
+      const callId = resolveCallRefId(call);
+      if (!callId) return;
+
+      const pending = resolveClientValidationPendingAmount(
+        call,
+        ledgerCallIds,
+        bookedTxSourceIds,
+        callId
+      );
+
+      if (pending > 0) {
+        clientValidationAmount += pending;
+        clientValidationCount += 1;
+      }
+    });
+
+    let retractionAmount = 0;
+    let retractionCount = 0;
+
+    repLedgerRows.forEach((row) => {
+      if (row.status !== 'pending_retraction' || row.type !== 'transaction') return;
+      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return;
+      if (!inPeriod(ledgerActivityDate(row))) return;
+      retractionAmount += row.repShare || 0;
+      retractionCount += 1;
+    });
+
+    const validatedInPeriod = repLedgerRows.reduce((sum, row) => {
+      if (!activeLedger(row)) return sum;
+      if (selectedGigId !== 'all' && row.gigId && row.gigId !== selectedGigId) return sum;
       if (!inPeriod(ledgerActivityDate(row))) return sum;
       return sum + (row.repShare || 0);
     }, 0);
 
-    const bookedCallIds = new Set(
-      repLedgerRows
-        .filter((row) => row.type === 'call_validated' && row.callId)
-        .map((row) => String(row.callId))
-    );
-    const bookedTxSourceIds = new Set(
-      repLedgerRows
-        .filter((row) => row.type === 'transaction' && row.sourceId)
-        .map((row) => String(row.sourceId))
-    );
-
-    let pendingCountInPeriod = 0;
-    const pendingGains = realCalls.reduce((sum, call) => {
-      const ts = new Date(call.startTime || call.createdAt || 0).getTime();
-      if (!ts || ts < periodStart || ts > periodEnd) return sum;
-
-      let callPending = 0;
-      const callIdStr = String(call._id?.$oid || call._id || call.sid || '');
-
-      if (!bookedCallIds.has(callIdStr) && call.validByAI !== false) {
-        callPending += resolveCallRepCommission(call);
-      }
-
-      if (hasDetectedTransactionSale(call)) {
-        const txSourceId = String(call.transaction?._id || call._id?.$oid || call._id);
-        if (!bookedTxSourceIds.has(txSourceId) && call.transaction?.validByCompany !== false) {
-          callPending += resolveTransactionRepCommission(call);
-        }
-      }
-
-      if (callPending > 0) pendingCountInPeriod += 1;
-      return sum + callPending;
-    }, 0);
-
-    const periodStartBalance = Math.max(0, availableBalance - validatedGains);
-    const totalGains = periodStartBalance + validatedGains + pendingGains;
+    const totalGains = validatedInPeriod + clientValidationAmount;
 
     return {
-      periodStartBalance,
-      validatedGains,
-      pendingGains,
+      availableBalance,
+      retractionAmount,
+      retractionCount,
+      clientValidationAmount,
+      clientValidationCount,
       totalGains,
-      pendingCountInPeriod,
+      validatedInPeriod,
     };
-  }, [selectedDateRange, repLedgerRows, realCalls, availableBalance, callActivityDateById]);
+  }, [
+    selectedDateRange,
+    selectedGigId,
+    repLedgerRows,
+    filteredCallsForPipeline,
+    availableBalance,
+    callActivityDateById,
+  ]);
+
+  const focusRetractionTransactions = () => {
+    setActiveTab('transactions');
+    setTransactionValidationFilter('retraction');
+  };
+
+  const focusClientValidationPending = () => {
+    setActiveTab('calls');
+    setCallValidationFilter('pending');
+    setTransactionValidationFilter('pending');
+  };
 
   const filteredTransactions = transactions.filter((tx) => {
     if (selectedGigId !== 'all' && tx.gigId && tx.gigId !== selectedGigId) return false;
@@ -676,6 +695,7 @@ export function WalletPage() {
         if (tx.status !== 'Completed' && tx.status !== 'Paid') return false;
       }
       if (transactionValidationFilter === 'pending' && tx.status !== 'Processing' && tx.status !== 'Pending') return false;
+      if (transactionValidationFilter === 'retraction' && tx.status !== 'Retraction') return false;
       if (transactionValidationFilter === 'refused' && tx.status !== 'Refused') return false;
     }
     return true;
@@ -774,114 +794,137 @@ export function WalletPage() {
         </div>
       </div>
 
-      {/* ── Gains pipeline: début → validés → en attente → total ─────── */}
-      <div className="rounded-3xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+      {/* ── Gains pipeline : Solde → Rétractation → Validation client → Total ── */}
+      <div className="rounded-3xl bg-white/50 backdrop-blur-xl border border-white/60 shadow-xl shadow-slate-200/20 overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
-          {/* 1. Début période */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-slate-100">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                <CalendarDays className="w-4 h-4 text-slate-500" />
+          {/* 1. Solde disponible */}
+          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r border-white/60">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 truncate">
+                  Solde disponible
+                </p>
+                <p className="text-2xl font-black text-slate-900 tracking-tighter mt-2">
+                  {fmtMoney(earningsPipeline.availableBalance)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-emerald-600">
+                  Prêt au retrait
+                </p>
               </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {getPeriodStartTitle(selectedDateRange)}
-                </p>
-                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                  {getPeriodStartDateLabel(selectedDateRange)}
-                </p>
+              <div className="h-9 w-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                <Wallet className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mt-auto">
-              {fmtMoney(periodEarningsBreakdown.periodStartBalance)}
-              <span className="text-lg text-slate-300 ml-0.5">€</span>
-            </p>
-            <p className="text-[10px] font-semibold text-slate-400 mt-2 leading-relaxed">
-              {getPeriodStartHint(selectedDateRange)}
-            </p>
           </div>
 
           <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 2. Gains validés */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-slate-100 bg-emerald-50/30">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                Gains validés
-              </p>
-            </div>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight leading-none mt-auto">
-              +{fmtMoney(periodEarningsBreakdown.validatedGains)}
-              <span className="text-lg text-emerald-300 ml-0.5">€</span>
-            </p>
-            <p className="text-[10px] font-semibold text-emerald-600/70 mt-2">Commissions créditées</p>
-          </div>
-
-          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-
-          {/* 3. Gains en attente */}
-          <div className="p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-slate-100 bg-amber-50/30">
-            <div className="flex items-start justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 leading-tight">
-                  En attente de validation
+          {/* 2. Rétractation (14 jours) */}
+          <button
+            type="button"
+            onClick={focusRetractionTransactions}
+            disabled={earningsPipeline.retractionCount === 0}
+            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 xl:border-r border-white/60 bg-orange-50/40 text-left transition-all w-full ${
+              transactionValidationFilter === 'retraction'
+                ? 'ring-2 ring-orange-400 ring-inset shadow-inner'
+                : earningsPipeline.retractionCount > 0
+                  ? 'hover:bg-orange-50/70 cursor-pointer'
+                  : 'cursor-default opacity-90'
+            }`}
+            aria-label="Voir les ventes en période de rétractation"
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-orange-700 truncate">
+                  Rétractation
+                </p>
+                <p className="text-2xl font-black text-orange-700 tracking-tighter mt-2">
+                  {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-orange-600/80">
+                  {earningsPipeline.retractionCount > 0
+                    ? `${earningsPipeline.retractionCount} vente(s) — 14 jours`
+                    : 'Aucune vente sous rétractation'}
                 </p>
               </div>
-              {periodEarningsBreakdown.pendingCountInPeriod > 0 && (
-                <span className="inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
-                  {periodEarningsBreakdown.pendingCountInPeriod}
-                </span>
-              )}
+              <div className="h-9 w-9 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-4 h-4" />
+              </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-amber-700 tracking-tight leading-none mt-auto">
-              +{fmtMoney(periodEarningsBreakdown.pendingGains)}
-              <span className="text-lg text-amber-300 ml-0.5">€</span>
-            </p>
-            <p className="text-[10px] font-semibold text-amber-600/70 mt-2">
-              {periodEarningsBreakdown.pendingGains > 0
-                ? 'Appels & ventes à valider'
-                : periodEarningsBreakdown.validatedGains > 0
-                  ? 'Commissions déjà créditées sur la période'
-                  : 'Appels & ventes à valider'}
-            </p>
-          </div>
+          </button>
 
           <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
             <ChevronRight className="w-5 h-5" />
           </div>
 
-          {/* 4. Total */}
-          <div className="p-5 sm:p-6 flex flex-col bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/20 blur-2xl pointer-events-none" />
-            <div className="relative z-10 flex flex-col h-full">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
-                  <DollarSign className="w-4 h-4 text-white" />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/50">Total</p>
+          {/* 3. Validation client */}
+          <button
+            type="button"
+            onClick={focusClientValidationPending}
+            disabled={earningsPipeline.clientValidationCount === 0}
+            className={`p-5 sm:p-6 flex flex-col border-b sm:border-b-0 sm:border-r xl:border-r border-white/60 bg-amber-50/40 text-left transition-all w-full ${
+              transactionValidationFilter === 'pending' || callValidationFilter === 'pending'
+                ? 'ring-2 ring-amber-400 ring-inset shadow-inner'
+                : earningsPipeline.clientValidationCount > 0
+                  ? 'hover:bg-amber-50/70 cursor-pointer'
+                  : 'cursor-default opacity-90'
+            }`}
+            aria-label="Voir les commissions en attente de validation entreprise"
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-700 truncate">
+                  Validation client
+                </p>
+                <p className="text-2xl font-black text-amber-700 tracking-tighter mt-2">
+                  +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-amber-600/80">
+                  {earningsPipeline.clientValidationCount > 0
+                    ? `${earningsPipeline.clientValidationCount} vente(s) — cliquer pour voir`
+                    : 'Aucune vente en attente entreprise'}
+                </p>
               </div>
-              <p className="text-2xl sm:text-3xl font-black tracking-tight leading-none mt-auto">
-                {fmtMoney(periodEarningsBreakdown.totalGains)}
-                <span className="text-lg text-white/40 ml-0.5">€</span>
-              </p>
-              <p className="text-[10px] font-semibold text-white/40 mt-2">Sur la période sélectionnée</p>
-              {weeklyEarnings > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 mt-3 self-start">
-                  <ArrowDownRight className="w-3 h-3" />
-                  +{fmtMoney(weeklyEarnings)}€ cette semaine
-                </span>
-              )}
+              <div className="h-9 w-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
             </div>
+          </button>
+
+          <div className="hidden xl:flex items-center justify-center px-1 text-slate-200">
+            <ChevronRight className="w-5 h-5" />
+          </div>
+
+          {/* 4. Total des gains */}
+          <div className="p-5 sm:p-6 flex flex-col bg-slate-950 text-white relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-harx-500/30 blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest text-white/50 truncate">
+                  Total des gains
+                </p>
+                <p className="text-2xl font-black text-white tracking-tighter mt-2">
+                  {fmtMoney(earningsPipeline.totalGains)} €
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-1 text-white/50">
+                  {fmtMoney(earningsPipeline.validatedInPeriod)} validés
+                  {earningsPipeline.clientValidationAmount > 0
+                    ? ` + ${fmtMoney(earningsPipeline.clientValidationAmount)} en attente`
+                    : ''}
+                </p>
+              </div>
+              <div className="h-9 w-9 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">
+                <Trophy className="w-4 h-4" />
+              </div>
+            </div>
+            {weeklyEarnings > 0 && (
+              <span className="relative z-10 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 mt-3 self-start">
+                <ArrowDownRight className="w-3 h-3" />
+                +{fmtMoney(weeklyEarnings)}€ cette semaine
+              </span>
+            )}
           </div>
         </div>
 
