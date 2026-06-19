@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Award, Download, Share2, CheckCircle, Star, Calendar, Trophy, X, Sparkles } from 'lucide-react';
+import harxLogo from '../../assets/logo-pink.png';
 
 interface CertificationViewProps {
   traineeName: string;
@@ -134,7 +135,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
 <body>
   <div class="cert">
     <div class="frame"></div>
-    <div class="brand">HARX ACADEMY</div>
+    <div class="brand"><img src="${harxLogo}" alt="HARX" style="height:42px;object-fit:contain;margin-bottom:4mm;" /></div>
     <div class="seal">🏆</div>
     <div class="sub">Certificat de réussite</div>
     <div class="name">${safe(traineeName)}</div>
@@ -222,6 +223,14 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
               {shareFeedback}
             </div>
           )}
+
+          <div className="flex justify-center mb-5">
+            <img
+              src={harxLogo}
+              alt="HARX"
+              className="h-10 md:h-12 w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+            />
+          </div>
 
           {/* Badge Image */}
           <div className="relative inline-block mb-4 group">

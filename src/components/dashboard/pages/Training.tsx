@@ -26,6 +26,7 @@ import {
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
 import {
+  enrichJourneyWithScriptModule,
   isScriptRequirementModule,
   journeyHasScriptModule,
   scriptModuleSlideKey,
@@ -283,23 +284,50 @@ function mergeJourney(
 ) {
   const id = journeyKey(j);
   if (!id) return;
+  const incoming: JourneyRow = { ...j };
+  if (gigTitle) incoming.__gigTitle = gigTitle;
+  if (gigId) incoming.__gigId = gigId;
+
   const prev = map.get(id);
-  if (prev) {
-    if (gigTitle && !prev.__gigTitle) prev.__gigTitle = gigTitle;
-    if (gigId && !prev.__gigId) prev.__gigId = gigId;
+  if (!prev) {
+    map.set(id, incoming);
     return;
   }
-  const row: JourneyRow = { ...j };
-  if (gigTitle) row.__gigTitle = gigTitle;
-  if (gigId) row.__gigId = gigId;
-  map.set(id, row);
+
+  if (gigTitle && !prev.__gigTitle) prev.__gigTitle = gigTitle;
+  if (gigId && !prev.__gigId) prev.__gigId = gigId;
+
+  const prevModules = extractModules(prev);
+  const incModules = extractModules(incoming);
+  const prevHasScript = prevModules.some(isScriptRequirementModule);
+  const incHasScript = incModules.some(isScriptRequirementModule);
+  if (incHasScript && !prevHasScript) {
+    prev.modules = incoming.modules;
+  } else if (!incHasScript && incModules.length > prevModules.length) {
+    prev.modules = incoming.modules;
+  } else if (incHasScript && incModules.length >= prevModules.length) {
+    prev.modules = incoming.modules;
+  }
+}
+
+function pickRicherJourney(a: JourneyRow, b: JourneyRow): JourneyRow {
+  const aMods = extractModules(a);
+  const bMods = extractModules(b);
+  const aScript = aMods.some(isScriptRequirementModule);
+  const bScript = bMods.some(isScriptRequirementModule);
+  if (bScript && !aScript) return b;
+  if (aScript && !bScript) return a;
+  if (bMods.length > aMods.length) return b;
+  return a;
 }
 
 function dedupeAndSort(rows: JourneyRow[]): JourneyRow[] {
   const m = new Map<string, JourneyRow>();
   for (const j of rows) {
     const k = journeyKey(j);
-    if (k && !m.has(k)) m.set(k, j);
+    if (!k) continue;
+    const prev = m.get(k);
+    m.set(k, prev ? pickRicherJourney(prev, j) : j);
   }
   return Array.from(m.values()).sort((a, b) => journeyTitle(a).localeCompare(journeyTitle(b), 'en'));
 }
@@ -736,6 +764,8 @@ export function Training() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [journeys, setJourneys] = useState<JourneyRow[]>([]);
+  /** Parcours enrichis avec le module script (si absent de l'API). */
+  const [scriptEnrichedById, setScriptEnrichedById] = useState<Record<string, JourneyRow>>({});
   const [enrolledGigs, setEnrolledGigs] = useState<{ gigId: string; title: string }[]>([]);
   const [gigFilter, setGigFilter] = useState<string>('__all__');
   const [routeGigApplied, setRouteGigApplied] = useState(false);
@@ -799,12 +829,50 @@ export function Training() {
   const pendingScriptJumpRef = useRef<string | null>(null);
 
   const displayJourneys = useMemo(() => {
-    if (gigFilter === '__all__') return journeys;
-    const fromGlobal = journeys.filter((j) => String(j.__gigId || '') === gigFilter);
-    return dedupeAndSort([...gigFetchedJourneys, ...fromGlobal]);
-  }, [journeys, gigFilter, gigFetchedJourneys]);
+    const base =
+      gigFilter === '__all__'
+        ? journeys
+        : dedupeAndSort([
+            ...gigFetchedJourneys,
+            ...journeys.filter((j) => String(j.__gigId || '') === gigFilter),
+          ]);
+    return base.map((j) => {
+      const id = journeyKey(j);
+      return id && scriptEnrichedById[id] ? scriptEnrichedById[id] : j;
+    });
+  }, [journeys, gigFilter, gigFetchedJourneys, scriptEnrichedById]);
 
   const listLoading = loading || (gigFilter !== '__all__' && gigFetchLoading);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const base =
+        gigFilter === '__all__'
+          ? journeys
+          : dedupeAndSort([
+              ...gigFetchedJourneys,
+              ...journeys.filter((j) => String(j.__gigId || '') === gigFilter),
+            ]);
+      const updates: Record<string, JourneyRow> = {};
+      await Promise.all(
+        base.map(async (j) => {
+          const id = journeyKey(j);
+          if (!id || journeyHasScriptModule(j)) return;
+          const enriched = await enrichJourneyWithScriptModule(j);
+          if (journeyHasScriptModule(enriched)) {
+            updates[id] = enriched as JourneyRow;
+          }
+        })
+      );
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setScriptEnrichedById((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [journeys, gigFetchedJourneys, gigFilter]);
 
   useEffect(() => {
     const base = trainingApiBase();
@@ -836,17 +904,6 @@ export function Training() {
           setEnrolledGigs([]);
         }
 
-        try {
-          const repRes = await axios.get<unknown[]>(
-            `${base}/training_journeys/rep/${encodeURIComponent(repId)}`,
-            { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
-          );
-          const repList = Array.isArray(repRes.data) ? repRes.data : [];
-          repList.forEach((j) => mergeJourney(byId, j as Record<string, unknown>));
-        } catch {
-          /* optional */
-        }
-
         if (token && enrolled.length > 0) {
           await Promise.all(
             enrolled.map(async ({ gigId, title }) => {
@@ -862,7 +919,7 @@ export function Training() {
                 console.log('[Training] fetchByGig:response', {
                   gigId,
                   status: r.status,
-                  count: Array.isArray(r.data?.data) ? r.data.data.length : 0
+                  count: Array.isArray(r.data?.data) ? r.data.data.length : 0,
                 });
                 if (r.status === 404) return;
                 const arr = Array.isArray(r.data?.data) ? r.data.data : [];
@@ -874,6 +931,17 @@ export function Training() {
               }
             })
           );
+        }
+
+        try {
+          const repRes = await axios.get<unknown[]>(
+            `${base}/training_journeys/rep/${encodeURIComponent(repId)}`,
+            { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          );
+          const repList = Array.isArray(repRes.data) ? repRes.data : [];
+          repList.forEach((j) => mergeJourney(byId, j as Record<string, unknown>));
+        } catch {
+          /* optional */
         }
 
         const merged = Array.from(byId.values()).sort((a, b) =>
@@ -1133,22 +1201,32 @@ export function Training() {
 
   const openScriptForJourney = useCallback(
     (j: JourneyRow, opts?: { switchTab?: boolean }) => {
-      const id = journeyKey(j);
-      if (!id) return;
-      const slideKey = scriptModuleSlideKey(j);
-      if (opts?.switchTab !== false) setTrainingTab('trainings');
-      if (slideKey) {
-        pendingScriptJumpRef.current = slideKey;
+      void (async () => {
+        const id = journeyKey(j);
+        if (!id) return;
+        let row: JourneyRow = scriptEnrichedById[id] || j;
+        if (!journeyHasScriptModule(row)) {
+          const enriched = await enrichJourneyWithScriptModule(row);
+          if (journeyHasScriptModule(enriched)) {
+            row = enriched as JourneyRow;
+            setScriptEnrichedById((prev) => ({ ...prev, [id]: row }));
+          }
+        }
+        const slideKey = scriptModuleSlideKey(row);
+        if (opts?.switchTab !== false) setTrainingTab('trainings');
+        if (slideKey) {
+          pendingScriptJumpRef.current = slideKey;
+          setSelectedJourneyId(id);
+          setFormationViewerSlideIndex(0);
+          setActiveSlide(0);
+          return;
+        }
         setSelectedJourneyId(id);
         setFormationViewerSlideIndex(0);
         setActiveSlide(0);
-        return;
-      }
-      setSelectedJourneyId(id);
-      setFormationViewerSlideIndex(0);
-      setActiveSlide(0);
+      })();
     },
-    []
+    [scriptEnrichedById]
   );
 
   const currentFormationViewerSlide = formationViewerSlides[formationViewerSlideIndex];
