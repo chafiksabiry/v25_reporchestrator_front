@@ -57,6 +57,8 @@ interface APIResponse {
   data: Lead[];
 }
 
+type LeadStatusFilter = 'all' | 'called' | 'signed';
+
 type CopilotGuardState = {
   loading: boolean;
   isEnrolledInGig: boolean;
@@ -158,6 +160,8 @@ export function WorkspaceContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('1');
+  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
+  const [leadsTotal, setLeadsTotal] = useState(0);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
   // Do not hydrate from sessionStorage on first paint — a stale activeGigId from
@@ -251,7 +255,12 @@ export function WorkspaceContent() {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage);
     }
-  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded]);
+  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter]);
+
+  useEffect(() => {
+    setLeadStatusFilter('all');
+    setCurrentPage(1);
+  }, [activeEnrolledGigId]);
 
   useEffect(() => {
     setPageInput(String(currentPage));
@@ -515,7 +524,8 @@ export function WorkspaceContent() {
     const limit = 50;
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
-    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}`;
+    const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
+    const url = `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
 
     try {
       setIsLoadingLeads(true);
@@ -530,11 +540,15 @@ export function WorkspaceContent() {
 
       if (responseData.success && Array.isArray(responseData.data)) {
         setLeads(responseData.data);
+        setLeadsTotal(responseData.total ?? responseData.data.length);
         if (responseData.totalPages) {
           setTotalPages(responseData.totalPages);
+        } else {
+          setTotalPages(1);
         }
       } else {
         setLeads([]);
+        setLeadsTotal(0);
       }
     } catch (error: any) {
       console.error('❌ Error fetching leads (detailed):', {
@@ -548,6 +562,12 @@ export function WorkspaceContent() {
       setIsLoadingLeads(false);
     }
   };
+
+  const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
+    { id: 'all', label: 'Tous' },
+    { id: 'called', label: 'Appelé' },
+    { id: 'signed', label: 'Signé' },
+  ];
 
   const workspaceTools = [
     { id: 'voice', label: 'Leads', icon: User },
@@ -680,11 +700,39 @@ export function WorkspaceContent() {
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t('workspaceGuard.recentLeads')}</h3>
-                  <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                    {leads.length} {t('sidebar.leads')}
-                  </span>
+                <div className="flex flex-col gap-3 mb-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t('workspaceGuard.recentLeads')}</h3>
+                    <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                      {leadsTotal} {t('sidebar.leads')}
+                    </span>
+                  </div>
+                  {activeEnrolledGigId && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">Filtrer</span>
+                      {leadStatusFilters.map((filter) => (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          onClick={() => {
+                            setLeadStatusFilter(filter.id);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            leadStatusFilter === filter.id
+                              ? filter.id === 'signed'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
+                                : filter.id === 'called'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                                  : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
+                              : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {isLoadingLeads ? (
                   <div className="space-y-4">
@@ -707,7 +755,9 @@ export function WorkspaceContent() {
                 ) : leads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
-                      {enrolledGigs.length === 0
+                      {leadStatusFilter !== 'all'
+                        ? t('workspaceGuard.noLeadsForFilter', 'Aucun prospect pour ce filtre.')
+                        : enrolledGigs.length === 0
                         ? t(
                             'workspaceGuard.noEnrolledLeads',
                             'Aucun prospect — inscrivez-vous à une mission sur la place de marché pour débloquer vos leads.'
