@@ -763,7 +763,7 @@ export function GigDetails() {
     setTimeout(() => {
       fetchTrainingsProgress();
     }, 500);
-    const trainingUrl = `https://harx25pageslinks.netlify.app/training/repdashboard/${trainingId}`;
+    const trainingUrl = `https://harx.ai/training/repdashboard/${trainingId}`;
     window.open(trainingUrl, '_blank');
   };
 
