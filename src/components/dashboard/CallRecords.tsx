@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Phone,
   Calendar,
-  Brain,
   ShieldAlert,
   ShieldCheck,
   RefreshCw,
@@ -896,16 +895,6 @@ export function CallRecords({
                         {renderTransactionCommissionPill(record)}
                       </div>
                     </div>
-                  )}
-
-                  {status === 'completed' && (
-                    <button
-                      onClick={() => openCallDetails(record, 'insights')}
-                      className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-harx-600 hover:bg-harx-50 hover:border-harx-200 transition-all shrink-0 self-start lg:self-center"
-                      title="Voir l'analyse IA"
-                    >
-                      <Brain className="w-5 h-5" />
-                    </button>
                   )}
                 </div>
               </div>
