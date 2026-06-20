@@ -2,7 +2,6 @@ import React from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import toast from 'react-hot-toast';
 import {
   Phone,
   Calendar,
@@ -21,11 +20,11 @@ import {
   BookOpen,
   Clock,
   CreditCard,
+  Loader2,
   RotateCcw,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
-import { getCallAnalyzeErrorMessage } from '../../utils/callAnalyzeErrors';
 import {
   hasDetectedTransactionSale,
   isCallPendingClientValidation,
@@ -273,8 +272,6 @@ export function CallRecords({
   const [activeTab, setActiveTab] = useState<'transcript' | 'insights'>('transcript');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [analyzingCallId, setAnalyzingCallId] = useState<string | null>(null);
-  const [analysisError, setAnalysisError] = useState<{ callId: string; message: string } | null>(null);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
 
   const resolveCallId = (record: CallRecord) =>
@@ -457,19 +454,6 @@ export function CallRecords({
     );
   };
 
-  const patchCallInLists = (callId: string, patch: Partial<CallRecord>) => {
-    setCallRecords((prev) =>
-      prev.map((r) => {
-        const id = typeof r._id === 'object' ? (r._id as any).$oid : r._id;
-        return id === callId ? { ...r, ...patch } : r;
-      })
-    );
-    setSelectedCall((prev) => {
-      if (!prev) return prev;
-      const id = typeof prev._id === 'object' ? (prev._id as any).$oid : prev._id;
-      return id === callId ? { ...prev, ...patch } : prev;
-    });
-  };
   const fetchCallRecords = async (silent = false) => {
     try {
       const agentId = getAgentId();
@@ -488,64 +472,6 @@ export function CallRecords({
         setError(err.message || 'Failed to fetch call records');
         setLoading(false);
       }
-    }
-  };
-
-  const handleAnalyzeCall = async (callId: string) => {
-    try {
-      setAnalyzingCallId(callId);
-      setAnalysisError(null);
-      const response = await api.calls.analyze(callId);
-
-      // Auto-analysis may already be running after hangup — poll, don't error.
-      if (response.inProgress) {
-        console.info('ℹ️ AI analysis already in progress — waiting for results…');
-        patchCallInLists(callId, { ai_call_status: 'processing' });
-        await fetchCallRecords(true);
-        return;
-      }
-
-      if (!response.success) {
-        const message = getCallAnalyzeErrorMessage(response);
-        setAnalysisError({ callId, message });
-        toast.error(message);
-        patchCallInLists(callId, { ai_call_status: 'error' });
-        return;
-      }
-
-      if (response.success) {
-        setAnalysisError(null);
-        if (selectedCall && (selectedCall._id === callId || (selectedCall as any).$oid === callId)) {
-          const isFullDoc =
-            response.data && typeof response.data === 'object' && '_id' in response.data;
-          const patch: Partial<CallRecord> = isFullDoc
-            ? (response.data as Partial<CallRecord>)
-            : {
-                ai_call_score: response.data,
-                transcript: response.transcript || selectedCall.transcript,
-                validByAI: response.validByAI,
-                valid: response.validByAI,
-                argumentation_score: response.data?.Argumentation?.score,
-                ai_call_status: 'scored',
-                callOutcome: response.callOutcome ?? selectedCall.callOutcome ?? null,
-              };
-          setSelectedCall({ ...selectedCall, ...patch });
-        }
-        fetchCallRecords();
-        void fetchRepLedger();
-        // A freshly validated call books commissions server-side — refresh wallet.
-        if (response.validByAI === true || (response.data as any)?.validByAI === true) {
-          onAnalysisSettled?.();
-        }
-      }
-    } catch (error) {
-      const message = getCallAnalyzeErrorMessage(error);
-      setAnalysisError({ callId, message });
-      toast.error(message);
-      patchCallInLists(callId, { ai_call_status: 'error' });
-      console.error('Error analyzing call:', error);
-    } finally {
-      setAnalyzingCallId(null);
     }
   };
 
@@ -659,7 +585,6 @@ export function CallRecords({
   const openCallDetails = (call: CallRecord, tab: 'transcript' | 'insights') => {
     setSelectedCall(call);
     setActiveTab(tab);
-    setAnalysisError(null);
   };
 
   const closeCallModal = () => {
@@ -720,30 +645,37 @@ export function CallRecords({
     return true;
   });
 
-  // Actively analyzing = we just kicked it off (analyzingCallId) OR the backend
-  // reports pending/processing AND the lock isn't stale. A stale lock no longer
-  // blocks the button so the user can relaunch the analysis.
   const selectedCallStale = selectedCall ? isAnalysisStale(selectedCall) : false;
   const selectedCallAnalyzing = selectedCall
-    ? analyzingCallId === selectedCall._id ||
-      (isAnalysisPending(selectedCall) && !selectedCallStale)
+    ? isAnalysisPending(selectedCall) && !selectedCallStale
     : false;
-  const selectedCallId = selectedCall
-    ? (typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id)
-    : null;
-  const selectedCallAnalysisError =
-    analysisError?.callId === selectedCallId ? analysisError.message : null;
 
-  const renderAnalysisErrorBanner = () =>
-    selectedCallAnalysisError ? (
-      <div
-        role="alert"
-        className="w-full max-w-lg mx-auto flex items-start gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-sm font-medium text-left"
-      >
-        <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-        <p>{selectedCallAnalysisError}</p>
-      </div>
-    ) : null;
+  const renderRepAnalysisWaitState = (emptyLabel: string) => (
+    <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
+      {selectedCallAnalyzing ? (
+        <>
+          <Loader2 className="w-8 h-8 animate-spin text-harx-500" />
+          <p className="text-harx-600 font-bold text-[10px] uppercase tracking-widest">
+            Analyse automatique en cours...
+          </p>
+        </>
+      ) : selectedCall?.ai_call_status === 'error' ? (
+        <div
+          role="status"
+          className="w-full max-w-lg mx-auto flex items-start gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-sm font-medium text-left"
+        >
+          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+          <p>Erreur d&apos;analyse — votre entreprise peut relancer l&apos;analyse si nécessaire.</p>
+        </div>
+      ) : selectedCallStale ? (
+        <p className="text-amber-600 font-bold text-[10px] uppercase tracking-widest max-w-md">
+          Analyse interrompue — contactez votre responsable si le statut ne se met pas à jour.
+        </p>
+      ) : (
+        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">{emptyLabel}</p>
+      )}
+    </div>
+  );
 
   return (
     <div className={overlayOpenCallId ? 'contents' : 'space-y-5 relative'}>
@@ -1158,47 +1090,13 @@ export function CallRecords({
                       </div>
                     ))
                   ) : (
-                    <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
-                      {renderAnalysisErrorBanner()}
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">Transcript not available</p>
-                      {selectedCallStale && (
-                        <p className="text-amber-500 font-bold text-[10px] uppercase tracking-widest">
-                          Analyse bloquée — relancez-la
-                        </p>
-                      )}
-                      <button
-                        onClick={() => handleAnalyzeCall(selectedCall._id)}
-                        disabled={selectedCallAnalyzing}
-                        className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
-                        {selectedCallAnalyzing ? 'Analyse...' : selectedCallStale ? 'Réessayer l\'analyse' : 'Analyze & Transcribe'}
-                      </button>
-                    </div>
+                    renderRepAnalysisWaitState('Transcript not available')
                   )}
                 </div>
               ) : (
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
                   {(!selectedCall.ai_call_score || !selectedCall.ai_call_score.overall?.score) ? (
-                    <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
-                      {renderAnalysisErrorBanner()}
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">
-                        Analyse détaillée non encore générée
-                      </p>
-                      {selectedCallStale && (
-                        <p className="text-amber-500 font-bold text-[10px] uppercase tracking-widest">
-                          Analyse bloquée — relancez-la
-                        </p>
-                      )}
-                      <button
-                        onClick={() => handleAnalyzeCall(selectedCall._id)}
-                        disabled={selectedCallAnalyzing}
-                        className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Brain className={`w-4 h-4 ${selectedCallAnalyzing ? 'animate-spin' : ''}`} />
-                        {selectedCallAnalyzing ? 'Analyse...' : selectedCallStale ? 'Réessayer l\'analyse' : 'Lancer l\'analyse IA'}
-                      </button>
-                    </div>
+                    renderRepAnalysisWaitState('Analyse détaillée non encore générée')
                   ) : (
                     <>
                       {/* Executive Summary Section - Now at the Top */}
