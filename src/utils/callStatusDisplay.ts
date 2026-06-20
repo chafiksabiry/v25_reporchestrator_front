@@ -93,6 +93,69 @@ export function isCallFraudDetected(call: CallLike): boolean {
   return false;
 }
 
+export type TranscriptEntry = {
+  speaker?: string;
+  text?: string;
+  timestamp?: string;
+  start?: string;
+  end?: string;
+  simulated?: boolean;
+  originalSpeaker?: string;
+};
+
+type AiCallScoreWithVoice = Record<string, { passed?: boolean; score?: number; voiceAnalysis?: Record<string, unknown> }> | null | undefined;
+
+function isAgentSpeakerLabel(label: string): boolean {
+  return /agent|rep|commercial|vendeur|conseiller|seller|harx/i.test(label);
+}
+
+export function isSingleVoiceSelfCall(aiCallScore?: AiCallScoreWithVoice): boolean {
+  const fraudScore = aiCallScore?.['Fraud detection']?.score;
+  if (typeof fraudScore === 'number' && fraudScore >= 50) return false;
+
+  const voiceAnalysis = aiCallScore?.['Fraud detection']?.voiceAnalysis as
+    | { distinctVoices?: number; sameSpeakerSuspected?: boolean; fraudReason?: string }
+    | undefined;
+  if (!voiceAnalysis) return typeof fraudScore === 'number' && fraudScore < 50;
+
+  if (voiceAnalysis.distinctVoices === 1) return true;
+  if (voiceAnalysis.sameSpeakerSuspected === true) return true;
+  return ['single_speaker_ai', 'same_voice_ai'].includes(String(voiceAnalysis.fraudReason || ''));
+}
+
+export function getDisplayTranscript(
+  transcript: TranscriptEntry[] | undefined | null,
+  aiCallScore?: AiCallScoreWithVoice
+): TranscriptEntry[] {
+  if (!transcript?.length) return [];
+  if (!isSingleVoiceSelfCall(aiCallScore)) return transcript;
+
+  return transcript.map((entry) => {
+    const speaker = String(entry.speaker || '');
+    if (entry.simulated || isAgentSpeakerLabel(speaker)) return entry;
+    return {
+      ...entry,
+      originalSpeaker: entry.originalSpeaker || speaker,
+      speaker: 'Voix simulée',
+      simulated: true,
+    };
+  });
+}
+
+export function getSelfCallTranscriptNotice(
+  aiCallScore?: AiCallScoreWithVoice,
+  language: string = 'fr'
+): string | null {
+  if (!isSingleVoiceSelfCall(aiCallScore)) return null;
+  return language === 'en'
+    ? 'Only one human voice was detected on this recording. Customer labels in the transcript were inferred by AI and may be simulated by the same person (self-call).'
+    : 'Une seule voix humaine a été détectée sur cet enregistrement. Les tours « Client » du transcript ont été inférés par l\'IA et peuvent être simulés par la même personne (auto-appel).';
+}
+
+export function isSimulatedTranscriptTurn(entry: TranscriptEntry): boolean {
+  return entry.simulated === true || String(entry.speaker || '').toLowerCase().includes('simul');
+}
+
 /** Vente encore dans la fenêtre légale de rétractation (14j). */
 export function isTransactionInRetraction(
   call: CallLike,
