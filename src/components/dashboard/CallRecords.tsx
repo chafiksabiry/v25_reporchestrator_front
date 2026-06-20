@@ -19,6 +19,7 @@ import {
   BookOpen,
   Clock,
   CreditCard,
+  Eye,
   Loader2,
   RotateCcw,
 } from 'lucide-react';
@@ -586,6 +587,12 @@ export function CallRecords({
     setActiveTab(tab);
   };
 
+  const openRecordDetails = (call: CallRecord) => {
+    const tab =
+      call.ai_call_score?.overall?.score != null ? 'insights' : 'transcript';
+    openCallDetails(call, tab);
+  };
+
   const closeCallModal = () => {
     setSelectedCall(null);
     if (overlayOpenCallId) onOverlayClose?.();
@@ -752,7 +759,16 @@ export function CallRecords({
             return (
               <div
                 key={callId}
-                className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200"
+                role="button"
+                tabIndex={0}
+                onClick={() => openRecordDetails(record)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openRecordDetails(record);
+                  }
+                }}
+                className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-harx-200 transition-all duration-200 cursor-pointer"
               >
                 <div className="absolute inset-y-0 left-0 w-1 bg-gradient-harx opacity-0 group-hover:opacity-100 transition-opacity" />
 
@@ -896,6 +912,19 @@ export function CallRecords({
                       </div>
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRecordDetails(record);
+                    }}
+                    className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-harx-600 hover:bg-harx-50 hover:border-harx-200 transition-all shrink-0 self-start lg:self-center"
+                    title="Voir les détails"
+                    aria-label="Voir les détails de l'appel"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             );
