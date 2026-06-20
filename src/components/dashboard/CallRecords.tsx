@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   Phone,
   Calendar,
@@ -21,10 +22,12 @@ import {
   CreditCard,
   Eye,
   Loader2,
+  BellRing,
   RotateCcw,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
+import { useNotifications } from '../../contexts/NotificationsContext';
 import {
   hasDetectedTransactionSale,
   isCallPendingClientValidation,
@@ -91,6 +94,14 @@ export interface CallRecord {
   // ── Unified call-analysis layer (shared with calls backend + ops dashboard) ──
   /** Lifecycle of the AI analyzer: pending → processing → scored | auto_refused | error. */
   ai_call_status?: 'pending' | 'processing' | 'scored' | 'auto_refused' | 'error' | null;
+  /** Rep a alerté la company qu'une analyse est bloquée. */
+  analysisCompanyAlert?: {
+    requestedAt?: string | Date | null;
+    repName?: string | null;
+    message?: string | null;
+    acknowledgedAt?: string | Date | null;
+    requestCount?: number;
+  } | null;
   /** Persisted summary (LLM). Falls back to ai_call_score.overall.feedback when absent. */
   ai_summary?: string | null;
   /** Disposition of the call (transaction, appointment, refusal, voicemail, ...). */
@@ -241,6 +252,15 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
+function hasAnalysisCompanyAlert(record: Pick<CallRecord, 'analysisCompanyAlert'>): boolean {
+  return Boolean(record.analysisCompanyAlert?.requestedAt);
+}
+
+function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
+  if (record.ai_call_status === 'error') return true;
+  return isAnalysisStale(record);
+}
+
 /** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
 function dispositionBadge(
   record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags'>,
@@ -267,11 +287,13 @@ export function CallRecords({
   onAnalysisSettled,
 }: CallRecordsProps) {
   const { t, i18n } = useTranslation();
+  const { upsertNotification } = useNotifications();
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   const [activeTab, setActiveTab] = useState<'transcript' | 'insights'>('transcript');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
 
   const resolveCallId = (record: CallRecord) =>
@@ -593,6 +615,55 @@ export function CallRecords({
     openCallDetails(call, tab);
   };
 
+  const patchCallInLists = (callId: string, patch: Partial<CallRecord>) => {
+    setCallRecords((prev) =>
+      prev.map((r) => {
+        const id = typeof r._id === 'object' ? (r._id as any).$oid : r._id;
+        return id === callId ? { ...r, ...patch } : r;
+      })
+    );
+    setSelectedCall((prev) => {
+      if (!prev) return prev;
+      const id = typeof prev._id === 'object' ? (prev._id as any).$oid : prev._id;
+      return id === callId ? { ...prev, ...patch } : prev;
+    });
+  };
+
+  const handleNotifyCompany = async (call: CallRecord) => {
+    const callId = typeof call._id === 'object' ? (call._id as any).$oid : call._id;
+    if (!callId) return;
+
+    try {
+      setNotifyingCallId(callId);
+      const result = await api.calls.requestAnalysisHelp(callId);
+      if (!result?.success) {
+        toast.error(result?.message || "Impossible d'alerter l'entreprise.");
+        return;
+      }
+
+      const alert = result.data?.analysisCompanyAlert;
+      patchCallInLists(callId, { analysisCompanyAlert: alert });
+
+      const leadName = call.lead?.First_Name
+        ? `${call.lead.First_Name} ${call.lead.Last_Name || ''}`.trim()
+        : call.lead?.name || 'Client';
+
+      toast.success('Entreprise alertée en temps réel.');
+      upsertNotification({
+        id: `call-analysis-help-${callId}`,
+        kind: 'general',
+        title: 'Alerte analyse envoyée',
+        message: `Votre entreprise a été notifiée pour l'appel avec ${leadName}.`,
+        actionPath: '/reps/workspace?tab=calls',
+        playSound: false,
+      });
+    } catch (err: any) {
+      toast.error(err?.message || "Impossible d'alerter l'entreprise.");
+    } finally {
+      setNotifyingCallId(null);
+    }
+  };
+
   const closeCallModal = () => {
     setSelectedCall(null);
     if (overlayOpenCallId) onOverlayClose?.();
@@ -655,6 +726,14 @@ export function CallRecords({
   const selectedCallAnalyzing = selectedCall
     ? isAnalysisPending(selectedCall) && !selectedCallStale
     : false;
+  const selectedCallId = selectedCall
+    ? typeof selectedCall._id === 'object'
+      ? (selectedCall._id as any).$oid
+      : selectedCall._id
+    : null;
+  const selectedCallNotifying = selectedCallId ? notifyingCallId === selectedCallId : false;
+  const selectedCallCanNotify = selectedCall ? canNotifyCompanyForAnalysis(selectedCall) : false;
+  const selectedCallCompanyAlerted = selectedCall ? hasAnalysisCompanyAlert(selectedCall) : false;
 
   const renderRepAnalysisWaitState = (emptyLabel: string) => (
     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
@@ -675,10 +754,38 @@ export function CallRecords({
         </div>
       ) : selectedCallStale ? (
         <p className="text-amber-600 font-bold text-[10px] uppercase tracking-widest max-w-md">
-          Analyse interrompue — contactez votre responsable si le statut ne se met pas à jour.
+          Analyse interrompue — alertez votre entreprise pour relancer l&apos;analyse.
         </p>
       ) : (
         <p className="text-slate-400 font-bold uppercase tracking-widest text-xs italic">{emptyLabel}</p>
+      )}
+
+      {selectedCall && selectedCallCanNotify && (
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleNotifyCompany(selectedCall)}
+            disabled={selectedCallNotifying}
+            className="flex items-center gap-2 px-6 py-3 bg-harx-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-harx-600 transition-all shadow-lg shadow-harx-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {selectedCallNotifying ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <BellRing className="w-4 h-4" />
+            )}
+            {selectedCallNotifying
+              ? 'Envoi...'
+              : selectedCallCompanyAlerted
+                ? 'Relancer l\'alerte entreprise'
+                : 'Alerter l\'entreprise'}
+          </button>
+          {selectedCallCompanyAlerted && selectedCall.analysisCompanyAlert?.requestedAt && (
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
+              Entreprise notifiée le{' '}
+              {new Date(selectedCall.analysisCompanyAlert.requestedAt).toLocaleString('fr-FR')}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -812,6 +919,12 @@ export function CallRecords({
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
                             <ShieldAlert className="w-2.5 h-2.5" />
                             Fraude
+                          </span>
+                        )}
+                        {hasAnalysisCompanyAlert(record) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                            <BellRing className="w-2.5 h-2.5" />
+                            Entreprise alertée
                           </span>
                         )}
                         <span
