@@ -34,7 +34,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getSelfCallTranscriptNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 import {
@@ -1282,26 +1282,49 @@ export function CallRecords({
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-slate-50/20 custom-scrollbar">
               {activeTab === 'transcript' ? (
                 <div className="max-w-4xl mx-auto space-y-6">
-                  {selectedCall.transcript && selectedCall.transcript.length > 0 ? (
-                    selectedCall.transcript.map((t, i) => (
-                      <div key={i} className={`flex gap-3 sm:gap-4 ${t.speaker?.toLowerCase().includes('agent') ? 'flex-row' : 'flex-row-reverse'}`}>
-                        <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${t.speaker?.toLowerCase().includes('agent') ? 'items-start' : 'items-end'}`}>
+                  {(() => {
+                    const displayTranscript = getDisplayTranscript(selectedCall.transcript, selectedCall.ai_call_score);
+                    const selfCallNotice = getSelfCallTranscriptNotice(selectedCall.ai_call_score, i18n.language);
+                    return (
+                      <>
+                  {selfCallNotice && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm font-medium"
+                    >
+                      <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+                      <p>{selfCallNotice}</p>
+                    </div>
+                  )}
+                  {displayTranscript.length > 0 ? (
+                    displayTranscript.map((turn, i) => {
+                      const simulated = isSimulatedTranscriptTurn(turn);
+                      const isAgent = !simulated && (turn.speaker?.toLowerCase().includes('agent') || turn.speaker === 'rep');
+                      return (
+                      <div key={i} className={`flex gap-3 sm:gap-4 ${isAgent || simulated ? 'flex-row' : 'flex-row-reverse'}`}>
+                        <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isAgent || simulated ? 'items-start' : 'items-end'}`}>
                           <div className="flex items-center gap-2 mb-1 px-2">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{t.speaker}</span>
-                            <span className="text-[9px] font-bold text-slate-300">{t.timestamp}</span>
+                            <span className={`text-[9px] font-black uppercase tracking-widest ${simulated ? 'text-amber-600' : 'text-slate-400'}`}>{turn.speaker}</span>
+                            <span className="text-[9px] font-bold text-slate-300">{turn.timestamp}</span>
                           </div>
-                          <div className={`px-4 py-3 sm:px-5 sm:py-4 rounded-[20px] sm:rounded-3xl text-sm font-medium leading-relaxed ${t.speaker?.toLowerCase().includes('agent')
+                          <div className={`px-4 py-3 sm:px-5 sm:py-4 rounded-[20px] sm:rounded-3xl text-sm font-medium leading-relaxed ${simulated
+                            ? 'bg-amber-50 text-amber-900 rounded-tl-none border border-amber-200 border-dashed shadow-sm'
+                            : isAgent
                             ? 'bg-white text-slate-700 rounded-tl-none border border-slate-100 shadow-sm'
                             : 'bg-gradient-harx text-white rounded-tr-none shadow-lg shadow-harx-500/20'
                             }`}>
-                            {t.text}
+                            {turn.text}
                           </div>
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   ) : (
                     renderRepAnalysisWaitState('Transcript not available')
                   )}
+                      </>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
