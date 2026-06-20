@@ -38,6 +38,9 @@ export function getProspectStatusBadge(
 ): StatusBadge | null {
   if (!aiCallScore) return null;
 
+  const fraudScore = aiCallScore['Fraud detection']?.score;
+  if (typeof fraudScore === 'number' && fraudScore < 50) return null;
+
   let best: { rubric: typeof PROSPECT_RUBRICS[number]; score: number } | null = null;
 
   for (const rubric of PROSPECT_RUBRICS) {
@@ -71,6 +74,7 @@ export type CallLike = {
   valid?: boolean | null;
   ai_call_status?: string | null;
   callOutcome?: string | null;
+  flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number }> | null;
   transaction?: {
     validByCompany?: boolean | null;
@@ -79,6 +83,15 @@ export type CallLike = {
     retractionEndsAt?: string | Date | null;
   } | null;
 };
+
+/** True when AI or system flagged fraud (including self-call). */
+export function isCallFraudDetected(call: CallLike): boolean {
+  if (call.flags?.fraud === true || call.flags?.selfCall === true) return true;
+  if (call.callOutcome === 'fraud') return true;
+  const fraudScore = call.ai_call_score?.['Fraud detection']?.score;
+  if (typeof fraudScore === 'number' && fraudScore < 50) return true;
+  return false;
+}
 
 /** Vente encore dans la fenêtre légale de rétractation (14j). */
 export function isTransactionInRetraction(
@@ -106,12 +119,14 @@ export function formatRetractionEndsLabel(
 }
 
 export function isCallRejectedByAI(call: CallLike): boolean {
+  if (isCallFraudDetected(call)) return true;
   if (call.validByAI === false || call.valid === false) return true;
   if (call.ai_call_status === 'auto_refused') return true;
   return false;
 }
 
 export function isCallApprovedByAI(call: CallLike): boolean {
+  if (isCallFraudDetected(call)) return false;
   return call.validByAI === true || call.valid === true;
 }
 
@@ -142,6 +157,13 @@ export function resolveCallDispositionStatus(
   call: CallLike,
   ledgerTxStatus?: string | null
 ): StatusBadge {
+  if (isCallFraudDetected(call)) {
+    const badge = callOutcomeBadge('fraud');
+    if (badge) {
+      return { ...badge, title: 'Fraude détectée — appel et transaction non validés' };
+    }
+  }
+
   if (hasBookedSaleCommission(call, ledgerTxStatus)) {
     const badge = callOutcomeBadge('transaction');
     if (badge) {
@@ -185,6 +207,14 @@ export function resolveCallDispositionStatus(
 }
 
 export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
+  if (isCallFraudDetected(call)) {
+    return {
+      label: 'Fraude',
+      tone: 'bg-rose-100 text-rose-800 border-rose-300',
+      title: 'Fraude détectée — aucune transaction validée',
+    };
+  }
+
   if (call.transaction?.validByCompany === false) {
     return {
       label: 'Call refused',

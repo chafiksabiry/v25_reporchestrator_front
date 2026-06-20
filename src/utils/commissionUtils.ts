@@ -4,7 +4,7 @@ type CommissionCall = {
   repTransactionCommission?: number;
   transactionOccurred?: boolean | null;
   callOutcome?: string | null;
-  flags?: { transactionDetected?: boolean };
+  flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number; transaction_detected?: boolean }> | null;
   lead?: {
     gigId?: {
@@ -22,6 +22,14 @@ type CommissionCall = {
 };
 
 const REP_SHARE = 0.7;
+
+function isFraudCommissionBlock(record: CommissionCall): boolean {
+  if (record.flags?.fraud === true || record.flags?.selfCall === true) return true;
+  if (record.callOutcome === 'fraud') return true;
+  const fraudScore = record.ai_call_score?.['Fraud detection']?.score;
+  if (typeof fraudScore === 'number' && fraudScore < 50) return true;
+  return false;
+}
 
 const PROSPECT_RUBRIC_KEYS = ['RDV', 'A plus tard', 'PAS INTÉRESSÉS', 'PAS AU COURANT', 'DÉJÀ ÉQUIPÉS'];
 
@@ -43,6 +51,7 @@ const NON_SALE_CALLOUTCOMES = new Set([
 
 /** RDV / rubriques prospect — pas une vente commerciale. */
 export function isProspectRubricOnly(record: CommissionCall): boolean {
+  if (isFraudCommissionBlock(record)) return false;
   if (record.callOutcome === 'transaction') return false;
   if (record.flags?.transactionDetected === true) return false;
   if (record.ai_call_score?.transaction_detected?.passed === true) return false;
@@ -67,6 +76,7 @@ export function isProspectRubricOnly(record: CommissionCall): boolean {
 
 /** IA a détecté une vente — en attente validation entreprise. */
 export function hasDetectedTransactionSale(record: CommissionCall): boolean {
+  if (isFraudCommissionBlock(record)) return false;
   if (record.transaction?.validByCompany === true) return true;
 
   if (record.validByAI !== true) return false;
@@ -92,6 +102,8 @@ export function hasValidatedTransactionSale(record: CommissionCall): boolean {
 }
 
 export function resolveCallRepCommission(record: CommissionCall): number {
+  if (isFraudCommissionBlock(record)) return 0;
+  if (record.validByAI !== true && record.valid !== true) return 0;
   if (record.repCallCommission !== undefined && record.repCallCommission !== null) {
     return Number(record.repCallCommission);
   }
@@ -109,6 +121,8 @@ function readPositiveRepCommission(value: unknown): number | null {
 }
 
 export function resolveTransactionRepCommission(record: CommissionCall): number {
+  if (isFraudCommissionBlock(record)) return 0;
+  if (record.validByAI !== true && record.valid !== true) return 0;
   const stored =
     readPositiveRepCommission(record.repTransactionCommission) ??
     readPositiveRepCommission(record.transaction?.repTransactionCommission);
