@@ -8,6 +8,7 @@ import axios from 'axios';
 // trailing `/api` (and slash) defensively so it works regardless of how the
 // env var is configured.
 import { stripApiSuffix, getRepApiHost } from './repApiUrl';
+import { getAgentId } from './authUtils';
 import { isExpectedCallAnalyzeHttpError, toCallAnalyzeFailure } from './callAnalyzeErrors';
 
 const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
@@ -321,7 +322,13 @@ export const callsApi = {
       }
       throw error;
     }
-  }
+  },
+  requestAnalysisHelp: async (id: string) => {
+    const response = await callsApiClient.post(`/api/calls/${id}/request-analysis-help`, {
+      agentId: getAgentId(),
+    });
+    return response.data;
+  },
 };
 
 export const vertexApi = {
