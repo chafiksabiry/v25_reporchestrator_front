@@ -37,6 +37,10 @@ import {
 import { callOutcomeBadge, formatRetractionEndsLabel, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
+import {
+  CALL_ANALYSIS_COMPLETE_EVENT,
+  type CallAnalysisCompleteDetail,
+} from '../../lib/callAnalysisCompleteNotification';
 
 export interface CallRecord {
   repTransactionCommission: undefined;
@@ -295,6 +299,8 @@ export function CallRecords({
   const [error, setError] = useState<string | null>(null);
   const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
+  const selectedCallRef = useRef<CallRecord | null>(null);
+  selectedCallRef.current = selectedCall;
 
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
@@ -510,6 +516,66 @@ export function CallRecords({
     return () => window.removeEventListener('REP_WALLET_REFRESH', handler);
   }, []);
 
+  useEffect(() => {
+    const onAnalysisComplete = (e: Event) => {
+      const detail = (e as CustomEvent<CallAnalysisCompleteDetail>).detail;
+      const callId = detail?.callId ? String(detail.callId) : '';
+      if (!callId) return;
+
+      const openCall = selectedCallRef.current;
+      const openCallId = openCall ? resolveCallId(openCall) : null;
+      const modalWasOpen = openCallId === callId;
+      const shouldOpenModal = modalWasOpen || detail.openModal === true;
+
+      void (async () => {
+        try {
+          const agentId = getAgentId();
+          if (!agentId) return;
+          const response = await api.calls.getByAgentId(agentId);
+          if (!response?.success || !Array.isArray(response.data)) return;
+
+          setCallRecords(response.data);
+          const match = response.data.find((r: CallRecord) => resolveCallId(r) === callId);
+          if (match && shouldOpenModal) {
+            setSelectedCall(match);
+            setActiveTab('insights');
+          } else if (match && modalWasOpen) {
+            setSelectedCall(match);
+          }
+        } catch (err) {
+          console.error('Failed to refresh call after analysis complete:', err);
+        }
+        void fetchRepLedger();
+      })();
+
+      const leadName = detail.leadName ? String(detail.leadName) : 'client';
+      const isError = detail.ai_call_status === 'error';
+      const isApproved = detail.validByAI === true;
+
+      upsertNotification({
+        id: `call-analysis-complete-${callId}`,
+        kind: 'general',
+        title: isError
+          ? 'Analyse terminée — erreur'
+          : isApproved
+            ? 'Appel validé par l\'IA'
+            : 'Analyse terminée',
+        message: isError
+          ? `L'analyse de l'appel avec ${leadName} a échoué.`
+          : `L'analyse de l'appel avec ${leadName} est prête.`,
+        actionPath: '/reps/workspace?tab=calls',
+        playSound: !modalWasOpen,
+      });
+
+      if (isApproved) {
+        onAnalysisSettled?.();
+      }
+    };
+
+    window.addEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisComplete);
+    return () => window.removeEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisComplete);
+  }, [onAnalysisSettled, upsertNotification]);
+
   const autoOpenHandledRef = React.useRef<string | null>(null);
   useEffect(() => {
     if (!autoOpenSid) return;
@@ -594,11 +660,24 @@ export function CallRecords({
 
   useEffect(() => {
     if (!selectedCall) return;
-    const refreshed = callRecords.find((r) => r._id === selectedCall._id);
+    const selectedId = resolveCallId(selectedCall);
+    const refreshed = callRecords.find((r) => resolveCallId(r) === selectedId);
     if (!refreshed) return;
     const wasPending = isAnalysisPending(selectedCall);
-    const isScoredNow = !isAnalysisPending(refreshed);
-    if (wasPending && isScoredNow) {
+    const isSettledNow = !isAnalysisPending(refreshed);
+    const scoresArrived =
+      !selectedCall.ai_call_score?.overall?.score && refreshed.ai_call_score?.overall?.score != null;
+    const transcriptArrived =
+      (!selectedCall.transcript || selectedCall.transcript.length === 0) &&
+      Array.isArray(refreshed.transcript) &&
+      refreshed.transcript.length > 0;
+
+    if (wasPending && isSettledNow) {
+      setSelectedCall(refreshed);
+      setActiveTab('insights');
+      return;
+    }
+    if (scoresArrived || transcriptArrived || refreshed.updatedAt !== selectedCall.updatedAt) {
       setSelectedCall(refreshed);
     }
   }, [callRecords, selectedCall]);
