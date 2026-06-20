@@ -32,7 +32,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { formatRetractionEndsLabel, isCallApprovedByAI, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { formatRetractionEndsLabel, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 
@@ -115,6 +115,7 @@ export interface CallRecord {
   /** Denormalised flags. `flags.fraud` is the canonical fraud signal now. */
   flags?: {
     fraud?: boolean;
+    selfCall?: boolean;
     serious?: boolean;
     transactionDetected?: boolean;
     refusalDetected?: boolean;
@@ -243,9 +244,12 @@ function isAnalysisStale(record: CallRecord): boolean {
 
 /** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status'>,
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags'>,
   ledgerTxStatus?: string | null
 ): { label: string; tone: string } | null {
+  if (isCallFraudDetected(record)) {
+    return callOutcomeBadge('fraud');
+  }
   if (isCallRejectedByAI(record)) return null;
   const status = resolveCallDispositionStatus(record, ledgerTxStatus);
   if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
@@ -395,13 +399,25 @@ export function CallRecords({
     const ledgerStatus = getLedgerTxStatus(record);
     const inRetraction = isTransactionInRetraction(record, ledgerStatus);
     const endsLabel = getRetractionEndsLabel(record);
-    const showCall = record.validByAI === true || record.valid === true;
+    const fraud = isCallFraudDetected(record);
+    const showCall = !fraud && isCallApprovedByAI(record);
     const showTx =
-      inRetraction ||
+      !fraud &&
+      (inRetraction ||
       record.transaction?.validByCompany === true ||
       ledgerStatus === 'earned' ||
       ledgerStatus === 'paid' ||
-      hasDetectedTransactionSale(record);
+      hasDetectedTransactionSale(record));
+
+    if (fraud) {
+      return (
+        <div className="px-4 md:px-8 py-4 border-b border-rose-100 bg-rose-50/60">
+          <p className="text-[11px] font-bold text-rose-800 leading-relaxed">
+            Fraude détectée — aucune commission appel ni transaction n&apos;est due sur cet enregistrement.
+          </p>
+        </div>
+      );
+    }
 
     if (!showCall && !showTx) return null;
 
@@ -828,7 +844,7 @@ export function CallRecords({
                         {leadPhone && (
                           <span className="text-[11px] font-semibold text-slate-400">{leadPhone}</span>
                         )}
-                        {record.validByAI === true && (
+                        {isCallApprovedByAI(record) && (
                           <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" title="Appel validé par l'IA" />
                         )}
                       </div>
@@ -845,7 +861,7 @@ export function CallRecords({
                             Rétractation 14j
                           </span>
                         )}
-                        {record.flags?.fraud === true && record.callOutcome !== 'fraud' && (
+                        {record.flags?.fraud === true && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
                             <ShieldAlert className="w-2.5 h-2.5" />
                             Fraude
@@ -894,7 +910,7 @@ export function CallRecords({
                     <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 shrink-0">
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
-                        {record.validByAI === true || record.valid === true ? (
+                        {isCallApprovedByAI(record) ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
@@ -1047,11 +1063,14 @@ export function CallRecords({
                     <Phone className="w-4 h-4" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${selectedCall.validByAI === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
+                    selectedCall.validByAI === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                     selectedCall.validByAI === false ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
-                    {selectedCall.validByAI === true ? (
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
+                    {isCallFraudDetected(selectedCall) ? (
+                      <X className="w-3 h-3" />
+                    ) : selectedCall.validByAI === true ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         +{resolveCallRepCommission(selectedCall).toFixed(2)}€
@@ -1069,7 +1088,8 @@ export function CallRecords({
                     <CreditCard className="w-4 h-4" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
                   </div>
-                  {(selectedCall.validByAI === null || selectedCall.validByAI === undefined) ? (
+                  {(selectedCall.validByAI === null || selectedCall.validByAI === undefined) &&
+                  !isCallFraudDetected(selectedCall) ? (
                     <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="En attente">
                       <Clock className="w-3 h-3" />
                     </span>
