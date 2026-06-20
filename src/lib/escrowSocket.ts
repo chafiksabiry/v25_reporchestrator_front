@@ -4,7 +4,19 @@ type EscrowMessage = {
   type?: string;
   repId?: string;
   companyId?: string;
+  callId?: string;
+  leadName?: string;
+  ai_call_status?: string;
+  validByAI?: boolean | null;
+  completedAt?: string;
   [key: string]: unknown;
+};
+
+export type { EscrowMessage };
+
+export type RepEscrowSocketOptions = {
+  /** Called for every parsed WS message targeting this rep (after repId filter). */
+  onEvent?: (data: EscrowMessage) => void;
 };
 
 function getWsUrl(): string | null {
@@ -29,7 +41,10 @@ function getWsUrl(): string | null {
  * server books new commissions for the current rep. Returns a disposer that
  * closes the socket and stops reconnection.
  */
-export function connectRepEscrowSocket(onWalletUpdate: () => void): () => void {
+export function connectRepEscrowSocket(
+  onWalletUpdate: () => void,
+  options?: RepEscrowSocketOptions
+): () => void {
   const wsUrl = getWsUrl();
   if (!wsUrl) return () => {};
 
@@ -37,7 +52,7 @@ export function connectRepEscrowSocket(onWalletUpdate: () => void): () => void {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
-  const RELEVANT_TYPES = new Set(['rep_wallet_update']);
+  const WALLET_TYPES = new Set(['rep_wallet_update']);
 
   const connect = () => {
     if (disposed) return;
@@ -55,13 +70,17 @@ export function connectRepEscrowSocket(onWalletUpdate: () => void): () => void {
       } catch {
         return;
       }
-      if (!data?.type || !RELEVANT_TYPES.has(data.type)) return;
+      if (!data?.type) return;
 
       // Only react to events targeting this rep.
       const myAgentId = getAgentId();
       if (data.repId && myAgentId && String(data.repId) !== String(myAgentId)) {
         return;
       }
+
+      options?.onEvent?.(data);
+
+      if (!WALLET_TYPES.has(data.type)) return;
       onWalletUpdate();
     };
 

@@ -30,6 +30,7 @@ import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
 import { HARX_NAVBAR_BG } from '../utils/harxBrand';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
+import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
 
 async function syncRepWalletBalance() {
   const agentId = getAgentId();
@@ -71,9 +72,16 @@ function DashboardAppContent() {
 
     // Live wallet updates over WebSocket: refresh as soon as the backend books
     // new commissions for this rep (after a validated call/sale).
-    const disposeSocket = connectRepEscrowSocket(() => {
-      void syncRepWalletBalance();
-    });
+    const disposeSocket = connectRepEscrowSocket(
+      () => {
+        void syncRepWalletBalance();
+      },
+      {
+        onEvent: (data) => {
+          handleCallAnalysisCompleteMessage(data);
+        },
+      }
+    );
 
     return () => {
       disposeSocket();
