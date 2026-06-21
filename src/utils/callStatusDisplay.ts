@@ -74,8 +74,10 @@ export type CallLike = {
   valid?: boolean | null;
   ai_call_status?: string | null;
   callOutcome?: string | null;
+  ai_summary?: string | null;
+  ai_summary_fr?: string | null;
   flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
-  ai_call_score?: Record<string, { passed?: boolean; score?: number }> | null;
+  ai_call_score?: Record<string, { passed?: boolean; score?: number; feedback?: string; feedback_fr?: string; feedback_en?: string }> | null;
   transaction?: {
     validByCompany?: boolean | null;
     validByAI?: boolean | null;
@@ -84,8 +86,31 @@ export type CallLike = {
   } | null;
 };
 
-/** True when AI or system flagged fraud (including self-call). */
+const VOICEMAIL_REGEX =
+  /messagerie|messagerie\s+(vocale|automatique)|r[ée]pondeur|laissez\s+(votre|un)\s+message|bo[îi]te\s+vocale|voicemail|answering\s+machine|leave\s+(a|your)\s+message|after\s+(the\s+)?(tone|beep)|appel\s+non\s+productif|non\s+productif|aucun(?:e)?\s+(?:interaction|[ée]change)|aucun\s+(?:él|el)[ée]ment\s+exploitable|n['']?est\s+pas\s+disponible|votre\s+correspondant|tombe?\s+(?:imm[ée]diatement\s+)?sur\s+la?\s?messagerie|redirig[ée]\s+vers\s+la?\s?messagerie/i;
+
+export function isCallVoicemail(call: CallLike): boolean {
+  if (call.callOutcome === 'voicemail') return true;
+  const feedback = String(
+    call.ai_summary_fr ||
+      call.ai_summary ||
+      call.ai_call_score?.overall?.feedback_fr ||
+      call.ai_call_score?.overall?.feedback ||
+      call.ai_call_score?.overall?.feedback_en ||
+      ''
+  ).toLowerCase();
+  return VOICEMAIL_REGEX.test(feedback);
+}
+
+export function getVoicemailCallNotice(language: string = 'fr'): string {
+  return language.toLowerCase().startsWith('en')
+    ? 'Voicemail — no exchange with the prospect. This is not fraud and no commission is due.'
+    : 'Messagerie — aucun échange avec le prospect. Ce n\'est pas une fraude et aucune commission n\'est due.';
+}
+
+/** True when AI or system flagged fraud (including self-call). Excludes voicemail. */
 export function isCallFraudDetected(call: CallLike): boolean {
+  if (isCallVoicemail(call)) return false;
   if (call.flags?.fraud === true || call.flags?.selfCall === true) return true;
   if (call.callOutcome === 'fraud') return true;
   const fraudScore = call.ai_call_score?.['Fraud detection']?.score;
@@ -247,6 +272,11 @@ export function resolveCallDispositionStatus(
   call: CallLike,
   ledgerTxStatus?: string | null
 ): StatusBadge {
+  if (isCallVoicemail(call)) {
+    const badge = callOutcomeBadge('voicemail');
+    if (badge) return { ...badge, title: 'Messagerie — aucun échange avec le prospect' };
+  }
+
   if (isCallFraudDetected(call)) {
     const badge = callOutcomeBadge('fraud');
     if (badge) {
@@ -297,6 +327,13 @@ export function resolveCallDispositionStatus(
 }
 
 export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
+  if (isCallVoicemail(call)) {
+    const badge = callOutcomeBadge('voicemail');
+    return badge
+      ? { ...badge, title: 'Messagerie — aucune commission due' }
+      : { label: 'Messagerie', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Messagerie — aucune commission due' };
+  }
+
   if (isCallFraudDetected(call)) {
     return {
       label: 'Fraude',
