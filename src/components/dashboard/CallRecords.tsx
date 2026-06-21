@@ -34,7 +34,8 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getSelfCallTranscriptNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 import {
@@ -299,6 +300,7 @@ export function CallRecords({
   const [error, setError] = useState<string | null>(null);
   const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
+  const [repFraudStats, setRepFraudStats] = useState<AgentFraudStatsApi | null>(null);
   const selectedCallRef = useRef<CallRecord | null>(null);
   selectedCallRef.current = selectedCall;
 
@@ -436,9 +438,17 @@ export function CallRecords({
 
     if (fraud) {
       return (
-        <div className="px-4 md:px-8 py-4 border-b border-rose-100 bg-rose-50/60">
+        <div className="px-4 md:px-8 py-4 border-b border-rose-100 bg-rose-50/60 space-y-2">
           <p className="text-[11px] font-bold text-rose-800 leading-relaxed">
-            Fraude détectée — aucune commission appel ni transaction n&apos;est due sur cet enregistrement.
+            {pickBilingual(repFraudStats?.warnings?.commissionNotice, i18n.language) ||
+              getFraudCommissionNotice(i18n.language)}
+          </p>
+          <p className="text-[11px] font-semibold text-rose-700 leading-relaxed flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              {pickBilingual(repFraudStats?.warnings?.repBlacklist, i18n.language) ||
+                getFraudBlacklistWarning(i18n.language)}
+            </span>
           </p>
         </div>
       );
@@ -491,6 +501,12 @@ export function CallRecords({
 
       if (response && response.success && Array.isArray(response.data)) {
         setCallRecords(response.data);
+        if (response.fraudStats) {
+          setRepFraudStats(response.fraudStats);
+        } else {
+          const stats = await fetchAgentFraudStats(agentId);
+          setRepFraudStats(stats);
+        }
       } else {
         throw new Error(response.message || 'Failed to fetch call records');
       }
@@ -801,6 +817,28 @@ export function CallRecords({
     return true;
   });
 
+  const fraudCallCount = repFraudStats?.fraudCount ?? filteredRecords.filter(isCallFraudDetected).length;
+
+  const renderFraudBlacklistBanner = () =>
+    fraudCallCount > 0 ? (
+      <div
+        role="alert"
+        className="flex items-start gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900"
+      >
+        <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
+        <div className="space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-rose-700">
+            {pickBilingual(repFraudStats?.warnings?.countLabel, i18n.language) ||
+              getFraudDetectedCountLabel(fraudCallCount, i18n.language)}
+          </p>
+          <p className="text-sm font-medium leading-relaxed">
+            {pickBilingual(repFraudStats?.warnings?.repBlacklist, i18n.language) ||
+              getFraudBlacklistWarning(i18n.language)}
+          </p>
+        </div>
+      </div>
+    ) : null;
+
   const selectedCallStale = selectedCall ? isAnalysisStale(selectedCall) : false;
   const selectedCallAnalyzing = selectedCall
     ? isAnalysisPending(selectedCall) && !selectedCallStale
@@ -894,6 +932,8 @@ export function CallRecords({
           <span>{t('calls.refresh')}</span>
         </button>
       </div>
+
+      {renderFraudBlacklistBanner()}
 
       {loading ? (
         <div className="space-y-3">
