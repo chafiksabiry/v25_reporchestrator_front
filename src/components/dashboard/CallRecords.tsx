@@ -218,10 +218,10 @@ interface CallRecordsProps {
    *  to deep-link the rep into the AI-insights modal right after they
    *  hang up. */
   autoOpenSid?: string;
-  /** Open the best matching call modal for this lead (e.g. signed prospect details). */
-  autoOpenLeadId?: string;
   /** Dashboard overlay: open this call's modal without rendering the list. */
   overlayOpenCallId?: string | null;
+  /** Dashboard overlay: open the lead's best call modal without rendering the list. */
+  overlayOpenLeadId?: string | null;
   /** Called when the overlay modal is closed. */
   onOverlayClose?: () => void;
   /** Called once we've successfully opened the deep-linked modal so the
@@ -291,8 +291,8 @@ export function CallRecords({
   callValidationFilter = 'all',
   transactionValidationFilter = 'all',
   autoOpenSid,
-  autoOpenLeadId,
   overlayOpenCallId,
+  overlayOpenLeadId,
   onOverlayClose,
   onAutoOpenHandled,
   onAnalysisSettled,
@@ -658,69 +658,6 @@ export function CallRecords({
     }
   }, [callRecords, autoOpenSid, onAutoOpenHandled]);
 
-  const pickBestCallForLead = (records: CallRecord[], targetLeadId: string) => {
-    const matches = records.filter((r) => {
-      const recordLeadId = normalizeMongoId(r.lead?._id ?? r.lead);
-      return recordLeadId === targetLeadId;
-    });
-    if (!matches.length) return undefined;
-    const withSignedTx = matches.find(
-      (r) => r.transaction?.validByReps === true || r.transaction?.validByCompany === true
-    );
-    if (withSignedTx) return withSignedTx;
-    return matches.sort(
-      (a, b) =>
-        new Date(b.startTime || b.createdAt || 0).getTime() -
-        new Date(a.startTime || a.createdAt || 0).getTime()
-    )[0];
-  };
-
-  const autoOpenLeadHandledRef = React.useRef<string | null>(null);
-  useEffect(() => {
-    autoOpenLeadHandledRef.current = null;
-  }, [autoOpenLeadId]);
-  useEffect(() => {
-    if (!autoOpenLeadId) return;
-    if (autoOpenLeadHandledRef.current === autoOpenLeadId) return;
-
-    fetchCallRecords(true);
-    let attempts = 0;
-    const tryOpen = () => {
-      attempts += 1;
-      const match = pickBestCallForLead(callRecords, autoOpenLeadId);
-      if (match) {
-        autoOpenLeadHandledRef.current = autoOpenLeadId;
-        setSelectedCall(match);
-        setActiveTab('insights');
-        onAutoOpenHandled?.();
-        return true;
-      }
-      return false;
-    };
-
-    if (tryOpen()) return;
-    const interval = setInterval(async () => {
-      await fetchCallRecords(true);
-      if (tryOpen() || attempts >= 8) {
-        clearInterval(interval);
-        if (attempts >= 8) onAutoOpenHandled?.();
-      }
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [autoOpenLeadId]);
-  useEffect(() => {
-    if (!autoOpenLeadId) return;
-    if (autoOpenLeadHandledRef.current === autoOpenLeadId) return;
-    const match = pickBestCallForLead(callRecords, autoOpenLeadId);
-    if (match) {
-      autoOpenLeadHandledRef.current = autoOpenLeadId;
-      setSelectedCall(match);
-      setActiveTab('insights');
-      onAutoOpenHandled?.();
-    }
-  }, [callRecords, autoOpenLeadId, onAutoOpenHandled]);
-
   const hasPendingAnalyses = callRecords.some((r) => isAnalysisPending(r));
 
   useEffect(() => {
@@ -844,7 +781,24 @@ export function CallRecords({
 
   const closeCallModal = () => {
     setSelectedCall(null);
-    if (overlayOpenCallId) onOverlayClose?.();
+    if (overlayOpenCallId || overlayOpenLeadId) onOverlayClose?.();
+  };
+
+  const pickBestCallForLead = (records: CallRecord[], targetLeadId: string) => {
+    const matches = records.filter((r) => {
+      const recordLeadId = normalizeMongoId(r.lead?._id ?? r.lead);
+      return recordLeadId === targetLeadId;
+    });
+    if (!matches.length) return undefined;
+    const withSignedTx = matches.find(
+      (r) => r.transaction?.validByReps === true || r.transaction?.validByCompany === true
+    );
+    if (withSignedTx) return withSignedTx;
+    return matches.sort(
+      (a, b) =>
+        new Date(b.startTime || b.createdAt || 0).getTime() -
+        new Date(a.startTime || a.createdAt || 0).getTime()
+    )[0];
   };
 
   useEffect(() => {
@@ -855,6 +809,17 @@ export function CallRecords({
     });
     if (match) openCallDetails(match, 'insights');
   }, [overlayOpenCallId, callRecords]);
+
+  useEffect(() => {
+    if (!overlayOpenLeadId) return;
+    void fetchCallRecords(true);
+  }, [overlayOpenLeadId]);
+
+  useEffect(() => {
+    if (!overlayOpenLeadId) return;
+    const match = pickBestCallForLead(callRecords, overlayOpenLeadId);
+    if (match) openCallDetails(match, 'insights');
+  }, [overlayOpenLeadId, callRecords]);
 
   const filteredRecords = callRecords.filter(record => {
     if (leadId) {
@@ -991,8 +956,8 @@ export function CallRecords({
   );
 
   return (
-    <div className={overlayOpenCallId ? 'contents' : 'space-y-5 relative'}>
-      {!overlayOpenCallId && (
+    <div className={overlayOpenCallId || overlayOpenLeadId ? 'contents' : 'space-y-5 relative'}>
+      {!overlayOpenCallId && !overlayOpenLeadId && (
       <>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>

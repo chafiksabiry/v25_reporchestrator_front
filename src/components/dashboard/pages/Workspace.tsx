@@ -117,7 +117,7 @@ export function WorkspaceContent() {
   // set, the Call History tab is auto-opened and `CallRecords` deep-links
   // the matching call into its details modal.
   const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(null);
-  const [pendingOpenLeadId, setPendingOpenLeadId] = useState<string | null>(null);
+  const [signedLeadOverlayId, setSignedLeadOverlayId] = useState<string | null>(null);
 
   // Sync activeTab with URL
   useEffect(() => {
@@ -1084,11 +1084,7 @@ export function WorkspaceContent() {
             <CallRecords
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
-              autoOpenLeadId={pendingOpenLeadId || undefined}
-              onAutoOpenHandled={() => {
-                setPendingOpenCallSid(null);
-                setPendingOpenLeadId(null);
-              }}
+              onAutoOpenHandled={() => setPendingOpenCallSid(null)}
             />
           </div>
         );
@@ -1212,17 +1208,7 @@ export function WorkspaceContent() {
   const handleViewSignedLeadDetails = (lead: Lead) => {
     const leadIdString = String(lead._id || lead.id || '');
     if (!leadIdString) return;
-
-    setPendingOpenLeadId(leadIdString);
-    setActiveTab('calls');
-
-    const params = new URLSearchParams(location.search);
-    params.set('tab', 'calls');
-    params.set('leadId', leadIdString);
-    navigate(
-      { pathname: location.pathname, search: `?${params.toString()}` },
-      { replace: true }
-    );
+    setSignedLeadOverlayId(leadIdString);
   };
 
   const handleCallClick = async (lead: Lead) => {
@@ -1520,6 +1506,12 @@ export function WorkspaceContent() {
             </div>
           </div>
         </div>
+      )}
+      {signedLeadOverlayId && (
+        <CallRecords
+          overlayOpenLeadId={signedLeadOverlayId}
+          onOverlayClose={() => setSignedLeadOverlayId(null)}
+        />
       )}
     </div>
   );
