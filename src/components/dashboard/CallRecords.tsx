@@ -34,7 +34,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -271,6 +271,9 @@ function dispositionBadge(
   record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags'>,
   ledgerTxStatus?: string | null
 ): { label: string; tone: string } | null {
+  if (isCallVoicemail(record)) {
+    return callOutcomeBadge('voicemail');
+  }
   if (isCallFraudDetected(record)) {
     return callOutcomeBadge('fraud');
   }
@@ -427,14 +430,27 @@ export function CallRecords({
     const inRetraction = isTransactionInRetraction(record, ledgerStatus);
     const endsLabel = getRetractionEndsLabel(record);
     const fraud = isCallFraudDetected(record);
-    const showCall = !fraud && isCallApprovedByAI(record);
+    const voicemail = isCallVoicemail(record);
+    const showCall = !fraud && !voicemail && isCallApprovedByAI(record);
     const showTx =
       !fraud &&
+      !voicemail &&
       (inRetraction ||
       record.transaction?.validByCompany === true ||
       ledgerStatus === 'earned' ||
       ledgerStatus === 'paid' ||
       hasDetectedTransactionSale(record));
+
+    if (voicemail) {
+      return (
+        <div className="px-4 md:px-8 py-4 border-b border-slate-200 bg-slate-50/80">
+          <p className="text-[11px] font-bold text-slate-700 leading-relaxed flex items-start gap-2">
+            <Phone className="w-4 h-4 shrink-0 mt-0.5 text-slate-500" />
+            <span>{getVoicemailCallNotice(i18n.language)}</span>
+          </p>
+        </div>
+      );
+    }
 
     if (fraud) {
       return (
@@ -1034,7 +1050,7 @@ export function CallRecords({
                             Rétractation 14j
                           </span>
                         )}
-                        {record.flags?.fraud === true && (
+                        {isCallFraudDetected(record) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
                             <ShieldAlert className="w-2.5 h-2.5" />
                             Fraude
@@ -1246,11 +1262,14 @@ export function CallRecords({
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
+                    isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
                     selectedCall.validByAI === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                     selectedCall.validByAI === false ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
                     {isCallFraudDetected(selectedCall) ? (
+                      <X className="w-3 h-3" />
+                    ) : isCallVoicemail(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : selectedCall.validByAI === true ? (
                       <div className="flex items-center gap-1">
