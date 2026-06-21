@@ -34,7 +34,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -698,7 +698,7 @@ export function CallRecords({
     const wasPending = isAnalysisPending(selectedCall);
     const isSettledNow = !isAnalysisPending(refreshed);
     const scoresArrived =
-      !selectedCall.ai_call_score?.overall?.score && refreshed.ai_call_score?.overall?.score != null;
+      !hasAiCallAnalysis(selectedCall) && hasAiCallAnalysis(refreshed);
     const transcriptArrived =
       (!selectedCall.transcript || selectedCall.transcript.length === 0) &&
       Array.isArray(refreshed.transcript) &&
@@ -1093,10 +1093,10 @@ export function CallRecords({
                   </div>
 
                   {/* Score */}
-                  {record.ai_call_score?.overall?.score !== undefined && (
+                  {getDisplayOverallScore(record) != null && (
                     <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                      <span className="text-sm font-black">{record.ai_call_score.overall.score}%</span>
+                      <span className="text-sm font-black">{getDisplayOverallScore(record)}%</span>
                     </div>
                   )}
 
@@ -1387,9 +1387,9 @@ export function CallRecords({
                 </div>
               ) : (
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
-                  {(!selectedCall.ai_call_score || !selectedCall.ai_call_score.overall?.score) ? (
+                  {(!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
                     renderRepAnalysisWaitState('Analyse détaillée non encore générée')
-                  ) : (
+                  ) : isNonEvaluableCall(selectedCall) ? null : (
                     <>
                       {/* Executive Summary Section - Now at the Top */}
                       <div className="relative group">
@@ -1413,11 +1413,11 @@ export function CallRecords({
                                 <div className="text-right">
                                   <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Score Global</p>
                                   <div className="text-2xl sm:text-4xl font-black text-slate-900 leading-none">
-                                    {selectedCall.ai_call_score?.overall?.score || 0}<span className="text-base sm:text-xl text-slate-400">%</span>
+                                    {getDisplayOverallScore(selectedCall) ?? 0}<span className="text-base sm:text-xl text-slate-400">%</span>
                                   </div>
                                 </div>
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
-                                  <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${(selectedCall.ai_call_score?.overall?.score || 0) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                                  <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${(getDisplayOverallScore(selectedCall) ?? 0) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
                                 </div>
                               </div>
                             </div>
