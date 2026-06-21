@@ -34,7 +34,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -1389,9 +1389,9 @@ export function CallRecords({
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
                   {(!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
                     renderRepAnalysisWaitState('Analyse détaillée non encore générée')
-                  ) : isNonEvaluableCall(selectedCall) ? null : (
+                  ) : (
                     <>
-                      {/* Executive Summary Section - Now at the Top */}
+                      {/* Executive Summary — always shown when analysis exists */}
                       <div className="relative group">
                         <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-[28px] sm:rounded-[40px] blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
                         <div className="relative bg-white rounded-[28px] sm:rounded-[40px] border border-emerald-100/50 shadow-2xl shadow-emerald-500/5 p-6 sm:p-10 overflow-hidden">
@@ -1413,11 +1413,11 @@ export function CallRecords({
                                 <div className="text-right">
                                   <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Score Global</p>
                                   <div className="text-2xl sm:text-4xl font-black text-slate-900 leading-none">
-                                    {getDisplayOverallScore(selectedCall) ?? 0}<span className="text-base sm:text-xl text-slate-400">%</span>
+                                    {getExecutiveSummaryScore(selectedCall)}<span className="text-base sm:text-xl text-slate-400">%</span>
                                   </div>
                                 </div>
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
-                                  <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${(getDisplayOverallScore(selectedCall) ?? 0) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                                  <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${getExecutiveSummaryScore(selectedCall) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
                                 </div>
                               </div>
                             </div>
@@ -1425,10 +1425,7 @@ export function CallRecords({
                             <div className="bg-gradient-to-br from-slate-50 to-white rounded-[20px] sm:rounded-[32px] p-5 sm:p-8 border border-slate-100 shadow-inner">
                               <p className="text-base sm:text-xl font-bold text-slate-800 leading-relaxed italic relative">
                                 <span className="absolute -left-2 -top-4 sm:-left-4 sm:-top-4 text-emerald-200 text-4xl sm:text-6xl font-serif opacity-50">&quot;</span>
-                                {/* Prefer the bilingual persisted ai_summary; fall back to bilingual overall feedback. */}
-                                {i18n.language === 'en'
-                                  ? (selectedCall.ai_summary || selectedCall.ai_call_score?.overall?.feedback_en || selectedCall.ai_summary || selectedCall.ai_call_score?.overall?.feedback || 'Analysis in progress...')
-                                  : (selectedCall.ai_summary || selectedCall.ai_call_score?.overall?.feedback_fr || selectedCall.ai_summary || selectedCall.ai_call_score?.overall?.feedback || 'Analyse en cours...')}
+                                {getExecutiveSummaryText(selectedCall, i18n.language) || (i18n.language === 'en' ? 'Analysis in progress...' : 'Analyse en cours...')}
                                 <span className="text-emerald-200 text-4xl sm:text-6xl font-serif opacity-50 ml-1 leading-none align-bottom">&quot;</span>
                               </p>
                             </div>
@@ -1436,6 +1433,8 @@ export function CallRecords({
                         </div>
                       </div>
 
+                      {!isNonEvaluableCall(selectedCall) && (
+                    <>
                       {/* Detailed Metrics Section */}
                       <div className="space-y-6">
                         <div className="flex items-center gap-4 px-4">
@@ -1624,6 +1623,8 @@ export function CallRecords({
                           })()}
                         </div>
                       </div>
+                    </>
+                      )}
                     </>
                   )}
                 </div>

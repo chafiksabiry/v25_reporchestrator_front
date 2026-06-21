@@ -118,20 +118,50 @@ export function isCallFraudDetected(call: CallLike): boolean {
   return false;
 }
 
-/** Messagerie or fraude — no analysis cards are shown in the modal. */
+/** Messagerie or fraude — hide per-rubric cards; executive summary still shown. */
 export function isNonEvaluableCall(call: CallLike): boolean {
   return isCallVoicemail(call) || isCallFraudDetected(call);
 }
 
-/** Display score: hidden (null) for voicemail/fraud; otherwise the persisted overall score. */
+/** Display score: hidden (null) for voicemail/fraud in list badges; otherwise the persisted overall score. */
 export function getDisplayOverallScore(call: CallLike): number | null {
   if (isNonEvaluableCall(call)) return null;
   const raw = call.ai_call_score?.overall?.score;
   return typeof raw === 'number' ? raw : null;
 }
 
+/** Score shown on the executive summary card (0 % for voicemail/fraud). */
+export function getExecutiveSummaryScore(call: CallLike): number {
+  if (isNonEvaluableCall(call)) return 0;
+  const raw = call.ai_call_score?.overall?.score;
+  return typeof raw === 'number' ? raw : 0;
+}
+
+export function getExecutiveSummaryText(call: CallLike, language: string = 'fr'): string {
+  const isEn = String(language || '').toLowerCase().startsWith('en');
+  if (isCallVoicemail(call)) return getVoicemailCallNotice(language);
+  if (isCallFraudDetected(call)) {
+    const fromOverall = isEn
+      ? (call.ai_call_score?.overall?.feedback_en || call.ai_call_score?.overall?.feedback || '')
+      : (call.ai_call_score?.overall?.feedback_fr || call.ai_call_score?.overall?.feedback || '');
+    if (fromOverall.trim()) return fromOverall;
+    return getFraudCommissionNotice(language);
+  }
+  const fromSummary = isEn
+    ? (call.ai_summary_en || call.ai_summary || '')
+    : (call.ai_summary_fr || call.ai_summary || '');
+  if (fromSummary.trim()) return fromSummary;
+  return isEn
+    ? (call.ai_call_score?.overall?.feedback_en || call.ai_call_score?.overall?.feedback || '')
+    : (call.ai_call_score?.overall?.feedback_fr || call.ai_call_score?.overall?.feedback || '');
+}
+
 export function hasAiCallAnalysis(call: CallLike): boolean {
-  return typeof call.ai_call_score?.overall?.score === 'number';
+  if (typeof call.ai_call_score?.overall?.score === 'number') return true;
+  const overall = call.ai_call_score?.overall;
+  if (overall?.feedback || overall?.feedback_fr || overall?.feedback_en) return true;
+  if (call.ai_summary || call.ai_summary_fr || call.ai_summary_en) return true;
+  return isNonEvaluableCall(call);
 }
 
 export type TranscriptEntry = {
