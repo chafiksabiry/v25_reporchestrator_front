@@ -5,7 +5,7 @@ import {
   Phone, Mail, User,
   Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
-  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search
+  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -41,6 +41,8 @@ interface Lead {
   signedAt?: string | null;
   isSignedByMe?: boolean;
   isCalledByMe?: boolean;
+  isRdvByMe?: boolean;
+  lastCallOutcome?: string | null;
 }
 
 interface EnrolledGig {
@@ -57,7 +59,12 @@ interface APIResponse {
   data: Lead[];
 }
 
-type LeadStatusFilter = 'all' | 'called' | 'signed';
+type LeadStatusFilter = 'all' | 'called' | 'signed' | 'rdv';
+
+function isLeadRdvByMe(lead: Lead): boolean {
+  if (lead.isRdvByMe === true) return true;
+  return lead.lastCallOutcome === 'appointment';
+}
 
 type CopilotGuardState = {
   loading: boolean;
@@ -526,6 +533,9 @@ export function WorkspaceContent() {
     if (leadStatusFilter === 'signed') {
       return leadList.filter((lead) => lead.isSignedByMe);
     }
+    if (leadStatusFilter === 'rdv') {
+      return leadList.filter((lead) => isLeadRdvByMe(lead));
+    }
     return leadList;
   };
 
@@ -548,7 +558,7 @@ export function WorkspaceContent() {
     const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
     const trimmedQuery = query.trim();
     const url = trimmedQuery
-      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}`
+      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${statusParam}`
       : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
 
     try {
@@ -607,6 +617,7 @@ export function WorkspaceContent() {
   const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
     { id: 'all', label: 'Tous' },
     { id: 'called', label: 'Appelé' },
+    { id: 'rdv', label: 'RDV' },
     { id: 'signed', label: 'Signé' },
   ];
 
@@ -782,7 +793,9 @@ export function WorkspaceContent() {
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
                                 : filter.id === 'called'
                                   ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                                  : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
+                                  : filter.id === 'rdv'
+                                    ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
+                                    : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
                               : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
                           }`}
                         >
@@ -833,7 +846,8 @@ export function WorkspaceContent() {
                       {leads.map((lead) => {
                         const leadLockedByOther = isLeadCockpitLockedByOther(lead, myAgentId);
                         const isSignedByMe = Boolean(lead.isSignedByMe);
-                        const isCalledByMe = Boolean(lead.isCalledByMe) && !isSignedByMe;
+                        const isRdvByMe = isLeadRdvByMe(lead) && !isSignedByMe;
+                        const isCalledByMe = Boolean(lead.isCalledByMe) && !isSignedByMe && !isRdvByMe;
                         return (
                         <div
                           key={`${lead._id || lead.id}-${lead.Email_1}-${lead.Created_Time}`}
@@ -858,6 +872,12 @@ export function WorkspaceContent() {
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
                                   <CheckCircle2 className="w-3 h-3" />
                                   Déjà signé
+                                </span>
+                              )}
+                              {isRdvByMe && (
+                                <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-violet-50 text-violet-700 border border-violet-100 flex items-center gap-1.5">
+                                  <Calendar className="w-3 h-3" />
+                                  RDV
                                 </span>
                               )}
                               {isCalledByMe && (
