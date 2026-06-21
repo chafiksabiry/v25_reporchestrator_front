@@ -104,8 +104,8 @@ export function isCallVoicemail(call: CallLike): boolean {
 
 export function getVoicemailCallNotice(language: string = 'fr'): string {
   return language.toLowerCase().startsWith('en')
-    ? 'Voicemail — no exchange with the prospect. This is not fraud and no commission is due.'
-    : 'Messagerie — aucun échange avec le prospect. Ce n\'est pas une fraude et aucune commission n\'est due.';
+    ? 'Voicemail — no exchange with the prospect. No commission is due.'
+    : 'Messagerie — aucun échange avec le prospect. Aucune commission n\'est due.';
 }
 
 /** True when AI or system flagged fraud (including self-call). Excludes voicemail. */
@@ -116,6 +116,22 @@ export function isCallFraudDetected(call: CallLike): boolean {
   const fraudScore = call.ai_call_score?.['Fraud detection']?.score;
   if (typeof fraudScore === 'number' && fraudScore < 50) return true;
   return false;
+}
+
+/** Messagerie or fraude — no analysis cards are shown in the modal. */
+export function isNonEvaluableCall(call: CallLike): boolean {
+  return isCallVoicemail(call) || isCallFraudDetected(call);
+}
+
+/** Display score: hidden (null) for voicemail/fraud; otherwise the persisted overall score. */
+export function getDisplayOverallScore(call: CallLike): number | null {
+  if (isNonEvaluableCall(call)) return null;
+  const raw = call.ai_call_score?.overall?.score;
+  return typeof raw === 'number' ? raw : null;
+}
+
+export function hasAiCallAnalysis(call: CallLike): boolean {
+  return typeof call.ai_call_score?.overall?.score === 'number';
 }
 
 export type TranscriptEntry = {
