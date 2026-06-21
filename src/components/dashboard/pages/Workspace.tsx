@@ -5,7 +5,7 @@ import {
   Phone, Mail, User,
   Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
-  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar
+  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -117,6 +117,7 @@ export function WorkspaceContent() {
   // set, the Call History tab is auto-opened and `CallRecords` deep-links
   // the matching call into its details modal.
   const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(null);
+  const [pendingOpenLeadId, setPendingOpenLeadId] = useState<string | null>(null);
 
   // Sync activeTab with URL
   useEffect(() => {
@@ -851,7 +852,16 @@ export function WorkspaceContent() {
                         return (
                         <div
                           key={`${lead._id || lead.id}-${lead.Email_1}-${lead.Created_Time}`}
-                          className="border border-gray-100 rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5"
+                          className={`border border-gray-100 rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5 ${isSignedByMe ? 'cursor-pointer' : ''}`}
+                          onClick={isSignedByMe ? () => handleViewSignedLeadDetails(lead) : undefined}
+                          onKeyDown={isSignedByMe ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleViewSignedLeadDetails(lead);
+                            }
+                          } : undefined}
+                          role={isSignedByMe ? 'button' : undefined}
+                          tabIndex={isSignedByMe ? 0 : undefined}
                         >
                           <div className="flex justify-between items-center">
                             <div className="space-y-1">
@@ -901,15 +911,26 @@ export function WorkspaceContent() {
                                 </span>
                               )}
                               <button
-                                className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${canUseCopilot && !leadLockedByOther && !isSignedByMe
-                                  ? 'bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/20 hover:-translate-y-0.5'
-                                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                  }`}
-                                disabled={!canUseCopilot || copilotGuard.loading || leadLockedByOther || claimingCockpit || isSignedByMe}
-                                onClick={() => handleCallClick(lead)}
+                                type="button"
+                                className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${
+                                  isSignedByMe
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:shadow-md'
+                                    : canUseCopilot && !leadLockedByOther
+                                      ? 'bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/20 hover:-translate-y-0.5'
+                                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                }`}
+                                disabled={!isSignedByMe && (!canUseCopilot || copilotGuard.loading || leadLockedByOther || claimingCockpit)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isSignedByMe) {
+                                    handleViewSignedLeadDetails(lead);
+                                    return;
+                                  }
+                                  void handleCallClick(lead);
+                                }}
                                 title={
                                   isSignedByMe
-                                    ? 'Contrat déjà signé pour ce prospect'
+                                    ? 'Voir les détails de la vente signée'
                                     : leadLockedByOther
                                       ? 'Ce prospect est ouvert dans le cockpit d’un autre agent'
                                       : !canUseCopilot && copilotGuard.reason
@@ -917,8 +938,14 @@ export function WorkspaceContent() {
                                         : ''
                                 }
                               >
-                                <Phone className="w-3.5 h-3.5" />
-                                <span>{claimingCockpit ? '...' : isSignedByMe ? 'Signé' : 'Call'}</span>
+                                {isSignedByMe ? (
+                                  <Eye className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Phone className="w-3.5 h-3.5" />
+                                )}
+                                <span>
+                                  {claimingCockpit ? '...' : isSignedByMe ? 'Détails' : 'Call'}
+                                </span>
                               </button>
                             </div>
                           </div>
@@ -1057,7 +1084,11 @@ export function WorkspaceContent() {
             <CallRecords
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
-              onAutoOpenHandled={() => setPendingOpenCallSid(null)}
+              autoOpenLeadId={pendingOpenLeadId || undefined}
+              onAutoOpenHandled={() => {
+                setPendingOpenCallSid(null);
+                setPendingOpenLeadId(null);
+              }}
             />
           </div>
         );
@@ -1178,12 +1209,29 @@ export function WorkspaceContent() {
     }
   };
 
+  const handleViewSignedLeadDetails = (lead: Lead) => {
+    const leadIdString = String(lead._id || lead.id || '');
+    if (!leadIdString) return;
+
+    setPendingOpenLeadId(leadIdString);
+    setActiveTab('calls');
+
+    const params = new URLSearchParams(location.search);
+    params.set('tab', 'calls');
+    params.set('leadId', leadIdString);
+    navigate(
+      { pathname: location.pathname, search: `?${params.toString()}` },
+      { replace: true }
+    );
+  };
+
   const handleCallClick = async (lead: Lead) => {
     if (!canUseCopilot) {
       setShowWarningModal(true);
       return;
     }
     if (lead.isSignedByMe) {
+      handleViewSignedLeadDetails(lead);
       return;
     }
     if (isLeadCockpitLockedByOther(lead, myAgentId)) {
