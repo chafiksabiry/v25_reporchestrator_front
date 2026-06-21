@@ -156,6 +156,33 @@ export function isSimulatedTranscriptTurn(entry: TranscriptEntry): boolean {
   return entry.simulated === true || String(entry.speaker || '').toLowerCase().includes('simul');
 }
 
+function isEnglishLanguage(language: string): boolean {
+  return String(language || '').toLowerCase().startsWith('en');
+}
+
+/** Avertissement rep : risque de blacklist en cas de fraudes répétées. */
+export function getFraudBlacklistWarning(language: string = 'fr'): string {
+  return isEnglishLanguage(language)
+    ? 'Warning: if fraudulent calls continue, you may be blacklisted. The company can make this decision at any time.'
+    : 'Attention : en cas de fraudes répétées, vous pourriez être blacklisté. L\'entreprise peut prendre cette décision à tout moment.';
+}
+
+/** Aucune commission due sur un appel frauduleux. */
+export function getFraudCommissionNotice(language: string = 'fr'): string {
+  return isEnglishLanguage(language)
+    ? 'Fraud detected — no call or transaction commission is due on this recording.'
+    : 'Fraude détectée — aucune commission appel ni transaction n\'est due sur cet enregistrement.';
+}
+
+/** Titre du bandeau liste (ex. « 2 fraudes détectées »). */
+export function getFraudDetectedCountLabel(count: number, language: string = 'fr'): string {
+  const n = Math.max(0, Math.round(count));
+  if (isEnglishLanguage(language)) {
+    return n === 1 ? '1 fraud detected' : `${n} frauds detected`;
+  }
+  return n === 1 ? '1 fraude détectée' : `${n} fraudes détectées`;
+}
+
 /** Vente encore dans la fenêtre légale de rétractation (14j). */
 export function isTransactionInRetraction(
   call: CallLike,
