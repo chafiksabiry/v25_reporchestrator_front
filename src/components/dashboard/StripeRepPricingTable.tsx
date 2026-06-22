@@ -51,6 +51,8 @@ export type StripeRepPricingTableProps = {
   /** ID profil rep — transmis à Stripe (client_reference_id) pour le webhook. */
   agentId?: string;
   customerEmail?: string;
+  /** Appelé après vérification du plan (ex. retour depuis Stripe Checkout). */
+  onSubscribed?: () => void;
 };
 
 /** Tableau de prix Stripe — plans représentants (Freemium, Standard, Pro, Elite). */
@@ -58,9 +60,11 @@ export function StripeRepPricingTable({
   className = '',
   agentId,
   customerEmail,
+  onSubscribed,
 }: StripeRepPricingTableProps) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const [pricingTableId, setPricingTableId] = useState(
     import.meta.env.VITE_STRIPE_REP_PRICING_TABLE_ID || DEFAULT_PRICING_TABLE_ID
   );
@@ -117,6 +121,19 @@ export function StripeRepPricingTable({
     );
   }
 
+  const handleContinueAfterCheckout = async () => {
+    if (!onSubscribed) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      onSubscribed();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Impossible de vérifier l’abonnement');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
     <div className={className}>
       <stripe-pricing-table
@@ -125,6 +142,21 @@ export function StripeRepPricingTable({
         {...(agentId ? { 'client-reference-id': agentId } : {})}
         {...(customerEmail ? { 'customer-email': customerEmail } : {})}
       />
+      {onSubscribed && (
+        <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-center">
+          <p className="text-sm text-slate-600">
+            Après le paiement sur Stripe, revenez ici et cliquez pour continuer.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleContinueAfterCheckout()}
+            disabled={verifying}
+            className="mt-3 inline-flex items-center justify-center rounded-xl bg-harx-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-harx-600 disabled:opacity-60"
+          >
+            {verifying ? 'Vérification…' : 'J’ai terminé mon paiement — continuer'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
