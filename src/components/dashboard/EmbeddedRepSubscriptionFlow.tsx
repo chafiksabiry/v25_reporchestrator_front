@@ -222,12 +222,12 @@ export function EmbeddedRepSubscriptionFlow({
   const handlePlanAction = useCallback(
     async (plan: ApiPlan) => {
       if (String(activePlanId) === String(plan._id)) return;
-      if (requiresStripeCheckout(plan)) {
-        await openStripeCheckout(plan);
-        return;
-      }
       if (plan.price <= 0) {
         await activateFreePlan(plan);
+        return;
+      }
+      if (requiresStripeCheckout(plan)) {
+        await openStripeCheckout(plan);
         return;
       }
       setInitError('Ce plan payant doit être configuré dans Stripe.');

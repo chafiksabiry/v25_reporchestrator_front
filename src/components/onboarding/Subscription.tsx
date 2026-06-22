@@ -2,15 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { CreditCard, ArrowLeft, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
-import { refreshOnboardingStatus } from '../../services/apiConfig';
+import { getAgentPlan, refreshOnboardingStatus } from '../../services/apiConfig';
 import config from '../../config';
 import progressService from '../../services/progressService';
-import { StripeRepPricingTable } from '../dashboard/StripeRepPricingTable';
+import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptionFlow';
 
 function Subscription() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
   const [agentId, setAgentId] = useState<string | undefined>();
   const [customerEmail, setCustomerEmail] = useState<string | undefined>();
 
@@ -26,6 +27,11 @@ function Subscription() {
 
         setAgentId(userData.agentId);
         setCustomerEmail(String(userData.email || '').trim() || undefined);
+
+        const planData = await getAgentPlan(userData.agentId);
+        if (planData?.plan?._id) {
+          setCurrentPlanId(String(planData.plan._id));
+        }
 
         const userProgress = await progressService.getUserProgress();
         if (
@@ -98,14 +104,15 @@ function Subscription() {
               Choisissez votre formule
             </h2>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-              Paiement sécurisé via Stripe
+              Paiement sécurisé via Stripe — restez sur HARX
             </p>
           </div>
         </div>
 
-        <StripeRepPricingTable
+        <EmbeddedRepSubscriptionFlow
           agentId={agentId}
           customerEmail={customerEmail}
+          currentPlanId={currentPlanId}
           onSubscribed={() => void handleSubscribed()}
         />
       </div>
