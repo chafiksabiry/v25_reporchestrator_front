@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CreditCard, ArrowLeft, Loader, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
-import { getAgentPlan, refreshOnboardingStatus } from '../../services/apiConfig';
+import { getAgentPlan, getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
 import config from '../../config';
 import progressService from '../../services/progressService';
 import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptionFlow';
@@ -13,7 +13,8 @@ function Subscription() {
   const [error, setError] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
   const [activePlanName, setActivePlanName] = useState<string | undefined>();
-  const [subscriptionComplete, setSubscriptionComplete] = useState(false);
+  const [phase4Completed, setPhase4Completed] = useState(false);
+  const [justActivated, setJustActivated] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [agentId, setAgentId] = useState<string | undefined>();
   const [customerEmail, setCustomerEmail] = useState<string | undefined>();
@@ -37,6 +38,15 @@ function Subscription() {
           if (planData.plan.name) {
             setActivePlanName(String(planData.plan.name));
           }
+        }
+
+        try {
+          const agentData = await getAgentData();
+          const phase4Status =
+            agentData?.onboardingProgress?.phases?.phase4?.status;
+          setPhase4Completed(phase4Status === 'completed');
+        } catch {
+          /* optional — button still shown if plan exists */
         }
 
         const userProgress = await progressService.getUserProgress();
@@ -63,7 +73,7 @@ function Subscription() {
         setCurrentPlanId(String(plan._id));
         setActivePlanName(plan.name);
       }
-      setSubscriptionComplete(true);
+      setJustActivated(true);
       toast.success(
         plan ? `Formule « ${plan.name} » activée` : 'Abonnement activé'
       );
@@ -87,6 +97,8 @@ function Subscription() {
       setContinuing(false);
     }
   }, [navigate]);
+
+  const canContinueOnboarding = Boolean(currentPlanId) && !phase4Completed;
 
   if (loading) {
     return (
@@ -132,14 +144,16 @@ function Subscription() {
           </div>
         </div>
 
-        {subscriptionComplete && (
+        {canContinueOnboarding && (
           <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
               <p className="text-sm font-bold text-green-800">
-                {activePlanName
+                {justActivated && activePlanName
                   ? `« ${activePlanName} » est maintenant votre formule active.`
-                  : 'Votre abonnement est activé.'}
+                  : activePlanName
+                    ? `Votre formule « ${activePlanName} » est active. Passez à l’étape suivante de l’onboarding.`
+                    : 'Votre formule est active. Passez à l’étape suivante de l’onboarding.'}
               </p>
             </div>
             <button
