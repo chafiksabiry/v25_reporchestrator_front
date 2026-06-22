@@ -298,7 +298,7 @@ export function EmbeddedRepSubscriptionFlow({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrent = String(activePlanId) === String(plan._id);
           const isPaid = isPaidPlan(plan);
