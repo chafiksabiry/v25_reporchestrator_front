@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CreditCard, ArrowLeft, Loader } from 'lucide-react';
+import { CreditCard, ArrowLeft, Loader, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import { getAgentPlan, refreshOnboardingStatus } from '../../services/apiConfig';
@@ -12,6 +12,9 @@ function Subscription() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
+  const [activePlanName, setActivePlanName] = useState<string | undefined>();
+  const [subscriptionComplete, setSubscriptionComplete] = useState(false);
+  const [continuing, setContinuing] = useState(false);
   const [agentId, setAgentId] = useState<string | undefined>();
   const [customerEmail, setCustomerEmail] = useState<string | undefined>();
 
@@ -31,6 +34,9 @@ function Subscription() {
         const planData = await getAgentPlan(userData.agentId);
         if (planData?.plan?._id) {
           setCurrentPlanId(String(planData.plan._id));
+          if (planData.plan.name) {
+            setActivePlanName(String(planData.plan.name));
+          }
         }
 
         const userProgress = await progressService.getUserProgress();
@@ -51,19 +57,34 @@ function Subscription() {
     void initialize();
   }, []);
 
-  const handleSubscribed = useCallback(async () => {
+  const handlePlanSubscribed = useCallback(
+    (plan?: { _id: string; name: string }) => {
+      if (plan) {
+        setCurrentPlanId(String(plan._id));
+        setActivePlanName(plan.name);
+      }
+      setSubscriptionComplete(true);
+      toast.success(
+        plan ? `Formule « ${plan.name} » activée` : 'Abonnement activé'
+      );
+    },
+    []
+  );
+
+  const handleContinueOnboarding = useCallback(async () => {
     const userData = config.getUserData();
     if (!userData.agentId) return;
 
+    setContinuing(true);
     try {
       await refreshOnboardingStatus(userData.agentId);
       await progressService.updatePhaseStatus(4, 'completed');
-      toast.success('Abonnement activé — onboarding mis à jour.');
       navigate('/orchestrator');
     } catch (err) {
       console.error('Post-subscription onboarding update failed:', err);
-      toast.success('Abonnement activé.');
       navigate('/orchestrator');
+    } finally {
+      setContinuing(false);
     }
   }, [navigate]);
 
@@ -106,14 +127,40 @@ function Subscription() {
             <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
               Paiement sécurisé via Stripe — restez sur HARX
             </p>
+            {activePlanName && (
+              <p className="mt-1 text-sm font-bold text-green-600">
+                Votre formule : {activePlanName}
+              </p>
+            )}
           </div>
         </div>
+
+        {subscriptionComplete && (
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+              <p className="text-sm font-bold text-green-800">
+                {activePlanName
+                  ? `« ${activePlanName} » est maintenant votre formule active.`
+                  : 'Votre abonnement est activé.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleContinueOnboarding()}
+              disabled={continuing}
+              className="shrink-0 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-black text-white transition hover:bg-green-700 disabled:opacity-60"
+            >
+              {continuing ? 'Mise à jour…' : 'Continuer l’onboarding'}
+            </button>
+          </div>
+        )}
 
         <EmbeddedRepSubscriptionFlow
           agentId={agentId}
           customerEmail={customerEmail}
           currentPlanId={currentPlanId}
-          onSubscribed={() => void handleSubscribed()}
+          onSubscribed={handlePlanSubscribed}
         />
       </div>
     </div>
