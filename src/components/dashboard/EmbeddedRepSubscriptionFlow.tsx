@@ -27,7 +27,7 @@ interface Props {
   agentId?: string;
   customerEmail?: string;
   currentPlanId?: string;
-  onSubscribed?: () => void;
+  onSubscribed?: (plan?: ApiPlan) => void;
 }
 
 const FALLBACK_PUBLIC_KEY =
@@ -152,7 +152,7 @@ export function EmbeddedRepSubscriptionFlow({
       try {
         await updateProfilePlan(agentId, plan._id);
         setActivePlanId(plan._id);
-        onSubscribed?.();
+        onSubscribed?.(plan);
       } catch (err: unknown) {
         const axiosErr = err as {
           response?: { data?: { message?: string; errors?: string[] } };
@@ -247,7 +247,7 @@ export function EmbeddedRepSubscriptionFlow({
       if (selectedPlan) {
         setActivePlanId(selectedPlan._id);
       }
-      onSubscribed?.();
+      onSubscribed?.(selectedPlan ?? undefined);
     } catch (err: unknown) {
       const axiosErr = err as {
         response?: { data?: { message?: string; error?: string } };

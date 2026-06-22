@@ -159,6 +159,27 @@ export const ProfileView: React.FC<{
       /* ignore */
     }
   }, [profile?._id]);
+
+  const handlePlanSubscribed = useCallback(
+    (activatedPlan?: { _id: string; name: string; price?: number }) => {
+      if (activatedPlan && profile?._id) {
+        setPlanData((prev) => ({
+          _id: prev?._id || String(profile._id),
+          userId: prev?.userId || String(profile.userId || ''),
+          plan: {
+            _id: activatedPlan._id,
+            name: activatedPlan.name,
+            price: activatedPlan.price ?? prev?.plan?.price ?? 0,
+            targetUserType: 'representative',
+            createdAt: prev?.plan?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+      }
+      void closePlanModal();
+    },
+    [closePlanModal, profile?._id, profile?.userId]
+  );
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [publicInfoDraft, setPublicInfoDraft] = useState({
     country: '',
@@ -1426,7 +1447,7 @@ export const ProfileView: React.FC<{
                 agentId={profile?._id ? String(profile._id) : undefined}
                 customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
                 currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
-                onSubscribed={() => void closePlanModal()}
+                onSubscribed={handlePlanSubscribed}
               />
             </div>
           </div>
