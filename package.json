@@ -19,6 +19,8 @@
     "@heroicons/react": "^2.2.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "@supabase/supabase-js": "^2.39.7",
     "@tensorflow/tfjs": "^4.17.0",
     "@vladmandic/face-api": "^1.7.15",

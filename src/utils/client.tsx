@@ -369,6 +369,14 @@ export const profileApi = {
   updatePlan: (profileId: string, planId: string) => repApiClient.put(`/api/profiles/${profileId}/plan`, { planId }),
   getRepresentativePlans: () => repApiClient.get('/api/profiles/plans/representative'),
   getRepStripeConfig: () => repApiClient.get('/api/stripe/rep/config'),
+  initRepSubscriptionCheckout: (body: {
+    agentId: string;
+    priceId: string;
+    planId: string;
+    customerEmail?: string;
+  }) => repApiClient.post('/api/stripe/subscriptions/checkout/init', body),
+  confirmRepSubscriptionCheckout: (body: { sessionId: string }) =>
+    repApiClient.post('/api/stripe/subscriptions/checkout/confirm', body),
 };
 
 // Export the API client for direct use
