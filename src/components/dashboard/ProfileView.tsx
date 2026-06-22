@@ -25,7 +25,7 @@ import { LanguagesTab } from './profile/tabs/LanguagesTab';
 import { OnboardingTab } from './profile/tabs/OnboardingTab';
 import { SpecializationTab } from './profile/tabs/SpecializationTab';
 import { AvailabilityTab } from './profile/tabs/AvailabilityTab';
-import { StripeRepPricingTable } from './StripeRepPricingTable';
+import { EmbeddedRepSubscriptionFlow } from './EmbeddedRepSubscriptionFlow';
 
 // Shared Interface Redefinitions (if needed by tabs)
 export interface AssessmentResults {
@@ -1396,7 +1396,7 @@ export const ProfileView: React.FC<{
         </div>
       )}
 
-      {/* Plan Selection Modal — Stripe Pricing Table */}
+      {/* Plan Selection Modal — embedded Stripe (no redirect) */}
       {isPlanModalOpen && (
         <div
           className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
@@ -1410,7 +1410,7 @@ export const ProfileView: React.FC<{
               <div>
                 <h3 className="text-lg font-black text-harx-900">Select Representative Plan</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Abonnement sécurisé via Stripe — choisissez votre formule ci-dessous.
+                  Paiement sécurisé via Stripe — restez sur HARX, sans redirection.
                 </p>
               </div>
               <button
@@ -1422,9 +1422,11 @@ export const ProfileView: React.FC<{
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-              <StripeRepPricingTable
+              <EmbeddedRepSubscriptionFlow
                 agentId={profile?._id ? String(profile._id) : undefined}
                 customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
+                currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
+                onSubscribed={() => void closePlanModal()}
               />
             </div>
           </div>
