@@ -333,12 +333,12 @@ export async function fetchActiveScriptForGig(gigId: string): Promise<GigScriptP
   const api = knowledgeBaseApiRoot();
   if (!api) return null;
   try {
-    const res = await fetch(`${api}/scripts/gig/${encodeURIComponent(gid)}`);
+    const res = await fetch(`${api}/scripts/gig/${encodeURIComponent(gid)}?active=true`);
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: GigScriptPayload[] };
     const scripts = Array.isArray(json.data) ? json.data : [];
     if (scripts.length === 0) return null;
-    return scripts.find((s) => s.isActive !== false) || scripts[0];
+    return scripts.find((s) => s.isActive) || null;
   } catch {
     return null;
   }
