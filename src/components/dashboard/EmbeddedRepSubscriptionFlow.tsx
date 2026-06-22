@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -17,7 +17,7 @@ interface ApiPlan {
   _id: string;
   name: string;
   price: number;
-  currency: string;
+  currency?: string;
   stripePriceId?: string;
   description?: string;
   features?: string[];
@@ -45,8 +45,12 @@ function formatPrice(amount: number, currency: string): string {
   }
 }
 
-function isFreePlan(plan: ApiPlan): boolean {
-  return !plan.stripePriceId || plan.price <= 0;
+function requiresStripeCheckout(plan: ApiPlan): boolean {
+  return Boolean(plan.stripePriceId?.trim());
+}
+
+function isPaidPlan(plan: ApiPlan): boolean {
+  return plan.price > 0;
 }
 
 export function EmbeddedRepSubscriptionFlow({
@@ -150,8 +154,13 @@ export function EmbeddedRepSubscriptionFlow({
         setActivePlanId(plan._id);
         onSubscribed?.();
       } catch (err: unknown) {
+        const axiosErr = err as {
+          response?: { data?: { message?: string; errors?: string[] } };
+          message?: string;
+        };
         const message =
-          (err as { message?: string })?.message ||
+          axiosErr?.response?.data?.errors?.[0] ||
+          axiosErr?.response?.data?.message ||
           (err instanceof Error ? err.message : 'Activation du plan gratuite impossible');
         setInitError(message);
       } finally {
@@ -161,14 +170,14 @@ export function EmbeddedRepSubscriptionFlow({
     [agentId, onSubscribed]
   );
 
-  const openPaidCheckout = useCallback(
+  const openStripeCheckout = useCallback(
     async (plan: ApiPlan) => {
       if (!agentId) {
         setInitError('Profil représentant introuvable — rechargez la page.');
         return;
       }
       if (!plan.stripePriceId) {
-        setInitError('Ce plan payant n’a pas de prix Stripe configuré.');
+        setInitError('Ce plan n’a pas de prix Stripe configuré.');
         return;
       }
 
@@ -213,13 +222,17 @@ export function EmbeddedRepSubscriptionFlow({
   const handlePlanAction = useCallback(
     async (plan: ApiPlan) => {
       if (String(activePlanId) === String(plan._id)) return;
-      if (isFreePlan(plan)) {
+      if (requiresStripeCheckout(plan)) {
+        await openStripeCheckout(plan);
+        return;
+      }
+      if (plan.price <= 0) {
         await activateFreePlan(plan);
         return;
       }
-      await openPaidCheckout(plan);
+      setInitError('Ce plan payant doit être configuré dans Stripe.');
     },
-    [activePlanId, activateFreePlan, openPaidCheckout]
+    [activePlanId, activateFreePlan, openStripeCheckout]
   );
 
   const handleStripeComplete = useCallback(async () => {
@@ -288,7 +301,7 @@ export function EmbeddedRepSubscriptionFlow({
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {plans.map((plan) => {
           const isCurrent = String(activePlanId) === String(plan._id);
-          const isPaid = !isFreePlan(plan);
+          const isPaid = isPaidPlan(plan);
           const isBusy =
             (initLoading && selectedPlan?._id === plan._id) ||
             activatingFreePlanId === plan._id;
