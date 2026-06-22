@@ -33,7 +33,7 @@ interface Props {
 const FALLBACK_PUBLIC_KEY =
   'pk_live_51TCj3DPJXYVCMk8pTo20zxqkRKZSes7sCY6TJjSYdXqNEjCSvrsbtprRhy52KoggYnNpiJi0se31LuahqFLqN9Ex00kbTYXVSK';
 
-function formatPrice(amount: number, currency: string): string {
+function formatPrice(amount: number, currency?: string): string {
   try {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
