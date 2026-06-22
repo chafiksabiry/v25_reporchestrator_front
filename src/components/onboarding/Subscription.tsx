@@ -124,9 +124,6 @@ function Subscription() {
             <h2 className="text-2xl font-black tracking-tight text-slate-900">
               Choisissez votre formule
             </h2>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-              Paiement sécurisé via Stripe — restez sur HARX
-            </p>
             {activePlanName && (
               <p className="mt-1 text-sm font-bold text-green-600">
                 Votre formule : {activePlanName}
