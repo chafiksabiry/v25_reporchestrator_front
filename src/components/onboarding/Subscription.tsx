@@ -1,273 +1,120 @@
-import React, { useEffect, useState } from 'react';
-import { CreditCard, Check, X, ArrowLeft, Loader } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { CreditCard, ArrowLeft, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAgentPlan, updateAgentPlan, getRepresentativePlans } from '../../services/apiConfig';
+import { toast, Toaster } from 'react-hot-toast';
+import { getAgentPlan, refreshOnboardingStatus } from '../../services/apiConfig';
 import config from '../../config';
 import progressService from '../../services/progressService';
-import { toast, Toaster } from 'react-hot-toast';
-
-interface Plan {
-  id: string;
-  name: string;
-  price: string;
-  isActive: boolean;
-  features: string[];
-}
+import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptionFlow';
 
 function Subscription() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPlan, setCurrentPlan] = useState<any>(null);
-  const [activatingPlanId, setActivatingPlanId] = useState<string | null>(null);
-  const [isPhaseCompleted, setIsPhaseCompleted] = useState(false);
-
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
+  const [agentId, setAgentId] = useState<string | undefined>();
+  const [customerEmail, setCustomerEmail] = useState<string | undefined>();
 
   useEffect(() => {
-    const initializeComponent = async () => {
+    const initialize = async () => {
       try {
         setLoading(true);
-        
-        // Check if Phase 4 is already completed
-        const userProgress = await progressService.getUserProgress();
-        const isCompleted = userProgress.completedPhaseIds.includes(4);
-        setIsPhaseCompleted(isCompleted);
-        console.log('🔍 Phase 4 - Initial status check:', {
-          isCompleted,
-          currentPhase: userProgress.inProgressPhaseId,
-          completedPhases: userProgress.completedPhaseIds
-        });
-
-        // Fetch current plan
         const userData = config.getUserData();
+        if (!userData.agentId) {
+          setError('Profil représentant introuvable. Reconnectez-vous.');
+          return;
+        }
+
+        setAgentId(userData.agentId);
+        setCustomerEmail(String(userData.email || '').trim() || undefined);
+
         const planData = await getAgentPlan(userData.agentId);
-        setCurrentPlan(planData.plan || {});
-        console.log('🔍 Phase 4 - Current plan data:', {
-          hasPlan: !!planData.plan?._id,
-          planId: planData.plan?._id || 'No plan'
-        });
+        if (planData?.plan?._id) {
+          setCurrentPlanId(String(planData.plan._id));
+        }
 
-        // Fetch representative plans
-        const fetchedPlans = await getRepresentativePlans();
-        const formattedPlans = fetchedPlans.map((p: any) => {
-          return {
-            id: p._id,
-            name: p.name,
-            price: `$${p.price}`,
-            isActive: true,
-            features: p.features && p.features.length > 0 ? p.features : [
-              'Access to basic REPS platform features',
-              'Limited marketplace access',
-              'Basic skills assessment'
-            ]
-          };
-        });
-        setPlans(formattedPlans);
-
-        // If not completed, mark the "Review plans" action as completed
-        if (!isCompleted) {
-          try {
-            console.log('📝 Phase 4 - Checking phase status for "Review plans" action');
-            
-            // Ensure phase is in progress
-            if (!userProgress.completedPhaseIds.includes(4) && 
-                userProgress.inProgressPhaseId !== 4) {
-              console.log('📝 Phase 4 - Setting phase to in-progress');
-              await progressService.updatePhaseStatus(4, 'in-progress');
-            }
-            
-            // Mark "Review plans" action as completed (index 0)
-            console.log('📝 Phase 4 - Marking "Review plans" action as completed');
-            await progressService.syncPhaseProgress(4, 2, 0); // 2 required, 0 optional
-            
-            // Get updated progress to confirm
-            const updatedProgress = await progressService.getUserProgress();
-            console.log('✅ Phase 4 - Progress after marking review action:', {
-              phase4Actions: updatedProgress.completedActions[4] || [],
-              phaseStatus: updatedProgress.completedPhaseIds.includes(4) ? 'completed' : 'in-progress'
-            });
-          } catch (err) {
-            console.error('❌ Phase 4 - Error updating review plans action:', err);
-          }
+        const userProgress = await progressService.getUserProgress();
+        if (
+          !userProgress.completedPhaseIds.includes(4) &&
+          userProgress.inProgressPhaseId !== 4
+        ) {
+          await progressService.updatePhaseStatus(4, 'in-progress');
         }
       } catch (err) {
-        console.error('❌ Phase 4 - Error in initialization:', err);
-        setError('Failed to load subscription information');
+        console.error('Subscription onboarding init failed:', err);
+        setError('Impossible de charger les formules d’abonnement.');
       } finally {
         setLoading(false);
       }
     };
 
-    initializeComponent();
+    void initialize();
   }, []);
 
-  const handlePlanSelection = async (planId: string) => {
+  const handleSubscribed = useCallback(async () => {
+    const userData = config.getUserData();
+    if (!userData.agentId) return;
+
     try {
-      setActivatingPlanId(planId);
-      const userData = config.getUserData();
-      
-      console.log('📝 Phase 4 - Attempting plan activation:', {
-        planId,
-        agentId: userData.agentId
-      });
-
-      const response = await updateAgentPlan(userData.agentId, planId);
-      console.log('🔍 Phase 4 - Plan activation response:', response);
-
-      if (response && response.plan) {
-        setCurrentPlan({ _id: planId });
-        
-        try {
-          console.log('📝 Phase 4 - Plan activated, marking phase as completed');
-          
-          // Get current progress before update
-          const beforeProgress = await progressService.getUserProgress();
-          console.log('🔍 Phase 4 - Progress before completion:', {
-            completedActions: beforeProgress.completedActions[4] || [],
-            phaseStatus: beforeProgress.completedPhaseIds.includes(4) ? 'completed' : 'in-progress'
-          });
-
-          // Mark the phase as completed since both actions are now done
-          await progressService.updatePhaseStatus(4, 'completed');
-          setIsPhaseCompleted(true);
-
-          // Get updated progress to confirm
-          const afterProgress = await progressService.getUserProgress();
-          console.log('✅ Phase 4 - Final progress after completion:', {
-            completedActions: afterProgress.completedActions[4] || [],
-            phaseStatus: afterProgress.completedPhaseIds.includes(4) ? 'completed' : 'in-progress',
-            allCompletedPhases: afterProgress.completedPhaseIds
-          });
-
-          // Show success message
-          const selectedPlan = plans.find(p => p.id === planId);
-          toast.success(`${selectedPlan?.name || 'Plan'} activated successfully!`);
-
-          // Navigate back to the onboarding dashboard to continue
-          setTimeout(() => {
-            console.log('➡️ Phase 4 - Navigating back to onboarding');
-            navigate('/orchestrator');
-          }, 1500);
-
-        } catch (err) {
-          console.error('❌ Phase 4 - Error marking phase as completed:', err);
-          // Don't show error toast here as the plan was successfully activated
-          // Just log the error for debugging
-        }
-      } else {
-        console.warn('⚠️ Phase 4 - Plan activation response invalid:', response);
-        toast.error('Error activating plan. Please try again.');
-      }
+      await refreshOnboardingStatus(userData.agentId);
+      await progressService.updatePhaseStatus(4, 'completed');
+      toast.success('Abonnement activé — onboarding mis à jour.');
+      navigate('/orchestrator');
     } catch (err) {
-      console.error('❌ Phase 4 - Error in plan activation:', err);
-      toast.error('Failed to activate plan. Please try again.');
-      setError('Failed to activate plan. Please try again.');
-    } finally {
-      setActivatingPlanId(null);
+      console.error('Post-subscription onboarding update failed:', err);
+      toast.success('Abonnement activé.');
+      navigate('/orchestrator');
     }
-  };
+  }, [navigate]);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="flex h-64 items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-harx-500" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl">
       <Toaster position="top-right" />
-      
-      <button 
+
+      <button
+        type="button"
         onClick={() => navigate('/orchestrator')}
-        className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+        className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
       >
-        <ArrowLeft className="w-5 h-5 mr-2" />
-        Back to Dashboard
+        <ArrowLeft className="mr-2 h-5 w-5" />
+        Retour à l’onboarding
       </button>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           {error}
         </div>
       )}
 
-      <div className="bg-white shadow-sm rounded-lg p-6">
-        <div className="flex items-center mb-6">
-          <CreditCard className="w-8 h-8 text-blue-600 mr-3" />
-          <h2 className="text-2xl font-bold text-gray-900">Choose Your Plan</h2>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan, index) => {
-            const isCurrentPlan = currentPlan?._id === plan.id;
-            const isActivating = activatingPlanId === plan.id;
-            
-            return (
-              <div 
-                key={index} 
-                className={`border rounded-lg p-6 h-full flex flex-col ${
-                  plan.isActive 
-                    ? 'bg-blue-50 border-blue-200' 
-                    : 'bg-gray-50 border-gray-200 opacity-75'
-                }`}
-              >
-                {/* Header section - fixed height for alignment */}
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-semibold h-7 flex items-center justify-center">{plan.name}</h3>
-                  <div className="mt-2 h-12 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-blue-600">{plan.price}</span>
-                    <span className="text-gray-600">/month</span>
-                  </div>
-                </div>
-
-                {/* Features section - flexible height */}
-                <div className="space-y-3 mb-6 flex-grow">
-                  {plan.features.map((feature, featureIndex) => (
-                    <div key={featureIndex} className="flex items-start">
-                      <Check className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Button section - fixed at bottom */}
-                <div className="mt-auto">
-                  <button 
-                    onClick={() => plan.isActive && !isCurrentPlan && handlePlanSelection(plan.id)}
-                    className={`w-full py-2 px-4 rounded-md transition-colors h-10 ${
-                      !plan.isActive
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : isCurrentPlan
-                        ? 'bg-green-600 text-white cursor-default'
-                        : 'bg-harx-600 text-white hover:bg-harx-700'
-                    }`}
-                    disabled={!plan.isActive || isCurrentPlan || isActivating}
-                  >
-                    {isActivating ? (
-                      <span className="flex items-center justify-center">
-                        <Loader className="w-4 h-4 animate-spin mr-2" />
-                        Activating...
-                      </span>
-                    ) : isCurrentPlan ? (
-                      'Already Activated'
-                    ) : !plan.isActive ? (
-                      'Coming Soon'
-                    ) : (
-                      'Select Plan'
-                    )}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-harx-50 text-harx-500">
+            <CreditCard className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-slate-900">
+              Choisissez votre formule
+            </h2>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+              Paiement sécurisé via Stripe — restez sur HARX
+            </p>
+          </div>
         </div>
 
-        <div className="mt-8 bg-gray-50 rounded-lg p-4 text-center text-gray-600 text-sm">
-          <p>Need help choosing the right plan? Contact our support team for guidance.</p>
-        </div>
+        <EmbeddedRepSubscriptionFlow
+          agentId={agentId}
+          customerEmail={customerEmail}
+          currentPlanId={currentPlanId}
+          onSubscribed={() => void handleSubscribed()}
+        />
       </div>
     </div>
   );
