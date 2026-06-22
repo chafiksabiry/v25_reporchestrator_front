@@ -1430,9 +1430,6 @@ export const ProfileView: React.FC<{
             <div className="shrink-0 px-5 py-4 border-b border-harx-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-harx-900">Select Representative Plan</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Paiement sécurisé via Stripe — restez sur HARX, sans redirection.
-                </p>
               </div>
               <button
                 type="button"
