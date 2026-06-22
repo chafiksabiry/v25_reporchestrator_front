@@ -59,16 +59,17 @@ export function useGigScript(gigId?: string) {
             : 'https://v25knowledgebasebackend-production.up.railway.app/api';
         }
 
-        console.log(`[useGigScript] Fetching collection scripts for gig ${normalizedGigId} from ${apiUrl}/scripts/gig/${normalizedGigId}`);
+        console.log(`[useGigScript] Fetching active script for gig ${normalizedGigId} from ${apiUrl}/scripts/gig/${normalizedGigId}?active=true`);
 
         const response = await axios.get<{ success: boolean; data: GigScript[] }>(
-          `${apiUrl}/scripts/gig/${normalizedGigId}`,
+          `${apiUrl}/scripts/gig/${normalizedGigId}?active=true`,
           { headers }
         );
 
         if (response.data.success) {
-          console.log(`[useGigScript] Successfully found ${response.data.data.length} scripts in collection.`);
-          setScripts(response.data.data);
+          const activeOnly = (response.data.data || []).filter((s) => s.isActive);
+          console.log(`[useGigScript] Active script loaded: ${activeOnly.length > 0 ? 'yes' : 'none'}.`);
+          setScripts(activeOnly);
         } else {
           setError('Failed to fetch scripts');
         }
@@ -83,7 +84,7 @@ export function useGigScript(gigId?: string) {
     fetchScripts();
   }, [gigId]);
 
-  const activeScript = scripts.find(s => s.isActive) || scripts[0];
+  const activeScript = scripts.find((s) => s.isActive) || null;
 
   return { scripts, activeScript, loading, error };
 }
