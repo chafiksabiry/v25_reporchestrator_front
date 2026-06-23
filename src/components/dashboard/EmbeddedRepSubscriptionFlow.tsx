@@ -395,10 +395,10 @@ export function EmbeddedRepSubscriptionFlow({
                   </div>
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-black tracking-tight text-slate-900">
-                      Paiement sécurisé
+                      Secure checkout
                     </h2>
                     <p className="truncate text-xs font-bold text-slate-500">
-                      {selectedPlan.name} — {formatPrice(selectedPlan.price, selectedPlan.currency)} / mois
+                      {selectedPlan.name} — {formatPrice(selectedPlan.price, selectedPlan.currency)} / month
                     </p>
                   </div>
                 </div>
