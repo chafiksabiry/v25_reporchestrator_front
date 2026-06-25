@@ -63,7 +63,7 @@ export interface LanguageVideoModalProps {
 }
 
 const MAX_DURATION = 180; // 3 min max
-const MIN_DURATION = 90; // 1 min 30 minimum
+const MIN_DURATION = 30; // 30 s minimum
 const ABSENCE_THREAT_TICKS = 2;
 const ABSENCE_CUT_TICKS = 4;
 
@@ -114,6 +114,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
   const [elapsed, setElapsed] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeElapsed, setAnalyzeElapsed] = useState(0);
+  const analyzeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [result, setResult] = useState<AnalysisPayload | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [savedFlag, setSavedFlag] = useState(false);
@@ -234,8 +236,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     if (elapsed < MIN_DURATION && !faceAbsenceInvalid) {
       setAnalyzeError(
         isFr
-          ? `Durée invalide (${formatTime(elapsed)}). L’enregistrement doit durer entre 1 min 30 et 3 min.`
-          : `Invalid duration (${formatTime(elapsed)}). Recording must be between 1:30 and 3 minutes.`
+          ? `Durée invalide (${formatTime(elapsed)}). L’enregistrement doit durer entre ${formatTime(MIN_DURATION)} et 3 min.`
+          : `Invalid duration (${formatTime(elapsed)}). Recording must be between ${formatTime(MIN_DURATION)} and 3 minutes.`
       );
       return;
     }
@@ -251,6 +253,15 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
 
     setAnalyzing(true);
     setAnalyzeError(null);
+    setAnalyzeElapsed(0);
+    if (analyzeTimerRef.current) clearInterval(analyzeTimerRef.current);
+    analyzeTimerRef.current = setInterval(() => {
+      setAnalyzeElapsed((s) => s + 1);
+    }, 1000);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 6 * 60 * 1000);
+
     try {
       const token = localStorage.getItem('token');
       const formData = new FormData();
@@ -264,6 +275,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -279,9 +291,21 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
         onAnalysisComplete?.();
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Analysis failed';
+      const aborted = err instanceof Error && err.name === 'AbortError';
+      const message = aborted
+        ? (isFr
+            ? 'L’analyse a pris trop de temps. Réessayez dans quelques instants ou avec une connexion plus stable.'
+            : 'Analysis timed out. Please try again in a moment or on a more stable connection.')
+        : err instanceof Error
+          ? err.message
+          : 'Analysis failed';
       setAnalyzeError(message);
     } finally {
+      window.clearTimeout(timeoutId);
+      if (analyzeTimerRef.current) {
+        clearInterval(analyzeTimerRef.current);
+        analyzeTimerRef.current = null;
+      }
       setAnalyzing(false);
     }
   };
@@ -369,8 +393,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                       ? `${formatTime(timeRemaining)} restantes`
                       : `${formatTime(timeRemaining)} left`
                     : isFr
-                      ? `Min 1:30 · ${formatTime(timeUntilMin)}`
-                      : `Min 1:30 · ${formatTime(timeUntilMin)}`}
+                      ? `Min ${formatTime(MIN_DURATION)} · ${formatTime(timeUntilMin)}`
+                      : `Min ${formatTime(MIN_DURATION)} · ${formatTime(timeUntilMin)}`}
                 </div>
               )}
 
@@ -398,8 +422,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <>
                   <p className="text-xs text-slate-400 text-center leading-relaxed">
                     {isFr
-                      ? `Parlez en ${languageName} entre 1 min 30 et 3 min. Présentez-vous — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
-                      : `Speak in ${languageName} between 1:30 and 3 minutes. Introduce yourself — AI will verify the language and ${expectedProficiency} level.`}
+                      ? `Parlez en ${languageName} entre ${formatTime(MIN_DURATION)} et 3 min. Présentez-vous — l’IA vérifie la langue et le niveau ${expectedProficiency}.`
+                      : `Speak in ${languageName} between ${formatTime(MIN_DURATION)} and 3 minutes. Introduce yourself — AI will verify the language and ${expectedProficiency} level.`}
                   </p>
                   <button
                     onClick={startRecording}
@@ -417,11 +441,11 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                   <p className="text-[11px] text-center font-semibold text-slate-400">
                     {canStopRecording
                       ? isFr
-                        ? 'Vous pouvez arrêter — durée valide (1 min 30 à 3 min).'
-                        : 'You can stop — valid window (1:30 to 3 min).'
+                        ? `Vous pouvez arrêter — durée valide (${formatTime(MIN_DURATION)} à 3 min).`
+                        : `You can stop — valid window (${formatTime(MIN_DURATION)} to 3 min).`
                       : isFr
-                        ? `Continuez encore ${formatTime(timeUntilMin)} pour atteindre le minimum (1 min 30).`
-                        : `Keep going ${formatTime(timeUntilMin)} more to reach the 1:30 minimum.`}
+                        ? `Continuez encore ${formatTime(timeUntilMin)} pour atteindre le minimum (${formatTime(MIN_DURATION)}).`
+                        : `Keep going ${formatTime(timeUntilMin)} more to reach the ${formatTime(MIN_DURATION)} minimum.`}
                   </p>
                   <button
                     onClick={() => stopRecording()}
@@ -469,11 +493,21 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <p className="text-sm font-black text-slate-700">
                   {isFr ? 'Analyse en cours…' : 'Analyzing…'}
                 </p>
-                <p className="text-xs text-slate-500 text-center max-w-xs">
+                <p className="text-xs text-slate-500 text-center max-w-xs leading-relaxed">
                   {isFr
                     ? `Vérification que vous parlez bien en ${languageName} au niveau ${expectedProficiency}.`
                     : `Checking that you speak ${languageName} at ${expectedProficiency} level.`}
                 </p>
+                <p className="text-[11px] text-slate-400 text-center max-w-sm leading-relaxed">
+                  {isFr
+                    ? 'Étapes : envoi vidéo → transcription audio → analyse IA (langue + identité). Comptez en général 1 à 3 minutes.'
+                    : 'Steps: upload → audio transcription → AI analysis (language + identity). Usually 1–3 minutes.'}
+                </p>
+                {analyzeElapsed > 0 && (
+                  <p className="text-[11px] font-semibold text-harx-600">
+                    {isFr ? `Temps écoulé : ${formatTime(analyzeElapsed)}` : `Elapsed: ${formatTime(analyzeElapsed)}`}
+                  </p>
+                )}
               </div>
             )}
 
@@ -577,8 +611,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <Globe className="w-12 h-12 mx-auto mb-3 opacity-40" />
                 <p className="text-sm font-semibold">
                   {isFr
-                    ? `Enregistrez entre 1 min 30 et 3 min en ${languageName} pour valider votre niveau ${expectedProficiency}.`
-                    : `Record between 1:30 and 3 minutes in ${languageName} to validate your ${expectedProficiency} level.`}
+                    ? `Enregistrez entre ${formatTime(MIN_DURATION)} et 3 min en ${languageName} pour valider votre niveau ${expectedProficiency}.`
+                    : `Record between ${formatTime(MIN_DURATION)} and 3 minutes in ${languageName} to validate your ${expectedProficiency} level.`}
                 </p>
               </div>
             )}
