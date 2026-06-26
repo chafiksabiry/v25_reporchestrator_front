@@ -4,6 +4,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 import './i18n';
+import { initVisitorTrackingScripts } from '@harx/shared/tracking/initVisitorTrackingScripts';
+
+initVisitorTrackingScripts();
 
 // Store the root instance for proper unmounting
 let root: ReturnType<typeof createRoot> | null = null;
