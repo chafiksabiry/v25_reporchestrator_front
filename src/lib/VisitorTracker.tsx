@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { buildTrackingPath } from '@harx/shared/tracking/pageMeta';
-import { syncVisitorTracking } from '@harx/shared/tracking/visitorTracking';
+import { buildTrackingPath } from '@/lib/tracking/pageMeta';
+import { syncVisitorTracking } from '@/lib/tracking/visitorTracking';
 
 export default function VisitorTracker() {
   const location = useLocation();
