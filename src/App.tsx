@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
 import { getRouterBasename } from './utils/routerBasename';
+import VisitorTracker from './lib/VisitorTracker';
 
 import OnboardingShell from './components/layout/OnboardingShell';
 import OnboardingDashboard from './components/onboarding/Dashboard';
@@ -37,6 +38,7 @@ function App() {
 
   return (
     <Router basename={getRouterBasename()}>
+      <VisitorTracker />
       <Routes>
         {/* Onboarding orchestrator (shared Sidebar + TopBar shell).
             The orchestrator home now lives at `/orchestrator` so the root `/`

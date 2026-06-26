@@ -1,31 +1,51 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>REPS Orchestrator</title>
+    <title>HARX — Portail rep</title>
+    <meta name="description" content="Gérez votre activité rep, vos gigs et vos revenus sur HARX." />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#E91E8C" />
+    <link rel="canonical" href="https://harx.ai/reps" />
+    <meta property="og:site_name" content="HARX" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://harx.ai/reps" />
+    <meta property="og:title" content="HARX — Portail rep" />
+    <meta property="og:description" content="Gérez votre activité rep, vos gigs et vos revenus sur HARX." />
+    <meta property="og:image" content="https://res.cloudinary.com/dyqg8x26j/image/upload/w_1200,f_auto,q_auto/v1782247023/HARX-color_Plan_de_travail_1_-_copie.jpg_mbnsax.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-93ZHG8LNXL"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-93ZHG8LNXL', { send_page_view: true });
+    </script>
+    <!-- Mouseflow — session replay & heatmaps -->
+    <script type="text/javascript">
+      window._mfq = window._mfq || [];
+      (function () {
+        if (document.querySelector('script[src*="cdn.mouseflow.com/projects/da6228dd"]')) return;
+        var mf = document.createElement('script');
+        mf.type = 'text/javascript';
+        mf.defer = true;
+        mf.src = 'https://cdn.mouseflow.com/projects/da6228dd-d4ca-437b-a84b-338ec23a3c34.js';
+        document.head.appendChild(mf);
+      })();
+    </script>
     <!-- Zoho SalesIQ — visitor tracking & live chat -->
     <script>
       window.$zoho = window.$zoho || {};
       $zoho.salesiq = $zoho.salesiq || { ready: function () {} };
-    </script>
-    <script
-      id="zsiqscript"
-      src="https://salesiq.zohopublic.com/widget?wc=siq1220e8ead391b873de364b43a6c31feaa7c8901cb0e74619ec1cf506af4b1e61"
-      defer
-    ></script>
-    <!-- Mouseflow — session replay & heatmaps -->
-    <script type="text/javascript">
-      window._mfq = window._mfq || [];
-      if (!document.querySelector('script[src*="cdn.mouseflow.com/projects/da6228dd"]')) {
-        (function () {
-          var mf = document.createElement('script');
-          mf.type = 'text/javascript';
-          mf.defer = true;
-          mf.src = '//cdn.mouseflow.com/projects/da6228dd-d4ca-437b-a84b-338ec23a3c34.js';
-          document.getElementsByTagName('head')[0].appendChild(mf);
-        })();
+      if (!document.getElementById('zsiqscript')) {
+        var zsiq = document.createElement('script');
+        zsiq.id = 'zsiqscript';
+        zsiq.src = 'https://salesiq.zohopublic.com/widget?wc=siq1220e8ead391b873de364b43a6c31feaa7c8901cb0e74619ec1cf506af4b1e61';
+        zsiq.defer = true;
+        document.head.appendChild(zsiq);
       }
     </script>
   </head>
