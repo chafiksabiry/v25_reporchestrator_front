@@ -260,10 +260,36 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     }, 1000);
 
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 6 * 60 * 1000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 8 * 60 * 1000);
+    const token = localStorage.getItem('token');
+    const authHeaders = { Authorization: `Bearer ${token}` };
+
+    const pollJobUntilDone = async (jobId: string): Promise<AnalysisPayload> => {
+      const pollIntervalMs = 2500;
+      const maxPolls = 160; // ~6.5 min
+      for (let attempt = 0; attempt < maxPolls; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, pollIntervalMs));
+        const statusRes = await fetch(
+          dashRepApiUrl(`/profiles/${profileId}/language/analyze-video/jobs/${jobId}`),
+          { headers: authHeaders, signal: controller.signal }
+        );
+        if (!statusRes.ok) {
+          const err = await statusRes.json().catch(() => ({}));
+          throw new Error(err.message || `Server error ${statusRes.status}`);
+        }
+        const statusJson = await statusRes.json();
+        if (statusJson.status === 'queued' || statusJson.status === 'processing') continue;
+        if (statusJson.status === 'completed' && statusJson.data) return statusJson.data as AnalysisPayload;
+        throw new Error(statusJson.message || 'Analysis failed');
+      }
+      throw new Error(
+        isFr
+          ? 'L’analyse prend plus de temps que prévu. Réessayez dans quelques instants.'
+          : 'Analysis is taking longer than expected. Please try again in a moment.'
+      );
+    };
 
     try {
-      const token = localStorage.getItem('token');
       const formData = new FormData();
       formData.append('video', new File([recordedBlob], 'language-video.webm', { type: 'video/webm' }));
       formData.append('languageName', languageName);
@@ -273,18 +299,24 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
 
       const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/language/analyze-video`), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
         body: formData,
         signal: controller.signal,
       });
 
-      if (!response.ok) {
+      let data: AnalysisPayload;
+      if (response.status === 202) {
+        const queued = await response.json();
+        if (!queued?.jobId) throw new Error(isFr ? 'Réponse serveur invalide' : 'Invalid server response');
+        data = await pollJobUntilDone(String(queued.jobId));
+      } else if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.message || `Server error ${response.status}`);
+      } else {
+        const json = await response.json();
+        data = json.data;
       }
 
-      const json = await response.json();
-      const data: AnalysisPayload = json.data;
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
@@ -292,13 +324,22 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
       }
     } catch (err: unknown) {
       const aborted = err instanceof Error && err.name === 'AbortError';
-      const message = aborted
+      let message = aborted
         ? (isFr
             ? 'L’analyse a pris trop de temps. Réessayez dans quelques instants ou avec une connexion plus stable.'
             : 'Analysis timed out. Please try again in a moment or on a more stable connection.')
         : err instanceof Error
           ? err.message
           : 'Analysis failed';
+      if (
+        message === 'Failed to fetch' ||
+        message.includes('NetworkError') ||
+        message.includes('Load failed')
+      ) {
+        message = isFr
+          ? 'Connexion interrompue par le serveur (timeout). L’analyse peut continuer côté serveur — réessayez dans 1 minute ou rafraîchissez la page.'
+          : 'Connection interrupted by the server (timeout). Analysis may still be running — retry in 1 minute or refresh the page.';
+      }
       setAnalyzeError(message);
     } finally {
       window.clearTimeout(timeoutId);
@@ -500,8 +541,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 </p>
                 <p className="text-[11px] text-slate-400 text-center max-w-sm leading-relaxed">
                   {isFr
-                    ? 'Étapes : envoi vidéo → transcription audio → analyse IA (langue + identité). Comptez en général 1 à 3 minutes.'
-                    : 'Steps: upload → audio transcription → AI analysis (language + identity). Usually 1–3 minutes.'}
+                    ? 'Étapes : envoi vidéo → transcription audio → analyse IA (langue + identité). Comptez en général 1 à 4 minutes.'
+                    : 'Steps: upload → audio transcription → AI analysis (language + identity). Usually 1–4 minutes.'}
                 </p>
                 {analyzeElapsed > 0 && (
                   <p className="text-[11px] font-semibold text-harx-600">
