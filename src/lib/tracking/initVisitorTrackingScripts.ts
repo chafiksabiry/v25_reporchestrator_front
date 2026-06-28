@@ -26,7 +26,7 @@ function appendScript(id: string | null, src: string | null, inline?: string) {
   if (id) script.id = id;
   if (src) {
     script.src = src;
-    script.defer = true;
+    script.async = true;
   }
   if (inline) script.text = inline;
   document.head.appendChild(script);
