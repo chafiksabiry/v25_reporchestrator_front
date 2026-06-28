@@ -74,11 +74,59 @@ const ROUTE_META: Array<{ test: (path: string) => boolean; meta: PageMeta }> = [
     },
   },
   {
+    test: (p) => p.startsWith('/admin/signin'),
+    meta: {
+      title: `${BASE_TITLE} — Admin · Connexion`,
+      description: 'Connexion back office HARX.',
+      canonical: `${HARX_SITE_URL}/admin/signin`,
+    },
+  },
+  {
+    test: (p) => p.startsWith('/admin/users'),
+    meta: {
+      title: `${BASE_TITLE} — Admin · Utilisateurs`,
+      description: 'Gestion des utilisateurs HARX.',
+      canonical: `${HARX_SITE_URL}/admin/users`,
+    },
+  },
+  {
+    test: (p) => p.startsWith('/admin/wallet'),
+    meta: {
+      title: `${BASE_TITLE} — Admin · Wallet`,
+      description: 'Gestion des wallets HARX.',
+      canonical: `${HARX_SITE_URL}/admin/wallet`,
+    },
+  },
+  {
+    test: (p) => p.startsWith('/admin'),
+    meta: {
+      title: `${BASE_TITLE} — Admin`,
+      description: 'Back office administrateur HARX.',
+      canonical: `${HARX_SITE_URL}/admin`,
+    },
+  },
+  {
     test: (p) => p.startsWith('/company'),
     meta: {
       title: `${BASE_TITLE} — Portail entreprise`,
       description: 'Pilotez vos opérations, reps et campagnes depuis le portail entreprise HARX.',
       canonical: `${HARX_SITE_URL}/company`,
+    },
+  },
+  {
+    test: (p) => p.includes('/reps/orchestrator') || p.includes('/reporchestrator'),
+    meta: {
+      title: `${BASE_TITLE} — Onboarding rep`,
+      description: 'Parcours d’onboarding rep HARX.',
+      canonical: `${HARX_SITE_URL}/reps/orchestrator`,
+    },
+  },
+  {
+    test: (p) => p.includes('/reps/dashboard') || p.includes('/reps/profile'),
+    meta: {
+      title: `${BASE_TITLE} — Dashboard rep`,
+      description: 'Tableau de bord rep HARX.',
+      canonical: `${HARX_SITE_URL}/reps`,
     },
   },
   {
@@ -105,13 +153,13 @@ export function normalizeTrackingPath(path: string): string {
 }
 
 export function resolvePageMeta(rawPath: string): PageMeta {
-  const path = normalizeTrackingPath(rawPath);
-  const match = ROUTE_META.find(({ test }) => test(path));
+  const full = rawPath || '/';
+  const match = ROUTE_META.find(({ test }) => test(full) || test(normalizeTrackingPath(full)));
   return (
     match?.meta ?? {
       title: BASE_TITLE,
       description: DEFAULT_PAGE_DESCRIPTION,
-      canonical: `${HARX_SITE_URL}${path === '/' ? '' : path}`,
+      canonical: `${HARX_SITE_URL}${normalizeTrackingPath(full) === '/' ? '' : normalizeTrackingPath(full)}`,
     }
   );
 }
