@@ -7,17 +7,32 @@ declare global {
     gtag?: (...args: unknown[]) => void;
     _mfq?: Array<string | string[]>;
     __harxMfPageTimer?: ReturnType<typeof setTimeout>;
+    __harxMfLastPath?: string;
+    __harxMfInitialLoadDone?: boolean;
   }
 }
 
-/** Qiankun mounts MFE DOM after route changes — delay so Mouseflow captures real UI. */
+/**
+ * Mouseflow already records the first full page load.
+ * Extra newPageView on startup creates a ~1s phantom page and ends the replay early.
+ */
 function pushMouseflowPageView(pagePath: string, title: string) {
   window._mfq = window._mfq || [];
+
+  if (!window.__harxMfInitialLoadDone) {
+    window.__harxMfInitialLoadDone = true;
+    window.__harxMfLastPath = pagePath;
+    return;
+  }
+
+  if (window.__harxMfLastPath === pagePath) return;
+  window.__harxMfLastPath = pagePath;
+
   if (window.__harxMfPageTimer) clearTimeout(window.__harxMfPageTimer);
   window.__harxMfPageTimer = setTimeout(() => {
     window._mfq?.push(['newPageView', pagePath, title]);
     window.__harxMfPageTimer = undefined;
-  }, 700);
+  }, 400);
 }
 
 function upsertMeta(name: string, content: string, attribute: 'name' | 'property' = 'name') {
