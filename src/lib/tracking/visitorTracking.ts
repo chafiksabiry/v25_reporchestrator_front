@@ -5,35 +5,13 @@ declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
-    _mfq?: Array<string | string[]>;
-    __harxMfPageTimer?: ReturnType<typeof setTimeout>;
-    __harxMfLastPath?: string;
-    __harxMfInitialLoadDone?: boolean;
   }
 }
 
 /**
- * Mouseflow already records the first full page load.
- * Extra newPageView on startup creates a ~1s phantom page and ends the replay early.
+ * Mouseflow records the full session automatically on SPAs (History API).
+ * Manual newPageView() fragments replays into short clips — do not call it.
  */
-function pushMouseflowPageView(pagePath: string, title: string) {
-  window._mfq = window._mfq || [];
-
-  if (!window.__harxMfInitialLoadDone) {
-    window.__harxMfInitialLoadDone = true;
-    window.__harxMfLastPath = pagePath;
-    return;
-  }
-
-  if (window.__harxMfLastPath === pagePath) return;
-  window.__harxMfLastPath = pagePath;
-
-  if (window.__harxMfPageTimer) clearTimeout(window.__harxMfPageTimer);
-  window.__harxMfPageTimer = setTimeout(() => {
-    window._mfq?.push(['newPageView', pagePath, title]);
-    window.__harxMfPageTimer = undefined;
-  }, 400);
-}
 
 function upsertMeta(name: string, content: string, attribute: 'name' | 'property' = 'name') {
   let tag = document.querySelector(`meta[${attribute}="${name}"]`);
@@ -55,19 +33,6 @@ function upsertCanonical(href: string) {
   link.href = href;
 }
 
-export function trackPageView(path?: string): void {
-  const pagePath = path ?? buildTrackingPath();
-
-  if (typeof window.gtag === 'function') {
-    window.gtag('config', GA_MEASUREMENT_ID, {
-      page_path: pagePath,
-      page_title: document.title,
-    });
-  }
-
-  pushMouseflowPageView(pagePath, document.title);
-}
-
 export function updatePageHead(meta: PageMeta): void {
   document.title = meta.title;
   upsertMeta('description', meta.description);
@@ -79,9 +44,24 @@ export function updatePageHead(meta: PageMeta): void {
   }
 }
 
-export function syncVisitorTracking(path?: string): void {
+/** Update document title + meta tags only (safe in qiankun child MFEs). */
+export function syncPageHead(path?: string): void {
   const pagePath = path ?? buildTrackingPath();
-  const meta = resolvePageMeta(pagePath);
-  updatePageHead(meta);
-  trackPageView(pagePath);
+  updatePageHead(resolvePageMeta(pagePath));
+}
+
+export function trackPageView(path?: string): void {
+  const pagePath = path ?? buildTrackingPath();
+
+  if (typeof window.gtag === 'function') {
+    window.gtag('config', GA_MEASUREMENT_ID, {
+      page_path: pagePath,
+      page_title: document.title,
+    });
+  }
+}
+
+export function syncVisitorTracking(path?: string): void {
+  syncPageHead(path);
+  trackPageView(path);
 }
