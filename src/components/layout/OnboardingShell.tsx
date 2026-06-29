@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../../contexts/NotificationsContext';
@@ -9,6 +9,8 @@ import { fetchProfileFromAPI } from '../../utils/profileUtils';
 import { getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
+import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
+import { usePageTitle } from '../../lib/tracking/usePageTitle';
 
 /**
  * Shared shell (Sidebar + TopBar) for the onboarding orchestrator pages.
@@ -16,8 +18,14 @@ import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
  * Used as a layout route: child pages render through <Outlet />.
  */
 function OnboardingShellContent() {
+  const location = useLocation();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  usePageTitle(
+    buildRepPageTitle(resolveRepTabTitle(location.pathname, location.search)),
+    'Parcours rep HARX.',
+  );
 
   useEffect(() => {
     const init = async () => {

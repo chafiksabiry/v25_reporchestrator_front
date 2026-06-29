@@ -8,6 +8,8 @@ import { fetchProfileFromAPI } from '../utils/profileUtils';
 import harxLogo from '../assets/logo_harx.png';
 import harxLogoDark from '../assets/logo-black.png';
 import mascotte from '../assets/mascotte2.png';
+import { buildRepPageTitle } from '../lib/repSections';
+import { usePageTitle } from '../lib/tracking/usePageTitle';
 
 const POWERED_BY_CAPABILITIES = [
   {
@@ -267,6 +269,13 @@ export default function ProfileRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const isEditor = location.pathname.includes('/profile-editor');
+
+  usePageTitle(
+    buildRepPageTitle(isEditor ? 'Éditeur de profil' : 'Import CV'),
+    isEditor
+      ? 'Affinez votre profil rep HARX.'
+      : 'Importez votre CV pour créer votre profil rep HARX.',
+  );
 
   const [profileData, setProfileData] = useState<ProfileRecord | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
