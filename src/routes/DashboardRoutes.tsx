@@ -31,6 +31,8 @@ import api from '../utils/client';
 import { HARX_NAVBAR_BG } from '../utils/harxBrand';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
 import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
+import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
+import { usePageTitle } from '../lib/tracking/usePageTitle';
 
 async function syncRepWalletBalance() {
   const agentId = getAgentId();
@@ -106,6 +108,11 @@ function DashboardAppContent() {
 function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
+
+  usePageTitle(
+    buildRepPageTitle(resolveRepTabTitle(location.pathname, `${location.search}${location.hash}`)),
+    'Espace rep HARX.',
+  );
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>

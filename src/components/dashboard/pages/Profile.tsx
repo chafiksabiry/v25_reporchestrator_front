@@ -8,6 +8,8 @@ import { setProfileData } from '../../../utils/authUtils';
 
 // Import Timezone type from repWizard service
 import { Timezone } from '../../../services/api/repWizard';
+import { buildRepPageTitle } from '../../../lib/repSections';
+import { usePageTitle } from '../../../lib/tracking/usePageTitle';
 
 // Define a type for your profile data - Updated to match new schema
 interface ProfileData {
@@ -151,6 +153,11 @@ export function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(window.location.search.includes('edit=true'));
   const [editInitialTab, setEditInitialTab] = useState('profile');
+
+  usePageTitle(
+    buildRepPageTitle(isEditing ? 'Modifier le profil' : 'Mon profil'),
+    isEditing ? 'Modifiez votre profil rep HARX.' : 'Consultez votre profil rep HARX.',
+  );
 
   useEffect(() => {
     const qs = location.search.startsWith('?') ? location.search.slice(1) : location.search;

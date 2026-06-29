@@ -1,3 +1,4 @@
+import { isRepPortalPath, resolveRepTabTitle, stripRepsPrefix } from '../repSections';
 import { DEFAULT_PAGE_DESCRIPTION, HARX_SITE_URL } from './constants';
 
 export type PageMeta = {
@@ -106,38 +107,6 @@ const ROUTE_META: Array<{ test: (path: string) => boolean; meta: PageMeta }> = [
     },
   },
   {
-    test: (p) => p.startsWith('/company'),
-    meta: {
-      title: `${BASE_TITLE} — Portail entreprise`,
-      description: 'Pilotez vos opérations, reps et campagnes depuis le portail entreprise HARX.',
-      canonical: `${HARX_SITE_URL}/company`,
-    },
-  },
-  {
-    test: (p) => p.includes('/reps/orchestrator') || p.includes('/reporchestrator'),
-    meta: {
-      title: `${BASE_TITLE} — Onboarding rep`,
-      description: 'Parcours d’onboarding rep HARX.',
-      canonical: `${HARX_SITE_URL}/reps/orchestrator`,
-    },
-  },
-  {
-    test: (p) => p.includes('/reps/dashboard') || p.includes('/reps/profile'),
-    meta: {
-      title: `${BASE_TITLE} — Dashboard rep`,
-      description: 'Tableau de bord rep HARX.',
-      canonical: `${HARX_SITE_URL}/reps`,
-    },
-  },
-  {
-    test: (p) => p.startsWith('/reps') || p.startsWith('/reporchestrator'),
-    meta: {
-      title: `${BASE_TITLE} — Portail rep`,
-      description: 'Gérez votre activité rep, vos gigs et vos revenus sur HARX.',
-      canonical: `${HARX_SITE_URL}/reps`,
-    },
-  },
-  {
     test: (p) => p.startsWith('/linkedin'),
     meta: {
       title: `${BASE_TITLE} — LinkedIn`,
@@ -152,8 +121,49 @@ export function normalizeTrackingPath(path: string): string {
   return pathname.replace(/\/+$/, '') || '/';
 }
 
+function extractAppPath(rawPath: string): { pathname: string; search: string } {
+  const hashIndex = rawPath.indexOf('#');
+  if (hashIndex >= 0) {
+    const afterHash = rawPath.slice(hashIndex + 1);
+    const [hashPathname, ...hashSearchParts] = afterHash.split('?');
+    if (hashPathname.startsWith('/')) {
+      return {
+        pathname: normalizeTrackingPath(hashPathname),
+        search: hashSearchParts.length ? `?${hashSearchParts.join('?')}` : '',
+      };
+    }
+  }
+
+  const withoutHash = rawPath.split('#')[0] || '/';
+  const [pathnamePart, ...searchParts] = withoutHash.split('?');
+  return {
+    pathname: normalizeTrackingPath(pathnamePart),
+    search: searchParts.length ? `?${searchParts.join('?')}` : '',
+  };
+}
+
+function resolveRepPageMeta(rawPath: string): PageMeta | null {
+  const { pathname, search } = extractAppPath(rawPath);
+  if (!isRepPortalPath(pathname)) return null;
+
+  const appPath = stripRepsPrefix(pathname);
+  const sectionLabel = resolveRepTabTitle(pathname, search);
+  const canonicalPath = pathname.startsWith('/reps')
+    ? pathname
+    : `/reps${appPath === '/' ? '' : appPath}`;
+
+  return {
+    title: `${BASE_TITLE} — Rep · ${sectionLabel}`,
+    description: `Espace rep HARX — ${sectionLabel}.`,
+    canonical: `${HARX_SITE_URL}${canonicalPath}`,
+  };
+}
+
 export function resolvePageMeta(rawPath: string): PageMeta {
   const full = rawPath || '/';
+  const repMeta = resolveRepPageMeta(full);
+  if (repMeta) return repMeta;
+
   const match = ROUTE_META.find(({ test }) => test(full) || test(normalizeTrackingPath(full)));
   return (
     match?.meta ?? {
