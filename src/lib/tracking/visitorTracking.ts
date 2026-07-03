@@ -50,13 +50,22 @@ export function syncPageHead(path?: string): void {
   updatePageHead(resolvePageMeta(pagePath));
 }
 
+const BLOCKED_PAGE_TITLE = /^vite(\s*\+\s*react)?$/i;
+
+function isTrackablePageTitle(title: string): boolean {
+  const trimmed = title.trim();
+  return Boolean(trimmed) && !BLOCKED_PAGE_TITLE.test(trimmed);
+}
+
 export function trackPageView(path?: string): void {
   const pagePath = path ?? buildTrackingPath();
+  if (!isTrackablePageTitle(document.title)) return;
 
   if (typeof window.gtag === 'function') {
-    window.gtag('config', GA_MEASUREMENT_ID, {
+    window.gtag('event', 'page_view', {
       page_path: pagePath,
       page_title: document.title,
+      send_to: GA_MEASUREMENT_ID,
     });
   }
 }

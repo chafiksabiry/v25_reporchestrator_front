@@ -5,7 +5,7 @@ import App from './App';
 import './index.css';
 import './i18n';
 import { initVisitorTrackingScripts } from '@/lib/tracking/initVisitorTrackingScripts';
-import { syncPageHead } from '@/lib/tracking/visitorTracking';
+import { syncVisitorTracking } from '@/lib/tracking/visitorTracking';
 
 initVisitorTrackingScripts();
 
@@ -19,7 +19,7 @@ function render(props: { container?: HTMLElement } = {}) {
     : document.getElementById('root');
 
   if (rootElement) {
-    syncPageHead();
+    syncVisitorTracking();
     if (!root) {
       root = createRoot(rootElement as HTMLElement);
     }
