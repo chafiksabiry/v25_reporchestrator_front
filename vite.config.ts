@@ -31,7 +31,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     // Absolute base so the host (qiankun) loads chunks/assets from the
     // micro-app's own origin (local in dev, Netlify in production builds).
-    base: isDev ? 'http://localhost:5174/' : 'https://harxv25reporchestratorfront.netlify.app/',
+    base: isDev ? 'http://localhost:5174/' : 'https://harx26reporchestrator-rollback.netlify.app/',
     plugins: [
       react(),
       qiankun('reps', {
