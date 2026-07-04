@@ -632,7 +632,7 @@ export function WorkspaceContent() {
     switch (activeTab) {
       case 'voice':
         return (
-          <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-5 flex flex-col shadow-sm border border-gray-100">
+          <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 flex flex-col shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <div className="flex flex-col">
                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Leads</h2>
@@ -1010,7 +1010,7 @@ export function WorkspaceContent() {
 
       case 'video':
         return (
-          <div className="h-[600px] bg-gray-900 rounded-3xl p-8 text-white flex flex-col shadow-2xl relative overflow-hidden">
+          <div className="min-h-[420px] lg:h-[600px] bg-gray-900 rounded-3xl p-4 sm:p-8 text-white flex flex-col shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-harx-500/10 blur-[100px] -mr-32 -mt-32"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 blur-[100px] -ml-32 -mb-32"></div>
 
@@ -1044,7 +1044,7 @@ export function WorkspaceContent() {
 
       case 'email':
         return (
-          <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-3xl border border-gray-100 flex flex-col shadow-sm">
+          <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-3xl border border-gray-100 flex flex-col shadow-sm">
             <div className="p-6 border-b border-gray-100">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 px-1">Subject</label>
               <input
@@ -1080,7 +1080,7 @@ export function WorkspaceContent() {
 
       case 'calls':
         return (
-          <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-5 overflow-y-auto shadow-sm border border-gray-100">
+          <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
@@ -1091,7 +1091,7 @@ export function WorkspaceContent() {
 
       case 'social':
         return (
-          <div className="h-[600px] bg-white/80 backdrop-blur-md rounded-3xl border border-gray-100 flex flex-col shadow-sm">
+          <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-3xl border border-gray-100 flex flex-col shadow-sm">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/10 rounded-t-3xl text-[10px] font-black uppercase tracking-widest">
               <div className="flex space-x-4">
                 <select className="bg-white border border-gray-100 rounded-xl px-4 py-2 text-gray-500 focus:outline-none focus:ring-2 focus:ring-harx-500 transition-all shadow-sm">
@@ -1263,7 +1263,7 @@ export function WorkspaceContent() {
   return (
     <div className="space-y-4">
       <div className="mb-4">
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-3">{t('workspace.title')}</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight mb-3">{t('workspace.title')}</h1>
 
         {enrolledGigs.length > 0 && (
           <div className="flex flex-col items-start space-y-1 relative">
@@ -1343,7 +1343,7 @@ export function WorkspaceContent() {
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3 mb-4">
         {workspaceTools.map((tool) => (
           <button
             key={tool.id}
@@ -1360,13 +1360,13 @@ export function WorkspaceContent() {
                 search: `?${params.toString()}`
               }, { replace: true });
             }}
-            className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl transition-all duration-300 border ${activeTab === tool.id
+            className={`flex flex-col sm:flex-row items-center justify-center sm:space-x-2 px-3 sm:px-6 py-2.5 rounded-xl transition-all duration-300 border ${activeTab === tool.id
               ? 'bg-gradient-harx text-white border-transparent shadow-xl shadow-harx-500/25 -translate-y-0.5'
               : 'bg-white/50 backdrop-blur-sm text-gray-400 border-gray-100 hover:border-harx-200 hover:bg-white hover:text-harx-600 hover:shadow-lg hover:shadow-harx-500/5'
               }`}
           >
             <tool.icon className={`w-4 h-4 transition-transform duration-500 ${activeTab === tool.id ? 'text-white scale-110' : 'text-current group-hover:scale-110'}`} />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tool.label}</span>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] mt-1 sm:mt-0 text-center">{tool.label}</span>
           </button>
         ))}
       </div>

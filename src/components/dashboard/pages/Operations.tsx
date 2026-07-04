@@ -65,9 +65,9 @@ export function Operations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">{t('operations.title')}</h1>
-        <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('operations.title')}</h1>
+        <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 self-start sm:self-auto">
           {t('operations.emergencyShutdown')}
         </button>
       </div>

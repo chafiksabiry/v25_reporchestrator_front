@@ -922,7 +922,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="relative flex items-center gap-2.5">
               <Briefcase size={16} className="text-purple-600 animate-pulse" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gig :</span>
-              <div className="relative min-w-[220px] max-w-[320px]">
+              <div className="relative w-full min-w-0 sm:min-w-[220px] sm:max-w-[320px]">
                 <button
                   ref={gigTriggerRef}
                   type="button"
@@ -1013,7 +1013,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="relative flex items-center gap-2.5">
               <CalendarDays size={16} className="text-blue-600" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Période :</span>
-              <div className="relative min-w-[180px] max-w-[240px]">
+              <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[240px]">
                 <button
                   ref={periodTriggerRef}
                   type="button"
