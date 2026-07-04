@@ -49,7 +49,7 @@ interface ProfileData {
     email: string;
     phone?: string;
     languages: Array<{
-      language: string;
+      language: string | { _id: string; name?: string; code?: string };
       proficiency: string;
       iso639_1?: string;
       assessmentResults?: {
@@ -77,7 +77,8 @@ interface ProfileData {
   professionalSummary: {
     yearsOfExperience: string;
     currentRole?: string;
-    industries?: string[];
+    industries?: Array<string | { _id: string; name?: string }>;
+    activities?: Array<string | { _id: string; name?: string }>;
     keyExpertise?: string[];
     notableCompanies?: string[];
     profileDescription?: string;
@@ -120,8 +121,10 @@ interface ProfileData {
   experience: Array<{
     title: string;
     company: string;
+    role?: string;
     startDate: string;
     endDate?: string;
+    description?: string;
     responsibilities?: string[];
     achievements?: string[];
     videoUrl?: string;
@@ -492,7 +495,7 @@ export function Profile() {
       title,
       role: title,
       company,
-      startDate: item.startDate || undefined,
+      startDate: item.startDate?.trim() || '',
       endDate: item.endDate || undefined,
       description: item.description ? String(item.description).trim() : undefined,
     };
@@ -526,8 +529,8 @@ export function Profile() {
       title,
       role: title,
       company,
-      startDate: item.startDate || undefined,
-      endDate: item.endDate || undefined,
+      startDate: item.startDate?.trim() || currentExperience[index].startDate,
+      endDate: item.endDate ?? currentExperience[index].endDate,
       description: item.description ? String(item.description).trim() : undefined,
     };
 
@@ -692,8 +695,8 @@ export function Profile() {
 
   console.log('🖥️ Rendering profile view with data');
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-full bg-gray-50">
+      <div className="w-full">
         {isEditing ? (
           <ProfileEditView
             profile={profile}

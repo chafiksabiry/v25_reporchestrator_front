@@ -22,7 +22,7 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-harx-100 p-4">
-            <div className="flex items-center justify-between mb-4 px-0.5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4 px-0.5">
                 <div className="flex items-center space-x-3">
                     <div className="p-2 bg-harx-50 rounded-xl">
                         <CalendarIcon className="w-5 h-5 text-harx-600" />
@@ -61,7 +61,8 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                 </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-2.5">
+            <div className="overflow-x-auto -mx-1 px-1">
+            <div className="grid grid-cols-7 gap-2.5 min-w-[640px]">
                 {weekDays.map((day) => {
                     const isSelected = isSameDay(day, selectedDate);
                     const isToday = isSameDay(day, today);
@@ -120,6 +121,7 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                         </button>
                     );
                 })}
+            </div>
             </div>
         </div>
     );

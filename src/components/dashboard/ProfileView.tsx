@@ -1030,10 +1030,10 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="max-w-5xl mx-auto px-6 py-4 lg:px-10 lg:py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2 animate-in fade-in slide-in-from-left-4 duration-500">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2 animate-in fade-in slide-in-from-left-4 duration-500">
             {currentHeader.title}
           </h1>
           <p className="text-slate-500 font-medium tracking-tight animate-in fade-in slide-in-from-left-6 duration-700">
