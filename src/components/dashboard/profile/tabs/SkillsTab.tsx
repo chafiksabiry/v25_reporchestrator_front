@@ -65,6 +65,17 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   const technicalDropdownRef = useRef<HTMLDivElement | null>(null);
   const professionalDropdownRef = useRef<HTMLDivElement | null>(null);
   const softDropdownRef = useRef<HTMLDivElement | null>(null);
+  const skillInputRefs = useRef<Record<'technical' | 'professional' | 'soft', HTMLInputElement | null>>({
+    technical: null,
+    professional: null,
+    soft: null,
+  });
+
+  const dismissSkillSearch = (type: 'technical' | 'professional' | 'soft') => {
+    setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
+    setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
+    skillInputRefs.current[type]?.blur();
+  };
 
   useEffect(() => {
     const loadSkills = async () => {
@@ -171,6 +182,9 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     return (
       <div className="mt-3 w-full">
         <input
+          ref={(el) => {
+            skillInputRefs.current[type] = el;
+          }}
           type="text"
           value={searchTermByType[type]}
           onChange={(e) => {
@@ -197,12 +211,10 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
                   key={skill._id}
                   type="button"
                   onMouseDown={(e) => {
-                    // Fire before the input's onBlur closes the dropdown, and
-                    // keep focus so the whole row is reliably clickable.
+                    // Fire before the input's onBlur closes the dropdown.
                     e.preventDefault();
                     onAddSkill(type, skill._id);
-                    setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
-                    setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
+                    dismissSkillSearch(type);
                   }}
                   className="block w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors cursor-pointer"
                 >
