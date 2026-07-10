@@ -3,7 +3,10 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 export class PDFParser {
   constructor() {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.js',
+      import.meta.url
+    ).toString();
   }
 
   async extractText(file) {
