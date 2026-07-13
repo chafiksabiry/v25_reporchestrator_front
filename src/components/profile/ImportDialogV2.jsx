@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18nText';
 
 function ImportDialog({ isOpen, onClose, onImport }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const { createProfile } = useProfile();
   const [text, setText] = useState('');
@@ -376,7 +376,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       onImport({ ...createdProfile, generatedSummary: summaryN.active });
 
       console.log("createdProfile : ", createdProfile);
-      console.log("summary : ", summary);
+      console.log("summary : ", summaryN.active);
 
       onClose();
     } catch (err) {
