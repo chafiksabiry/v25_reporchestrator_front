@@ -60,16 +60,16 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
   const steps = [
     {
-      title: "Choose Your CV Format",
-      description: "We support PDF, DOC, DOCX, and TXT files. Make sure your CV is up-to-date and includes your key achievements."
+      title: t('profileImportDialog.step1Title', "Choose Your CV Format"),
+      description: t('profileImportDialog.step1Desc', "We support PDF, DOC, DOCX, and TXT files. Make sure your CV is up-to-date and includes your key achievements.")
     },
     {
-      title: "Review Content",
-      description: "We'll extract the important information from your CV. You can review and edit before proceeding."
+      title: t('profileImportDialog.step2Title', "Review Content"),
+      description: t('profileImportDialog.step2Desc', "We'll extract the important information from your CV. You can review and edit before proceeding.")
     },
     {
-      title: "AI Enhancement",
-      description: "Our AI will analyze your CV to create a compelling professional summary and highlight your key skills."
+      title: t('profileImportDialog.step3Title', "AI Enhancement"),
+      description: t('profileImportDialog.step3Desc', "Our AI will analyze your CV to create a compelling professional summary and highlight your key skills.")
     }
   ];
 
@@ -409,9 +409,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                 </span>
                 <div>
                   <Dialog.Title className="text-xl font-extrabold text-gray-900 leading-tight">
-                    Import your professional profile
+                    {t('profileImportDialog.title', 'Import your professional profile')}
                   </Dialog.Title>
-                  <p className="text-sm text-gray-400 mt-0.5">PDF, DOC, DOCX or TXT — up to 5MB</p>
+                  <p className="text-sm text-gray-400 mt-0.5">{t('profileImportDialog.subtitle', 'PDF, DOC, DOCX or TXT — up to 5MB')}</p>
                 </div>
               </div>
               <button
@@ -433,7 +433,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {showGuidance ? 'Hide how it works' : 'How it works'}
+              {showGuidance ? t('profileImportDialog.hideHowItWorks', 'Hide how it works') : t('profileImportDialog.howItWorks', 'How it works')}
               <svg
                 className={`h-3.5 w-3.5 transition-transform duration-200 ${showGuidance ? 'rotate-180' : ''}`}
                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -448,7 +448,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             {showGuidance && (
               <div className="mb-6 rounded-2xl bg-harx-50/70 p-5">
                 <p className="text-sm text-gray-600 mb-4">
-                  We'll guide you through creating your professional profile. Here's what to expect:
+                  {t('profileImportDialog.guidanceDesc', "We'll guide you through creating your professional profile. Here's what to expect:")}
                 </p>
                 <div className="space-y-3.5">
                   {steps.map((step, index) => (
@@ -488,8 +488,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </span>
-                    <p className="mt-3 text-lg font-semibold">CV successfully uploaded!</p>
-                    <p className="text-sm text-green-500 mt-0.5">Click to upload a different file</p>
+                    <p className="mt-3 text-lg font-semibold">{t('profileImportDialog.success', 'CV successfully uploaded!')}</p>
+                    <p className="text-sm text-green-500 mt-0.5">{t('profileImportDialog.uploadDifferent', 'Click to upload a different file')}</p>
                   </div>
                 ) : (
                   <>
@@ -498,9 +498,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </span>
-                    <p className="mt-4 text-lg font-semibold text-gray-900">Drop your CV here</p>
-                    <p className="mt-1 text-sm text-gray-500">or click to browse your files</p>
-                    <p className="text-xs text-gray-400 mt-2">Supports PDF, DOC, DOCX, TXT (max 5MB)</p>
+                    <p className="mt-4 text-lg font-semibold text-gray-900">{t('profileImportDialog.dropCV', 'Drop your CV here')}</p>
+                    <p className="mt-1 text-sm text-gray-500">{t('profileImportDialog.browseFiles', 'or click to browse your files')}</p>
+                    <p className="text-xs text-gray-400 mt-2">{t('profileImportDialog.supports', 'Supports PDF, DOC, DOCX, TXT (max 5MB)')}</p>
                   </>
                 )}
               </div>
@@ -512,7 +512,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <h3 className="text-sm font-semibold text-red-800">Error</h3>
+                      <h3 className="text-sm font-semibold text-red-800">{t('profileImportDialog.errorTitle', 'Error')}</h3>
                       <p className="text-sm text-red-700 mt-0.5">{error}</p>
                     </div>
                   </div>
@@ -528,12 +528,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                     />
                   </div>
                   <div className="flex justify-between text-sm text-gray-500">
-                    <span>Step {currentStep} of 3</span>
+                    <span>{t('profileImportDialog.stepNof3', 'Step {{currentStep}} of 3', { currentStep })}</span>
                     <span>
-                      {progress < 25 && "Preparing..."}
-                      {progress >= 25 && progress < 50 && "Analyzing CV..."}
-                      {progress >= 50 && progress < 75 && "Extracting information..."}
-                      {progress >= 75 && "Generating summary..."}
+                      {progress < 25 && t('profileImportDialog.preparing', "Preparing...")}
+                      {progress >= 25 && progress < 50 && t('profileImportDialog.analyzing', "Analyzing CV...")}
+                      {progress >= 50 && progress < 75 && t('profileImportDialog.extracting', "Extracting information...")}
+                      {progress >= 75 && t('profileImportDialog.generating', "Generating summary...")}
                     </span>
                   </div>
                   {analysisSteps.length > 0 && (
@@ -559,7 +559,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
               className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
               onClick={handleClose}
             >
-              {loading ? 'Cancel & close' : 'Cancel'}
+              {loading ? t('profileImportDialog.cancelClose', 'Cancel & close') : t('profileImportDialog.cancel', 'Cancel')}
             </button>
             {text && (
               <button
@@ -573,10 +573,10 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Processing...
+                    {t('profileImportDialog.processing', 'Processing...')}
                   </span>
                 ) : (
-                  'Generate Summary'
+                  t('profileImportDialog.generateSummary', 'Generate Summary')
                 )}
               </button>
             )}

@@ -157,5 +157,53 @@
     "modalTitle": "Sélection de projet requise",
     "modalSubtitle": "Pour accéder au COCKPIT, vous devez sélectionner un projet spécifique dans la liste déroulante de la page de Formation au lieu de \"Tous les projets\".",
     "understandButton": "Compris"
+  },
+  "profileImport": {
+    "step1": "Étape 1 · Créez votre profil",
+    "title1": "Transformez votre CV en un",
+    "title2": "profil remarquable",
+    "subtitle": "Importez votre CV et laissez notre IA construire votre histoire professionnelle, extraire vos compétences et langues — le tout en quelques secondes.",
+    "importBtn": "Importer mon CV",
+    "feat1Title": "Analyse instantanée",
+    "feat1Desc": "Votre CV est analysé en quelques secondes.",
+    "feat2Title": "Propulsé par l'IA",
+    "feat2Desc": "Résumé intelligent et correspondance des compétences.",
+    "feat3Title": "Privé & sécurisé",
+    "feat3Desc": "Vos données restent protégées.",
+    "step1Label": "Importez votre CV (PDF)",
+    "step2Label": "L'IA extrait votre profil",
+    "step3Label": "Vérifiez & enregistrez",
+    "poweredBy": "Propulsé par"
+  },
+  "profileImportDialog": {
+    "title": "Importez votre profil professionnel",
+    "subtitle": "PDF, DOC, DOCX ou TXT — jusqu'à 5 Mo",
+    "howItWorks": "Comment ça marche",
+    "hideHowItWorks": "Masquer comment ça marche",
+    "guidanceDesc": "Nous vous guiderons dans la création de votre profil professionnel. Voici à quoi vous attendre :",
+    "step1Title": "Choisissez le format de votre CV",
+    "step1Desc": "Nous prenons en charge les fichiers PDF, DOC, DOCX et TXT. Assurez-vous que votre CV est à jour et inclut vos principales réalisations.",
+    "step2Title": "Vérification du contenu",
+    "step2Desc": "Nous allons extraire les informations importantes de votre CV. Vous pourrez les vérifier et les modifier avant de continuer.",
+    "step3Title": "Amélioration par l'IA",
+    "step3Desc": "Notre IA analysera votre CV pour créer un résumé professionnel attrayant et mettre en valeur vos compétences clés.",
+    "dropCV": "Déposez votre CV ici",
+    "browseFiles": "ou cliquez pour parcourir vos fichiers",
+    "supports": "Supporte PDF, DOC, DOCX, TXT (max 5 Mo)",
+    "success": "CV téléchargé avec succès !",
+    "uploadDifferent": "Cliquez pour télécharger un autre fichier",
+    "errorTitle": "Erreur",
+    "stepNof3": "Étape {{currentStep}} sur 3",
+    "preparing": "Préparation...",
+    "analyzing": "Analyse du CV...",
+    "extracting": "Extraction des informations...",
+    "generating": "Génération du résumé...",
+    "cancelClose": "Annuler & fermer",
+    "cancel": "Annuler",
+    "processing": "Traitement en cours...",
+    "generateSummary": "Générer le résumé"
+  },
+  "auth": {
+    "verifying": "Vérification de l'authentification..."
   }
 }

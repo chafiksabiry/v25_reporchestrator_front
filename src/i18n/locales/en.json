@@ -157,5 +157,53 @@
     "modalTitle": "Project Selection Required",
     "modalSubtitle": "To access the COCKPIT, you must select a specific gig from the dropdown on the Training page instead of \"All enrolled gigs\".",
     "understandButton": "Understood"
+  },
+  "profileImport": {
+    "step1": "Step 1 · Create your profile",
+    "title1": "Turn your CV into a",
+    "title2": "standout profile",
+    "subtitle": "Upload your CV and let our AI build your professional story, extract your skills and languages — all in a few seconds.",
+    "importBtn": "Import my CV",
+    "feat1Title": "Instant analysis",
+    "feat1Desc": "Your CV is parsed in seconds.",
+    "feat2Title": "AI-powered",
+    "feat2Desc": "Smart summary & skill matching.",
+    "feat3Title": "Private & secure",
+    "feat3Desc": "Your data stays protected.",
+    "step1Label": "Upload your CV (PDF)",
+    "step2Label": "AI extracts your profile",
+    "step3Label": "Review & save",
+    "poweredBy": "Powered by"
+  },
+  "profileImportDialog": {
+    "title": "Import your professional profile",
+    "subtitle": "PDF, DOC, DOCX or TXT — up to 5MB",
+    "howItWorks": "How it works",
+    "hideHowItWorks": "Hide how it works",
+    "guidanceDesc": "We'll guide you through creating your professional profile. Here's what to expect:",
+    "step1Title": "Choose Your CV Format",
+    "step1Desc": "We support PDF, DOC, DOCX, and TXT files. Make sure your CV is up-to-date and includes your key achievements.",
+    "step2Title": "Review Content",
+    "step2Desc": "We'll extract the important information from your CV. You can review and edit before proceeding.",
+    "step3Title": "AI Enhancement",
+    "step3Desc": "Our AI will analyze your CV to create a compelling professional summary and highlight your key skills.",
+    "dropCV": "Drop your CV here",
+    "browseFiles": "or click to browse your files",
+    "supports": "Supports PDF, DOC, DOCX, TXT (max 5MB)",
+    "success": "CV successfully uploaded!",
+    "uploadDifferent": "Click to upload a different file",
+    "errorTitle": "Error",
+    "stepNof3": "Step {{currentStep}} of 3",
+    "preparing": "Preparing...",
+    "analyzing": "Analyzing CV...",
+    "extracting": "Extracting information...",
+    "generating": "Generating summary...",
+    "cancelClose": "Cancel & close",
+    "cancel": "Cancel",
+    "processing": "Processing...",
+    "generateSummary": "Generate Summary"
+  },
+  "auth": {
+    "verifying": "Verifying authentication..."
   }
 }

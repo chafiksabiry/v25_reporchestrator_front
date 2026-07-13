@@ -10,6 +10,7 @@ import harxLogoDark from '../assets/logo-black.png';
 import mascotte from '../assets/mascotte2.png';
 import { buildRepPageTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
+import { useTranslation } from 'react-i18next';
 
 const POWERED_BY_CAPABILITIES = [
   {
@@ -73,29 +74,35 @@ const IMPORT_FEATURES = [
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
     ),
-    title: 'Instant analysis',
-    desc: 'Your CV is parsed in seconds.',
+    titleKey: 'profileImport.feat1Title',
+    defaultTitle: 'Instant analysis',
+    descKey: 'profileImport.feat1Desc',
+    defaultDesc: 'Your CV is parsed in seconds.',
   },
   {
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
     ),
-    title: 'AI-powered',
-    desc: 'Smart summary & skill matching.',
+    titleKey: 'profileImport.feat2Title',
+    defaultTitle: 'AI-powered',
+    descKey: 'profileImport.feat2Desc',
+    defaultDesc: 'Smart summary & skill matching.',
   },
   {
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
     ),
-    title: 'Private & secure',
-    desc: 'Your data stays protected.',
+    titleKey: 'profileImport.feat3Title',
+    defaultTitle: 'Private & secure',
+    descKey: 'profileImport.feat3Desc',
+    defaultDesc: 'Your data stays protected.',
   },
 ];
 
 const IMPORT_STEPS = [
-  { n: 1, label: 'Upload your CV (PDF)' },
-  { n: 2, label: 'AI extracts your profile' },
-  { n: 3, label: 'Review & save' },
+  { n: 1, labelKey: 'profileImport.step1Label', defaultLabel: 'Upload your CV (PDF)' },
+  { n: 2, labelKey: 'profileImport.step2Label', defaultLabel: 'AI extracts your profile' },
+  { n: 3, labelKey: 'profileImport.step3Label', defaultLabel: 'Review & save' },
 ];
 
 function ProfileImportPage({
@@ -104,6 +111,7 @@ function ProfileImportPage({
   onImport: (data: ProfileRecord) => void;
 }) {
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div className="relative flex min-h-[calc(100vh-9.5rem)] flex-col justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-harx-50/40 to-harx-alt-50/40 shadow-sm">
@@ -147,18 +155,17 @@ function ProfileImportPage({
         <div className="flex flex-col items-center text-center py-10">
           <span className="inline-flex items-center gap-2 mb-3 text-[11px] font-bold tracking-[0.2em] uppercase text-harx-600">
           <span className="h-1.5 w-1.5 rounded-full bg-harx-500 animate-pulse" />
-          Step 1 · Create your profile
+          {t('profileImport.step1', 'Step 1 · Create your profile')}
         </span>
 
         <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2 leading-tight">
-          Turn your CV into a{' '}
+          {t('profileImport.title1', 'Turn your CV into a')}{' '}
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-harx-600 to-harx-alt-600">
-            standout profile
+            {t('profileImport.title2', 'standout profile')}
           </span>
         </h2>
         <p className="text-gray-500 max-w-lg mb-6">
-          Upload your CV and let our AI build your professional story, extract
-          your skills and languages — all in a few seconds.
+          {t('profileImport.subtitle', 'Upload your CV and let our AI build your professional story, extract your skills and languages — all in a few seconds.')}
         </p>
 
         <button
@@ -168,7 +175,7 @@ function ProfileImportPage({
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
-          Import my CV
+          {t('profileImport.importBtn', 'Import my CV')}
           <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
@@ -177,14 +184,14 @@ function ProfileImportPage({
         {/* Feature highlights — borderless */}
         <div className="mt-8 grid gap-x-8 gap-y-5 sm:grid-cols-3 w-full">
           {IMPORT_FEATURES.map((f) => (
-            <div key={f.title} className="flex flex-col items-center text-center">
+            <div key={f.titleKey} className="flex flex-col items-center text-center">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-harx-50 text-harx-600 mb-2">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {f.icon}
                 </svg>
               </span>
-              <p className="text-sm font-semibold text-gray-900">{f.title}</p>
-              <p className="text-xs text-gray-500 mt-0.5 max-w-[14rem]">{f.desc}</p>
+              <p className="text-sm font-semibold text-gray-900">{t(f.titleKey, f.defaultTitle)}</p>
+              <p className="text-xs text-gray-500 mt-0.5 max-w-[14rem]">{t(f.descKey, f.defaultDesc)}</p>
             </div>
           ))}
         </div>
@@ -196,7 +203,7 @@ function ProfileImportPage({
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
                 {s.n}
               </span>
-              <span className="text-sm font-medium text-gray-600">{s.label}</span>
+              <span className="text-sm font-medium text-gray-600">{t(s.labelKey, s.defaultLabel)}</span>
               {i < IMPORT_STEPS.length - 1 && (
                 <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -209,7 +216,7 @@ function ProfileImportPage({
         {/* Powered by — platform capabilities */}
         <div className="mt-10 w-full">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">
-            Powered by
+            {t('profileImport.poweredBy', 'Powered by')}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
             {POWERED_BY_CAPABILITIES.map((cap) => (
