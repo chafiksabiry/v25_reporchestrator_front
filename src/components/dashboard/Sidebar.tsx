@@ -263,10 +263,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             </div>
 
             <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-white/75">
-              {t(
-                'cvGuide.mascotte',
-                "Salut ! Je suis votre assistant HARX. Importez votre CV et je crée un profil percutant en quelques secondes."
-              )}
+              {t('cvGuide.mascotte')}
             </p>
           </div>
         )}

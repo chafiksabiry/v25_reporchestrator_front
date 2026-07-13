@@ -148,7 +148,7 @@ function ProfileImportPage({
         aria-hidden="true"
         className="absolute bottom-24 left-8 text-[10px] font-black uppercase tracking-[0.35em] text-harx-600/10 pointer-events-none select-none -rotate-90 origin-left"
       >
-        We inspire growth
+        {t('brand.inspireGrowth')}
       </p>
 
       <div className="relative w-full max-w-3xl mx-auto px-4">

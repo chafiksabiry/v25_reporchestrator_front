@@ -158,6 +158,12 @@
     "modalSubtitle": "Pour accéder au COCKPIT, vous devez sélectionner un projet spécifique dans la liste déroulante de la page de Formation au lieu de \"Tous les projets\".",
     "understandButton": "Compris"
   },
+  "cvGuide": {
+    "mascotte": "Salut ! Je suis votre assistant HARX. Importez votre CV et je crée un profil percutant en quelques secondes."
+  },
+  "brand": {
+    "inspireGrowth": "Nous inspirons la croissance"
+  },
   "profileImport": {
     "step1": "Étape 1 · Créez votre profil",
     "title1": "Transformez votre CV en un",
