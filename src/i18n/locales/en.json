@@ -158,6 +158,12 @@
     "modalSubtitle": "To access the COCKPIT, you must select a specific gig from the dropdown on the Training page instead of \"All enrolled gigs\".",
     "understandButton": "Understood"
   },
+  "cvGuide": {
+    "mascotte": "Hi! I'm your HARX assistant. Upload your CV and I'll create a standout profile in seconds."
+  },
+  "brand": {
+    "inspireGrowth": "We inspire growth"
+  },
   "profileImport": {
     "step1": "Step 1 · Create your profile",
     "title1": "Turn your CV into a",
