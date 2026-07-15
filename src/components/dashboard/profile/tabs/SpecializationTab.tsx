@@ -13,8 +13,7 @@ interface SpecializationTabProps {
 }
 
 export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, onDeleteItemClick, onAddItemClick, onGoToExperience }) => {
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
+  const { t } = useTranslation();
   const [allIndustries, setAllIndustries] = useState<Array<{ _id: string; name: string }>>([]);
   const [allActivities, setAllActivities] = useState<Array<{ _id: string; name: string }>>([]);
   const [industrySearch, setIndustrySearch] = useState('');
@@ -96,14 +95,8 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
   };
 
   const renderVideoWarning = (kind: 'industries' | 'activities') => {
-    const titleFr = kind === 'industries' ? 'Aucune industrie détectée' : 'Aucune activité détectée';
-    const titleEn = kind === 'industries' ? 'No industry detected' : 'No activity detected';
-    const hintFr = kind === 'industries'
-      ? 'Enregistrez une vidéo dans l’onglet Expérience pour détecter automatiquement vos industries.'
-      : 'Enregistrez une vidéo dans l’onglet Expérience pour détecter automatiquement vos activités.';
-    const hintEn = kind === 'industries'
-      ? 'Record a video in the Experience tab to automatically detect your industries.'
-      : 'Record a video in the Experience tab to automatically detect your activities.';
+    const title = t(kind === 'industries' ? 'profile.specialization.noIndustryDetected' : 'profile.specialization.noActivityDetected');
+    const hint = t(kind === 'industries' ? 'profile.specialization.industryHint' : 'profile.specialization.activityHint');
     return (
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-300/80 shadow-sm">
         <div className="flex items-start gap-3">
@@ -111,8 +104,8 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
             <AlertTriangle className="w-5 h-5 text-yellow-600" />
           </span>
           <div>
-            <p className="text-sm font-black text-yellow-800">{isFr ? titleFr : titleEn}</p>
-            <p className="text-xs font-medium text-yellow-700/90 mt-0.5">{isFr ? hintFr : hintEn}</p>
+            <p className="text-sm font-black text-yellow-800">{title}</p>
+            <p className="text-xs font-medium text-yellow-700/90 mt-0.5">{hint}</p>
           </div>
         </div>
         {onGoToExperience && (
@@ -122,7 +115,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
             className="px-5 py-2.5 rounded-xl bg-gradient-harx text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/25 active:scale-95 whitespace-nowrap"
           >
             <Video className="w-4 h-4" />
-            {isFr ? 'Enregistrer' : 'Record'}
+            {t('profile.languages.record')}
           </button>
         )}
       </div>
@@ -142,7 +135,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
         type="button"
         onClick={() => onDeleteItemClick(section, idx)}
         className="p-0.5 rounded-md hover:bg-white/50 transition-colors"
-        title="Delete item"
+        title={t('profile.common.deleteItem')}
       >
         <X className="w-3.5 h-3.5" />
       </button>
@@ -155,10 +148,10 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
       <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-black text-harx-900 tracking-tight">
-            {isFr ? 'Industries principales' : 'Primary Industries'}
+            {t('profile.specialization.industries')}
           </h2>
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            {isFr ? 'Détecté depuis vos vidéos' : 'Detected from your videos'}
+            {t('profile.specialization.detected')}
           </span>
         </div>
         {industriesCount === 0 && renderVideoWarning('industries')}
@@ -174,7 +167,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               )
             )
           ) : (
-            <p className="text-slate-500 italic">{isFr ? 'Aucune industrie spécifiée' : 'No industries specified'}</p>
+            <p className="text-slate-500 italic">{t('profile.specialization.noIndustries')}</p>
           )}
         </div>
         <div ref={industryRef} className="mt-4">
@@ -186,7 +179,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               setIndustryOpen(true);
             }}
             onFocus={() => setIndustryOpen(true)}
-            placeholder="Search and add industry..."
+            placeholder={t('profile.specialization.searchIndustry')}
             className={`w-full px-3 py-2.5 text-sm font-semibold border border-harx-100/80 bg-harx-50/40 text-harx-900 shadow-sm outline-none focus:ring-2 focus:ring-harx-200 ${industryOpen ? 'rounded-t-xl rounded-b-none' : 'rounded-xl'}`}
           />
           {industryOpen && (
@@ -206,7 +199,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
                     <div className="text-sm font-bold text-harx-900">{industry.name}</div>
                   </button>
                 )) : (
-                  <div className="px-3 py-3 text-xs text-slate-500">No more industries available.</div>
+                  <div className="px-3 py-3 text-xs text-slate-500">{t('profile.specialization.noMoreIndustries')}</div>
                 )}
               </div>
             </div>
@@ -218,10 +211,10 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
       <div className="bg-harx-alt-50/25 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-alt-100/70">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-black text-harx-alt-900 tracking-tight">
-            {isFr ? 'Activités professionnelles' : 'Professional Activities'}
+            {t('profile.specialization.activities')}
           </h2>
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            {isFr ? 'Détecté depuis vos vidéos' : 'Detected from your videos'}
+            {t('profile.specialization.detected')}
           </span>
         </div>
         {activitiesCount === 0 && renderVideoWarning('activities')}
@@ -237,7 +230,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               )
             )
           ) : (
-            <p className="text-slate-500 italic">{isFr ? 'Aucune activité spécifiée' : 'No activities specified'}</p>
+            <p className="text-slate-500 italic">{t('profile.specialization.noActivities')}</p>
           )}
         </div>
         <div ref={activityRef} className="mt-4">
@@ -249,7 +242,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
               setActivityOpen(true);
             }}
             onFocus={() => setActivityOpen(true)}
-            placeholder="Search and add activity..."
+            placeholder={t('profile.specialization.searchActivity')}
             className={`w-full px-3 py-2.5 text-sm font-semibold border border-harx-alt-100/80 bg-harx-alt-50/40 text-harx-alt-900 shadow-sm outline-none focus:ring-2 focus:ring-harx-alt-200 ${activityOpen ? 'rounded-t-xl rounded-b-none' : 'rounded-xl'}`}
           />
           {activityOpen && (
@@ -269,7 +262,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
                     <div className="text-sm font-bold text-harx-alt-900">{activity.name}</div>
                   </button>
                 )) : (
-                  <div className="px-3 py-3 text-xs text-slate-500">No more activities available.</div>
+                  <div className="px-3 py-3 text-xs text-slate-500">{t('profile.specialization.noMoreActivities')}</div>
                 )}
               </div>
             </div>

@@ -23,11 +23,10 @@ export function OnboardingNextStepButton({
   hint,
   disabled = false,
 }: Props) {
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || "en").slice(0, 2) === "fr";
-  const label = isFr ? "Étape suivante" : "Next step";
-  const bannerTitle = title || (isFr ? "Continuez votre onboarding" : "Continue your onboarding");
-  const bannerHint = hint || (isFr ? "Passez à l’étape suivante" : "Move on to the next step");
+  const { t } = useTranslation();
+  const label = t("repOnboarding.nextStep.label");
+  const bannerTitle = title || t("repOnboarding.nextStep.defaultTitle");
+  const bannerHint = hint || t("repOnboarding.nextStep.defaultHint");
   const [alertDismissed, setAlertDismissed] = useState(false);
 
   const content = (
@@ -54,7 +53,7 @@ export function OnboardingNextStepButton({
             <button
               type="button"
               onClick={() => setAlertDismissed(true)}
-              aria-label={isFr ? "Fermer" : "Close"}
+              aria-label={t("repOnboarding.nextStep.close")}
               className="ml-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-emerald-400 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
             >
               <X size={12} strokeWidth={2.5} />
