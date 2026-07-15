@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock, CheckCircle, AlertTriangle, RefreshCw, ChevronRight, Pencil, Search, X, ChevronDown, MapPin } from 'lucide-react';
+import { Clock, CheckCircle, AlertTriangle, RefreshCw, Pencil, Search, X, ChevronDown, MapPin } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AvailabilityTabProps {
   profile: any;
@@ -24,6 +25,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
   repWizardApi,
   onSaveAvailability
 }) => {
+  const { t } = useTranslation();
   const timezoneMismatch = getTimezoneMismatchInfo();
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -132,7 +134,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
       {/* Verification & Alerts Section */}
       {(countryMismatch?.hasMismatch || checkingCountryMismatch || timezoneMismatch) && (
         <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
-          <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">Verification Notices</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">{t('profile.availability.verificationNotices')}</h2>
           
           <div className="space-y-4">
             {/* Country Mismatch */}
@@ -140,9 +142,12 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
               <div className="p-5 bg-rose-50/50 border border-rose-100/50 rounded-2xl flex items-start gap-4">
                 <AlertTriangle className="w-6 h-6 text-rose-500 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="font-black text-rose-800 text-sm uppercase tracking-wide">Location Mismatch</h4>
+                  <h4 className="font-black text-rose-800 text-sm uppercase tracking-wide">{t('profile.availability.locationMismatch')}</h4>
                   <p className="text-sm text-rose-700 mt-1 leading-relaxed">
-                    Account registered from <span className="font-bold underline">{countryMismatch.firstLoginCountry}</span>, but your profile specifies <span className="font-bold underline">{countryMismatch.selectedCountry}</span>.
+                    {t('profile.availability.locationMismatchText', {
+                      registered: countryMismatch.firstLoginCountry,
+                      selected: countryMismatch.selectedCountry,
+                    })}
                   </p>
                 </div>
               </div>
@@ -153,9 +158,13 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
               <div className="p-5 bg-amber-50/50 border border-amber-100/50 rounded-2xl flex items-start gap-4">
                 <Clock className="w-6 h-6 text-amber-500 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="font-black text-amber-800 text-sm uppercase tracking-wide">Timezone Synchronization</h4>
+                  <h4 className="font-black text-amber-800 text-sm uppercase tracking-wide">{t('profile.availability.timezoneSynchronization')}</h4>
                   <p className="text-sm text-amber-700 mt-1 leading-relaxed">
-                    Your working timezone (<span className="font-bold">{timezoneMismatch.timezoneName}</span>) belongs to <span className="font-bold">{timezoneMismatch.timezoneCountry}</span>, while your profile country is <span className="font-bold">{timezoneMismatch.selectedCountry}</span>.
+                    {t('profile.availability.timezoneMismatchText', {
+                      timezone: timezoneMismatch.timezoneName,
+                      timezoneCountry: timezoneMismatch.timezoneCountry,
+                      profileCountry: timezoneMismatch.selectedCountry,
+                    })}
                   </p>
                 </div>
               </div>
@@ -165,7 +174,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
             {checkingCountryMismatch && showLoadingSpinner && (
               <div className="flex items-center gap-3 p-5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl">
                 <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
-                <span className="text-sm font-bold text-indigo-700">Verifying location data...</span>
+                <span className="text-sm font-bold text-indigo-700">{t('profile.availability.verifying')}</span>
               </div>
             )}
           </div>
@@ -178,7 +187,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
           <div className="p-2.5 bg-gradient-harx rounded-xl text-white">
             <Clock className="w-5 h-5" />
           </div>
-          <h2 className="text-xl font-black text-harx-900 tracking-tight">Availability & Schedule</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight">{t('profile.availability.title')}</h2>
           <button
             type="button"
             onClick={() => {
@@ -188,7 +197,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
             className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-harx-50 text-harx-700 border border-harx-100 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-all"
           >
             <Pencil className="w-3.5 h-3.5" />
-            {isEditingAvailability ? 'Close' : 'Edit'}
+            {isEditingAvailability ? t('profile.common.close') : t('profile.common.edit')}
           </button>
           {isEditingAvailability && (
             <button
@@ -196,14 +205,14 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
               onClick={() => void saveAvailability()}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all"
             >
-              Save
+              {t('profile.common.save')}
             </button>
           )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Selected Timezone</h3>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">{t('profile.availability.selectedTimezone')}</h3>
             <div className="p-5 bg-slate-200/40 rounded-2xl border border-slate-200/30">
               {isEditingAvailability ? (
                 <>
@@ -218,7 +227,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                     className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 outline-none transition-all focus:ring-2 focus:ring-harx-200"
                   >
                     <span className={selectedTimezone ? 'truncate' : 'truncate text-slate-400'}>
-                      {selectedTimezone ? repWizardApi.formatTimezone(selectedTimezone) : 'Select timezone...'}
+                      {selectedTimezone ? repWizardApi.formatTimezone(selectedTimezone) : t('profile.availability.selectTimezone')}
                     </span>
                     <ChevronDown className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform ${tzOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -233,7 +242,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                           autoFocus
                           value={tzSearch}
                           onChange={(e) => setTzSearch(e.target.value)}
-                          placeholder="Search timezone or city..."
+                          placeholder={t('profile.availability.searchTimezone')}
                           className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
                         />
                         {tzSearch && (
@@ -241,7 +250,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                             type="button"
                             onClick={() => setTzSearch('')}
                             className="flex-shrink-0 text-slate-300 hover:text-slate-500"
-                            aria-label="Clear"
+                            aria-label={t('profile.common.clear')}
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -254,7 +263,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                           <>
                             <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-widest text-harx-500">
                               <MapPin className="w-3 h-3" />
-                              Suggested for you
+                              {t('profile.availability.suggested')}
                             </div>
                             {suggestedTimezones.map((tz: any) => {
                               const isSelected = String(tz._id) === String(editingTimezoneId);
@@ -272,7 +281,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                                   <span className="flex items-center gap-1.5 flex-shrink-0">
                                     {isDetected && (
                                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-600">
-                                        Detected
+                                        {t('profile.availability.detected')}
                                       </span>
                                     )}
                                     {isSelected && <CheckCircle className="w-4 h-4 text-harx-500" />}
@@ -282,7 +291,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                             })}
                             <div className="my-1 border-t border-slate-100" />
                             <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-300">
-                              All timezones
+                              {t('profile.availability.allTimezones')}
                             </div>
                           </>
                         )}
@@ -305,7 +314,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                           })
                         ) : (
                           <div className="px-3 py-4 text-center text-xs font-medium text-slate-400">
-                            No timezone matches "{tzSearch}"
+                            {t('profile.availability.noTimezone', { search: tzSearch })}
                           </div>
                         )}
                       </div>
@@ -322,7 +331,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                     className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
                   >
                     <MapPin className="w-3.5 h-3.5" />
-                    Use my timezone · {repWizardApi.formatTimezone(detectedTimezone)}
+                    {t('profile.availability.useMine', { timezone: repWizardApi.formatTimezone(detectedTimezone) })}
                   </button>
                 )}
                 </>
@@ -332,21 +341,21 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                     ? repWizardApi.formatTimezone(timezoneData)
                     : typeof profile.availability?.timeZone === 'string'
                       ? profile.availability.timeZone
-                      : 'Not configured'}
+                      : t('profile.common.notConfigured')}
                 </span>
               )}
             </div>
           </div>
           
           <div className="space-y-3">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Weekly Schedule</h3>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">{t('profile.availability.weeklySchedule')}</h3>
             <div className="space-y-2">
               {days.map((day) => {
                 const daySchedule = profile.availability?.schedule?.find((s: any) => s.day === day);
                 const row = editingSchedule.find((r) => r.day === day);
                 return (
                   <div key={day} className="flex items-center justify-between px-4 py-2 bg-slate-200/40 rounded-xl border border-slate-200/30">
-                    <span className="text-xs font-bold text-slate-600">{day}</span>
+                    <span className="text-xs font-bold text-slate-600">{t(`profile.availability.days.${day}`)}</span>
                     {isEditingAvailability && row ? (
                       <div className="flex items-center gap-2">
                         <label className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
@@ -359,7 +368,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                               )
                             }
                           />
-                          On
+                          {t('profile.availability.on')}
                         </label>
                         <input
                           type="time"
@@ -387,7 +396,7 @@ export const AvailabilityTab: React.FC<AvailabilityTabProps> = ({
                       </div>
                     ) : (
                       <span className={`text-[10px] font-black uppercase ${daySchedule ? 'text-indigo-600' : 'text-slate-300 italic'}`}>
-                        {daySchedule ? `${daySchedule.hours.start} - ${daySchedule.hours.end}` : 'Off'}
+                        {daySchedule ? `${daySchedule.hours.start} - ${daySchedule.hours.end}` : t('profile.availability.off')}
                       </span>
                     )}
                   </div>

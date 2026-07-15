@@ -10,6 +10,7 @@ import { setProfileData } from '../../../utils/authUtils';
 import { Timezone } from '../../../services/api/repWizard';
 import { buildRepPageTitle } from '../../../lib/repSections';
 import { usePageTitle } from '../../../lib/tracking/usePageTitle';
+import { useTranslation } from 'react-i18next';
 
 // Define a type for your profile data - Updated to match new schema
 interface ProfileData {
@@ -148,6 +149,7 @@ interface ProfileData {
 }
 
 export function Profile() {
+  const { t } = useTranslation();
   console.log('🧩 Profile component initializing');
   const navigate = useNavigate();
   const location = useLocation();
@@ -158,8 +160,8 @@ export function Profile() {
   const [editInitialTab, setEditInitialTab] = useState('profile');
 
   usePageTitle(
-    buildRepPageTitle(isEditing ? 'Modifier le profil' : 'Mon profil'),
-    isEditing ? 'Modifiez votre profil rep HARX.' : 'Consultez votre profil rep HARX.',
+    buildRepPageTitle(t(isEditing ? 'profile.page.editTitle' : 'profile.page.viewTitle')),
+    t(isEditing ? 'profile.page.editDescription' : 'profile.page.viewDescription'),
   );
 
   useEffect(() => {
@@ -192,13 +194,13 @@ export function Profile() {
         setLoading(false);
       } catch (err: any) {
         console.error('❌ Error loading profile:', err);
-        setError(err.message || 'Failed to load profile');
+        setError(err.message || t('profile.page.loadError'));
         setLoading(false);
       }
     };
 
     loadProfile();
-  }, []);
+  }, [t]);
 
   const updateProfileStateAndStorage = (data: ProfileData) => {
     setProfile(data);
@@ -336,7 +338,7 @@ export function Profile() {
         error?.message ||
         error?.error ||
         (typeof error === 'string' ? error : JSON.stringify(error));
-      alert(`Could not add ${type} skill: ${serverMessage}`);
+      alert(t('profile.page.addSkillError', { type, message: serverMessage }));
       // Rollback if API fails
       try {
         const refreshed = await getProfileData();
@@ -679,7 +681,7 @@ export function Profile() {
     console.log('❌ Profile has error state, showing error message');
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="text-lg text-red-600">Error: {error}</div>
+        <div className="text-lg text-red-600">{t('profile.page.error', { message: error })}</div>
       </div>
     );
   }
@@ -688,7 +690,7 @@ export function Profile() {
     console.log('⚠️ No profile data available');
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="text-lg text-gray-600">No profile data available</div>
+        <div className="text-lg text-gray-600">{t('profile.page.noData')}</div>
       </div>
     );
   }

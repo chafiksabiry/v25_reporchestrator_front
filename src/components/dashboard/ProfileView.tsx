@@ -96,8 +96,7 @@ export const ProfileView: React.FC<{
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
-  const { t, i18n } = useTranslation();
-  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const getInitialTab = () => {
     try {
@@ -507,7 +506,7 @@ export const ProfileView: React.FC<{
       const skillId = normalizeId(item?._id) || normalizeId(item?.id) || normalizeId(item?.skill);
       const resolvedById = skillId ? skillNameById[skillId] : null;
       const detailsFallback = typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
-      return { name: resolvedById || detailsFallback || (typeof item?.skill === 'string' ? item.skill : null) || 'Unknown' };
+      return { name: resolvedById || detailsFallback || (typeof item?.skill === 'string' ? item.skill : null) || t('profile.common.unknown') };
     });
   };
 
@@ -555,7 +554,7 @@ export const ProfileView: React.FC<{
     setInlineAssessment({
       type: 'contact-center',
       skillId: formattedSkill,
-      category: categoryName || 'Unknown',
+      category: categoryName || t('profile.common.unknown'),
       skillName,
     });
   };
@@ -581,7 +580,7 @@ export const ProfileView: React.FC<{
       if (onProfileUpdate) onProfileUpdate(updatedData);
     } catch (error) {
       console.error('Error publishing profile:', error);
-      alert('Failed to publish profile.');
+      alert(t('profile.errors.publish'));
     } finally {
       setIsPublishing(false);
     }
@@ -591,10 +590,10 @@ export const ProfileView: React.FC<{
   const getCountryDisplayName = () => {
     if (countryData?.countryName) return countryData.countryName;
     const country = (profile as any)?.personalInfo?.country;
-    if (!country) return 'Not specified';
+    if (!country) return t('profile.common.notSpecified');
     if (typeof country === 'string') return country;
-    if (typeof country === 'object') return country.countryName || country.zoneName || 'Not specified';
-    return 'Not specified';
+    if (typeof country === 'object') return country.countryName || country.zoneName || t('profile.common.notSpecified');
+    return t('profile.common.notSpecified');
   };
 
   const handleInlineUpdate = async (payload: any, buildNextProfile: (prev: any) => any) => {
@@ -604,7 +603,7 @@ export const ProfileView: React.FC<{
       onProfileUpdate?.(buildNextProfile(profile));
     } catch (error) {
       console.error('Inline update failed:', error);
-      window.alert('Update failed. Please try again.');
+      window.alert(t('profile.errors.update'));
     }
   };
 
@@ -725,7 +724,7 @@ export const ProfileView: React.FC<{
     if (!file || !profile?._id) return;
     const token = localStorage.getItem('token');
     if (!token) {
-      window.alert('Authentication token missing.');
+      window.alert(t('profile.errors.authToken'));
       return;
     }
 
@@ -751,7 +750,7 @@ export const ProfileView: React.FC<{
       window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
     } catch (error) {
       console.error('Error uploading presentation video:', error);
-      window.alert('Failed to upload video.');
+      window.alert(t('profile.errors.uploadVideo'));
     } finally {
       setIsUploadingVideo(false);
     }
@@ -830,7 +829,7 @@ export const ProfileView: React.FC<{
 
     const token = localStorage.getItem('token');
     if (!token) {
-      window.alert('Authentication token missing.');
+      window.alert(t('profile.errors.authToken'));
       return;
     }
 
@@ -859,7 +858,7 @@ export const ProfileView: React.FC<{
       window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
     } catch (error) {
       console.error('Error uploading cropped photo:', error);
-      window.alert('Failed to upload cropped photo.');
+      window.alert(t('profile.errors.uploadPhoto'));
     } finally {
       setIsUploadingPhoto(false);
       if (photoInputRef.current) {
@@ -973,12 +972,12 @@ export const ProfileView: React.FC<{
       subtitle: t('profile.tabs.specialization.subtitle')
     },
     onboarding: {
-      title: t('profile.tabs.onboarding.title', { defaultValue: 'Onboarding Progress' }),
-      subtitle: t('profile.tabs.onboarding.subtitle', { defaultValue: 'Track your verification and setup steps' })
+      title: t('profile.tabs.onboarding.title'),
+      subtitle: t('profile.tabs.onboarding.subtitle')
     },
     availability: {
-      title: t('profile.tabs.availability.title', { defaultValue: 'Availability & Schedule' }),
-      subtitle: t('profile.tabs.availability.subtitle', { defaultValue: 'Manage your working hours and timezone' })
+      title: t('profile.tabs.availability.title'),
+      subtitle: t('profile.tabs.availability.subtitle')
     }
   };
 
@@ -1002,13 +1001,13 @@ export const ProfileView: React.FC<{
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
           >
             <ArrowRight size={16} className="rotate-180" />
-            Back to {activeTab === 'languages' ? (isFr ? 'Langues' : 'Languages') : (isFr ? 'Profil' : 'Profile')}
+            {t('profile.header.backTo', { destination: t(activeTab === 'languages' ? 'profile.nav.languages' : 'profile.nav.profile') })}
           </button>
           <div className="glass-card rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="bg-gradient-harx px-10 py-8 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
               <h1 className="text-2xl lg:text-3xl font-black text-white tracking-widest uppercase relative z-10">
-                {`${inlineAssessment.category}: ${inlineAssessment.skillName} Assessment`}
+                {t('profile.header.assessment', { category: inlineAssessment.category, skill: inlineAssessment.skillName })}
               </h1>
             </div>
             <div className="p-6">
@@ -1061,12 +1060,8 @@ export const ProfileView: React.FC<{
                 : []),
             ]}
             warningMessages={{
-              languages: isFr
-                ? 'Niveaux de langue non vérifiés. Enregistrez une vidéo/audio dans l’onglet Langues — l’IA vérifie votre niveau.'
-                : 'Language levels not verified. Record video/audio in the Languages tab — AI verifies your level.',
-              specialization: isFr
-                ? 'Industries/activités manquantes. Enregistrez une vidéo dans l’onglet Expérience pour les détecter.'
-                : 'Missing industries/activities. Record a video in the Experience tab to detect them.',
+              languages: t('profile.nav.languageWarning'),
+              specialization: t('profile.nav.specializationWarning'),
             }}
           />
         </div>
@@ -1091,7 +1086,7 @@ export const ProfileView: React.FC<{
                   {profile.personalInfo?.photo?.url ? (
                     <img
                       src={profile.personalInfo.photo.url}
-                      alt="Profile"
+                      alt={t('profile.header.profilePhotoAlt')}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                   ) : (
@@ -1100,7 +1095,7 @@ export const ProfileView: React.FC<{
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
-                    <div className="text-white text-xs font-black uppercase tracking-widest bg-white/20 px-4 py-2 rounded-full border border-white/30 truncate">View Photo</div>
+                    <div className="text-white text-xs font-black uppercase tracking-widest bg-white/20 px-4 py-2 rounded-full border border-white/30 truncate">{t('profile.header.viewPhoto')}</div>
                   </div>
                 </div>
                 <button
@@ -1108,7 +1103,7 @@ export const ProfileView: React.FC<{
                   onClick={() => !isUploadingPhoto && photoInputRef.current?.click()}
                   disabled={isUploadingPhoto}
                   className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-harx text-white shadow-lg hover:opacity-90 disabled:opacity-60"
-                  title="Change photo"
+                  title={t('profile.header.changePhoto')}
                 >
                   {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 </button>
@@ -1128,10 +1123,10 @@ export const ProfileView: React.FC<{
                         </div>
                         <div>
                           <p className="text-base font-black tracking-tight">
-                            {isFr ? 'Votre profil est prêt à être publié !' : 'Your profile is ready to publish!'}
+                            {t('profile.header.publishReady')}
                           </p>
                           <p className="text-xs font-medium text-white/85 mt-0.5">
-                            {isFr ? 'Toutes les phases sont complétées. Publiez pour devenir visible aux entreprises.' : 'All phases are complete. Publish to become visible to companies.'}
+                            {t('profile.header.publishReadyDescription')}
                           </p>
                         </div>
                       </div>
@@ -1141,7 +1136,7 @@ export const ProfileView: React.FC<{
                         className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap"
                       >
                         {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
-                        {isPublishing ? (isFr ? 'Publication...' : 'Publishing...') : (isFr ? 'Publier mon profil' : 'Publish my profile')}
+                        {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
                       </button>
                     </div>
                   ) : null
@@ -1151,12 +1146,10 @@ export const ProfileView: React.FC<{
                       <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-black text-amber-900">
-                          {isFr ? 'Dernière étape : postuler à un gig' : 'Final step: apply to a gig'}
+                          {t('profile.header.finalStep')}
                         </p>
                         <p className="text-xs font-medium text-amber-800 mt-0.5">
-                          {isFr
-                            ? 'Parcourez la place de marché et postulez à au moins une mission pour finaliser votre onboarding.'
-                            : 'Browse the marketplace and apply to at least one gig to finish your onboarding.'}
+                          {t('profile.header.finalStepDescription')}
                         </p>
                       </div>
                     </div>
@@ -1164,7 +1157,7 @@ export const ProfileView: React.FC<{
                       onClick={() => navigate('/marketplace')}
                       className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
                     >
-                      {isFr ? 'Voir les missions' : 'Browse missions'}
+                      {t('profile.header.browseMissions')}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1174,10 +1167,10 @@ export const ProfileView: React.FC<{
                       <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-black text-emerald-800">
-                          {isFr ? 'Phase 2 complétée' : 'Phase 2 completed'}
+                          {t('profile.header.phase2Complete')}
                         </p>
                         <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                          {isFr ? 'Votre profil est complet. Continuez votre onboarding pour débloquer la suite.' : 'Your profile is complete. Continue your onboarding to unlock the rest.'}
+                          {t('profile.header.phase2CompleteDescription')}
                         </p>
                       </div>
                     </div>
@@ -1185,7 +1178,7 @@ export const ProfileView: React.FC<{
                       onClick={() => navigate(getRepOnboardingStep(profile).path)}
                       className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
                     >
-                      {isFr ? 'Continuer l’onboarding' : 'Continue onboarding'}
+                      {t('profile.header.continueOnboarding')}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1194,12 +1187,10 @@ export const ProfileView: React.FC<{
                     <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-black text-yellow-800">
-                        {isFr ? 'Complétez la Phase 2 pour continuer' : 'Complete Phase 2 to continue'}
+                        {t('profile.header.completePhase2')}
                       </p>
                       <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                        {isFr
-                          ? 'Ajoutez votre photo de profil pour compléter la Phase 2.'
-                          : 'Upload your profile photo to complete Phase 2.'}
+                        {t('profile.header.completePhase2Description')}
                       </p>
                     </div>
                   </div>
@@ -1209,14 +1200,14 @@ export const ProfileView: React.FC<{
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
                   <div>
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
-                    <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || 'Representative'}</p>
+                    <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
                   </div>
                   {profile.status === 'completed' && (
                     <div className="flex items-center gap-3">
                       <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl flex items-center gap-2">
                         <Check className="w-4 h-4" strokeWidth={3} />
                         <span className="text-xs font-black uppercase tracking-wider">
-                          {isFr ? 'Publié' : 'Published'}
+                          {t('profile.header.published')}
                         </span>
                       </div>
                     </div>
@@ -1229,7 +1220,7 @@ export const ProfileView: React.FC<{
                       type="button"
                       onClick={openPublicInfoEditor}
                       className="inline-flex items-center justify-center p-2 rounded-lg bg-gradient-harx text-white hover:opacity-90 transition-all"
-                      title="Edit Public Properties"
+                      title={t('profile.header.editPublicProperties')}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
@@ -1240,7 +1231,7 @@ export const ProfileView: React.FC<{
                         onClick={() => setIsEditingPublicInfo(false)}
                         className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
                       >
-                        Cancel
+                        {t('profile.common.cancel')}
                       </button>
                       <button
                         type="button"
@@ -1248,7 +1239,7 @@ export const ProfileView: React.FC<{
                         disabled={isSavingPublicInfo}
                         className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-60"
                       >
-                        {isSavingPublicInfo ? 'Saving...' : 'Save'}
+                        {isSavingPublicInfo ? t('profile.common.saving') : t('profile.common.save')}
                       </button>
                     </div>
                   )}
@@ -1257,7 +1248,7 @@ export const ProfileView: React.FC<{
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
                   {/* Location */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Country</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.currentCountry')}</label>
                     <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-200 transition-colors">
                       <MapPin className="w-3.5 h-3.5 text-harx-400" />
                       {isEditingPublicInfo ? (
@@ -1273,7 +1264,7 @@ export const ProfileView: React.FC<{
                             onBlur={() => {
                               setTimeout(() => setIsCountryDropdownOpen(false), 160);
                             }}
-                            placeholder="Search country..."
+                            placeholder={t('profile.header.searchCountry')}
                             className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
                           />
                           <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1301,7 +1292,7 @@ export const ProfileView: React.FC<{
                                     </button>
                                   ))
                                 ) : (
-                                  <div className="px-3 py-2.5 text-xs text-slate-500">No countries found.</div>
+                                  <div className="px-3 py-2.5 text-xs text-slate-500">{t('profile.header.noCountries')}</div>
                                 )}
                               </div>
                             </div>
@@ -1311,14 +1302,14 @@ export const ProfileView: React.FC<{
                         <span className="text-sm font-bold text-slate-900">{getCountryDisplayName()}</span>
                       )}
                       {countryMismatch?.hasMismatch && (
-                        <div className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse" title="Location mismatch" />
+                        <div className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse" title={t('profile.header.locationMismatch')} />
                       )}
                     </div>
                   </div>
 
                   {/* Email */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Direct Contact</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.directContact')}</label>
                     <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
@@ -1336,7 +1327,7 @@ export const ProfileView: React.FC<{
 
                   {/* Phone */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Line</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.phoneLine')}</label>
                     <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Phone className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
@@ -1361,7 +1352,7 @@ export const ProfileView: React.FC<{
                       <Target size={24} className="animate-pulse" />
                     </div>
                     <div className="relative z-10">
-                      <div className="text-[10px] font-black text-harx-400 uppercase tracking-widest">REPS Score (Overall)</div>
+                      <div className="text-[10px] font-black text-harx-400 uppercase tracking-widest">{t('profile.header.scoreOverall')}</div>
                       <div className="text-2xl font-black text-harx-900 tracking-tighter leading-none mt-0.5">{calculateOverallScore()} / 100</div>
                     </div>
                   </div>
@@ -1372,14 +1363,14 @@ export const ProfileView: React.FC<{
                       <Briefcase size={24} />
                     </div>
                     <div className="relative z-10">
-                      <div className="text-[10px] font-black text-harx-alt-400 uppercase tracking-widest">Growth Plan</div>
+                      <div className="text-[10px] font-black text-harx-alt-400 uppercase tracking-widest">{t('profile.header.growthPlan')}</div>
                       {isEditingPublicInfo ? (
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
                           className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors underline underline-offset-2"
                         >
-                          {planData?.plan?.name || 'Choisir un plan'}
+                          {planData?.plan?.name || t('profile.header.choosePlan')}
                         </button>
                       ) : (
                         <button
@@ -1387,7 +1378,7 @@ export const ProfileView: React.FC<{
                           onClick={() => setIsPlanModalOpen(true)}
                           className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
                         >
-                          {planData?.plan?.name || 'Standard Representative'}
+                          {planData?.plan?.name || t('profile.header.defaultPlan')}
                         </button>
                       )}
                     </div>
@@ -1412,7 +1403,7 @@ export const ProfileView: React.FC<{
             <button className="absolute top-4 right-4 p-2 bg-slate-900/20 hover:bg-slate-900/40 text-white rounded-full transition-colors z-10" onClick={() => setShowImageModal(false)}>
               <X size={24} />
             </button>
-            <img src={profile.personalInfo.photo.url} alt="Profile" className="w-full h-auto object-contain" style={{ maxHeight: '80vh' }} />
+            <img src={profile.personalInfo.photo.url} alt={t('profile.header.profilePhotoAlt')} className="w-full h-auto object-contain" style={{ maxHeight: '80vh' }} />
           </div>
         </div>
       )}
@@ -1429,7 +1420,7 @@ export const ProfileView: React.FC<{
           >
             <div className="shrink-0 px-5 py-4 border-b border-harx-100 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-black text-harx-900">Select Representative Plan</h3>
+                <h3 className="text-lg font-black text-harx-900">{t('profile.header.selectPlan')}</h3>
               </div>
               <button
                 type="button"
@@ -1456,7 +1447,7 @@ export const ProfileView: React.FC<{
         <div className="fixed inset-0 z-[130] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-black text-slate-900">Crop Profile Photo</h3>
+              <h3 className="text-xl font-black text-slate-900">{t('profile.header.cropPhoto')}</h3>
               <button
                 onClick={() => setIsCropModalOpen(false)}
                 className="p-2 hover:bg-slate-50 rounded-xl transition-colors"
@@ -1476,7 +1467,7 @@ export const ProfileView: React.FC<{
                 <img
                   ref={imgRef}
                   src={imgSrc}
-                  alt="Crop"
+                  alt={t('profile.header.cropAlt')}
                   onLoad={onImageLoad}
                   className="max-w-full max-h-[50vh] object-contain"
                 />
@@ -1488,13 +1479,13 @@ export const ProfileView: React.FC<{
                 onClick={() => setIsCropModalOpen(false)}
                 className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
               >
-                Cancel
+                {t('profile.common.cancel')}
               </button>
               <button
                 onClick={handleCropComplete}
                 className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-harx-500/20 active:scale-95"
               >
-                Save Photo
+                {t('profile.header.savePhoto')}
               </button>
             </div>
           </div>

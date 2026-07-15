@@ -21,8 +21,7 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, onReplaceVideo, isUploadingVideo = false, onAddNotableCompany, onDeleteNotableCompany }) => {
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
+  const { t } = useTranslation();
   const [notableCompanyInput, setNotableCompanyInput] = useState('');
   const [isEditingAbout, setIsEditingAbout] = useState(false);
   const [isEditingVideo, setIsEditingVideo] = useState(false);
@@ -153,7 +152,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
       }
     } catch (error) {
       console.error('Camera/microphone access failed:', error);
-      window.alert('Unable to access camera/microphone.');
+      window.alert(t('profile.errors.camera'));
     }
   };
 
@@ -223,12 +222,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
       {/* About Section */}
       <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-black text-harx-900 tracking-tight">About</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight">{t('profile.overview.about')}</h2>
           <button
             type="button"
             onClick={() => setIsEditingAbout(true)}
             className="inline-flex items-center justify-center p-2 rounded-lg bg-gradient-harx text-white hover:opacity-90 transition-all"
-            title="Edit About"
+            title={t('profile.overview.editAbout')}
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -253,7 +252,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
                   }}
                   className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
                 >
-                  Cancel
+                  {t('profile.common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -263,14 +262,14 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
                   }}
                   className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90"
                 >
-                  Save
+                  {t('profile.common.save')}
                 </button>
               </div>
             </div>
           ) : profile.professionalSummary?.profileDescription ? (
             <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{profile.professionalSummary.profileDescription}</p>
           ) : (
-            <p className="text-slate-500 italic">No professional summary provided</p>
+            <p className="text-slate-500 italic">{t('profile.overview.emptySummary')}</p>
           )}
         </div>
 
@@ -280,7 +279,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
       <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-black text-harx-900 tracking-tight">
-            {isFr ? 'Entreprises notables' : 'Notable Companies Worked For'}
+            {t('profile.overview.notableCompanies')}
           </h2>
           <button
             type="button"
@@ -293,7 +292,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-harx-50 text-harx-700 border border-harx-100 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
-            {isFr ? 'Ajouter' : 'Add'}
+            {t('profile.common.add')}
           </button>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -308,7 +307,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
                   type="button"
                   onClick={() => onDeleteNotableCompany?.(idx)}
                   className="p-0.5 rounded-md hover:bg-white/50 transition-colors"
-                  title={isFr ? 'Supprimer' : 'Delete item'}
+                  title={t('profile.common.deleteItem')}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -316,7 +315,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
             ))
           ) : (
             <p className="text-slate-500 italic">
-              {isFr ? 'Aucune entreprise notable spécifiée' : 'No notable companies specified'}
+              {t('profile.overview.emptyCompanies')}
             </p>
           )}
         </div>
@@ -334,7 +333,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
                 setNotableCompanyInput('');
               }
             }}
-            placeholder={isFr ? 'Saisissez un nom d’entreprise et appuyez sur Entrée…' : 'Type company name and press Enter...'}
+            placeholder={t('profile.overview.companyPlaceholder')}
             className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-harx-100/80 bg-harx-50/40 text-harx-900 shadow-sm outline-none focus:ring-2 focus:ring-harx-200"
           />
         </div>
