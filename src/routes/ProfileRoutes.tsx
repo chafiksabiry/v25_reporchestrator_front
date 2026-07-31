@@ -11,6 +11,7 @@ import mascotte from '../assets/mascotte2.png';
 import { buildRepPageTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { useTranslation } from 'react-i18next';
+import { getRepOnboardingStep } from '../utils/repOnboardingNextStep';
 
 const POWERED_BY_CAPABILITIES = [
   {
@@ -280,7 +281,8 @@ export default function ProfileRoutes() {
 
   const [profileData, setProfileData] = useState<ProfileRecord | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  // Start true so /profile-import does not flash Import CV before the resume redirect check.
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   const applyProfileData = useCallback((data: ProfileRecord) => {
     const { generatedSummary: summary, ...profileInfo } = data;
@@ -306,28 +308,43 @@ export default function ProfileRoutes() {
   );
 
   // When landing on /profile-editor directly (refresh, link), load profile if missing.
+  // On /profile-import, if the user already progressed past CV import, resume their
+  // current onboarding step instead of forcing Import CV again.
   useEffect(() => {
-    if (!isEditor || profileData) return;
-
     let cancelled = false;
 
     const loadProfile = async () => {
+      if (isEditor && profileData) {
+        setLoadingProfile(false);
+        return;
+      }
+
       setLoadingProfile(true);
       try {
-        const cached = localStorage.getItem('profileData');
-        if (cached) {
-          const parsed = JSON.parse(cached) as ProfileRecord;
-          if (parsed?.personalInfo) {
-            if (!cancelled) {
-              applyProfileData(parsed);
+        if (isEditor) {
+          const cached = localStorage.getItem('profileData');
+          if (cached) {
+            const parsed = JSON.parse(cached) as ProfileRecord;
+            if (parsed?.personalInfo) {
+              if (!cancelled) {
+                applyProfileData(parsed);
+              }
+              return;
             }
-            return;
           }
         }
 
         const fromApi = await fetchProfileFromAPI();
-        if (!cancelled && fromApi) {
+        if (cancelled || !fromApi) return;
+
+        if (isEditor) {
           applyProfileData(fromApi as ProfileRecord);
+          return;
+        }
+
+        const next = getRepOnboardingStep(fromApi);
+        if (next.path !== '/profile-import') {
+          navigate(next.path, { replace: true });
         }
       } catch (err) {
         console.error('Failed to load profile for editor:', err);
@@ -340,7 +357,7 @@ export default function ProfileRoutes() {
     return () => {
       cancelled = true;
     };
-  }, [isEditor, profileData, applyProfileData]);
+  }, [isEditor, profileData, applyProfileData, navigate]);
 
   return (
     <ProtectedRoute>
@@ -355,6 +372,8 @@ export default function ProfileRoutes() {
             onProfileUpdate={handleProfileData}
           />
         )
+      ) : loadingProfile ? (
+        <ProfileLoading label={t('profileImport.loadingProfile')} />
       ) : (
         <ProfileImportPage onImport={handleProfileData} />
       )}
