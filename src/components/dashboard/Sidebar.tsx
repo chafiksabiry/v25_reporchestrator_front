@@ -250,24 +250,6 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
-        {/* ── Mascotte (shown on the CV import / editor pages) ── */}
-        {isProfileCreationPage && !isCollapsed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute inset-0 m-auto h-28 w-28 rounded-full bg-harx-500/20 blur-2xl animate-pulse" />
-              <img
-                src={mascotte}
-                alt="HARX assistant"
-                className="relative w-28 h-auto drop-shadow-2xl animate-float"
-              />
-            </div>
-
-            <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-white/75">
-              {t('cvGuide.mascotte')}
-            </p>
-          </div>
-        )}
-
         {/* ── Guide (hidden on CV import/editor — content is on the page itself) ── */}
         {!onboardingComplete && !isCollapsed && !isProfileCreationPage && (
           <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
@@ -659,6 +641,24 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           </div>
         )}
       </nav>
+
+      {/* CV guide mascotte — footer slot so it never overlays nav links */}
+      {isProfileCreationPage && !isCollapsed && (
+        <div className="shrink-0 border-t border-white/10 px-4 py-4">
+          <div className="relative flex flex-col items-center text-center">
+            <div className="pointer-events-none absolute inset-0 m-auto h-16 w-16 rounded-full bg-harx-500/20 blur-2xl" />
+            <img
+              src={mascotte}
+              alt=""
+              aria-hidden="true"
+              className="relative w-20 h-auto drop-shadow-xl"
+            />
+            <p className="relative mt-2 text-[10px] leading-snug text-white/75">
+              {t('cvGuide.mascotte')}
+            </p>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Warning Modal */}
