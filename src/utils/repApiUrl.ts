@@ -5,7 +5,7 @@ export const stripApiSuffix = (url?: string) =>
 const REP_API_HOST = stripApiSuffix(import.meta.env.VITE_REP_API_URL);
 const REP_DASH_API_HOST = stripApiSuffix(
   import.meta.env.VITE_REP_DASH_API_URL ||
-    'https://v25dashrepback-production.up.railway.app/api'
+    'https://v25dashrepback-recette.up.railway.app/api'
 );
 
 function buildApiUrl(host: string, path: string): string {

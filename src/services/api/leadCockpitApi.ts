@@ -1,7 +1,7 @@
 function getDashboardApiBase(): string {
   const raw =
     import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
-    'https://v25dashboardbackend-production.up.railway.app/api';
+    'https://v25dashboardbackend-recette.up.railway.app/api';
   return raw.replace(/\/$/, '');
 }
 
