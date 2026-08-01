@@ -103,7 +103,7 @@ export function AttendanceScorecard({ rep, slots }: AttendanceScoreCardProps) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 text-center">
                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 text-center">CURRENT MONTH</div>
                     <div className={`text-2xl font-black ${getScoreStyles(metrics.currentMonthScore).split(' ')[0]}`}>

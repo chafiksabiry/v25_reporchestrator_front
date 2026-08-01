@@ -133,7 +133,7 @@ export function PerformanceMetrics({ rep, slots }: PerformanceMetricsProps) {
                 <Bar data={chartData} options={chartOptions as any} />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {metrics.map(metric => (
                     <div key={metric.metric} className="group p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-blue-100 hover:bg-white transition-all duration-300">
                         <div className="flex items-center space-x-2 mb-2">
