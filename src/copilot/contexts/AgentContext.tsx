@@ -17,6 +17,8 @@ import {
 // though 'any' is used in existing hooks for simplicity
 type TwilioConnection = any;
 type TwilioDevice = any;
+type TelnyxConnection = any;
+type TelnyxDevice = any;
 
 // Define the complete agent state interface matching what components expect
 export interface AgentState {
@@ -35,6 +37,11 @@ export interface AgentState {
   mediaStream: MediaStream | null;
   twilioConnection: TwilioConnection | null;
   twilioDevice: TwilioDevice | null;
+  /** Active Telnyx WebRTC call (Workspace Telnyx dial path). */
+  telnyxConnection: TelnyxConnection | null;
+  telnyxDevice: TelnyxDevice | null;
+  /** Which provider owns the active softphone connection. */
+  callProvider: 'twilio' | 'telnyx' | null;
 
   // Transcript and conversation
   transcript: TranscriptEntry[];
@@ -80,6 +87,8 @@ export type AgentAction =
   | { type: 'SET_MEDIA_STREAM'; mediaStream: MediaStream | null }
   | { type: 'SET_TWILIO_CONNECTION'; connection: TwilioConnection; device: TwilioDevice }
   | { type: 'CLEAR_TWILIO_CONNECTION' }
+  | { type: 'SET_TELNYX_CONNECTION'; connection: TelnyxConnection; device: TelnyxDevice }
+  | { type: 'CLEAR_TELNYX_CONNECTION' }
   | { type: 'SET_MIC_MUTE'; muted: boolean }
   | { type: 'ADD_TRANSCRIPT_ENTRY'; entry: TranscriptEntry }
   | { type: 'UPDATE_PERSONALITY_PROFILE'; profile: PersonalityProfile }
@@ -114,6 +123,9 @@ const initialState: AgentState = {
   mediaStream: null,
   twilioConnection: null,
   twilioDevice: null,
+  telnyxConnection: null,
+  telnyxDevice: null,
+  callProvider: null,
   transcript: [],
   recommendations: [],
   callMetrics: {
@@ -193,7 +205,12 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
           contact: undefined
         },
         isAIListening: false,
-        audioLevel: 0
+        audioLevel: 0,
+        twilioConnection: null,
+        twilioDevice: null,
+        telnyxConnection: null,
+        telnyxDevice: null,
+        callProvider: null,
       };
 
     case 'TOGGLE_RECORDING':
@@ -339,14 +356,36 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
       return {
         ...state,
         twilioConnection: action.connection,
-        twilioDevice: action.device
+        twilioDevice: action.device,
+        callProvider: 'twilio' as const,
+        telnyxConnection: null,
+        telnyxDevice: null,
       };
 
     case 'CLEAR_TWILIO_CONNECTION':
       return {
         ...state,
         twilioConnection: null,
-        twilioDevice: null
+        twilioDevice: null,
+        callProvider: state.callProvider === 'twilio' ? null : state.callProvider,
+      };
+
+    case 'SET_TELNYX_CONNECTION':
+      return {
+        ...state,
+        telnyxConnection: action.connection,
+        telnyxDevice: action.device,
+        callProvider: 'telnyx' as const,
+        twilioConnection: null,
+        twilioDevice: null,
+      };
+
+    case 'CLEAR_TELNYX_CONNECTION':
+      return {
+        ...state,
+        telnyxConnection: null,
+        telnyxDevice: null,
+        callProvider: state.callProvider === 'telnyx' ? null : state.callProvider,
       };
 
     case 'SET_MIC_MUTE':
@@ -470,7 +509,7 @@ const AgentContext = createContext<{
 export function AgentProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(agentReducer, initialState);
 
-  // Synchronize Microphone Mute with Twilio Connection
+  // Synchronize Microphone Mute with active softphone (Twilio or Telnyx)
   useEffect(() => {
     if (state.twilioConnection) {
       const applyMute = () => {
@@ -480,17 +519,29 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      // Apply immediately and also on 'accept' just in case of race conditions
       applyMute();
       state.twilioConnection.on('accept', applyMute);
-      
+
       return () => {
         if (state.twilioConnection) {
           state.twilioConnection.off('accept', applyMute);
         }
       };
     }
-  }, [state.isMicMuted, state.twilioConnection]);
+
+    if (state.telnyxConnection) {
+      try {
+        if (state.isMicMuted && typeof state.telnyxConnection.muteAudio === 'function') {
+          state.telnyxConnection.muteAudio();
+        } else if (!state.isMicMuted && typeof state.telnyxConnection.unmuteAudio === 'function') {
+          state.telnyxConnection.unmuteAudio();
+        }
+        console.log(`🎤 Telnyx Microphone synchronized: ${state.isMicMuted ? 'Muted' : 'Unmuted'}`);
+      } catch (err) {
+        console.warn('Telnyx mute sync failed:', err);
+      }
+    }
+  }, [state.isMicMuted, state.twilioConnection, state.telnyxConnection]);
 
   // Synchronize Speaker Mute with Audio Element
   useEffect(() => {
