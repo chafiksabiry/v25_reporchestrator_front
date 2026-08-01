@@ -26,6 +26,9 @@
   # /api prefix themselves, so adding it here produces a double /api/api/ 404.
   VITE_CALLS_API_URL = "https://v25dashcallsbackend-production.up.railway.app"
   VITE_API_URL_CALL = "https://v25dashcallsbackend-production.up.railway.app"
+  # Dev/test: allow Workspace calls without 100% training + active reservation
+  # (enrollment still required). Pair with TELEPHONY_TEST_BYPASS on dash_calls for Twilio.
+  VITE_TELEPHONY_TEST_BYPASS = "true"
   # Comporchestrator backend
   VITE_COMPORCHESTRATOR_BACK_URL = "https://v25comporchestratorback-production.up.railway.app/api"
 

@@ -355,6 +355,8 @@
     "sessionRequiredTitle": "Réservation Requise",
     "sessionRequiredDesc": "Vous devez avoir un créneau de temps planifié et réservé en cours pour lancer des appels.",
     "sessionButton": "Réserver",
+    "telephonyTestTitle": "Mode test téléphonie",
+    "telephonyTestDesc": "Formation et réservation sont contournées pour les tests. L’inscription au gig reste obligatoire.",
     "connectionErrorTitle": "Erreur de Connexion",
     "connectionErrorDesc": "Impossible de valider vos conditions d'appel en temps réel (vérification des formations et réservations). Veuillez rafraîchir la page ou réessayer ultérieurement.",
     "refreshButton": "Actualiser",

@@ -20,6 +20,7 @@ import {
   releaseCockpit,
   isLeadCockpitLockedByOther,
 } from '../../../services/api/leadCockpitApi';
+import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
 
 interface Lead {
   _id?: string;
@@ -310,12 +311,18 @@ export function WorkspaceContent() {
     prevTabRef.current = activeTab;
   }, [activeTab, cockpitClaimedLeadId]);
 
+  const telephonyTestBypass = useMemo(() => isTelephonyTestBypassEnabled(), [
+    location.search,
+    activeTab,
+  ]);
+
+  // Enrollment always required. Training + reservation can be bypassed in test mode.
   const canUseCopilot = useMemo(
     () =>
       copilotGuard.isEnrolledInGig &&
-      copilotGuard.isTrainingComplete &&
-      copilotGuard.hasActiveReservationNow,
-    [copilotGuard]
+      (telephonyTestBypass ||
+        (copilotGuard.isTrainingComplete && copilotGuard.hasActiveReservationNow)),
+    [copilotGuard, telephonyTestBypass]
   );
 
   // Claim cockpit when opening COCKPIT tab with an active lead
@@ -686,8 +693,27 @@ export function WorkspaceContent() {
 
                 {activeEnrolledGigId && !copilotGuard.loading && (
                   <>
+                    {telephonyTestBypass && (
+                      <div className="p-4 bg-slate-50 border border-slate-300 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in duration-300">
+                        <div className="p-2.5 bg-slate-200 text-slate-700 rounded-xl shrink-0">
+                          <ShieldAlert className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <h4 className="text-xs font-black text-slate-900 tracking-tight uppercase">
+                            {t('workspaceGuard.telephonyTestTitle', 'Mode test téléphonie')}
+                          </h4>
+                          <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                            {t(
+                              'workspaceGuard.telephonyTestDesc',
+                              'Formation et réservation sont contournées pour les tests. L’inscription au gig reste obligatoire.'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Warning A: Training Incomplete */}
-                    {!copilotGuard.isTrainingComplete && (
+                    {!telephonyTestBypass && !copilotGuard.isTrainingComplete && (
                       <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in duration-300">
                         <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl shrink-0">
                           <BookOpen className="w-5 h-5" />
@@ -708,7 +734,7 @@ export function WorkspaceContent() {
                     )}
 
                     {/* Warning B: No Active Reservation Slot (Availability) */}
-                    {!copilotGuard.hasActiveReservationNow && (
+                    {!telephonyTestBypass && !copilotGuard.hasActiveReservationNow && (
                       <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in duration-300">
                         <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl shrink-0">
                           <Clock className="w-5 h-5" />
