@@ -68,11 +68,7 @@ export const useLead = (leadId: string | null): UseLeadResult => {
         import.meta.env.VITE_DASH_COMPANY_BACKEND ||
         import.meta.env.VITE_DASH_COMPANY_API_URL;
 
-      // Fallback to production URL if none provided
-      if (!apiUrl) {
-        apiUrl = 'https://harxv25dashboardfrontend.netlify.app/api';
-        console.warn('API URL environment variable is not defined, using production fallback');
-      }
+
 
       // Normalize all URLs to include /api if missing (all backend services use /api prefix)
       if (!apiUrl.includes('/api')) {
