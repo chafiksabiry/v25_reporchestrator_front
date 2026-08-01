@@ -216,6 +216,7 @@ export function ContactInfo() {
       const line = await TelnyxCallPersist.fetchLineForLead(contact.id);
       activeLineRef.current = line;
       setLineError(null);
+      console.log('[resolveGigLine] provider=', line.provider, 'from=', line.phoneNumber, 'id=', line.phoneNumberId);
       return line;
     } catch (err: any) {
       const msg =
