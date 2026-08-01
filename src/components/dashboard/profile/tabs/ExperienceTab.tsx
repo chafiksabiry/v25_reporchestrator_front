@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Briefcase, Calendar, Plus, X, Pencil, Video } from 'lucide-react';
 import { ExperienceVideoModal } from '../ExperienceVideoModal';
+import { useTranslation } from 'react-i18next';
 
 interface ExperienceTabProps {
   profile: any;
@@ -23,6 +24,7 @@ interface ExperienceTabProps {
 }
 
 export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAnalysisComplete, onAddItemClick, onUpdateItemClick, onDeleteItemClick }) => {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState({
     title: '',
     company: '',
@@ -79,13 +81,13 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
       <input
         value={draft.title}
         onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))}
-        placeholder="Role / title"
+        placeholder={t('profile.experience.rolePlaceholder')}
         className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-harx-200"
       />
       <input
         value={draft.company}
         onChange={(e) => setDraft((p) => ({ ...p, company: e.target.value }))}
-        placeholder="Company"
+        placeholder={t('profile.experience.companyPlaceholder')}
         className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-harx-200"
       />
       <input
@@ -109,7 +111,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
             submitForm();
           }
         }}
-        placeholder={`Short description (optional) and press Enter to ${mode === 'edit' ? 'save' : 'save'}`}
+        placeholder={t('profile.experience.descriptionPlaceholder')}
         className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-harx-200 md:col-span-2"
       />
       <div className="md:col-span-2 flex items-center justify-end gap-2 pt-1">
@@ -122,14 +124,14 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
           }}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all"
         >
-          Cancel
+          {t('profile.common.cancel')}
         </button>
         <button
           type="button"
           onClick={submitForm}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all"
         >
-          Save
+          {t('profile.common.save')}
         </button>
       </div>
     </div>
@@ -139,17 +141,17 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Experience Summary */}
       <div className="bg-harx-alt-50/25 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-alt-100/70">
-        <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">Summary</h2>
+        <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">{t('profile.experience.summary')}</h2>
         <div className="flex items-center gap-4 bg-slate-200/40 p-6 rounded-2xl border border-slate-200/30">
           <div className="p-3 bg-harx-100/80 rounded-xl text-harx-600">
             <Briefcase className="w-8 h-8" />
           </div>
           <div>
             <div className="text-3xl font-black text-slate-900">
-              {profile.professionalSummary?.yearsOfExperience || 0}+ Years
+              {profile.professionalSummary?.yearsOfExperience || 0}+ {t('profile.experience.years')}
             </div>
             <div className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-              Professional Experience
+              {t('profile.experience.professionalExperience')}
             </div>
           </div>
         </div>
@@ -158,7 +160,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
       {/* Detailed Experience */}
       <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black text-harx-900 tracking-tight">Work History</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight">{t('profile.experience.workHistory')}</h2>
           <button
             type="button"
             onClick={() => {
@@ -169,7 +171,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-harx-50 text-harx-700 border border-harx-100 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add
+            {t('profile.common.add')}
           </button>
         </div>
         {isAddFormOpen && <div className="mb-6">{renderExperienceForm('add')}</div>}
@@ -177,7 +179,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
           <div className="space-y-12 relative before:absolute before:inset-0 before:ml-4 before:-z-10 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-harx-200 before:to-transparent">
             {profile.experience.map((exp: any, index: number) => {
               const startDate = formatDateToDD_MM_YYYY(exp.startDate);
-              const endDate = exp.endDate === 'present' ? 'Present' : exp.endDate ? formatDateToDD_MM_YYYY(exp.endDate) : 'Present';
+              const endDate = exp.endDate === 'present' ? t('profile.experience.present') : exp.endDate ? formatDateToDD_MM_YYYY(exp.endDate) : t('profile.experience.present');
               
               return (
                 <div key={index} className="relative pl-12 group">
@@ -215,7 +217,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
                               });
                             }}
                             className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
-                            title="Edit experience"
+                            title={t('profile.experience.edit')}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -223,7 +225,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
                             type="button"
                             onClick={() => onDeleteItemClick(index)}
                             className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
-                            title="Delete experience"
+                            title={t('profile.experience.delete')}
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -238,7 +240,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
 
                       {exp.responsibilities?.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Key Responsibilities</h4>
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">{t('profile.experience.keyResponsibilities')}</h4>
                           <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             {exp.responsibilities.map((r: string, idx: number) => (
                               <li key={idx} className="flex items-start gap-2 text-sm text-slate-600 bg-slate-50/50 p-2 rounded-lg border border-slate-100/50">
@@ -260,7 +262,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
                         }`}
                       >
                         <Video className="w-4 h-4" />
-                        {exp.videoUrl || exp.videoAnalysis ? 'View AI Analysis' : 'Record & Analyze with AI'}
+                        {exp.videoUrl || exp.videoAnalysis ? t('profile.experience.viewAnalysis') : t('profile.experience.recordAnalysis')}
                       </button>
                     </>
                   )}
@@ -270,7 +272,7 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
           </div>
         ) : (
           <div className="text-center py-12 bg-slate-200/40 rounded-3xl border border-dashed border-slate-300">
-            <p className="text-slate-500 font-medium">No experience history listed yet</p>
+            <p className="text-slate-500 font-medium">{t('profile.experience.empty')}</p>
           </div>
         )}
       </div>

@@ -1,14 +1,18 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
-const LoadingScreen = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-harx-50 via-white to-harx-alt-50">
-    <div className="flex flex-col items-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-harx-500"></div>
-      <p className="mt-4 text-gray-600">Vérification de l'authentification...</p>
+const LoadingScreen = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-harx-50 via-white to-harx-alt-50">
+      <div className="flex flex-col items-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-harx-500"></div>
+        <p className="mt-4 text-gray-600">{t('auth.verifying', "Vérification de l'authentification...")}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ProtectedRoute = ({ children, fallback }) => {
   const { isAuthenticated, isLoading } = useAuth();

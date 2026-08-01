@@ -52,9 +52,9 @@ export function Learning() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Learning Hub</h1>
-        <div className="flex items-center space-x-2 bg-green-50 px-4 py-2 rounded-lg">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Learning Hub</h1>
+        <div className="flex items-center space-x-2 bg-green-50 px-4 py-2 rounded-lg self-start sm:self-auto">
           <Star className="w-5 h-5 text-green-600" />
           <span className="text-green-600 font-medium">Level 3 Certified</span>
         </div>

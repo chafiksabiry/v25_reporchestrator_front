@@ -164,11 +164,11 @@ export function Payouts() {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Payouts & Earnings</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Payouts & Earnings</h1>
         <button 
           onClick={handleOpenWithdraw}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 self-start sm:self-auto"
         >
           Request Payout
         </button>
@@ -277,7 +277,7 @@ export function Payouts() {
                   <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-2">
                     Méthode de Paiement
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setSelectedMethod('bank')}

@@ -1221,8 +1221,8 @@ export function GigDetails() {
   const showCommissionDetailsColumn = hasCommissionPills || hasAdditionalCommissionDetails;
 
   return (
-    <div className="min-h-screen bg-transparent py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-transparent py-4 sm:py-8">
+      <div className="w-full">
         {/* Header avec bouton retour */}
         <div className="mb-6">
           <button
@@ -1233,13 +1233,13 @@ export function GigDetails() {
             Back to Marketplace
           </button>
 
-          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex-1">
+          <div className="bg-white/80 backdrop-blur-md rounded-3xl p-4 sm:p-6 lg:p-8 shadow-sm border border-gray-100">
+            <div className="flex flex-col gap-6 lg:flex-row lg:justify-between lg:items-start mb-6">
+              <div className="flex-1 min-w-0">
                 {/* Titre du gig, puis catégorie (toujours sous le titre) */}
                 <div className="mb-5">
-                  <div className="flex items-center flex-wrap gap-3">
-                    <h1 className="text-4xl font-black text-gray-900 tracking-tight">{gig.title}</h1>
+                  <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-3">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 tracking-tight">{gig.title}</h1>
                     {getAgentStatus() === 'invited' && (
                       <span className="inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-harx-50 text-harx-600 border border-harx-100 shadow-sm">
                         ✉ Invited
@@ -1319,7 +1319,7 @@ export function GigDetails() {
                     ⌛ Pending Review
                   </span>
                 ) : getAgentStatus() === 'invited' ? (
-                  <div className="flex flex-col items-stretch gap-2 min-w-[220px]">
+                  <div className="flex flex-col items-stretch gap-2 w-full lg:min-w-[220px] lg:w-auto lg:max-w-xs">
                     <span className="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest border border-indigo-100">
                       ✉ You're invited
                     </span>

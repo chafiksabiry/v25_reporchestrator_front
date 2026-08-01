@@ -33,6 +33,7 @@ import { connectRepEscrowSocket } from '../lib/escrowSocket';
 import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
 import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
+import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
 
 async function syncRepWalletBalance() {
   const agentId = getAgentId();
@@ -140,9 +141,10 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
             setIsSidebarOpen={setIsSidebarOpen}
           />
         )}
-        <main className={`flex-1 overflow-y-auto bg-white ${location.pathname.includes('/profile') ? 'p-0' : 'px-4 py-3'}`}>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
+          <PageContainer variant={resolvePageContainerVariant(location.pathname)}>
           {loading ? (
-            <div className="flex justify-center items-center h-full">
+            <div className="flex justify-center items-center min-h-[50vh]">
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
             </div>
           ) : (
@@ -202,6 +204,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           )}
+          </PageContainer>
         </main>
       </div>
     </div>

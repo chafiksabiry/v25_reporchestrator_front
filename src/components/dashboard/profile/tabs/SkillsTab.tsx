@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { fetchSkillsByType, Skill } from '../../../../services/api/skills';
 import { repApiClient } from '../../../../utils/client';
+import { useTranslation } from 'react-i18next';
 
 interface SkillsTabProps {
   profile: any;
@@ -41,6 +42,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   onAddSpecializationItem,
   onDeleteSpecializationItem
 }) => {
+  const { t } = useTranslation();
   const [availableSkills, setAvailableSkills] = useState<Record<'technical' | 'professional' | 'soft', Skill[]>>({
     technical: [],
     professional: [],
@@ -65,6 +67,17 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   const technicalDropdownRef = useRef<HTMLDivElement | null>(null);
   const professionalDropdownRef = useRef<HTMLDivElement | null>(null);
   const softDropdownRef = useRef<HTMLDivElement | null>(null);
+  const skillInputRefs = useRef<Record<'technical' | 'professional' | 'soft', HTMLInputElement | null>>({
+    technical: null,
+    professional: null,
+    soft: null,
+  });
+
+  const dismissSkillSearch = (type: 'technical' | 'professional' | 'soft') => {
+    setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
+    setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
+    skillInputRefs.current[type]?.blur();
+  };
 
   useEffect(() => {
     const loadSkills = async () => {
@@ -171,6 +184,9 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     return (
       <div className="mt-3 w-full">
         <input
+          ref={(el) => {
+            skillInputRefs.current[type] = el;
+          }}
           type="text"
           value={searchTermByType[type]}
           onChange={(e) => {
@@ -183,7 +199,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
               setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
             }, 180);
           }}
-          placeholder={`Search and add ${type} skill...`}
+          placeholder={t('profile.skills.search', { type: t(`profile.skills.${type}`) })}
           className={`w-full px-3 py-2.5 text-sm font-semibold border border-harx-100/80 bg-harx-50/40 text-harx-900 shadow-sm outline-none focus:ring-2 focus:ring-harx-200 ${
             dropdownOpenByType[type] ? 'rounded-t-xl rounded-b-none' : 'rounded-xl'
           }`}
@@ -197,12 +213,10 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
                   key={skill._id}
                   type="button"
                   onMouseDown={(e) => {
-                    // Fire before the input's onBlur closes the dropdown, and
-                    // keep focus so the whole row is reliably clickable.
+                    // Fire before the input's onBlur closes the dropdown.
                     e.preventDefault();
                     onAddSkill(type, skill._id);
-                    setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
-                    setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
+                    dismissSkillSearch(type);
                   }}
                   className="block w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors cursor-pointer"
                 >
@@ -211,7 +225,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
                 </button>
               ))
             ) : (
-              <div className="px-3 py-3 text-xs text-slate-500">No more skills available for this section.</div>
+              <div className="px-3 py-3 text-xs text-slate-500">{t('profile.skills.noneAvailable')}</div>
             )}
           </div>
           </div>
@@ -235,8 +249,8 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
         type="button"
         onClick={() => onDeleteSkill(type, idx)}
         className="inline-flex items-center justify-center rounded-md p-0.5 hover:bg-slate-300/50 transition-colors"
-        title="Delete this skill"
-        aria-label={`Delete ${skill.name}`}
+        title={t('profile.skills.delete')}
+        aria-label={t('profile.skills.deleteNamed', { name: skill.name })}
       >
         <X className="w-3 h-3" />
       </button>
@@ -250,7 +264,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
         {/* Technical Skills */}
         <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-black text-harx-900">Technical</h2>
+            <h2 className="text-lg font-black text-harx-900">{t('profile.skills.technical')}</h2>
           </div>
           <div className="flex flex-wrap gap-2 items-start content-start">
             {formatSkillsForDisplay(profile.skills?.technical).map((skill: any, idx: number) =>
@@ -265,7 +279,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
         {/* Professional Skills */}
         <div className="bg-harx-alt-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-alt-100/70">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-black text-harx-alt-900">Professional</h2>
+            <h2 className="text-lg font-black text-harx-alt-900">{t('profile.skills.professional')}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {formatSkillsForDisplay(profile.skills?.professional).map((skill: any, idx: number) =>
@@ -280,7 +294,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
         {/* Soft Skills */}
         <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-black text-harx-900">Soft Skills</h2>
+            <h2 className="text-lg font-black text-harx-900">{t('profile.skills.soft')}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {formatSkillsForDisplay(profile.skills?.soft).map((skill: any, idx: number) =>

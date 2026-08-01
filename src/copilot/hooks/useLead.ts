@@ -63,21 +63,16 @@ export const useLead = (leadId: string | null): UseLeadResult => {
         'Authorization': `Bearer ${token}`
       };
 
-      // Prioritize VITE_API_URL_CALL as it's the standard backend for Copilot
-      let apiUrl = import.meta.env.VITE_API_URL_CALL ||
-        import.meta.env.VITE_DASH_COMPANY_BACKEND ||
-        import.meta.env.VITE_DASH_COMPANY_API_URL;
-
-      // Fallback to production URL if none provided
-      if (!apiUrl) {
-        apiUrl = 'https://harxv25dashboardfrontend.netlify.app/api';
-        console.warn('API URL environment variable is not defined, using production fallback');
-      }
+      // Copilot leads/calls → dash_calls. Prefer env; default matches
+      // Netlify build.environment in netlify.toml (recette → production APIs).
+      let apiUrl =
+        import.meta.env.VITE_API_URL_CALL ||
+        import.meta.env.VITE_CALLS_API_URL ||
+        'https://v25dashcallsbackend-production.up.railway.app';
 
       // Normalize all URLs to include /api if missing (all backend services use /api prefix)
       if (!apiUrl.includes('/api')) {
         apiUrl = `${apiUrl.replace(/\/$/, '')}/api`;
-        console.log('[useLead] Normalized API URL:', apiUrl);
       }
 
       console.log(`[useLead] Fetching lead ${id} from ${apiUrl}`);
