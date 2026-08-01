@@ -622,11 +622,13 @@ export function ContactInfo() {
             callReachedActiveRef.current = true;
             callStartedAtRef.current = Date.now();
           }
-          const Sid =
-            call.id ||
-            call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
+          // Prefer Call Control id so recording webhooks / record_start match the Call doc.
+          const callControlId =
             call.telnyxCallControlId ||
+            call.options?.telnyxCallControlId ||
+            call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
             null;
+          const Sid = callControlId || call.id || null;
           if (Sid) {
             callSidRef.current = Sid;
             setCurrentCallSid(Sid);
@@ -638,6 +640,14 @@ export function ContactInfo() {
             contact,
             sid: Sid || undefined,
           });
+
+          if (callControlId) {
+            TelnyxCallPersist.startRecording(callControlId).catch((err) => {
+              console.warn('Telnyx record_start failed:', err?.response?.data || err?.message || err);
+            });
+          } else {
+            console.warn('Telnyx active call has no callControlId — server recording cannot start');
+          }
 
           setTimeout(async () => {
             try {

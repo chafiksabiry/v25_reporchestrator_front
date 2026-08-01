@@ -52,6 +52,13 @@ export class TelnyxCallPersist {
     return data.login_token;
   }
 
+  static async startRecording(callControlId: string): Promise<void> {
+    if (!callControlId) return;
+    await axios.post(`${callsBase()}/api/calls/telnyx/record-start`, {
+      callControlId,
+    });
+  }
+
   static async finalizeCall(payload: TelnyxStorePayload): Promise<any> {
     const formattedTranscript = payload.transcript?.map((entry) => ({
       speaker:
