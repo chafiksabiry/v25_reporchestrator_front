@@ -355,6 +355,8 @@
     "sessionRequiredTitle": "Reservation Required",
     "sessionRequiredDesc": "You must have a scheduled active slot reserved to start placing calls.",
     "sessionButton": "Reserve Slot",
+    "telephonyTestTitle": "Telephony test mode",
+    "telephonyTestDesc": "Training and reservation checks are bypassed for testing. Gig enrollment is still required.",
     "connectionErrorTitle": "Connection Error",
     "connectionErrorDesc": "Unable to validate call conditions. Please check your network or refresh the page to try again.",
     "refreshButton": "Refresh",
