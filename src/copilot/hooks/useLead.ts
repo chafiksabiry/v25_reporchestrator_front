@@ -64,11 +64,11 @@ export const useLead = (leadId: string | null): UseLeadResult => {
       };
 
       // Copilot leads/calls → dash_calls. Prefer env; default matches
-      // Netlify build.environment in netlify.toml (recette → production APIs).
+      // Netlify build.environment in netlify.toml (recette → *-recette APIs).
       let apiUrl =
         import.meta.env.VITE_API_URL_CALL ||
         import.meta.env.VITE_CALLS_API_URL ||
-        'https://v25dashcallsbackend-production.up.railway.app';
+        'https://v25dashcallsbackend-recette.up.railway.app';
 
       // Normalize all URLs to include /api if missing (all backend services use /api prefix)
       if (!apiUrl.includes('/api')) {

@@ -37,13 +37,13 @@ function normalizeTrainingBase(): string {
   const raw =
     import.meta.env.VITE_TRAINING_API_URL ||
     import.meta.env.VITE_TRAINING_BACKEND_URL ||
-    'https://v25platformtrainingbackend-production.up.railway.app';
+    'https://v25platformtrainingbackend-recette.up.railway.app';
   return String(raw).replace(/\/$/, '');
 }
 
 function normalizeMatchingBase(): string {
   return String(
-    import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api'
+    import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api'
   ).replace(/\/$/, '');
 }
 

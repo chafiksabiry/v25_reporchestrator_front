@@ -65,7 +65,7 @@ export const useAgentProfile = () => {
 
                 let apiUrl = import.meta.env.VITE_API_URL_CALL ||
                     import.meta.env.VITE_CALLS_API_URL ||
-                    'https://v25dashcallsbackend-production.up.railway.app';
+                    'https://v25dashcallsbackend-recette.up.railway.app';
 
                 // Normalize all URLs to include /api if missing (all backend services use /api prefix)
                 if (!apiUrl.includes('/api')) {

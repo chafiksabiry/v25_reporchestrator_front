@@ -13,7 +13,7 @@ export interface GigStatusData {
 
 const matchingApiBase = () =>
   import.meta.env.VITE_MATCHING_API_URL ||
-  'https://v25matchingbackend-production.up.railway.app/api';
+  'https://v25matchingbackend-recette.up.railway.app/api';
 
 function extractGigIdsFromMatchingResponse(data: unknown): string[] {
   if (!data || typeof data !== 'object') return [];

@@ -253,7 +253,7 @@ function knowledgeBaseApiRoot(): string {
     import.meta.env.VITE_KNOWLEDGEBASE_API_URL ||
     import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API ||
     import.meta.env.VITE_DASHBOARD_KNOWLEDGEBASE_API_URL ||
-    'https://v25knowledgebasebackend-production.up.railway.app/api';
+    'https://v25knowledgebasebackend-recette.up.railway.app/api';
   const base = String(raw).replace(/\/$/, '');
   if (!base) return '';
   return base.endsWith('/api') ? base : `${base}/api`;

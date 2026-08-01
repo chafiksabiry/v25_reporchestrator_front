@@ -245,7 +245,7 @@ export function Dashboard({ profile }: DashboardProps) {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token') || '';
-        const dashboardApi = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
+        const dashboardApi = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-recette.up.railway.app/api').replace(/\/$/, '');
         const gigsQuery = new URLSearchParams({
           agentId: String(agentId),
           ...(realUserId ? { userId: String(realUserId) } : {}),

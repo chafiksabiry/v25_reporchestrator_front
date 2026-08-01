@@ -353,7 +353,7 @@ export function SessionPlanning() {
 
             try {
                 setLoadingGigs(true);
-                const apiUrl = import.meta.env.VITE_API_URL_GIGS || 'https://v25gigsmanualcreationbackend-production.up.railway.app/api';
+                const apiUrl = import.meta.env.VITE_API_URL_GIGS || 'https://v25gigsmanualcreationbackend-recette.up.railway.app/api';
                 const response = await axios.get(`${apiUrl}/gigs/company/${companyId}`);
 
                 if (response.data && response.data.data) {
@@ -380,7 +380,7 @@ export function SessionPlanning() {
             if (!selectedRepId) return;
 
             try {
-                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api';
+                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api';
                 const response = await axios.get(`${matchingApiUrl}/gig-agents/agent/${selectedRepId}`);
 
                 if (response.data) {

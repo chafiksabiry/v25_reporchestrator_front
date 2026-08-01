@@ -20,7 +20,7 @@ export function getDashCallsApiBase(): string {
   const raw =
     fromImportMeta ||
     (typeof window !== 'undefined' ? (window as any).__HARX_ENV__?.VITE_DASH_CALLS_API_URL : undefined) ||
-    'https://v25dashcallsbackend-development.up.railway.app/api';
+    'https://v25dashcallsbackend-recette.up.railway.app/api';
   return raw.endsWith('/api') ? raw : `${String(raw).replace(/\/+$/, '')}/api`;
 }
 

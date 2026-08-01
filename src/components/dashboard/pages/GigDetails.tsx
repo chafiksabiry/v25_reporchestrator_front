@@ -629,7 +629,7 @@ export function GigDetails() {
 
     setLoadingProgress(true);
     try {
-      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-production.up.railway.app';
+      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-recette.up.railway.app';
       const url = `${trainingBackendUrl}/training_journeys/rep/${agentId}/progress/gig/${gigId}`;
 
       const response = await fetch(url);
@@ -667,7 +667,7 @@ export function GigDetails() {
     console.log('🔍 Fetching trainings for gigId:', gigId);
     setLoadingTrainings(true);
     try {
-      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-production.up.railway.app';
+      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-recette.up.railway.app';
       console.log('🌐 Training backend URL:', trainingBackendUrl);
 
       const url = `${trainingBackendUrl}/training_journeys/gig/${gigId}`;
@@ -725,7 +725,7 @@ export function GigDetails() {
     }
 
     try {
-      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-production.up.railway.app';
+      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-recette.up.railway.app';
       const url = `${trainingBackendUrl}/training_journeys/rep-progress/start`;
 
       const response = await fetch(url, {
@@ -773,7 +773,7 @@ export function GigDetails() {
     if (!agentId || !gigId) return null;
 
     try {
-      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-production.up.railway.app';
+      const trainingBackendUrl = import.meta.env.VITE_TRAINING_BACKEND_URL || 'https://v25platformtrainingbackend-recette.up.railway.app';
 
       // Récupérer les journeys pour ce gig
       const journeysResponse = await fetch(

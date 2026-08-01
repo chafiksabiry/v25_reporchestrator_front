@@ -16,7 +16,7 @@ const REP_API_URL = getRepApiHost();
 const CALLS_API_URL = stripApiSuffix(
   import.meta.env.VITE_CALLS_API_URL ||
     import.meta.env.VITE_API_URL_CALL ||
-    'https://v25dashcallsbackend-development.up.railway.app/api'
+    'https://v25dashcallsbackend-recette.up.railway.app/api'
 );
 const DASHBOARD_COMPANY_API_URL = import.meta.env.VITE_DASHBOARD_COMPANY_API_URL;
 
@@ -220,7 +220,7 @@ export interface Agent {
 }
 
 const orchestratorApiClient = axios.create({
-  baseURL: import.meta.env.VITE_COMPORCHESTRATOR_BACK_URL || 'https://v25comporchestratorback-production.up.railway.app/api',
+  baseURL: import.meta.env.VITE_COMPORCHESTRATOR_BACK_URL || 'https://v25comporchestratorback-recette.up.railway.app/api',
   headers: {
     'Content-Type': 'application/json',
   },

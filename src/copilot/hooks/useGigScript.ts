@@ -56,7 +56,7 @@ export function useGigScript(gigId?: string) {
           // Robust fallbacks based on project patterns
           apiUrl = import.meta.env.DEV
             ? 'http://localhost:3001/api'
-            : 'https://v25knowledgebasebackend-production.up.railway.app/api';
+            : 'https://v25knowledgebasebackend-recette.up.railway.app/api';
         }
 
         console.log(`[useGigScript] Fetching active script for gig ${normalizedGigId} from ${apiUrl}/scripts/gig/${normalizedGigId}?active=true`);
