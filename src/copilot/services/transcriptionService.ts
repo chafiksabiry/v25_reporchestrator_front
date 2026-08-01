@@ -79,7 +79,7 @@ export class TranscriptionService {
 
     const callApi: string =
       import.meta.env.VITE_API_URL_CALL ||
-      'https://v25dashcallsbackend-production.up.railway.app/api';
+      'https://v25dashcallsbackend-development.up.railway.app/api';
     const host = callApi.replace(/\/+$/, '').replace(/\/api$/, '');
     return `${host.replace(/^http/, 'ws')}/speech-to-text`;
   }
