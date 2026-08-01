@@ -64,9 +64,7 @@ export const useLead = (leadId: string | null): UseLeadResult => {
       };
 
       // Prioritize VITE_API_URL_CALL as it's the standard backend for Copilot
-      let apiUrl = import.meta.env.VITE_API_URL_CALL ||
-        import.meta.env.VITE_DASH_COMPANY_BACKEND ||
-        import.meta.env.VITE_DASH_COMPANY_API_URL;
+      let apiUrl = import.meta.env.VITE_API_URL_CALL;
 
 
 
