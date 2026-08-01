@@ -618,18 +618,29 @@ export function ContactInfo() {
         const call = notification.call;
         const stateName = call.state;
 
+        // Capture ids as soon as Telnyx exposes them (not only on active) so
+        // early failures still leave a sid for logging / partial persist.
+        const callControlId =
+          call.telnyxCallControlId ||
+          call.options?.telnyxCallControlId ||
+          call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
+          null;
+        const Sid = callControlId || call.id || null;
+        if (Sid && !callSidRef.current) {
+          callSidRef.current = Sid;
+          setCurrentCallSid(Sid);
+        }
+
+        if (stateName === 'trying' || stateName === 'ringing' || stateName === 'early') {
+          console.log('[Telnyx] call state=', stateName, 'id=', call.id, 'callControlId=', callControlId);
+          setCallStatus(stateName === 'ringing' ? 'ringing' : 'initiating');
+        }
+
         if (stateName === 'active' || stateName === 'answered') {
           if (!callReachedActiveRef.current) {
             callReachedActiveRef.current = true;
             callStartedAtRef.current = Date.now();
           }
-          // Prefer Call Control id so recording webhooks / record_start match the Call doc.
-          const callControlId =
-            call.telnyxCallControlId ||
-            call.options?.telnyxCallControlId ||
-            call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
-            null;
-          const Sid = callControlId || call.id || null;
           if (Sid) {
             callSidRef.current = Sid;
             setCurrentCallSid(Sid);
@@ -679,6 +690,13 @@ export function ContactInfo() {
           stateName === 'purge' ||
           stateName === 'done'
         ) {
+          console.warn('[Telnyx] hangup', {
+            state: stateName,
+            id: call.id,
+            callControlId,
+            cause: call.cause || call.hangupCause || call.causeCode || call.sipCode,
+            reason: call.sipReason || call.hangupCause || call.reason,
+          });
           await handleTelnyxHangup();
         }
       });
