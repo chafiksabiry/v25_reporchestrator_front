@@ -63,12 +63,13 @@ export const useLead = (leadId: string | null): UseLeadResult => {
         'Authorization': `Bearer ${token}`
       };
 
-      // Copilot leads/calls → dash_calls. Prefer env; default matches
-      // Netlify build.environment in netlify.toml (recette → *-recette APIs).
+      // Lead contact data (Phone, etc.) lives on the company dashboard DB —
+      // same source as Workspace LEADS list. Never use dash_calls here or
+      // cockpit phones diverge from the list.
       let apiUrl =
-        import.meta.env.VITE_API_URL_CALL ||
-        import.meta.env.VITE_CALLS_API_URL ||
-        'https://v25dashcallsbackend-recette.up.railway.app';
+        import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
+        import.meta.env.VITE_DASH_COMPANY_BACKEND ||
+        'https://v25dashboardbackend-recette.up.railway.app/api';
 
       // Normalize all URLs to include /api if missing (all backend services use /api prefix)
       if (!apiUrl.includes('/api')) {
