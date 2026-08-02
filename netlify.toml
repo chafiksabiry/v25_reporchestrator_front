@@ -26,11 +26,18 @@
   # /api prefix themselves, so adding it here produces a double /api/api/ 404.
   VITE_CALLS_API_URL = "https://v25dashcallsbackend-development.up.railway.app"
   VITE_API_URL_CALL = "https://v25dashcallsbackend-development.up.railway.app"
-  # Dev/test: allow Workspace calls without 100% training + active reservation
-  # (enrollment still required). Pair with TELEPHONY_TEST_BYPASS on dash_calls for Twilio.
+  # Dev/test only (default build / branch deploys). Production overrides below.
+  # Pair with TELEPHONY_TEST_BYPASS on dash_calls for Twilio when testing.
   VITE_TELEPHONY_TEST_BYPASS = "true"
   # Comporchestrator backend
   VITE_COMPORCHESTRATOR_BACK_URL = "https://v25comporchestratorback-development.up.railway.app/api"
+
+# Production (harx.ai) — never bake telephony test bypass into the client
+[context.production.environment]
+  VITE_TELEPHONY_TEST_BYPASS = "false"
+
+[context.prod.environment]
+  VITE_TELEPHONY_TEST_BYPASS = "false"
 
 [[redirects]]
   from = "/*"
