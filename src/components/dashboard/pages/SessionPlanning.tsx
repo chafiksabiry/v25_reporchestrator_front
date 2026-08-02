@@ -17,6 +17,7 @@ import { schedulerApi } from '../../../services/api/scheduler';
 import { slotApi } from '../../../services/api/slotApi';
 import { AvailableSlotsGrid } from '../scheduler/AvailableSlotsGrid';
 import { Skeleton } from '../ui/Skeleton';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
 // Define ExternalGig type locally for API response mapping
 interface ExternalGig {
@@ -353,7 +354,7 @@ export function SessionPlanning() {
 
             try {
                 setLoadingGigs(true);
-                const apiUrl = import.meta.env.VITE_API_URL_GIGS || 'https://v25gigsmanualcreationbackend-production.up.railway.app/api';
+                const apiUrl = getGigsApiBase();
                 const response = await axios.get(`${apiUrl}/gigs/company/${companyId}`);
 
                 if (response.data && response.data.data) {
