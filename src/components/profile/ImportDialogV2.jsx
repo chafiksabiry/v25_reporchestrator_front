@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18nText';
 
 function ImportDialog({ isOpen, onClose, onImport }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const { createProfile } = useProfile();
   const [text, setText] = useState('');
@@ -60,16 +60,16 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
   const steps = [
     {
-      title: "Choose Your CV Format",
-      description: "We support PDF, DOC, DOCX, and TXT files. Make sure your CV is up-to-date and includes your key achievements."
+      title: t('profileImportDialog.step1Title'),
+      description: t('profileImportDialog.step1Desc')
     },
     {
-      title: "Review Content",
-      description: "We'll extract the important information from your CV. You can review and edit before proceeding."
+      title: t('profileImportDialog.step2Title'),
+      description: t('profileImportDialog.step2Desc')
     },
     {
-      title: "AI Enhancement",
-      description: "Our AI will analyze your CV to create a compelling professional summary and highlight your key skills."
+      title: t('profileImportDialog.step3Title'),
+      description: t('profileImportDialog.step3Desc')
     }
   ];
 
@@ -78,7 +78,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB');
+      setError(t('profileImportDialog.errors.fileTooLarge'));
       return;
     }
 
@@ -90,7 +90,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       const extractedText = await cvParser.parse(file);
 
       if (!extractedText || extractedText.trim().length === 0) {
-        throw new Error('No text could be extracted from the file');
+        throw new Error(t('profileImportDialog.errors.noText'));
       }
 
       setText(extractedText);
@@ -99,7 +99,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       setUploadSuccess(true);
       setCurrentStep(2);
     } catch (err) {
-      setError(`Failed to read file: ${err.message}`);
+      setError(t('profileImportDialog.errors.readFailed'));
       console.error('File upload error:', err);
     } finally {
       setLoading(false);
@@ -128,21 +128,21 @@ function ImportDialog({ isOpen, onClose, onImport }) {
     try {
       console.log("contentToProcess :", contentToProcess);
       if (!contentToProcess.trim()) {
-        throw new Error('Please provide some content to process');
+        throw new Error(t('profileImportDialog.errors.noContent'));
       }
 
-      addAnalysisStep("Starting CV analysis...");
+      addAnalysisStep(t('profileImportDialog.analysis.starting'));
 
       // Initial analysis to extract basic information
       const basicInfo = await extractBasicInfo(contentToProcess);
       ensureNotCancelled();
-      addAnalysisStep("Basic information extracted");
+      addAnalysisStep(t('profileImportDialog.analysis.basicInfo'));
       setProgress(20);
 
       // Analyze work experience
       const experience = await analyzeExperience(contentToProcess);
       ensureNotCancelled();
-      addAnalysisStep("Work experience analyzed");
+      addAnalysisStep(t('profileImportDialog.analysis.experience'));
       setProgress(40);
 
       // Extract and categorize skills
@@ -152,11 +152,11 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       console.log("🔍 analyzeSkills result:", skills);
       console.log("🔍 analyzeExperience result:", experience);
       if (skills.languages.length === 0) {
-        throw new Error('Languages section is required to generate your profile. Please ensure your CV includes the languages you speak.');
+        throw new Error(t('profileImportDialog.errors.languagesRequired'));
       }
 
       // Match extracted languages with database languages
-      addAnalysisStep("Matching languages with database...");
+      addAnalysisStep(t('profileImportDialog.analysis.matchingLanguages'));
       const matchedLanguages = [];
 
       // Load the full DB language list once so we can fall back to a name match
@@ -230,22 +230,22 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       }
 
       if (matchedLanguages.length === 0) {
-        throw new Error('No languages could be matched with our database. Please ensure your CV includes common languages.');
+        throw new Error(t('profileImportDialog.errors.languagesUnmatched'));
       }
 
-      addAnalysisStep("Skills categorized and languages matched");
+      addAnalysisStep(t('profileImportDialog.analysis.skills'));
       setProgress(60);
 
       // Extract achievements and projects
       const achievements = await analyzeAchievements(contentToProcess);
       ensureNotCancelled();
-      addAnalysisStep("Achievements extracted");
+      addAnalysisStep(t('profileImportDialog.analysis.achievements'));
       setProgress(80);
 
       // Extract availability information
       const availability = await analyzeAvailability(contentToProcess);
       ensureNotCancelled();
-      addAnalysisStep("Availability preferences analyzed");
+      addAnalysisStep(t('profileImportDialog.analysis.availability'));
       setProgress(85);
 
       // Ensure all arrays exist with default empty arrays
@@ -347,7 +347,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         })
       };
 
-      addAnalysisStep("Generating professional summary");
+      addAnalysisStep(t('profileImportDialog.analysis.summary'));
       setProgress(90);
 
       // Generate optimized summary (bilingual { en, fr } from the backend).
@@ -357,7 +357,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Ensure we have a valid summary
       if (!summaryRaw) {
-        throw new Error('Failed to generate summary');
+        throw new Error(t('profileImportDialog.errors.summaryFailed'));
       }
 
       // Normalize to active string + { en, fr } mirror.
@@ -365,7 +365,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       combinedData.professionalSummary.profileDescription = summaryN.active;
       combinedData.professionalSummary.profileDescription_i18n = summaryN.i18n;
 
-      addAnalysisStep("Analysis complete!");
+      addAnalysisStep(t('profileImportDialog.analysis.complete'));
       setProgress(100);
 
       // Create profile in database and get MongoDB document
@@ -376,7 +376,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       onImport({ ...createdProfile, generatedSummary: summaryN.active });
 
       console.log("createdProfile : ", createdProfile);
-      console.log("summary : ", summary);
+      console.log("summary : ", summaryN.active);
 
       onClose();
     } catch (err) {
@@ -385,8 +385,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return;
       }
       console.error('Profile parsing error:', err);
-      setError(err.message || 'Failed to parse profile. Please try again or use a different file.');
-      addAnalysisStep(`Error: ${err.message}`, true);
+      const displayError = err.message || t('profileImportDialog.errors.parseFailed');
+      setError(displayError);
+      addAnalysisStep(t('profileImportDialog.analysis.error', { message: displayError }), true);
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
@@ -409,15 +410,15 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                 </span>
                 <div>
                   <Dialog.Title className="text-xl font-extrabold text-gray-900 leading-tight">
-                    Import your professional profile
+                    {t('profileImportDialog.title')}
                   </Dialog.Title>
-                  <p className="text-sm text-gray-400 mt-0.5">PDF, DOC, DOCX or TXT — up to 5MB</p>
+                  <p className="text-sm text-gray-400 mt-0.5">{t('profileImportDialog.subtitle')}</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                aria-label="Close"
+                aria-label={t('profileImportDialog.close')}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -433,7 +434,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {showGuidance ? 'Hide how it works' : 'How it works'}
+              {showGuidance ? t('profileImportDialog.hideHowItWorks') : t('profileImportDialog.howItWorks')}
               <svg
                 className={`h-3.5 w-3.5 transition-transform duration-200 ${showGuidance ? 'rotate-180' : ''}`}
                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -448,7 +449,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
             {showGuidance && (
               <div className="mb-6 rounded-2xl bg-harx-50/70 p-5">
                 <p className="text-sm text-gray-600 mb-4">
-                  We'll guide you through creating your professional profile. Here's what to expect:
+                  {t('profileImportDialog.guidanceDesc')}
                 </p>
                 <div className="space-y-3.5">
                   {steps.map((step, index) => (
@@ -488,8 +489,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </span>
-                    <p className="mt-3 text-lg font-semibold">CV successfully uploaded!</p>
-                    <p className="text-sm text-green-500 mt-0.5">Click to upload a different file</p>
+                    <p className="mt-3 text-lg font-semibold">{t('profileImportDialog.success')}</p>
+                    <p className="text-sm text-green-500 mt-0.5">{t('profileImportDialog.uploadDifferent')}</p>
                   </div>
                 ) : (
                   <>
@@ -498,9 +499,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </span>
-                    <p className="mt-4 text-lg font-semibold text-gray-900">Drop your CV here</p>
-                    <p className="mt-1 text-sm text-gray-500">or click to browse your files</p>
-                    <p className="text-xs text-gray-400 mt-2">Supports PDF, DOC, DOCX, TXT (max 5MB)</p>
+                    <p className="mt-4 text-lg font-semibold text-gray-900">{t('profileImportDialog.dropCV')}</p>
+                    <p className="mt-1 text-sm text-gray-500">{t('profileImportDialog.browseFiles')}</p>
+                    <p className="text-xs text-gray-400 mt-2">{t('profileImportDialog.supports')}</p>
                   </>
                 )}
               </div>
@@ -512,7 +513,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <h3 className="text-sm font-semibold text-red-800">Error</h3>
+                      <h3 className="text-sm font-semibold text-red-800">{t('profileImportDialog.errorTitle')}</h3>
                       <p className="text-sm text-red-700 mt-0.5">{error}</p>
                     </div>
                   </div>
@@ -528,12 +529,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                     />
                   </div>
                   <div className="flex justify-between text-sm text-gray-500">
-                    <span>Step {currentStep} of 3</span>
+                    <span>{t('profileImportDialog.stepNof3', { currentStep })}</span>
                     <span>
-                      {progress < 25 && "Preparing..."}
-                      {progress >= 25 && progress < 50 && "Analyzing CV..."}
-                      {progress >= 50 && progress < 75 && "Extracting information..."}
-                      {progress >= 75 && "Generating summary..."}
+                      {progress < 25 && t('profileImportDialog.preparing')}
+                      {progress >= 25 && progress < 50 && t('profileImportDialog.analyzing')}
+                      {progress >= 50 && progress < 75 && t('profileImportDialog.extracting')}
+                      {progress >= 75 && t('profileImportDialog.generating')}
                     </span>
                   </div>
                   {analysisSteps.length > 0 && (
@@ -559,7 +560,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
               className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
               onClick={handleClose}
             >
-              {loading ? 'Cancel & close' : 'Cancel'}
+              {loading ? t('profileImportDialog.cancelClose') : t('profileImportDialog.cancel')}
             </button>
             {text && (
               <button
@@ -573,10 +574,10 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Processing...
+                    {t('profileImportDialog.processing')}
                   </span>
                 ) : (
-                  'Generate Summary'
+                  t('profileImportDialog.generateSummary')
                 )}
               </button>
             )}

@@ -58,20 +58,16 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   onUpdateProficiency,
   onDeleteItemClick,
 }) => {
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
+  const { t } = useTranslation();
 
   const proficiencyOptions = [
-    { value: 'A1', label: isFr ? 'A1 - Débutant' : 'A1 - Beginner' },
-    { value: 'A2', label: isFr ? 'A2 - Élémentaire' : 'A2 - Elementary' },
-    { value: 'B1', label: isFr ? 'B1 - Intermédiaire' : 'B1 - Intermediate' },
-    { value: 'B2', label: isFr ? 'B2 - Intermédiaire avancé' : 'B2 - Upper Intermediate' },
-    { value: 'C1', label: isFr ? 'C1 - Avancé' : 'C1 - Advanced' },
-    { value: 'C2', label: isFr ? 'C2 - Maîtrise' : 'C2 - Proficient' },
+    { value: 'A1', label: t('profile.languages.levels.A1') },
+    { value: 'A2', label: t('profile.languages.levels.A2') },
+    { value: 'B1', label: t('profile.languages.levels.B1') },
+    { value: 'B2', label: t('profile.languages.levels.B2') },
+    { value: 'C1', label: t('profile.languages.levels.C1') },
+    { value: 'C2', label: t('profile.languages.levels.C2') },
   ];
-  const getProficiencyLabel = (value: string) =>
-    proficiencyOptions.find((option) => option.value === value)?.label || value;
-
   const [draftLanguage, setDraftLanguage] = useState('');
   const [draftProficiency, setDraftProficiency] = useState('B1');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -145,13 +141,11 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
             </span>
             <div>
               <h2 className="text-xl font-black text-harx-900 tracking-tight">
-                {isFr ? 'Maîtrise des langues' : 'Language Proficiency'}
+                {t('profile.languages.title')}
               </h2>
               {totalCount > 0 && (
                 <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                  {isFr
-                    ? `${totalCount} langue${totalCount > 1 ? 's' : ''} · ${verifiedCount} vérifiée${verifiedCount > 1 ? 's' : ''}`
-                    : `${totalCount} language${totalCount > 1 ? 's' : ''} · ${verifiedCount} verified`}
+                  {t(totalCount === 1 ? 'profile.languages.count' : 'profile.languages.count_plural', { total: totalCount, verified: verifiedCount })}
                 </p>
               )}
             </div>
@@ -166,7 +160,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
             }`}
           >
             {showAddForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-            {showAddForm ? (isFr ? 'Fermer' : 'Close') : (isFr ? 'Ajouter' : 'Add')}
+            {showAddForm ? t('profile.common.close') : t('profile.common.add')}
           </button>
         </div>
 
@@ -176,14 +170,14 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
-                  {isFr ? 'Langue' : 'Language'}
+                  {t('profile.languages.language')}
                 </label>
                 <select
                   value={draftLanguage}
                   onChange={(e) => setDraftLanguage(e.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-harx-300 focus:ring-2 focus:ring-harx-200"
                 >
-                  <option value="">{isFr ? 'Sélectionnez une langue…' : 'Select a language…'}</option>
+                  <option value="">{t('profile.languages.select')}</option>
                   {selectableLanguages.map((lang) => (
                     <option key={lang._id || `${lang.name}-${lang.code}`} value={lang._id || `${lang.name}-${lang.code}`}>
                       {lang.name}{lang.code ? ` (${lang.code})` : ''}
@@ -193,7 +187,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
-                  {isFr ? 'Niveau' : 'Level'}
+                  {t('profile.languages.level')}
                 </label>
                 <select
                   value={draftProficiency}
@@ -214,7 +208,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                   disabled={!draftLanguage}
                   className="w-full md:w-auto rounded-xl bg-gradient-harx px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/25 transition-all hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                 >
-                  {isFr ? 'Enregistrer' : 'Save'}
+                  {t('profile.common.save')}
                 </button>
               </div>
             </div>
@@ -232,14 +226,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               </span>
               <div>
                 <p className="text-sm font-black text-yellow-800">
-                  {isFr
-                    ? `${unverifiedCount} langue${unverifiedCount > 1 ? 's' : ''} non vérifiée${unverifiedCount > 1 ? 's' : ''}`
-                    : `${unverifiedCount} language${unverifiedCount > 1 ? 's' : ''} not verified`}
+                  {t(unverifiedCount === 1 ? 'profile.languages.unverifiedCount' : 'profile.languages.unverifiedCount_plural', { count: unverifiedCount })}
                 </p>
                 <p className="text-xs font-medium text-yellow-700/90 mt-0.5">
-                  {isFr
-                    ? 'Enregistrez ici une courte vidéo — l’IA vérifie que vous parlez bien dans cette langue et valide votre niveau.'
-                    : 'Record a short video here — AI verifies you speak this language and validates your level.'}
+                  {t('profile.languages.recordNotice')}
                 </p>
               </div>
             </div>
@@ -250,7 +240,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               className="px-5 py-2.5 rounded-xl bg-gradient-harx text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/25 active:scale-95 whitespace-nowrap"
             >
               <Video className="w-4 h-4" />
-              {isFr ? 'Enregistrer' : 'Record'}
+              {t('profile.languages.record')}
             </button>
             )}
           </div>
@@ -261,14 +251,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
             </span>
             <div>
               <p className="text-sm font-black text-emerald-800">
-                {isFr
-                  ? `Toutes vos langues sont vérifiées (${verifiedCount}/${totalCount})`
-                  : `All your languages are verified (${verifiedCount}/${totalCount})`}
+                {t('profile.languages.allVerified', { verified: verifiedCount, total: totalCount })}
               </p>
               <p className="text-xs font-medium text-emerald-700/90 mt-0.5">
-                {isFr
-                  ? 'Vos niveaux ont été validés par l’IA. Rien d’autre à faire ici.'
-                  : 'Your levels have been validated by AI. Nothing else to do here.'}
+                {t('profile.languages.allVerifiedHelp')}
               </p>
             </div>
           </div>
@@ -281,7 +267,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
           {totalCount > 0 ? (
             languagesList.map((lang: any, index: number) => {
               const stars = getProficiencyStars(lang.proficiency);
-              const languageName = typeof lang.language === 'object' && lang.language ? lang.language.name : 'Unknown Language';
+              const languageName = typeof lang.language === 'object' && lang.language ? lang.language.name : t('profile.languages.unknown');
               const languageCode = typeof lang.language === 'object' && lang.language ? lang.language.code : '';
               const ar = lang.assessmentResults;
               const isVerified = isLanguageVerified(lang);
@@ -340,12 +326,12 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       >
                         {isVerified ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                         {isVerified
-                          ? (isFr ? 'Vérifié' : 'Verified')
+                          ? t('profile.languages.verified')
                           : isCvEstimate
-                            ? (isFr ? 'Estimé (CV)' : 'CV estimate')
+                            ? t('profile.languages.cvEstimate')
                             : mustReVerify && hasScores
-                              ? (isFr ? 'Niveau à re-vérifier' : 'Re-verify level')
-                              : (isFr ? 'À valider' : 'To verify')}
+                              ? t('profile.languages.reverify')
+                              : t('profile.languages.toVerify')}
                       </span>
                     </div>
 
@@ -373,9 +359,9 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       <>
                         <div className="mt-4 grid grid-cols-3 gap-2.5">
                           {[
-                            { label: isFr ? 'Aisance' : 'Fluency', value: ar.fluency?.score || 0 },
-                            { label: isFr ? 'Niveau' : 'Proficiency', value: ar.proficiency?.score || 0 },
-                            { label: isFr ? 'Complét.' : 'Comp.', value: ar.completeness?.score || 0 },
+                            { label: t('profile.languages.fluency'), value: ar.fluency?.score || 0 },
+                            { label: t('profile.languages.proficiency'), value: ar.proficiency?.score || 0 },
+                            { label: t('profile.languages.completeness'), value: ar.completeness?.score || 0 },
                           ].map((metric) => (
                             <div key={metric.label} className="text-center">
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{metric.label}</div>
@@ -391,24 +377,18 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         </div>
                         {isCvEstimate && (
                           <p className="mt-2.5 text-[11px] font-medium text-sky-600 leading-snug">
-                            {isFr
-                              ? 'Estimation à partir du CV — enregistrez une vidéo pour valider.'
-                              : 'Estimated from your CV — record a video to validate.'}
+                            {t('profile.languages.cvHelp')}
                           </p>
                         )}
                         {isExperienceSource && (
                           <p className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 leading-snug">
                             <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
-                            {isFr
-                              ? 'Niveau détecté depuis votre vidéo d’expérience.'
-                              : 'Level detected from your experience video.'}
+                            {t('profile.languages.experienceSource')}
                           </p>
                         )}
                         {mustReVerify && hasScores && (
                           <p className="mt-2.5 text-[11px] font-medium text-amber-700 leading-snug">
-                            {isFr
-                              ? `Niveau modifié (vérifié : ${getVerifiedProficiency(lang)}). Enregistrez une vidéo pour valider ${String(lang.proficiency || '').toUpperCase()}.`
-                              : `Level changed (verified: ${getVerifiedProficiency(lang)}). Record a video to validate ${String(lang.proficiency || '').toUpperCase()}.`}
+                            {t('profile.languages.levelChanged', { verified: getVerifiedProficiency(lang), current: String(lang.proficiency || '').toUpperCase() })}
                           </p>
                         )}
                       </>
@@ -416,9 +396,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       <div className="mt-4 flex items-center gap-2 rounded-xl bg-yellow-50/70 border border-yellow-200 px-3 py-2.5">
                         <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                         <p className="text-xs font-semibold text-yellow-700 leading-snug">
-                          {isFr
-                            ? 'Niveau non vérifié — enregistrez ici pour lancer la vérification IA.'
-                            : 'Level not verified — record here to start AI verification.'}
+                          {t('profile.languages.levelUnverified')}
                         </p>
                       </div>
                     )}
@@ -439,12 +417,12 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                           {languageMedia.source === 'experience' ? (
                             <>
                               <Briefcase className="w-3.5 h-3.5" />
-                              {isFr ? 'Voir vidéo expérience & analyse' : 'View experience video & analysis'}
+                              {t('profile.languages.viewExperienceAnalysis')}
                             </>
                           ) : (
                             <>
                               <PlayCircle className="w-3.5 h-3.5" />
-                              {isFr ? 'Voir vidéo & analyse' : 'View video & analysis'}
+                              {t('profile.languages.viewAnalysis')}
                             </>
                           )}
                         </button>
@@ -454,13 +432,11 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         <button
                           type="button"
                           onClick={() => openAssessmentForLang(lang)}
-                          title={isFr
-                            ? 'Enregistrez et laissez l’IA vérifier cette langue'
-                            : 'Record and let AI verify this language'}
+                          title={t('profile.languages.recordTooltip')}
                           className="flex-1 py-2.5 bg-gradient-harx text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-harx-500/25 active:scale-95 hover:opacity-90 inline-flex items-center justify-center gap-1.5"
                         >
                           <Video className="w-3.5 h-3.5" />
-                          {isFr ? 'Enregistrer la vidéo' : 'Record video'}
+                          {t('profile.languages.recordVideo')}
                         </button>
                       )}
                       <button
@@ -469,10 +445,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                         className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-95 ${
                           isVerified ? 'flex-1' : 'px-3.5'
                         }`}
-                        title={isFr ? 'Supprimer la langue' : 'Delete language'}
+                        title={t('profile.languages.deleteLanguage')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span className={isVerified ? 'inline' : 'hidden sm:inline'}>{isFr ? 'Supprimer' : 'Delete'}</span>
+                        <span className={isVerified ? 'inline' : 'hidden sm:inline'}>{t('profile.common.delete')}</span>
                       </button>
                       </div>
                     </div>
@@ -486,10 +462,10 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                 <Globe className="w-8 h-8 text-slate-300" />
               </span>
               <p className="text-slate-600 font-bold">
-                {isFr ? 'Aucune langue ajoutée pour le moment' : 'No languages added yet'}
+                {t('profile.languages.empty')}
               </p>
               <p className="text-xs text-slate-400 mt-1 font-medium">
-                {isFr ? 'Ajoutez une langue ou importez votre CV pour commencer.' : 'Add a language or import your CV to get started.'}
+                {t('profile.languages.emptyHelp')}
               </p>
               <button
                 type="button"
@@ -497,7 +473,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                 className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-harx text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-harx-500/25 transition-all hover:opacity-90 active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
-                {isFr ? 'Ajouter une langue' : 'Add a language'}
+                {t('profile.languages.addLanguage')}
               </button>
             </div>
           )}

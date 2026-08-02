@@ -10,6 +10,7 @@ import { setProfileData } from '../../../utils/authUtils';
 import { Timezone } from '../../../services/api/repWizard';
 import { buildRepPageTitle } from '../../../lib/repSections';
 import { usePageTitle } from '../../../lib/tracking/usePageTitle';
+import { useTranslation } from 'react-i18next';
 
 // Define a type for your profile data - Updated to match new schema
 interface ProfileData {
@@ -49,7 +50,7 @@ interface ProfileData {
     email: string;
     phone?: string;
     languages: Array<{
-      language: string;
+      language: string | { _id: string; name?: string; code?: string };
       proficiency: string;
       iso639_1?: string;
       assessmentResults?: {
@@ -77,7 +78,8 @@ interface ProfileData {
   professionalSummary: {
     yearsOfExperience: string;
     currentRole?: string;
-    industries?: string[];
+    industries?: Array<string | { _id: string; name?: string }>;
+    activities?: Array<string | { _id: string; name?: string }>;
     keyExpertise?: string[];
     notableCompanies?: string[];
     profileDescription?: string;
@@ -120,8 +122,10 @@ interface ProfileData {
   experience: Array<{
     title: string;
     company: string;
+    role?: string;
     startDate: string;
     endDate?: string;
+    description?: string;
     responsibilities?: string[];
     achievements?: string[];
     videoUrl?: string;
@@ -145,6 +149,7 @@ interface ProfileData {
 }
 
 export function Profile() {
+  const { t } = useTranslation();
   console.log('🧩 Profile component initializing');
   const navigate = useNavigate();
   const location = useLocation();
@@ -155,8 +160,8 @@ export function Profile() {
   const [editInitialTab, setEditInitialTab] = useState('profile');
 
   usePageTitle(
-    buildRepPageTitle(isEditing ? 'Modifier le profil' : 'Mon profil'),
-    isEditing ? 'Modifiez votre profil rep HARX.' : 'Consultez votre profil rep HARX.',
+    buildRepPageTitle(t(isEditing ? 'profile.page.editTitle' : 'profile.page.viewTitle')),
+    t(isEditing ? 'profile.page.editDescription' : 'profile.page.viewDescription'),
   );
 
   useEffect(() => {
@@ -189,13 +194,13 @@ export function Profile() {
         setLoading(false);
       } catch (err: any) {
         console.error('❌ Error loading profile:', err);
-        setError(err.message || 'Failed to load profile');
+        setError(err.message || t('profile.page.loadError'));
         setLoading(false);
       }
     };
 
     loadProfile();
-  }, []);
+  }, [t]);
 
   const updateProfileStateAndStorage = (data: ProfileData) => {
     setProfile(data);
@@ -334,7 +339,7 @@ export function Profile() {
         error?.message ||
         error?.error ||
         (typeof error === 'string' ? error : JSON.stringify(error));
-      alert(`Could not add ${type} skill: ${detail}`);
+      alert(t('profile.page.addSkillError', { type, message: serverMessage }));
       // Rollback if API fails
       try {
         const refreshed = await getProfileData();
@@ -493,7 +498,7 @@ export function Profile() {
       title,
       role: title,
       company,
-      startDate: item.startDate || undefined,
+      startDate: item.startDate?.trim() || '',
       endDate: item.endDate || undefined,
       description: item.description ? String(item.description).trim() : undefined,
     };
@@ -527,8 +532,8 @@ export function Profile() {
       title,
       role: title,
       company,
-      startDate: item.startDate || undefined,
-      endDate: item.endDate || undefined,
+      startDate: item.startDate?.trim() || currentExperience[index].startDate,
+      endDate: item.endDate ?? currentExperience[index].endDate,
       description: item.description ? String(item.description).trim() : undefined,
     };
 
@@ -677,7 +682,7 @@ export function Profile() {
     console.log('❌ Profile has error state, showing error message');
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="text-lg text-red-600">Error: {error}</div>
+        <div className="text-lg text-red-600">{t('profile.page.error', { message: error })}</div>
       </div>
     );
   }
@@ -686,15 +691,15 @@ export function Profile() {
     console.log('⚠️ No profile data available');
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="text-lg text-gray-600">No profile data available</div>
+        <div className="text-lg text-gray-600">{t('profile.page.noData')}</div>
       </div>
     );
   }
 
   console.log('🖥️ Rendering profile view with data');
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-full bg-gray-50">
+      <div className="w-full">
         {isEditing ? (
           <ProfileEditView
             profile={profile}

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Clock, CheckCircle, AlertTriangle, RefreshCw, ChevronRight, Pencil } from 'lucide-react';
+import { Clock, CheckCircle, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface OnboardingTabProps {
   profile: any;
@@ -24,6 +25,7 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
   repWizardApi,
   onSaveAvailability
 }) => {
+  const { t } = useTranslation();
   const onboardingPhases = [1, 2, 3, 4];
   const timezoneMismatch = getTimezoneMismatchInfo();
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
@@ -75,7 +77,7 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
       {/* Verification & Alerts Section */}
       {(countryMismatch?.hasMismatch || checkingCountryMismatch || timezoneMismatch) && (
         <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-100/70">
-          <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">Verification Notices</h2>
+          <h2 className="text-xl font-black text-harx-900 tracking-tight mb-5">{t('profile.availability.verificationNotices')}</h2>
           
           <div className="space-y-4">
             {/* Country Mismatch */}
@@ -83,9 +85,9 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
               <div className="p-5 bg-rose-50/50 border border-rose-100/50 rounded-2xl flex items-start gap-4">
                 <AlertTriangle className="w-6 h-6 text-rose-500 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="font-black text-rose-800 text-sm uppercase tracking-wide">Location Mismatch</h4>
+                  <h4 className="font-black text-rose-800 text-sm uppercase tracking-wide">{t('profile.availability.locationMismatch')}</h4>
                   <p className="text-sm text-rose-700 mt-1 leading-relaxed">
-                    Account registered from <span className="font-bold underline">{countryMismatch.firstLoginCountry}</span>, but your profile specifies <span className="font-bold underline">{countryMismatch.selectedCountry}</span>.
+                    {t('profile.availability.locationMismatchText', { registered: countryMismatch.firstLoginCountry, selected: countryMismatch.selectedCountry })}
                   </p>
                 </div>
               </div>
@@ -96,9 +98,9 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
               <div className="p-5 bg-amber-50/50 border border-amber-100/50 rounded-2xl flex items-start gap-4">
                 <Clock className="w-6 h-6 text-amber-500 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="font-black text-amber-800 text-sm uppercase tracking-wide">Timezone Synchronization</h4>
+                  <h4 className="font-black text-amber-800 text-sm uppercase tracking-wide">{t('profile.availability.timezoneSynchronization')}</h4>
                   <p className="text-sm text-amber-700 mt-1 leading-relaxed">
-                    Your working timezone (<span className="font-bold">{timezoneMismatch.timezoneName}</span>) belongs to <span className="font-bold">{timezoneMismatch.timezoneCountry}</span>, while your profile country is <span className="font-bold">{timezoneMismatch.selectedCountry}</span>.
+                    {t('profile.availability.timezoneMismatchText', { timezone: timezoneMismatch.timezoneName, timezoneCountry: timezoneMismatch.timezoneCountry, profileCountry: timezoneMismatch.selectedCountry })}
                   </p>
                 </div>
               </div>
@@ -108,7 +110,7 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
             {checkingCountryMismatch && showLoadingSpinner && (
               <div className="flex items-center gap-3 p-5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl">
                 <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
-                <span className="text-sm font-bold text-indigo-700">Verifying location data...</span>
+                <span className="text-sm font-bold text-indigo-700">{t('profile.availability.verifying')}</span>
               </div>
             )}
           </div>
@@ -117,7 +119,7 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
 
       {/* Detailed Onboarding Progress */}
       <div className="bg-harx-alt-50/25 backdrop-blur-md rounded-3xl p-6 shadow-sm border border-harx-alt-100/70">
-        <h2 className="text-xl font-black text-harx-alt-900 tracking-tight mb-6">Onboarding Progress</h2>
+        <h2 className="text-xl font-black text-harx-alt-900 tracking-tight mb-6">{t('profile.availability.onboardingProgress')}</h2>
         <div className="space-y-4">
           {onboardingPhases.map((phaseNum) => {
             const phaseKey = `phase${phaseNum}`;
@@ -143,16 +145,16 @@ export const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-slate-900 uppercase">Phase {phaseNum}</span>
+                    <span className="text-sm font-black text-slate-900 uppercase">{t('profile.availability.phase', { number: phaseNum })}</span>
                     <span className={`
                       text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter
                       ${isCompleted ? 'bg-emerald-100/80 text-emerald-700' : 'bg-slate-200 text-slate-600'}
                     `}>
-                      {status.replace('_', ' ')}
+                      {t(`profile.availability.statuses.${status}`)}
                     </span>
                   </div>
                   <div className="text-xs font-medium text-slate-500 mt-1">
-                    {isCompleted ? 'Steps successfully verified' : 'Requires additional information'}
+                    {isCompleted ? t('profile.availability.stepsVerified') : t('profile.availability.requiresInformation')}
                   </div>
                 </div>
                 

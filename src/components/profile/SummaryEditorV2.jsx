@@ -10,79 +10,6 @@ import { Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 
-// Bilingual (EN/FR) strings for the CV review page. The active language is read
-// from i18next; we fall back to English when a key/locale is missing.
-const PAGE_STRINGS = {
-  stepBadge: { en: 'Step 3 · Verify & save', fr: 'Étape 3 · Vérifier et enregistrer' },
-  pageTitle: { en: 'Your professional story', fr: 'Votre parcours professionnel' },
-  pageSubtitle: {
-    en: 'Review the information extracted from your CV. Edit anything that needs a correction, then continue.',
-    fr: 'Vérifiez les informations extraites de votre CV. Corrigez ce qui doit l’être, puis continuez.',
-  },
-  confirmContinue: { en: 'Confirm to continue', fr: 'Confirmer pour continuer' },
-  continueToProfile: { en: 'Continue to my profile', fr: 'Continuer vers mon profil' },
-  everythingGood: {
-    en: 'Everything looks good? Continue to your full REPS profile.',
-    fr: 'Tout est bon ? Continuez vers votre profil REPS complet.',
-  },
-  edit: { en: 'Edit', fr: 'Modifier' },
-  save: { en: 'Save', fr: 'Enregistrer' },
-  saving: { en: 'Saving…', fr: 'Enregistrement…' },
-  cancel: { en: 'Cancel', fr: 'Annuler' },
-  personalInfo: { en: 'Personal information', fr: 'Informations personnelles' },
-  name: { en: 'Name', fr: 'Nom' },
-  country: { en: 'Country', fr: 'Pays' },
-  email: { en: 'Email', fr: 'E-mail' },
-  phone: { en: 'Phone', fr: 'Téléphone' },
-  experienceLabel: { en: 'Experience', fr: 'Expérience' },
-  languages: { en: 'Languages', fr: 'Langues' },
-  professionalExperience: { en: 'Professional Experience', fr: 'Expérience professionnelle' },
-  addExperience: { en: 'Add Experience', fr: 'Ajouter une expérience' },
-  workingHours: { en: 'Working Hours & Availability', fr: 'Horaires de travail et disponibilité' },
-  professionalSummary: { en: 'Professional summary', fr: 'Résumé professionnel' },
-  summarySubtitle: {
-    en: 'AI-generated from your CV — edit or regenerate anytime.',
-    fr: 'Généré par IA à partir de votre CV — modifiable ou régénérable à tout moment.',
-  },
-  regenerate: { en: 'Regenerate', fr: 'Régénérer' },
-  generating: { en: 'Generating…', fr: 'Génération…' },
-  notableCompanies: { en: 'Notable Companies', fr: 'Entreprises notables' },
-  noSummary: {
-    en: 'No summary yet. Click Edit, then Regenerate to create one from your CV.',
-    fr: 'Pas encore de résumé. Cliquez sur Modifier, puis Régénérer pour en créer un à partir de votre CV.',
-  },
-  summaryPlaceholder: { en: 'Edit your professional summary...', fr: 'Modifiez votre résumé professionnel...' },
-  warnVideoTitle: {
-    en: 'A video is required for each experience',
-    fr: 'Une vidéo est requise pour chaque expérience',
-  },
-  warnAddExp: {
-    en: 'Add at least one experience, then record a video for it.',
-    fr: 'Ajoutez au moins une expérience, puis enregistrez une vidéo pour celle-ci.',
-  },
-  warnBottom: {
-    en: 'Record a video for every experience above to unlock the “Continue” button.',
-    fr: 'Enregistrez une vidéo pour chaque expérience ci-dessus pour débloquer le bouton « Continuer ».',
-  },
-  warnBottomAvail: {
-    en: 'Set your working schedule above to unlock the “Continue” button.',
-    fr: 'Renseignez vos horaires de travail ci-dessus pour débloquer le bouton « Continuer ».',
-  },
-  recordAnalyze: { en: 'Record & Analyze with AI', fr: 'Enregistrer et analyser avec l’IA' },
-  viewAnalysis: { en: 'View AI Analysis', fr: 'Voir l’analyse IA' },
-  expVideoMissing: {
-    en: 'Video required — record a video for this experience to continue.',
-    fr: 'Vidéo requise — enregistrez une vidéo pour cette expérience afin de continuer.',
-  },
-  expVideoDone: { en: 'Video recorded', fr: 'Vidéo enregistrée' },
-  availMissing: {
-    en: 'Availability not set — click Edit to add your working schedule.',
-    fr: 'Disponibilité non renseignée — cliquez sur Modifier pour ajouter vos horaires de travail.',
-  },
-  savedSuccess: { en: 'Saved successfully!', fr: 'Enregistré avec succès !' },
-  saveError: { en: 'Error saving. Please try again.', fr: 'Erreur lors de l’enregistrement. Veuillez réessayer.' },
-};
-
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
 // Flip back to true to restore them.
@@ -210,6 +137,7 @@ const getUserId = (profileData) => {
 
 // Move ExperienceForm outside the main component
 const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
+  const { t } = useTranslation('translation', { keyPrefix: 'profileImportReview.experienceForm' });
   console.log('ExperienceForm rendered with:', { experience, isNew });
 
   const [formData, setFormData] = useState({
@@ -309,7 +237,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
     <div className="space-y-4 bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative z-10">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('jobTitle')}</label>
           <input
             type="text"
             value={formData.title}
@@ -318,12 +246,12 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
               handleInputChange('title', e.target.value);
             }}
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-harx-500 focus:border-harx-500 bg-white"
-            placeholder="e.g. Software Engineer"
+            placeholder={t('jobTitlePlaceholder')}
             autoComplete="off"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('company')}</label>
           <input
             type="text"
             value={formData.company}
@@ -332,12 +260,12 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
               handleInputChange('company', e.target.value);
             }}
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-harx-500 focus:border-harx-500 bg-white"
-            placeholder="e.g. Tech Corp"
+            placeholder={t('companyPlaceholder')}
             autoComplete="off"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('startDate')}</label>
           <input
             type="date"
             value={formData.startDate}
@@ -349,7 +277,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('endDate')}</label>
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -374,14 +302,14 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
                 }}
                 className="rounded border-gray-300 cursor-pointer"
               />
-              Present
+              {t('present')}
             </label>
           </div>
         </div>
       </div>
 
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">Responsibilities</label>
+        <label className="block text-sm font-medium text-gray-700">{t('responsibilities')}</label>
         {formData.responsibilities.map((resp, index) => (
           <div key={index} className="flex gap-2 items-center">
             <input
@@ -392,7 +320,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
                 handleResponsibilityChange(index, e.target.value);
               }}
               className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-harx-500 focus:border-harx-500 bg-white"
-              placeholder="Add a responsibility"
+              placeholder={t('responsibilityPlaceholder')}
               autoComplete="off"
             />
             {formData.responsibilities.length > 1 && (
@@ -403,7 +331,8 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
                 }}
                 className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors duration-200"
                 type="button"
-                title="Remove responsibility"
+                title={t('removeResponsibility')}
+                aria-label={t('removeResponsibility')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -423,7 +352,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          Add Responsibility
+          {t('addResponsibility')}
         </button>
       </div>
 
@@ -436,7 +365,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
           type="button"
         >
-          Cancel
+          {t('cancel')}
         </button>
         <button
           onClick={() => {
@@ -446,7 +375,7 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
           className="px-4 py-2 text-sm font-medium text-white bg-harx-600 rounded-lg hover:bg-harx-700 transition-colors duration-200"
           type="button"
         >
-          {isNew ? 'Add Experience' : 'Save Changes'}
+          {isNew ? t('addExperience') : t('saveChanges')}
         </button>
       </div>
     </div>
@@ -481,10 +410,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   console.log("generatedSummary : ", generatedSummary);
   const [editedSummary, setEditedSummary] = useState(generatedSummary);
   const [loading, setLoading] = useState(false);
-  const { i18n } = useTranslation();
+  const { t: i18nT, i18n } = useTranslation();
   const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const otherLang = uiLang === 'fr' ? 'en' : 'fr';
-  const t = (key) => PAGE_STRINGS[key]?.[uiLang] || PAGE_STRINGS[key]?.en || key;
+  const t = (key, options) => i18nT(`profileImportReview.${key}`, options);
 
   // Build/refresh the { en, fr } mirror for a single free-text field on save:
   // the active locale takes the edited value, the other locale is re-translated.
@@ -599,14 +528,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [firstLoginLocation, setFirstLoginLocation] = useState(null);
   const [videoModalExp, setVideoModalExp] = useState(null);
 
-  const proficiencyLevels = [
-    { value: 'A1', label: 'A1 - Beginner', description: 'Can understand and use basic phrases, introduce themselves' },
-    { value: 'A2', label: 'A2 - Elementary', description: 'Can communicate in simple, routine situations' },
-    { value: 'B1', label: 'B1 - Intermediate', description: 'Can deal with most situations while traveling, describe experiences' },
-    { value: 'B2', label: 'B2 - Upper Intermediate', description: 'Can interact fluently with native speakers, produce clear text' },
-    { value: 'C1', label: 'C1 - Advanced', description: 'Can use language flexibly, produce clear well-structured text' },
-    { value: 'C2', label: 'C2 - Mastery', description: 'Can understand virtually everything, express spontaneously' }
-  ];
+  const proficiencyLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((value) => ({
+    value,
+    label: t(`proficiency.${value}.label`),
+    description: t(`proficiency.${value}.description`),
+  }));
 
   useEffect(() => {
     if (profileData) {
@@ -773,10 +699,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     if (detected) {
       tzAutoDetectedRef.current = true;
       handleAvailabilityChangeLocal('timeZone', detected);
-      showToast(
-        `Fuseau horaire détecté automatiquement : ${detected.zoneName}. Vous pouvez le modifier si besoin.`,
-        'success'
-      );
+      showToast(t('toasts.timezoneDetected', { timezone: detected.zoneName }), 'success');
     }
   }, [countries, firstLoginLocation, editedProfile?.availability?.timeZone]);
 
@@ -919,7 +842,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       // Auto-suggest this timezone (only if no timezone is currently set or if forced)
       if (!editedProfile.availability?.timeZone || forceUpdate) {
         handleAvailabilityChangeLocal('timeZone', primaryTimezone);
-        showToast(`Timezone ${forceUpdate ? 'updated' : 'automatically set'} to ${primaryTimezone.zoneName} based on your country. You can change it if needed.`, 'success');
+        showToast(t(forceUpdate ? 'toasts.timezoneUpdated' : 'toasts.timezoneSet', { timezone: primaryTimezone.zoneName }), 'success');
       }
     }
   };
@@ -930,7 +853,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     if (currentCountry) {
       suggestTimezoneForCountry(currentCountry, true);
     } else {
-      showToast('Please select a country first to get timezone suggestions.', 'error');
+      showToast(t('toasts.selectCountryFirst'), 'error');
     }
   };
 
@@ -1024,12 +947,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     const timezoneCountryCode = currentTimezone.countryCode;
 
     if (selectedCountryCode !== timezoneCountryCode) {
-      const timezoneCountryName = countries.find(c => c.countryCode === timezoneCountryCode)?.countryName || 'Unknown';
+      const timezoneCountryName = countries.find(c => c.countryCode === timezoneCountryCode)?.countryName || t('unknown');
       const selectedCountryName = typeof selectedCountry === 'object' ? selectedCountry.countryName : selectedCountry;
 
       return {
         matches: false,
-        message: `Your timezone is set to ${timezoneCountryName}, but your country is ${selectedCountryName}. This is fine if you work across time zones.`
+        message: t('timezoneMismatch', { timezoneCountry: timezoneCountryName, profileCountry: selectedCountryName })
       };
     }
 
@@ -1084,10 +1007,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-amber-800 mb-1">Location Notice</h4>
+            <h4 className="text-sm font-semibold text-amber-800 mb-1">{t('locationNotice')}</h4>
             <div className="text-sm text-amber-700 space-y-1">
               <p>
-                Your profile shows <strong>{mismatch.profileCountry.name}</strong>, but your first login was from <strong>{mismatch.firstLoginCountry.name}</strong>
+                {t('locationMismatchPrefix')} <strong>{mismatch.profileCountry.name}</strong>, {t('locationMismatchMiddle')} <strong>{mismatch.firstLoginCountry.name}</strong>
                 {mismatch.firstLoginCountry.city && (
                   <span className="text-amber-600">
                     {' '}({mismatch.firstLoginCountry.city}
@@ -1096,7 +1019,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 )}
               </p>
               <p className="text-xs text-amber-600 mt-2">
-                💡 If this seems incorrect, you can update your country selection above.
+                {t('locationMismatchHint')}
               </p>
             </div>
           </div>
@@ -1116,13 +1039,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     // Validate languages (at least one required)
     if (!editedProfile.personalInfo.languages?.length) {
-      errors.languages = 'At least one language is required';
+      errors.languages = t('validation.languageRequired');
       console.error('Languages validation failed:', errors.languages);
     }
 
     // Validate name
     if (!editedProfile.personalInfo.name?.trim()) {
-      errors.name = 'Name is required';
+      errors.name = t('validation.nameRequired');
       console.error('Name validation failed:', errors.name);
     }
 
@@ -1131,7 +1054,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       ? editedProfile.personalInfo.country?.countryCode
       : editedProfile.personalInfo.country;
     if (!countryValue?.trim()) {
-      errors.country = 'Country is required';
+      errors.country = t('validation.countryRequired');
       console.error('Country validation failed:', errors.country);
     }
 
@@ -1149,30 +1072,30 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     // Validate industries (at least one required) — skipped while the section is hidden.
     if (SHOW_PROFILE_DETAILS && !editedProfile.professionalSummary.industries?.length) {
-      errors.industries = 'At least one industry is required';
+      errors.industries = t('validation.industryRequired');
       console.error('Industries validation failed:', errors.industries);
     }
 
     // Validate notable companies (at least one required)
     if (!editedProfile.professionalSummary.notableCompanies?.length) {
-      errors.companies = 'At least one notable company is required';
+      errors.companies = t('validation.companyRequired');
       console.error('Companies validation failed:', errors.companies);
     }
 
     if (!editedProfile.personalInfo.email?.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t('validation.emailRequired');
       console.error('Email validation failed:', errors.email);
     } else if (!emailRegex.test(editedProfile.personalInfo.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = t('validation.emailInvalid');
       console.error('Email validation failed:', errors.email);
     }
 
     // Validate phone
     if (!editedProfile.personalInfo.phone?.trim()) {
-      errors.phone = 'Phone number is required';
+      errors.phone = t('validation.phoneRequired');
       console.error('Phone validation failed:', errors.phone);
     } else if (!phoneRegex.test(editedProfile.personalInfo.phone.replace(/\s+/g, ''))) {
-      errors.phone = 'Please enter a valid phone number';
+      errors.phone = t('validation.phoneInvalid');
       console.error('Phone validation failed:', errors.phone);
     }
 
@@ -1207,26 +1130,26 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     // Validation rules
     const validations = {
-      name: (val) => val.trim() ? '' : 'Name is required',
+      name: (val) => val.trim() ? '' : t('validation.nameRequired'),
       country: (val) => {
         const countryValue = typeof val === 'object' ? val?.countryCode : val;
-        return countryValue?.trim() ? '' : 'Country is required';
+        return countryValue?.trim() ? '' : t('validation.countryRequired');
       },
       email: (val) => {
-        if (!val.trim()) return 'Email is required';
+        if (!val.trim()) return t('validation.emailRequired');
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(val) ? '' : 'Please enter a valid email address';
+        return emailRegex.test(val) ? '' : t('validation.emailInvalid');
       },
       phone: (val) => {
-        if (!val.trim()) return 'Phone is required';
+        if (!val.trim()) return t('validation.phoneRequired');
         const phoneRegex = /^\+?[\d\s-]{10,}$/;
-        return phoneRegex.test(val) ? '' : 'Please enter a valid phone number';
+        return phoneRegex.test(val) ? '' : t('validation.phoneInvalid');
       },
-      languages: (val) => val.length === 0 ? 'At least one language is required' : ''
+      languages: (val) => val.length === 0 ? t('validation.languageRequired') : ''
     };
 
     // Get the appropriate validation function
-    const validateField = validations[field] || ((val) => val.trim() ? '' : `${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
+    const validateField = validations[field] || ((val) => val.trim() ? '' : t('validation.fieldRequired', { field }));
 
     // Run validation
     const validationError = validateField(value);
@@ -1286,7 +1209,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       if (updatedIndustries.length === 0) {
         setValidationErrors(prev => ({
           ...prev,
-          industries: 'At least one industry is required'
+          industries: t('validation.industryRequired')
         }));
       } else {
         // Clear validation error if there are still industries
@@ -1406,7 +1329,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       if (updatedCompanies.length === 0) {
         setValidationErrors(prev => ({
           ...prev,
-          companies: 'At least one notable company is required'
+          companies: t('validation.companyRequired')
         }));
       } else {
         // Clear validation error if there are still companies
@@ -1437,7 +1360,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     if (!tempLanguage.languageObj) {
       setValidationErrors(prev => ({
         ...prev,
-        languages: 'Please select a language'
+        languages: t('validation.selectLanguage')
       }));
       return;
     }
@@ -1451,7 +1374,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       if (isAlreadySelected) {
         setValidationErrors(prev => ({
           ...prev,
-          languages: 'This language is already selected'
+          languages: t('validation.languageSelected')
         }));
         return;
       }
@@ -1496,7 +1419,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       if (updatedLanguages.length === 0) {
         setValidationErrors(prev => ({
           ...prev,
-          languages: 'At least one language is required'
+          languages: t('validation.languageRequired')
         }));
       } else {
         // Clear validation error if there are still languages
@@ -1573,11 +1496,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
       setIsEditing(false);
-      showToast('Professional summary has been regenerated! Click Save to apply changes.');
+      showToast(t('toasts.summaryRegenerated'));
 
     } catch (error) {
       console.error('Failed to regenerate summary:', error);
-      showToast('Failed to regenerate summary. Please try again.', 'error');
+      showToast(t('toasts.summaryRegenerateFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -1697,7 +1620,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         }
       } catch (error) {
         console.error(`Error adding ${type}:`, error);
-        alert(`Failed to add ${type}: ${error.message}`);
+        alert(t('errors.addItem', { type, message: error.message }));
       }
     };
 
@@ -1710,12 +1633,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           if (updatedData.length === 0 && type === 'industries') {
             setValidationErrors(prev => ({
               ...prev,
-              industries: 'At least one industry is required'
+              industries: t('validation.industryRequired')
             }));
           } else if (updatedData.length === 0 && type === 'notableCompanies') {
             setValidationErrors(prev => ({
               ...prev,
-              companies: 'At least one notable company is required'
+              companies: t('validation.companyRequired')
             }));
           } else {
             // Clear validation error if there are still items
@@ -1762,7 +1685,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         }
       } catch (error) {
         console.error(`Error removing ${type}:`, error);
-        alert(`Failed to remove ${type}: ${error.message}`);
+        alert(t('errors.removeItem', { type, message: error.message }));
       }
     };
 
@@ -1854,7 +1777,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 if (typeof skillData === 'object' && skillData !== null) {
                   // New structure: skill.skill.name
                   if (skillData.skill && typeof skillData.skill === 'object') {
-                    return skillData.skill.name || skillData.skill.skill || skillData.skill.title || `Skill ${index + 1}`;
+                    return skillData.skill.name || skillData.skill.skill || skillData.skill.title || t('skillFallback', { number: index + 1 });
                   }
 
                   // Direct structure: skill.name
@@ -1873,7 +1796,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 }
 
                 // Fallback
-                return `Skill ${index + 1}`;
+                return t('skillFallback', { number: index + 1 });
               };
 
               const skillName = getSkillName(skill);
@@ -1930,7 +1853,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
-                    <option value="" disabled className="text-gray-400 bg-white">Select {title.toLowerCase().replace(' skills', '')} skills...</option>
+                    <option value="" disabled className="text-gray-400 bg-white">{t('selectSkills', { type: title })}</option>
                     {Object.entries(skillData).map(([category, categorySkills]) => (
                       <optgroup label={category} key={category} className="font-bold text-harx-900 bg-harx-50/50">
                         {categorySkills.map(skill => {
@@ -1953,7 +1876,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                               disabled={isSelected}
                               className={`py-2 px-4 ${isSelected ? 'text-gray-400 bg-gray-50 italic' : 'text-gray-700 bg-white hover:bg-harx-50'}`}
                             >
-                              {skill.name} {isSelected ? '(Selected)' : ''}
+                              {skill.name} {isSelected ? t('selectedSuffix') : ''}
                             </option>
                           );
                         })}
@@ -1976,7 +1899,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
-                    <option value="" disabled className="text-gray-400 bg-white">Select industries...</option>
+                    <option value="" disabled className="text-gray-400 bg-white">{t('selectIndustries')}</option>
                     {availableIndustries.length > 0 ? (
                       availableIndustries.map((industry) => {
                         const isSelected = safeSkills.some(item =>
@@ -1990,12 +1913,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             disabled={isSelected}
                             className={`py-2 px-4 ${isSelected ? 'text-gray-400 bg-gray-50 italic' : 'text-gray-700 bg-white hover:bg-harx-50'}`}
                           >
-                            {industry.name} {isSelected ? '(Selected)' : ''}
+                            {industry.name} {isSelected ? t('selectedSuffix') : ''}
                           </option>
                         );
                       })
                     ) : (
-                      <option value="" disabled>No industries available</option>
+                      <option value="" disabled>{t('noIndustries')}</option>
                     )}
                   </select>
                 </div>
@@ -2014,11 +1937,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     className="profile-form-select w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl bg-white text-gray-700 text-sm font-medium outline-none focus:ring-4 focus:ring-harx-500/10 focus:border-harx-500 cursor-pointer transition-all duration-200 hover:border-harx-300 hover:shadow-md shadow-sm"
                     defaultValue=""
                   >
-                    <option value="" disabled className="text-gray-400 bg-white">Select activities...</option>
+                    <option value="" disabled className="text-gray-400 bg-white">{t('selectActivities')}</option>
                     {availableActivities.length > 0 ? (
                       Object.entries(
                         availableActivities.reduce((groups, activity) => {
-                          const category = activity.category || 'Other';
+                          const category = activity.category || t('other');
                           if (!groups[category]) groups[category] = [];
                           groups[category].push(activity);
                           return groups;
@@ -2037,14 +1960,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                                 disabled={isSelected}
                                 className={`py-2 px-4 ${isSelected ? 'text-gray-400 bg-gray-50 italic' : 'text-gray-700 bg-white hover:bg-harx-50'}`}
                               >
-                                {activity.name} {isSelected ? '(Selected)' : ''}
+                                {activity.name} {isSelected ? t('selectedSuffix') : ''}
                               </option>
                             );
                           })}
                         </optgroup>
                       ))
                     ) : (
-                      <option value="" disabled>No activities available</option>
+                      <option value="" disabled>{t('noActivities')}</option>
                     )}
                   </select>
                 </div>
@@ -2055,7 +1978,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     value={getTempValue()}
                     onChange={(e) => handleTempChange(e.target.value)}
                     className="flex-1 p-2 border rounded-md bg-white/50"
-                    placeholder={`Add ${title.toLowerCase()}`}
+                    placeholder={t('addPlaceholder', { type: title.toLowerCase() })}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -2070,7 +1993,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Add
+                    {t('add')}
                   </button>
                 </>
               )}
@@ -2083,7 +2006,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   const renderExperienceSection = () => {
     const formatDate = (date) => {
-      if (date === 'present') return 'Present';
+      if (date === 'present') return t('present');
       if (!date) return '';
       try {
         const dateObj = new Date(date);
@@ -2160,7 +2083,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             });
                           }}
                           className="p-2 text-harx-600 hover:text-harx-700 bg-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-harx-200"
-                          title="Edit experience"
+                          title={t('editExperience')}
+                          aria-label={t('editExperience')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2169,7 +2093,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         <button
                           onClick={() => handleRemoveExperience(index)}
                           className="p-2 text-red-600 hover:text-red-700 bg-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 border border-red-200"
-                          title="Remove experience"
+                          title={t('removeExperience')}
+                          aria-label={t('removeExperience')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -2343,10 +2268,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       // Validate the dates
       if (isNaN(processedExperience.startDate.getTime())) {
-        throw new Error('Invalid start date');
+        throw new Error(t('validation.startDateInvalid'));
       }
       if (!experienceData.isPresent && isNaN(processedExperience.endDate.getTime())) {
-        throw new Error('Invalid end date');
+        throw new Error(t('validation.endDateInvalid'));
       }
 
       // Create a new array with the new experience at the beginning
@@ -2375,7 +2300,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       });
     } catch (error) {
       console.error('Error adding experience:', error);
-      alert('Error adding experience: ' + error.message);
+      alert(t('errors.addExperience', { message: error.message }));
     }
   };
 
@@ -2452,7 +2377,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       const { isValid, errors } = validateProfile();
       if (!isValid) {
         setValidationErrors(errors);
-        showToast('Please fix validation errors before saving', 'error');
+        showToast(t('toasts.fixValidation'), 'error');
         return;
       }
 
@@ -2503,11 +2428,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       setHasUnsavedChanges(false);
       setEditingProfile(false);
-      showToast('Profile saved successfully!', 'success');
+      showToast(t('toasts.profileSaved'), 'success');
 
     } catch (error) {
       console.error('Error saving profile:', error);
-      showToast('Error saving profile. Please try again.', 'error');
+      showToast(t('toasts.profileSaveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -2723,7 +2648,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </svg>
           </span>
         </span>
-        <p className="mt-5 text-gray-700 font-medium">Loading your profile…</p>
+        <p className="mt-5 text-gray-700 font-medium">{t('loadingProfile')}</p>
       </div>
     );
   }
@@ -2808,9 +2733,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <p className="mt-1 text-sm font-semibold text-red-600">
                     {experienceList.length === 0
                       ? t('warnAddExp')
-                      : uiLang === 'fr'
-                      ? `${missingVideosCount} expérience${experienceList.length > 1 ? 's' : ''} sur ${experienceList.length} ${missingVideosCount > 1 ? 'n’ont' : 'n’a'} pas encore de vidéo. Utilisez le bouton « ${t('recordAnalyze')} » sur chaque expérience ci-dessous. Vous ne pouvez pas continuer tant que toutes les vidéos ne sont pas enregistrées.`
-                      : `${missingVideosCount} of ${experienceList.length} experience${experienceList.length > 1 ? 's' : ''} still ${missingVideosCount > 1 ? 'need' : 'needs'} a video. Use the “Record & Analyze with AI” button on each experience below. You can’t continue until all videos are recorded.`}
+                      : t('missingVideos', { count: missingVideosCount, total: experienceList.length })}
                   </p>
                 </div>
               </div>
@@ -2826,18 +2749,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             {isSectionEditing('basic') ? (
               <>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">👤 Name</h3>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">👤 {t('name')}</h3>
                   <input
                     type="text"
                     value={editedProfile.personalInfo.name}
                     onChange={(e) => handleProfileChange('name', e.target.value)}
                     className="w-full p-2 border rounded-md bg-white/50"
-                    placeholder="Enter your name"
+                    placeholder={t('namePlaceholder')}
                   />
                   {renderError(validationErrors.name, 'name')}
                 </div>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 Country</h3>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('country')}</h3>
                   <div className="relative country-selector">
                     <input
                       type="text"
@@ -2847,7 +2770,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       onChange={handleCountryInputChange}
                       onFocus={handleCountryInputFocus}
                       className="w-full p-2 pr-8 border rounded-md bg-white/50"
-                      placeholder="Search for your country..."
+                      placeholder={t('countryPlaceholder')}
                     />
                     {!isSearching && editedProfile.personalInfo.country && (
                       <button
@@ -2858,7 +2781,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                           setShowCountryDropdown(true);
                         }}
                         className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        title="Clear selection"
+                        title={t('clearSelection')}
+                        aria-label={t('clearSelection')}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2875,7 +2799,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Clear selection
+                            {t('clearSelection')}
                           </button>
                         )}
                         {filteredCountries.length > 0 ? (
@@ -2890,9 +2814,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             </button>
                           ))
                         ) : countrySearch ? (
-                          <div className="px-4 py-2 text-sm text-gray-500">No countries found matching "{countrySearch}"</div>
+                          <div className="px-4 py-2 text-sm text-gray-500">{t('noCountriesMatch', { search: countrySearch })}</div>
                         ) : (
-                          <div className="px-4 py-2 text-sm text-gray-500">Start typing to search for countries</div>
+                          <div className="px-4 py-2 text-sm text-gray-500">{t('searchCountriesHint')}</div>
                         )}
                       </div>
                     )}
@@ -2901,29 +2825,29 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
                 </div>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">📧 Email</h3>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">📧 {t('email')}</h3>
                   <input
                     type="email"
                     value={editedProfile.personalInfo.email}
                     onChange={(e) => handleProfileChange('email', e.target.value)}
                     className="w-full p-2 border rounded-md bg-white/50"
-                    placeholder="Enter your email"
+                    placeholder={t('emailPlaceholder')}
                   />
                   {renderError(validationErrors.email, 'email')}
                 </div>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">📱 Phone</h3>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">📱 {t('phone')}</h3>
                   <input
                     type="tel"
                     value={editedProfile.personalInfo.phone}
                     onChange={(e) => handleProfileChange('phone', e.target.value)}
                     className="w-full p-2 border rounded-md bg-white/50"
-                    placeholder="Enter your phone number"
+                    placeholder={t('phonePlaceholder')}
                   />
                   {renderError(validationErrors.phone, 'phone')}
                 </div>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl col-span-2">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 Languages</h3>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('languages')}</h3>
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
                       {editedProfile.personalInfo.languages.map((lang, index) => {
@@ -2984,7 +2908,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             <button
                               onClick={() => removeLanguage(index)}
                               className="text-gray-400 hover:text-red-500 transition-colors duration-200"
-                              title="Remove language"
+                              title={t('removeLanguage')}
+                              aria-label={t('removeLanguage')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3009,7 +2934,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                           }}
                           onFocus={() => setShowLanguageDropdown(true)}
                           className="w-full p-2 border rounded-md bg-white/50"
-                          placeholder="Search for a language..."
+                          placeholder={t('languagePlaceholder')}
                         />
                         {showLanguageDropdown && (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto z-20">
@@ -3041,9 +2966,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                                   </button>
                                 ))
                               ) : languageSearch ? (
-                                <div className="px-4 py-2 text-sm text-gray-500">No languages found matching "{languageSearch}"</div>
+                                <div className="px-4 py-2 text-sm text-gray-500">{t('noLanguagesMatch', { search: languageSearch })}</div>
                               ) : (
-                                <div className="px-4 py-2 text-sm text-gray-500">Start typing to search for languages</div>
+                                <div className="px-4 py-2 text-sm text-gray-500">{t('searchLanguagesHint')}</div>
                               );
                             })()}
                           </div>
@@ -3094,13 +3019,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Add
+                        {t('add')}
                       </button>
                     </div>
 
                     {/* Proficiency Level Descriptions */}
                     <div className="mt-4 bg-white rounded-lg p-4 border border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Language Proficiency Levels:</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">{t('proficiencyTitle')}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {proficiencyLevels.map(level => (
                           <div
@@ -3170,7 +3095,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 />
                 <ProfileReadField
                   label={t('experienceLabel')}
-                  value={`${editedProfile.professionalSummary?.yearsOfExperience || 0} ${uiLang === 'fr' ? 'ans' : 'years'}`}
+                  value={t('yearsExperience', { count: Number(editedProfile.professionalSummary?.yearsOfExperience || 0) })}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -3218,11 +3143,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           <div className="space-y-6">
             {SHOW_PROFILE_DETAILS && (
               <>
-                {renderSkillSection('Technical Skills', editedProfile.skills?.technical || [], 'technical')}
-                {renderSkillSection('Professional Skills', editedProfile.skills?.professional || [], 'professional')}
-                {renderSkillSection('Soft Skills', editedProfile.skills?.soft || [], 'soft')}
-                {renderSkillSection('Industries', editedProfile.professionalSummary?.industries || [], 'industries')}
-                {renderSkillSection('Activities', editedProfile.professionalSummary?.activities || [], 'activities')}
+                {renderSkillSection(t('technicalSkills'), editedProfile.skills?.technical || [], 'technical')}
+                {renderSkillSection(t('professionalSkills'), editedProfile.skills?.professional || [], 'professional')}
+                {renderSkillSection(t('softSkills'), editedProfile.skills?.soft || [], 'soft')}
+                {renderSkillSection(t('industries'), editedProfile.professionalSummary?.industries || [], 'industries')}
+                {renderSkillSection(t('activities'), editedProfile.professionalSummary?.activities || [], 'activities')}
               </>
             )}
             {renderSkillSection(t('notableCompanies'), editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies', isSectionEditing('companies'))}
@@ -3240,7 +3165,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 {/* Simple Working Hours and Days Selector */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <div className="mb-8">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Default Working Hours</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">{t('availability.defaultHours')}</label>
                     <div className="flex items-center gap-4 max-w-md">
                       <input
                         type="time"
@@ -3260,7 +3185,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         }}
                         className="w-32 p-2 border rounded"
                       />
-                      <span className="text-gray-500">to</span>
+                      <span className="text-gray-500">{t('availability.to')}</span>
                       <input
                         type="time"
                         value={editedProfile.availability?.tempHours?.end || '17:00'}
@@ -3292,13 +3217,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         }}
                         className="px-4 py-2 text-sm text-harx-600 bg-harx-50 rounded hover:bg-harx-100"
                       >
-                        Apply to Selected Days
+                        {t('availability.applySelectedDays')}
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-4">Working Days</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-4">{t('availability.workingDays')}</label>
                     <div className="space-y-4">
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
                         const daySchedule = editedProfile.availability?.schedule?.find(s => s.day === day);
@@ -3311,12 +3236,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                               }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-800">{day}</span>
+                              <span className="font-medium text-gray-800">{t(`availability.days.${day}`)}</span>
                               <div className="flex items-center gap-8">
                                 {daySchedule && (
                                   <div className="flex items-center gap-6">
                                     <div className="flex-1 min-w-[140px]">
-                                      <label className="block text-xs text-gray-500 mb-1">Start</label>
+                                      <label className="block text-xs text-gray-500 mb-1">{t('availability.start')}</label>
                                       <input
                                         type="time"
                                         value={daySchedule.hours.start}
@@ -3333,7 +3258,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                                       />
                                     </div>
                                     <div className="flex-1 min-w-[140px]">
-                                      <label className="block text-xs text-gray-500 mb-1">End</label>
+                                      <label className="block text-xs text-gray-500 mb-1">{t('availability.end')}</label>
                                       <input
                                         type="time"
                                         value={daySchedule.hours.end}
@@ -3377,7 +3302,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                                 >
-                                  {daySchedule ? 'Remove' : 'Add'}
+                                  {daySchedule ? t('remove') : t('add')}
                                 </button>
                               </div>
                             </div>
@@ -3390,7 +3315,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                 {/* Time Zone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Time Zone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('availability.timezone')}</label>
                   <div className="flex gap-2 max-w-2xl">
                     <div className="relative timezone-selector flex-1">
                       <input
@@ -3402,7 +3327,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         onChange={handleTimezoneInputChange}
                         onFocus={handleTimezoneInputFocus}
                         className="w-full p-2 pr-8 border rounded bg-white"
-                        placeholder="Search for your timezone..."
+                        placeholder={t('availability.timezonePlaceholder')}
                       />
                       {!isSearchingTimezone && getCurrentTimezone() && (
                         <button
@@ -3413,7 +3338,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             setShowTimezoneDropdown(true);
                           }}
                           className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          title="Clear selection"
+                          title={t('clearSelection')}
+                          aria-label={t('clearSelection')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3430,7 +3356,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                              Clear selection
+                              {t('clearSelection')}
                             </button>
                           )}
                           {filteredTimezones.length > 0 ? (
@@ -3448,9 +3374,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                               </button>
                             ))
                           ) : timezoneSearch ? (
-                            <div className="px-4 py-2 text-sm text-gray-500">No timezones found matching "{timezoneSearch}"</div>
+                            <div className="px-4 py-2 text-sm text-gray-500">{t('availability.noTimezoneMatch', { search: timezoneSearch })}</div>
                           ) : (
-                            <div className="px-4 py-2 text-sm text-gray-500">Start typing to search for timezones</div>
+                            <div className="px-4 py-2 text-sm text-gray-500">{t('availability.searchTimezoneHint')}</div>
                           )}
                         </div>
                       )}
@@ -3460,12 +3386,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     <button
                       onClick={suggestTimezoneForCurrentCountry}
                       className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
-                      title="Suggest timezone based on your selected country"
+                      title={t('availability.suggestTimezoneTooltip')}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Suggest from Country
+                      {t('availability.suggestFromCountry')}
                     </button>
                   </div>
 
@@ -3479,7 +3405,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <div>
-                            <p className="text-sm text-amber-800 font-medium">Timezone Notice</p>
+                            <p className="text-sm text-amber-800 font-medium">{t('availability.timezoneNotice')}</p>
                             <p className="text-xs text-amber-700 mt-1">{matchCheck.message}</p>
                           </div>
                         </div>
@@ -3490,7 +3416,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                 {/* Schedule Flexibility */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Schedule Flexibility</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('availability.flexibility')}</label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       'Remote Work Available',
@@ -3516,7 +3442,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                       >
-                        {option}
+                        {t(`availability.options.${option}`)}
                       </button>
                     ))}
                   </div>
@@ -3535,11 +3461,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                 {/* Schedule Display */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Working Schedule</h4>
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">{t('availability.schedule')}</h4>
                   <div className="space-y-2">
                     {editedProfile.availability?.schedule?.map((schedule) => (
                       <div key={schedule.day} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <span className="font-medium">{schedule.day}</span>
+                        <span className="font-medium">{t(`availability.days.${schedule.day}`)}</span>
                         <span className="text-gray-600">
                           {schedule.hours.start} - {schedule.hours.end}
                         </span>
@@ -3550,13 +3476,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                 {/* Time Zone Display */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Time Zone</h4>
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">{t('availability.timezone')}</h4>
                   <p className="text-gray-800">
                     {(() => {
                       const currentTz = getCurrentTimezone();
                       return currentTz
                         ? `${currentTz.countryName} - ${currentTz.zoneName} (GMT${currentTz.gmtOffset >= 0 ? '+' : ''}${Math.floor(currentTz.gmtOffset / 3600)}:${Math.abs(currentTz.gmtOffset % 3600 / 60).toString().padStart(2, '0')})`
-                        : 'Not specified';
+                        : t('notSpecified');
                     })()}
                   </p>
 
@@ -3570,7 +3496,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <div>
-                            <p className="text-sm text-amber-800 font-medium">Timezone Notice</p>
+                            <p className="text-sm text-amber-800 font-medium">{t('availability.timezoneNotice')}</p>
                             <p className="text-xs text-amber-700 mt-1">{matchCheck.message}</p>
                           </div>
                         </div>
@@ -3581,14 +3507,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                 {/* Schedule Flexibility Display */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Schedule Flexibility</h4>
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">{t('availability.flexibility')}</h4>
                   <div className="flex flex-wrap gap-2">
                     {editedProfile.availability?.flexibility?.map((option) => (
                       <span
                         key={option}
                         className="px-4 py-2 bg-gray-50 text-gray-700 rounded"
                       >
-                        {option}
+                        {t(`availability.options.${option}`)}
                       </span>
                     ))}
                   </div>
@@ -3614,7 +3540,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    {loading ? 'Generating…' : 'Regenerate'}
+                    {loading ? t('generating') : t('regenerate')}
                   </button>
                 )}
                 {renderSectionControls('summary')}

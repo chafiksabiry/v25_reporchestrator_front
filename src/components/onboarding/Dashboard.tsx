@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   UserPlus,
   UserCircle,
@@ -28,13 +29,13 @@ import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig'
 // Define the phase interface
 interface Phase {
   id: number;
-  name: string;
-  description: string;
+  nameKey: string;
+  descriptionKey: string;
   icon: React.ElementType;
   path: string;
   status: 'completed' | 'in-progress' | 'pending';
-  requiredActions: string[];
-  optionalActions: string[];
+  requiredActionKeys: string[];
+  optionalActionKeys: string[];
   completedActions?: number[];
 }
 
@@ -141,144 +142,145 @@ interface AgentData {
 const phaseTemplates = [
   {
     id: 1,
-    name: 'Sign Up & Verification',
-    description: 'Complete your account setup and verify your identity',
+    nameKey: 'repOnboarding.phases.signup.name',
+    descriptionKey: 'repOnboarding.phases.signup.description',
     icon: UserPlus,
     path: '/orchestrator/signup',
-    requiredActions: [
-      'Create your REPS account with email',
-      'Verify your email address'
+    requiredActionKeys: [
+      'repOnboarding.actions.createAccount',
+      'repOnboarding.actions.verifyEmail'
     ],
-    optionalActions: [
-      'Confirm location based on IP Address',
-      'Complete identity verification',
-      'Set up two-factor authentication'
+    optionalActionKeys: [
+      'repOnboarding.actions.confirmLocation',
+      'repOnboarding.actions.verifyIdentity',
+      'repOnboarding.actions.enableTwoFactor'
     ]
   },
   {
     id: 2,
-    name: 'Profile Creation',
-    description: 'Build your professional profile',
+    nameKey: 'repOnboarding.phases.profile.name',
+    descriptionKey: 'repOnboarding.phases.profile.description',
     icon: UserCircle,
     path: '/orchestrator/profile',
-    requiredActions: [
-      'Add your work experience',
-      'Record a video for each experience'
+    requiredActionKeys: [
+      'repOnboarding.actions.addExperience',
+      'repOnboarding.actions.recordExperienceVideo'
     ],
-    optionalActions: [
-      'Upload a professional photo',
-      'Complete your bio',
-      'Set your availability hours'
+    optionalActionKeys: [
+      'repOnboarding.actions.uploadPhoto',
+      'repOnboarding.actions.completeBio',
+      'repOnboarding.actions.setAvailability'
     ]
   },
   {
     id: 4,
-    name: 'Subscription Plan',
-    description: 'Choose your membership level',
+    nameKey: 'repOnboarding.phases.subscription.name',
+    descriptionKey: 'repOnboarding.phases.subscription.description',
     icon: CreditCard,
     path: '/orchestrator/subscription',
-    requiredActions: [
-      'Activate subscription'
+    requiredActionKeys: [
+      'repOnboarding.actions.activateSubscription'
     ],
-    optionalActions: []
+    optionalActionKeys: []
   },
   {
     id: 5,
-    name: 'Marketplace Access',
-    description: 'Browse and apply for gigs',
+    nameKey: 'repOnboarding.phases.marketplace.name',
+    descriptionKey: 'repOnboarding.phases.marketplace.description',
     icon: ShoppingBag,
     path: '/marketplace',
-    requiredActions: [
-      'Apply or enroll in a gig'
+    requiredActionKeys: [
+      'repOnboarding.actions.applyToGig'
     ],
-    optionalActions: [
-      'Review available opportunities',
-      'Set up gig preferences'
+    optionalActionKeys: [
+      'repOnboarding.actions.reviewOpportunities',
+      'repOnboarding.actions.setGigPreferences'
     ]
   },
   {
     id: 6,
-    name: 'Operations Launch',
-    description: 'Start your first gig',
+    nameKey: 'repOnboarding.phases.operations.name',
+    descriptionKey: 'repOnboarding.phases.operations.description',
     icon: PhoneCall,
     path: '/orchestrator/operations',
-    requiredActions: [
-      'Review assigned tasks',
-      'Set up communication tools'
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewTasks',
+      'repOnboarding.actions.setupCommunication'
     ],
-    optionalActions: [
-      'Complete first client briefing',
-      'Schedule your first session',
-      'Review performance metrics'
+    optionalActionKeys: [
+      'repOnboarding.actions.completeBriefing',
+      'repOnboarding.actions.scheduleFirstSession',
+      'repOnboarding.actions.reviewMetrics'
     ]
   },
   {
     id: 7,
-    name: 'Support & Training',
-    description: 'Access resources and community',
+    nameKey: 'repOnboarding.phases.support.name',
+    descriptionKey: 'repOnboarding.phases.support.description',
     icon: Headphones,
     path: '/orchestrator/support',
-    requiredActions: [
-      'Join REPS community',
-      'Complete onboarding training'
+    requiredActionKeys: [
+      'repOnboarding.actions.joinCommunity',
+      'repOnboarding.actions.completeTraining'
     ],
-    optionalActions: [
-      'Access support resources',
-      'Connect with mentor',
-      'Schedule first check-in'
+    optionalActionKeys: [
+      'repOnboarding.actions.accessSupport',
+      'repOnboarding.actions.connectMentor',
+      'repOnboarding.actions.scheduleCheckIn'
     ]
   },
   {
     id: 8,
-    name: 'Quality Control',
-    description: 'Monitor your performance',
+    nameKey: 'repOnboarding.phases.quality.name',
+    descriptionKey: 'repOnboarding.phases.quality.description',
     icon: Shield,
     path: '/orchestrator/quality',
-    requiredActions: [
-      'Review quality guidelines',
-      'Set up performance tracking'
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewQuality',
+      'repOnboarding.actions.setupTracking'
     ],
-    optionalActions: [
-      'Complete quality checklist',
-      'Schedule quality review',
-      'Set performance goals'
+    optionalActionKeys: [
+      'repOnboarding.actions.completeQualityChecklist',
+      'repOnboarding.actions.scheduleQualityReview',
+      'repOnboarding.actions.setPerformanceGoals'
     ]
   },
   {
     id: 9,
-    name: 'Career Growth',
-    description: 'Advance your REPS career',
+    nameKey: 'repOnboarding.phases.career.name',
+    descriptionKey: 'repOnboarding.phases.career.description',
     icon: TrendingUp,
     path: '/orchestrator/career',
-    requiredActions: [
-      'Review career paths',
-      'Set career goals'
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewCareerPaths',
+      'repOnboarding.actions.setCareerGoals'
     ],
-    optionalActions: [
-      'Join specialization track',
-      'Complete advanced training',
-      'Plan certification path'
+    optionalActionKeys: [
+      'repOnboarding.actions.joinSpecialization',
+      'repOnboarding.actions.completeAdvancedTraining',
+      'repOnboarding.actions.planCertification'
     ]
   },
   {
     id: 10,
-    name: 'Wallet & Payments',
-    description: 'Manage your earnings',
+    nameKey: 'repOnboarding.phases.wallet.name',
+    descriptionKey: 'repOnboarding.phases.wallet.description',
     icon: Wallet,
     path: '/orchestrator/wallet',
-    requiredActions: [
-      'Set up payment account',
-      'Configure payout preferences'
+    requiredActionKeys: [
+      'repOnboarding.actions.setupPayment',
+      'repOnboarding.actions.configurePayouts'
     ],
-    optionalActions: [
-      'Review payment schedule',
-      'Set earnings goals',
-      'Enable payment notifications'
+    optionalActionKeys: [
+      'repOnboarding.actions.reviewPaymentSchedule',
+      'repOnboarding.actions.setEarningsGoals',
+      'repOnboarding.actions.enablePaymentNotifications'
     ]
   }
 ];
 
 function Dashboard() {
+  const { t } = useTranslation();
   const [phases, setPhases] = useState<Phase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -472,7 +474,7 @@ function Dashboard() {
         }
 
         if (apiPhase.optionalActions) {
-          const requiredActionsLength = phase.requiredActions.length;
+          const requiredActionsLength = phase.requiredActionKeys.length;
           let optionalCompletedActions: number[] = [];
 
           // For phase 1
@@ -620,7 +622,7 @@ function Dashboard() {
       setLoading(false);
     } catch (err) {
       console.error('Error fetching user progress:', err);
-      setError('Failed to load your progress. Please try again later.');
+      setError(t('repOnboarding.errors.loadProgress'));
       setLoading(false);
     }
   };
@@ -630,7 +632,7 @@ function Dashboard() {
     if (!phase.completedActions) return false;
 
     // Check if all required action indexes are in the completed actions array
-    for (let i = 0; i < phase.requiredActions.length; i++) {
+    for (let i = 0; i < phase.requiredActionKeys.length; i++) {
       if (!phase.completedActions.includes(i)) {
         return false;
       }
@@ -666,7 +668,7 @@ function Dashboard() {
       navigate(phase.path);
     } catch (err) {
       console.error(`Error handling phase action for phase ${phase.id}:`, err);
-      setError('Failed to update phase status. Please try again later.');
+      setError(t('repOnboarding.errors.updatePhase'));
     }
   };
 
@@ -759,7 +761,7 @@ function Dashboard() {
           className="mt-2 bg-red-100 text-red-800 px-4 py-2 rounded"
           onClick={() => window.location.reload()}
         >
-          Retry
+          {t('repOnboarding.retry')}
         </button>
       </div>
     );
@@ -786,14 +788,14 @@ function Dashboard() {
                 <ShoppingBag className="h-6 w-6 text-harx-600" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Marketplace Coming Soon!
+                {t('repOnboarding.comingSoon.title')}
               </h3>
               <p className="text-sm text-gray-800 mb-6 leading-relaxed">
-                We're working hard to bring you an amazing marketplace experience. This feature will be available soon with exciting opportunities to browse and apply for gigs.
+                {t('repOnboarding.comingSoon.description')}
               </p>
               <div className="flex items-center justify-center space-x-2 text-harx-700 mb-6 bg-harx-50/50 py-2 rounded-xl border border-harx-100">
                 <Clock className="h-4 w-4" />
-                <span className="text-sm font-bold">Stay tuned for updates!</span>
+                <span className="text-sm font-bold">{t('repOnboarding.comingSoon.updates')}</span>
               </div>
               <button
                 onClick={() => {
@@ -802,7 +804,7 @@ function Dashboard() {
                 }}
                 className="w-full bg-gradient-harx text-white py-2 px-4 rounded-md hover:shadow-lg hover:shadow-harx-500/30 transition-all font-black uppercase tracking-widest text-xs"
               >
-                Got it, thanks!
+                {t('repOnboarding.comingSoon.confirm')}
               </button>
             </div>
           </div>
@@ -811,9 +813,9 @@ function Dashboard() {
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">REPS Onboarding</h2>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">{t('repOnboarding.title')}</h2>
             <p className="mt-2 text-sm text-gray-700 font-medium">
-              Complete required actions to unlock next phases
+              {t('repOnboarding.subtitle')}
             </p>
           </div>
           <button
@@ -822,17 +824,17 @@ function Dashboard() {
             disabled={syncing}
           >
             <RefreshCw className={`w-3 h-3 mr-2 ${syncing ? 'animate-spin' : ''} text-harx-600`} />
-            {syncing ? 'Syncing...' : 'Refresh Progress'}
+            {syncing ? t('repOnboarding.syncing') : t('repOnboarding.refreshProgress')}
           </button>
         </div>
       <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/40 shadow-xl shadow-harx-500/5 transition-all duration-500 hover:shadow-harx-500/10">
-        <h3 className="text-xs font-black text-harx-700 uppercase tracking-[0.2em] mb-6">Your Progress</h3>
+        <h3 className="text-xs font-black text-harx-700 uppercase tracking-[0.2em] mb-6">{t('repOnboarding.yourProgress')}</h3>
 
         <div className="space-y-6">
           {/* Phases progress */}
           <div>
             <div className="flex justify-between mb-3 text-xs font-black text-gray-600 uppercase tracking-widest">
-              <span>Phases Completed</span>
+              <span>{t('repOnboarding.phasesCompleted')}</span>
               <span className="text-emerald-700 font-black">{visibleCompletedPhases} / {visiblePhaseTemplates.length}</span>
             </div>
             <div className="w-full bg-white/50 rounded-full h-3 p-0.5 border border-white overflow-hidden shadow-inner">
@@ -844,11 +846,11 @@ function Dashboard() {
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/30 pt-6">
           <p className="flex items-center text-xs font-bold text-gray-700 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
             <CheckCircle className="w-4 h-4 mr-3 text-emerald-600" />
-            REQUIRED ACTIONS UNLOCK PHASES
+            {t('repOnboarding.requiredUnlock')}
           </p>
           <p className="flex items-center text-xs font-bold text-gray-700 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
             <AlertCircle className="w-4 h-4 mr-3 text-harx-alt-600" />
-            OPTIONAL ACTIONS IMPROVE PROFILE
+            {t('repOnboarding.optionalImprove')}
           </p>
         </div>
       </div>
@@ -889,33 +891,35 @@ function Dashboard() {
                         </div>
                         <div className="ml-5">
                           <h3 className="text-xl font-black text-gray-900 flex items-center tracking-tight uppercase">
-                            {phase.name}
+                            {t(phase.nameKey)}
                             {!isAvailable && !isComingSoon && (
                               <div className="ml-3 p-1.5 bg-amber-50 rounded-lg border border-amber-100">
                                 <Lock className="w-3 h-3 text-amber-600" />
                               </div>
                             )}
                           </h3>
-                          <p className="mt-1 text-xs font-bold text-gray-600 uppercase tracking-widest">Phase {index + 1} • {phase.description}</p>
+                          <p className="mt-1 text-xs font-bold text-gray-600 uppercase tracking-widest">
+                            {t('repOnboarding.phaseLabel', { number: index + 1, description: t(phase.descriptionKey) })}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center">
                         {isComingSoon ? (
                           <div className="flex items-center text-purple-600 bg-purple-50 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
                             <Clock className="w-4 h-4 mr-2" />
-                            Coming Soon
+                            {t('repOnboarding.statuses.comingSoon')}
                           </div>
                         ) : phase.status === 'completed' ? (
                           <div className="flex items-center text-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-100 shadow-sm shadow-emerald-500/5">
                             <CheckCircle className="w-4 h-4 mr-2" />
-                            Completed
+                            {t('repOnboarding.statuses.completed')}
                           </div>
                         ) : phase.status === 'in-progress' ? (
                           <button
                             onClick={() => handlePhaseAction(phase)}
                             className="inline-flex items-center px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/30 transition-all hover:-translate-y-0.5"
                           >
-                            Continue
+                            {t('repOnboarding.actionsUi.continue')}
                             {isExternalLink ? (
                               <ExternalLink className="ml-2 w-4 h-4" />
                             ) : (
@@ -930,11 +934,11 @@ function Dashboard() {
                               : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed'
                               }`}
                             disabled={!isAvailable}
-                            title={!isAvailable ? "Complete required actions in the previous phase first" : ""}
+                            title={!isAvailable ? t('repOnboarding.completePreviousFirst') : ''}
                           >
                             {isAvailable ? (
                               <>
-                                Start Step
+                                {t('repOnboarding.actionsUi.startStep')}
                                 {isExternalLink ? (
                                   <ExternalLink className="ml-2 w-4 h-4" />
                                 ) : (
@@ -943,7 +947,7 @@ function Dashboard() {
                               </>
                             ) : (
                               <>
-                                Locked
+                                {t('repOnboarding.statuses.locked')}
                                 <Lock className="ml-2 w-3.5 h-3.5" />
                               </>
                             )}
@@ -956,7 +960,7 @@ function Dashboard() {
                       <div className="mb-4 p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-start">
                         <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
                         <p>
-                          Complete the required actions in Phase {visiblePhases[index - 1]?.id} to unlock this phase.
+                          {t('repOnboarding.unlockPhase', { number: index })}
                         </p>
                       </div>
                     )}
@@ -965,11 +969,11 @@ function Dashboard() {
                       {/* Required Actions */}
                       <h4 className="text-xs font-black text-gray-600 uppercase tracking-[0.2em] mb-4 flex items-center">
                         <ListChecks className="w-3.5 h-3.5 mr-2 text-gray-500" />
-                        Required Actions
-                        <span className="ml-3 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 text-[8px] font-black">MUST COMPLETE</span>
+                        {t('repOnboarding.requiredActions')}
+                        <span className="ml-3 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 text-[8px] font-black">{t('repOnboarding.mustComplete')}</span>
                       </h4>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                        {phase.requiredActions.map((action, actionIndex) => {
+                        {phase.requiredActionKeys.map((actionKey, actionIndex) => {
                           const isCompleted = phase.completedActions?.includes(actionIndex);
 
                           return (
@@ -984,23 +988,23 @@ function Dashboard() {
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 )}
                               </div>
-                              <span className="text-xs font-black">{action}</span>
+                              <span className="text-xs font-black">{t(actionKey)}</span>
                             </li>
                           );
                         })}
                       </ul>
 
                       {/* Optional Actions */}
-                      {phase.optionalActions.length > 0 && (
+                      {phase.optionalActionKeys.length > 0 && (
                         <>
                           <h4 className="text-xs font-black text-gray-600 uppercase tracking-[0.2em] mb-4 flex items-center">
                             <Clock className="w-3.5 h-3.5 mr-2 text-gray-500" />
-                            Optional Actions
+                            {t('repOnboarding.optionalActions')}
                           </h4>
                           <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {phase.optionalActions.map((action, actionIndex) => {
+                            {phase.optionalActionKeys.map((actionKey, actionIndex) => {
                               // Calculate the actual index in the completedActions array
-                              const actualIndex = phase.requiredActions.length + actionIndex;
+                              const actualIndex = phase.requiredActionKeys.length + actionIndex;
                               const isCompleted = phase.completedActions?.includes(actualIndex);
 
                               return (
@@ -1013,7 +1017,7 @@ function Dashboard() {
                                       <CheckCircle className="w-3.5 h-3.5" />
                                     )}
                                   </div>
-                                  <span className="text-xs font-black">{action}</span>
+                                  <span className="text-xs font-black">{t(actionKey)}</span>
                                 </li>
                               );
                             })}
@@ -1032,7 +1036,7 @@ function Dashboard() {
       {/* Floating "Next step" guide — points to the next incomplete phase */}
       {nextActionablePhase && (
         <OnboardingNextStepButton
-          title={nextActionablePhase.name}
+          title={t(nextActionablePhase.nameKey)}
           onClick={() => handlePhaseAction(nextActionablePhase)}
         />
       )}

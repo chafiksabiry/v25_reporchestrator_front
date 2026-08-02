@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Zap, Briefcase, Globe, ClipboardCheck, Target, Clock, AlertTriangle } from 'lucide-react';
+import { User, Zap, Briefcase, Globe, Target, Clock, AlertTriangle } from 'lucide-react';
 
 interface ProfileNavbarProps {
   activeTab: string;
@@ -12,16 +12,15 @@ interface ProfileNavbarProps {
 }
 
 export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabChange, warningTabs = [], warningMessages = {} }) => {
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || 'en').slice(0, 2) === 'fr';
-  const defaultWarning = isFr ? 'Action requise sur cet onglet' : 'Action required on this tab';
+  const { t } = useTranslation();
+  const defaultWarning = t('profile.nav.actionRequired');
   const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'experience', label: 'Experience', icon: Briefcase },
-    { id: 'languages', label: 'Languages', icon: Globe },
-    { id: 'skills', label: 'Skills', icon: Zap },
-    { id: 'specialization', label: 'Specialization', icon: Target },
-    { id: 'availability', label: 'Availability', icon: Clock },
+    { id: 'profile', label: t('profile.nav.profile'), icon: User },
+    { id: 'experience', label: t('profile.nav.experience'), icon: Briefcase },
+    { id: 'languages', label: t('profile.nav.languages'), icon: Globe },
+    { id: 'skills', label: t('profile.nav.skills'), icon: Zap },
+    { id: 'specialization', label: t('profile.nav.specialization'), icon: Target },
+    { id: 'availability', label: t('profile.nav.availability'), icon: Clock },
   ];
 
   return (

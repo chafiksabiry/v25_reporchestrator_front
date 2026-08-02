@@ -193,13 +193,15 @@ export function Calendar({ selectedDate, onDateSelect, slots, view = 'month' }: 
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 transition-all hover:shadow-2xl">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4 sm:p-6 lg:p-8 transition-all hover:shadow-2xl">
             {renderHeader()}
-            <div className="relative">
+            <div className="relative overflow-x-auto -mx-1 px-1">
+                <div className="min-w-[640px]">
                 {renderDays()}
                 {renderCells()}
+                </div>
             </div>
-            <div className="mt-6 flex items-center justify-end space-x-6 text-xs font-semibold text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 sm:gap-6 text-xs font-semibold text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100">
                 <div className="flex items-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2 shadow-sm shadow-blue-200"></div>
                     <span>Today</span>
