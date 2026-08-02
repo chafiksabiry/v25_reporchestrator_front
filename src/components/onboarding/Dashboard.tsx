@@ -1,0 +1,1077 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import {
+  UserPlus,
+  UserCircle,
+  CreditCard,
+  ShoppingBag,
+  PhoneCall,
+  Headphones,
+  Shield,
+  TrendingUp,
+  Wallet,
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  ListChecks,
+  MapPin,
+  Lock,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink
+} from 'lucide-react';
+import config from '../../config';
+import progressService, { UserProgress } from '../../services/progressService';
+import { OnboardingNextStepButton } from './OnboardingNextStepButton';
+import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
+
+// Define the phase interface
+interface Phase {
+  id: number;
+  nameKey: string;
+  descriptionKey: string;
+  icon: React.ElementType;
+  path: string;
+  status: 'completed' | 'in-progress' | 'pending';
+  requiredActionKeys: string[];
+  optionalActionKeys: string[];
+  completedActions?: number[];
+}
+
+// API Onboarding progress interface
+interface ApiPhase1RequiredActions {
+  accountCreated: boolean;
+  emailVerified: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase1OptionalActions {
+  locationConfirmed: boolean;
+  identityVerified: boolean;
+  twoFactorEnabled: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase2RequiredActions {
+  experienceAdded: boolean;
+  skillsAdded: boolean;
+  industriesAdded: boolean;
+  activitiesAdded: boolean;
+  availabilitySet: boolean;
+  videoUploaded: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase2OptionalActions {
+  photoUploaded: boolean;
+  bioCompleted: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase3RequiredActions {
+  languageAssessmentDone: boolean;
+  contactCenterAssessmentDone: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase3OptionalActions {
+  technicalEvaluationDone: boolean;
+  bestPracticesReviewed: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase4RequiredActions {
+  subscriptionActivated: boolean;
+  [key: string]: boolean;
+}
+
+interface ApiPhase4OptionalActions {
+  [key: string]: boolean;
+}
+
+interface ApiPhaseData {
+  requiredActions: Record<string, boolean>;
+  optionalActions: Record<string, boolean>;
+  status: 'completed' | 'in_progress' | 'pending';
+  completedAt?: string;
+}
+
+interface ApiPhase1Data extends ApiPhaseData {
+  requiredActions: ApiPhase1RequiredActions;
+  optionalActions: ApiPhase1OptionalActions;
+}
+
+interface ApiPhase2Data extends ApiPhaseData {
+  requiredActions: ApiPhase2RequiredActions;
+  optionalActions: ApiPhase2OptionalActions;
+}
+
+interface ApiPhase3Data extends ApiPhaseData {
+  requiredActions: ApiPhase3RequiredActions;
+  optionalActions: ApiPhase3OptionalActions;
+}
+
+interface ApiPhase4Data extends ApiPhaseData {
+  requiredActions: ApiPhase4RequiredActions;
+  optionalActions: ApiPhase4OptionalActions;
+}
+
+interface ApiOnboardingProgress {
+  phases: {
+    phase1?: ApiPhase1Data;
+    phase2?: ApiPhase2Data;
+    phase3?: ApiPhase3Data;
+    phase4?: ApiPhase4Data;
+    [key: string]: ApiPhaseData | undefined;
+  };
+  currentPhase: number;
+  lastUpdated: string;
+}
+
+// Agent data interface
+interface AgentData {
+  id: string;
+  name?: string;
+  email?: string;
+  status?: string;
+  onboardingProgress?: ApiOnboardingProgress;
+  // Add other agent properties as needed
+}
+
+// Phase template data
+const phaseTemplates = [
+  {
+    id: 1,
+    nameKey: 'repOnboarding.phases.signup.name',
+    descriptionKey: 'repOnboarding.phases.signup.description',
+    icon: UserPlus,
+    path: '/orchestrator/signup',
+    requiredActionKeys: [
+      'repOnboarding.actions.createAccount',
+      'repOnboarding.actions.verifyEmail'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.confirmLocation',
+      'repOnboarding.actions.verifyIdentity',
+      'repOnboarding.actions.enableTwoFactor'
+    ]
+  },
+  {
+    id: 2,
+    nameKey: 'repOnboarding.phases.profile.name',
+    descriptionKey: 'repOnboarding.phases.profile.description',
+    icon: UserCircle,
+    path: '/orchestrator/profile',
+    requiredActionKeys: [
+      'repOnboarding.actions.addExperience',
+      'repOnboarding.actions.recordExperienceVideo'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.uploadPhoto',
+      'repOnboarding.actions.completeBio',
+      'repOnboarding.actions.setAvailability'
+    ]
+  },
+  {
+    id: 4,
+    nameKey: 'repOnboarding.phases.subscription.name',
+    descriptionKey: 'repOnboarding.phases.subscription.description',
+    icon: CreditCard,
+    path: '/orchestrator/subscription',
+    requiredActionKeys: [
+      'repOnboarding.actions.activateSubscription'
+    ],
+    optionalActionKeys: []
+  },
+  {
+    id: 5,
+    nameKey: 'repOnboarding.phases.marketplace.name',
+    descriptionKey: 'repOnboarding.phases.marketplace.description',
+    icon: ShoppingBag,
+    path: '/marketplace',
+    requiredActionKeys: [
+      'repOnboarding.actions.applyToGig'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.reviewOpportunities',
+      'repOnboarding.actions.setGigPreferences'
+    ]
+  },
+  {
+    id: 6,
+    nameKey: 'repOnboarding.phases.operations.name',
+    descriptionKey: 'repOnboarding.phases.operations.description',
+    icon: PhoneCall,
+    path: '/orchestrator/operations',
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewTasks',
+      'repOnboarding.actions.setupCommunication'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.completeBriefing',
+      'repOnboarding.actions.scheduleFirstSession',
+      'repOnboarding.actions.reviewMetrics'
+    ]
+  },
+  {
+    id: 7,
+    nameKey: 'repOnboarding.phases.support.name',
+    descriptionKey: 'repOnboarding.phases.support.description',
+    icon: Headphones,
+    path: '/orchestrator/support',
+    requiredActionKeys: [
+      'repOnboarding.actions.joinCommunity',
+      'repOnboarding.actions.completeTraining'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.accessSupport',
+      'repOnboarding.actions.connectMentor',
+      'repOnboarding.actions.scheduleCheckIn'
+    ]
+  },
+  {
+    id: 8,
+    nameKey: 'repOnboarding.phases.quality.name',
+    descriptionKey: 'repOnboarding.phases.quality.description',
+    icon: Shield,
+    path: '/orchestrator/quality',
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewQuality',
+      'repOnboarding.actions.setupTracking'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.completeQualityChecklist',
+      'repOnboarding.actions.scheduleQualityReview',
+      'repOnboarding.actions.setPerformanceGoals'
+    ]
+  },
+  {
+    id: 9,
+    nameKey: 'repOnboarding.phases.career.name',
+    descriptionKey: 'repOnboarding.phases.career.description',
+    icon: TrendingUp,
+    path: '/orchestrator/career',
+    requiredActionKeys: [
+      'repOnboarding.actions.reviewCareerPaths',
+      'repOnboarding.actions.setCareerGoals'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.joinSpecialization',
+      'repOnboarding.actions.completeAdvancedTraining',
+      'repOnboarding.actions.planCertification'
+    ]
+  },
+  {
+    id: 10,
+    nameKey: 'repOnboarding.phases.wallet.name',
+    descriptionKey: 'repOnboarding.phases.wallet.description',
+    icon: Wallet,
+    path: '/orchestrator/wallet',
+    requiredActionKeys: [
+      'repOnboarding.actions.setupPayment',
+      'repOnboarding.actions.configurePayouts'
+    ],
+    optionalActionKeys: [
+      'repOnboarding.actions.reviewPaymentSchedule',
+      'repOnboarding.actions.setEarningsGoals',
+      'repOnboarding.actions.enablePaymentNotifications'
+    ]
+  }
+];
+
+function Dashboard() {
+  const { t } = useTranslation();
+  const [phases, setPhases] = useState<Phase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userData, setUserData] = useState<{ userId: string; agentId: string | null; token: string | null } | null>(null);
+  const [completedPhases, setCompletedPhases] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const syncIntervalRef = useRef<number | null>(null);
+  const [agentData, setAgentData] = useState<AgentData | null>(null);
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
+  const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone'
+    ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
+    : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+  const repMarketplaceUrl = import.meta.env.VITE_REP_MARKETPLACE_URL || '';
+  const navigate = useNavigate();
+
+  // Fetch agent data from the API
+  const fetchAgentData = async () => {
+    try {
+      const userData = config.getUserData();
+
+      // Skip fetch if agentId is not available
+      if (!userData.agentId || userData.agentId === 'null') {
+        console.log(' ⚠️ No agent ID available, skipping agent data fetch');
+        return null;
+      }
+
+      console.log('🔍 Fetching agent data from API...');
+      const data = await getAgentData();
+      console.log('📊 Agent data received:', data);
+      setAgentData(data);
+
+      // If the agent data includes onboarding progress, use it
+      if (data.onboardingProgress) {
+        console.log('📋 Onboarding progress found in API response:', data.onboardingProgress);
+
+        // Debugging - log Phase 1 data specifically
+        if (data.onboardingProgress.phases.phase1) {
+          console.log('🔍 Phase 1 data from API:', {
+            required: data.onboardingProgress.phases.phase1.requiredActions,
+            optional: data.onboardingProgress.phases.phase1.optionalActions,
+            status: data.onboardingProgress.phases.phase1.status
+          });
+        }
+
+        // Debugging - log Phase 2 data specifically
+        if (data.onboardingProgress.phases.phase2) {
+          console.log('🔍 Phase 2 data from API:', {
+            required: data.onboardingProgress.phases.phase2.requiredActions,
+            optional: data.onboardingProgress.phases.phase2.optionalActions,
+            status: data.onboardingProgress.phases.phase2.status
+          });
+        }
+
+        // Debugging - log Phase 3 data specifically
+        if (data.onboardingProgress.phases.phase3) {
+          console.log('🔍 Phase 3 data from API:', {
+            required: data.onboardingProgress.phases.phase3.requiredActions,
+            optional: data.onboardingProgress.phases.phase3.optionalActions,
+            status: data.onboardingProgress.phases.phase3.status
+          });
+        }
+
+        // Debugging - log Phase 4 data specifically
+        if (data.onboardingProgress.phases.phase4) {
+          console.log('🔍 Phase 4 data from API:', {
+            required: data.onboardingProgress.phases.phase4.requiredActions,
+            optional: data.onboardingProgress.phases.phase4.optionalActions,
+            status: data.onboardingProgress.phases.phase4.status
+          });
+        }
+
+        return data;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('❌ Error fetching agent data:', err);
+      return null;
+    }
+  };
+
+  // Map API phase data to UI phase format
+  const mapApiPhasesToUiPhases = (apiData: AgentData): Phase[] => {
+    if (!apiData.onboardingProgress) {
+      return phaseTemplates.map(phase => ({
+        ...phase,
+        status: 'pending',
+        completedActions: []
+      }));
+    }
+
+    const apiOnboarding = apiData.onboardingProgress;
+
+    // Debugging - log Phase 1 data specifically
+    if (apiOnboarding.phases.phase1) {
+      console.log('🔍 Phase 1 data from API:', {
+        required: apiOnboarding.phases.phase1.requiredActions,
+        optional: apiOnboarding.phases.phase1.optionalActions,
+        status: apiOnboarding.phases.phase1.status
+      });
+    }
+
+    // Debugging - log Phase 3 data specifically
+    if (apiOnboarding.phases.phase3) {
+      console.log('🔍 Phase 3 data from API in mapping function:', {
+        required: apiOnboarding.phases.phase3.requiredActions,
+        optional: apiOnboarding.phases.phase3.optionalActions,
+        status: apiOnboarding.phases.phase3.status
+      });
+    }
+
+    // Debugging - log Phase 4 data specifically
+    if (apiOnboarding.phases.phase4) {
+      console.log('🔍 Phase 4 data from API in mapping function:', {
+        required: apiOnboarding.phases.phase4.requiredActions,
+        optional: apiOnboarding.phases.phase4.optionalActions,
+        status: apiOnboarding.phases.phase4.status
+      });
+    }
+
+    return phaseTemplates.map(phase => {
+      const phaseKey = `phase${phase.id}`;
+      const apiPhase = apiOnboarding.phases[phaseKey as keyof typeof apiOnboarding.phases];
+
+      // Default to pending if this phase doesn't exist in API data
+      let status: 'completed' | 'in-progress' | 'pending' = 'pending';
+      let completedActions: number[] = [];
+
+      if (apiPhase) {
+        // Map API status to UI status
+        if (apiPhase.status === 'completed') {
+          status = 'completed';
+        } else if (apiPhase.status === 'in_progress') {
+          status = 'in-progress';
+        }
+
+        // Map completed actions from API to UI format based on the specific field names
+        if (apiPhase.requiredActions) {
+          // For phase 1
+          if (phase.id === 1 && phaseKey === 'phase1') {
+            const phase1Actions = apiPhase.requiredActions as ApiPhase1RequiredActions;
+            if (phase1Actions.accountCreated) completedActions.push(0);
+            if (phase1Actions.emailVerified) completedActions.push(1);
+
+            // Log the completed required actions for phase 1
+            console.log('🔍 Phase 1 - Mapped required actions:', completedActions);
+          }
+          // For phase 2
+          else if (phase.id === 2 && phaseKey === 'phase2') {
+            const phase2Actions = apiPhase.requiredActions as ApiPhase2RequiredActions;
+            // 0: work experience added, 1: a video recorded for every experience.
+            // Availability is now OPTIONAL (rarely present in a CV) and is mapped
+            // in the optional-actions block below. Skills/industries/activities and
+            // the standalone 1-minute intro video are not shown as required actions.
+            if (phase2Actions.experienceAdded) completedActions.push(0);
+
+            const experiences = (apiData as any).experience;
+            const allExperiencesHaveVideo =
+              Array.isArray(experiences) &&
+              experiences.length > 0 &&
+              experiences.every((exp: any) => exp && (exp.videoUrl || exp.videoAnalysis));
+            if (allExperiencesHaveVideo) completedActions.push(1);
+
+            // Log the completed required actions for phase 2
+            console.log('🔍 Phase 2 - Mapped required actions:', completedActions);
+          }
+          // For phase 3
+          else if (phase.id === 3 && phaseKey === 'phase3') {
+            const phase3Actions = apiPhase.requiredActions as ApiPhase3RequiredActions;
+            if (phase3Actions.languageAssessmentDone) completedActions.push(0);
+            if (phase3Actions.contactCenterAssessmentDone) completedActions.push(1);
+
+            // Log the completed required actions for phase 3
+            console.log('🔍 Phase 3 - Mapped required actions:', completedActions);
+          }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4Actions = apiPhase.requiredActions as ApiPhase4RequiredActions;
+            if (phase4Actions.subscriptionActivated) completedActions.push(0);
+
+            // Log the completed required actions for phase 4
+            console.log('🔍 Phase 4 - Mapped required actions:', completedActions);
+          }
+          // Generic fallback for other phases - use index-based mapping
+          else {
+            Object.values(apiPhase.requiredActions).forEach((isCompleted, index) => {
+              if (isCompleted) {
+                completedActions.push(index);
+              }
+            });
+          }
+        }
+
+        if (apiPhase.optionalActions) {
+          const requiredActionsLength = phase.requiredActionKeys.length;
+          let optionalCompletedActions: number[] = [];
+
+          // For phase 1
+          if (phase.id === 1 && phaseKey === 'phase1') {
+            const phase1OptActions = apiPhase.optionalActions as ApiPhase1OptionalActions;
+            if (phase1OptActions.locationConfirmed) optionalCompletedActions.push(requiredActionsLength + 0);
+            if (phase1OptActions.identityVerified) optionalCompletedActions.push(requiredActionsLength + 1);
+            if (phase1OptActions.twoFactorEnabled) optionalCompletedActions.push(requiredActionsLength + 2);
+
+            // Log the completed optional actions for phase 1
+            console.log('🔍 Phase 1 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // For phase 2
+          else if (phase.id === 2 && phaseKey === 'phase2') {
+            const phase2OptActions = apiPhase.optionalActions as ApiPhase2OptionalActions;
+            const phase2ReqActions = apiPhase.requiredActions as ApiPhase2RequiredActions;
+            if (phase2OptActions.photoUploaded) optionalCompletedActions.push(requiredActionsLength + 0);
+            if (phase2OptActions.bioCompleted) optionalCompletedActions.push(requiredActionsLength + 1);
+            // Availability moved to optional: tick it when the backend flag is set.
+            if (phase2ReqActions?.availabilitySet) optionalCompletedActions.push(requiredActionsLength + 2);
+
+            // Log the completed optional actions for phase 2
+            console.log('🔍 Phase 2 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // For phase 3
+          else if (phase.id === 3 && phaseKey === 'phase3') {
+            const phase3OptActions = apiPhase.optionalActions as ApiPhase3OptionalActions;
+            if (phase3OptActions.technicalEvaluationDone) optionalCompletedActions.push(requiredActionsLength + 0);
+            if (phase3OptActions.bestPracticesReviewed) optionalCompletedActions.push(requiredActionsLength + 1);
+
+            // Log the completed optional actions for phase 3
+            console.log('🔍 Phase 3 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // For phase 4
+          else if (phase.id === 4 && phaseKey === 'phase4') {
+            const phase4OptActions = apiPhase.optionalActions as ApiPhase4OptionalActions;
+            // No additional optional actions for phase 4
+
+            // Log the completed optional actions for phase 4
+            console.log('🔍 Phase 4 - Mapped optional actions:', optionalCompletedActions);
+          }
+          // Generic fallback for other phases
+          else {
+            Object.values(apiPhase.optionalActions).forEach((isCompleted, index) => {
+              if (isCompleted) {
+                optionalCompletedActions.push(requiredActionsLength + index);
+              }
+            });
+          }
+
+          // Add optional completed actions to the completedActions array
+          completedActions = [...completedActions, ...optionalCompletedActions];
+        }
+
+      } else if (phase.id < apiOnboarding.currentPhase) {
+        // If this phase is before the current phase but not in API data,
+        // assume it's completed (for backward compatibility)
+        status = 'completed';
+      } else if (phase.id === apiOnboarding.currentPhase) {
+        // If this is the current phase but not in API data,
+        // assume it's in progress (for backward compatibility)
+        status = 'in-progress';
+      }
+
+      // Marketplace (last phase) has no dedicated backend phase. It completes once
+      // the rep has applied to / enrolled in at least one gig. It unlocks (becomes
+      // in-progress) as soon as the subscription phase (phase4) is completed.
+      if (phase.id === 5) {
+        const gigs = (apiData as any).gigs;
+        const subscriptionDone =
+          apiOnboarding.phases.phase4?.status === 'completed';
+        const hasGigEngagement =
+          Array.isArray(gigs) &&
+          gigs.some((g: any) => g && ['requested', 'enrolled'].includes(g.status));
+
+        if (hasGigEngagement) {
+          status = 'completed';
+          completedActions = [0];
+        } else if (subscriptionDone) {
+          status = 'in-progress';
+          completedActions = [];
+        } else {
+          status = 'pending';
+          completedActions = [];
+        }
+      }
+
+      return {
+        ...phase,
+        status,
+        completedActions
+      };
+    });
+  };
+
+  // Fetch user progress from API
+  const fetchUserProgress = async () => {
+    try {
+      setLoading(true);
+
+      // First try to get agent data from API which may include progress
+      const agent = await fetchAgentData();
+
+      if (agent && agent.onboardingProgress) {
+        console.log('📊 Using onboarding progress from API');
+
+        // Map API data to our UI format
+        const mappedPhases = mapApiPhasesToUiPhases(agent);
+        setPhases(mappedPhases);
+
+        // Calculate completed phases count
+        const completedCount = mappedPhases.filter(p => p.status === 'completed').length;
+        setCompletedPhases(completedCount);
+
+        setLoading(false);
+        return;
+      }
+
+      // Fallback to progress service if no API data
+      console.log('📊 Fallback to progress service');
+      const userProgress = await progressService.getUserProgress();
+
+      // Map the phase templates to include the user's progress
+      const userPhases = phaseTemplates.map(phase => {
+        let status: 'completed' | 'in-progress' | 'pending' = 'pending';
+
+        if (userProgress.completedPhaseIds.includes(phase.id)) {
+          status = 'completed';
+        } else if (phase.id === userProgress.inProgressPhaseId) {
+          status = 'in-progress';
+        }
+
+        // Get completed actions for this phase
+        const completedActions = userProgress.completedActions[phase.id] || [];
+
+        return {
+          ...phase,
+          status,
+          completedActions
+        };
+      });
+
+      setPhases(userPhases);
+      setCompletedPhases(userProgress.completedPhaseIds.length);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching user progress:', err);
+      setError(t('repOnboarding.errors.loadProgress'));
+      setLoading(false);
+    }
+  };
+
+  // Check if all required actions for a phase are completed
+  const areRequiredActionsCompleted = (phase: Phase) => {
+    if (!phase.completedActions) return false;
+
+    // Check if all required action indexes are in the completed actions array
+    for (let i = 0; i < phase.requiredActionKeys.length; i++) {
+      if (!phase.completedActions.includes(i)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Handle phase start or continue
+  const handlePhaseAction = async (phase: Phase) => {
+    try {
+      // Phase 2 (Profile Creation): show the profile page (keeps sidebar + header)
+      if (phase.id === 2) {
+        if (phase.status === 'pending') {
+          await progressService.updatePhaseStatus(phase.id, 'in-progress');
+        }
+        navigate('/profile');
+        return;
+      }
+
+      // Marketplace (last phase): go to the real marketplace, available gigs tab.
+      // The phase completes once the rep applies to / enrolls in a gig.
+      if (phase.id === 5) {
+        navigate('/marketplace');
+        return;
+      }
+
+      if (phase.status === 'pending') {
+        // Start a new phase
+        await progressService.updatePhaseStatus(phase.id, 'in-progress');
+      }
+
+      // Navigate to the phase page (internal route, keeps sidebar + header)
+      navigate(phase.path);
+    } catch (err) {
+      console.error(`Error handling phase action for phase ${phase.id}:`, err);
+      setError(t('repOnboarding.errors.updatePhase'));
+    }
+  };
+
+  useEffect(() => {
+    // Get user data from config
+    const data = config.getUserData();
+    setUserData(data);
+
+    console.log('🚀 Dashboard initializing for agent ID:', data.agentId);
+
+    // Initial fetch
+    fetchUserProgress();
+
+    // Only set up periodic sync if agentId is available
+    if (data.agentId && data.agentId !== 'null') {
+      syncIntervalRef.current = window.setInterval(syncProgressWithBackend, 30000); // Check every 30 seconds
+    } else {
+      console.log(' ⚠️ No agent ID available, skipping periodic sync setup');
+    }
+
+    return () => {
+      // Clean up interval on component unmount
+      if (syncIntervalRef.current) {
+        window.clearInterval(syncIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Sync progress with backend to automatically detect completed actions
+  const syncProgressWithBackend = async () => {
+    try {
+      if (syncing) return; // Prevent multiple syncs at once
+      setSyncing(true);
+
+      console.log('🔄 Syncing progress with backend...');
+
+      const userData = config.getUserData();
+
+      // Skip sync if agentId is not available
+      if (!userData.agentId || userData.agentId === 'null') {
+        console.log(' ⚠️ No agent ID available, skipping backend sync');
+        setSyncing(false);
+        return;
+      }
+
+      const refreshedData = await refreshOnboardingStatus(userData.agentId);
+      console.log('📊 Refreshed onboarding data:', refreshedData);
+
+      if (refreshedData && refreshedData.onboardingProgress) {
+        // Map API data to our UI format
+        const mappedPhases = mapApiPhasesToUiPhases({
+          ...refreshedData,
+          id: userData.agentId
+        });
+
+        // Update phases state
+        setPhases(mappedPhases);
+
+        // Calculate completed phases count
+        const completedCount = mappedPhases.filter(p => p.status === 'completed').length;
+        setCompletedPhases(completedCount);
+
+        console.log('✅ Progress sync completed:', {
+          completedPhases: completedCount,
+          currentPhase: refreshedData.onboardingProgress.currentPhase,
+          lastUpdated: refreshedData.onboardingProgress.lastUpdated
+        });
+      }
+
+      setSyncing(false);
+    } catch (err) {
+      console.error('❌ Error syncing progress with backend:', err);
+      setSyncing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <p>{error}</p>
+        <button
+          className="mt-2 bg-red-100 text-red-800 px-4 py-2 rounded"
+          onClick={() => window.location.reload()}
+        >
+          {t('repOnboarding.retry')}
+        </button>
+      </div>
+    );
+  }
+
+  // Show phases 1-5 (phase 3 removed — assessments via experience videos), hide 6-10
+  const visiblePhases = phases.filter(phase => phase.id <= 5 && phase.id !== 3);
+  const visiblePhaseTemplates = phaseTemplates.filter(phase => phase.id <= 5 && phase.id !== 3);
+  const visibleCompletedPhases = visiblePhases.filter(p => p.status === 'completed').length;
+  const progressPercentage = (visibleCompletedPhases / visiblePhaseTemplates.length) * 100;
+
+  // Next actionable phase = first visible phase that isn't completed yet.
+  // Powers the floating "Next step" guide button (mirrors the company orchestrator).
+  const nextActionablePhase = visiblePhases.find(p => p.status !== 'completed');
+
+  return (
+    <div className="space-y-6">
+      {/* Coming Soon Modal */}
+      {showComingSoonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 shadow-xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-harx-50 mb-4">
+                <ShoppingBag className="h-6 w-6 text-harx-600" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {t('repOnboarding.comingSoon.title')}
+              </h3>
+              <p className="text-sm text-gray-800 mb-6 leading-relaxed">
+                {t('repOnboarding.comingSoon.description')}
+              </p>
+              <div className="flex items-center justify-center space-x-2 text-harx-700 mb-6 bg-harx-50/50 py-2 rounded-xl border border-harx-100">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-bold">{t('repOnboarding.comingSoon.updates')}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowComingSoonModal(false);
+                  navigate('/marketplace');
+                }}
+                className="w-full bg-gradient-harx text-white py-2 px-4 rounded-md hover:shadow-lg hover:shadow-harx-500/30 transition-all font-black uppercase tracking-widest text-xs"
+              >
+                {t('repOnboarding.comingSoon.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">{t('repOnboarding.title')}</h2>
+            <p className="mt-2 text-sm text-gray-700 font-medium">
+              {t('repOnboarding.subtitle')}
+            </p>
+          </div>
+          <button
+            className={`flex items-center px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl bg-white/50 text-gray-800 border border-white/50 shadow-sm backdrop-blur-sm hover:bg-white/80 transition-all duration-300 ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={syncProgressWithBackend}
+            disabled={syncing}
+          >
+            <RefreshCw className={`w-3 h-3 mr-2 ${syncing ? 'animate-spin' : ''} text-harx-600`} />
+            {syncing ? t('repOnboarding.syncing') : t('repOnboarding.refreshProgress')}
+          </button>
+        </div>
+      <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/40 shadow-xl shadow-harx-500/5 transition-all duration-500 hover:shadow-harx-500/10">
+        <h3 className="text-xs font-black text-harx-700 uppercase tracking-[0.2em] mb-6">{t('repOnboarding.yourProgress')}</h3>
+
+        <div className="space-y-6">
+          {/* Phases progress */}
+          <div>
+            <div className="flex justify-between mb-3 text-xs font-black text-gray-600 uppercase tracking-widest">
+              <span>{t('repOnboarding.phasesCompleted')}</span>
+              <span className="text-emerald-700 font-black">{visibleCompletedPhases} / {visiblePhaseTemplates.length}</span>
+            </div>
+            <div className="w-full bg-white/50 rounded-full h-3 p-0.5 border border-white overflow-hidden shadow-inner">
+              <div className="bg-gradient-harx h-full rounded-full transition-all duration-1000 ease-out shadow-sm" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/30 pt-6">
+          <p className="flex items-center text-xs font-bold text-gray-700 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
+            <CheckCircle className="w-4 h-4 mr-3 text-emerald-600" />
+            {t('repOnboarding.requiredUnlock')}
+          </p>
+          <p className="flex items-center text-xs font-bold text-gray-700 bg-white/30 px-4 py-2 rounded-xl border border-white/20">
+            <AlertCircle className="w-4 h-4 mr-3 text-harx-alt-600" />
+            {t('repOnboarding.optionalImprove')}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-6">
+        <h3 className="text-lg font-medium text-blue-900">Your Progress</h3>
+        
+        <div className="mt-4 space-y-4">
+          {/* Phases progress */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="text-sm font-medium text-blue-700">Phases Completed</span>
+              <span className="text-sm font-medium text-blue-700">{visibleCompletedPhases} of {visiblePhaseTemplates.length}</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 text-sm text-blue-700 border-t border-blue-200 pt-4">
+          <p className="flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Complete required actions to unlock the next phase
+          </p>
+          <p className="flex items-center mt-1">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Optional actions improve your profile but are not mandatory
+          </p>
+        </div>
+      </div>
+
+      <div className="relative">
+        <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        <div className="space-y-8">
+          {visiblePhases.map((phase, index) => {
+            const Icon = phase.icon;
+            const isComingSoon = false; // No more coming soon phases since we only show phases 1-5
+            const isAvailable = phase.status === 'completed' || phase.status === 'in-progress' ||
+              (index > 0 && (visiblePhases[index - 1]?.status === 'completed' || areRequiredActionsCompleted(visiblePhases[index - 1])));
+
+            // All phases now navigate internally
+            const isExternalLink = false;
+
+            return (
+              <div key={phase.id} className="relative group/phase">
+                <div className={`absolute left-8 top-10 w-5 h-5 -ml-2.5 rounded-full border-4 z-10 transition-all duration-500 ring-8 ${
+                  phase.status === 'completed' ? 'bg-emerald-500 border-emerald-100 ring-emerald-500/5' :
+                    phase.status === 'in-progress' ? 'bg-harx-alt-500 border-harx-alt-50 ring-harx-alt-500/10 animate-pulse-subtle' :
+                      'bg-white border-gray-100 ring-transparent'
+                  }`}></div>
+                <div className="ml-16 relative">
+                  <div className={`bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl p-8 transition-all duration-500 group-hover/phase:-translate-y-1 ${
+                    phase.status === 'completed' ? 'border-emerald-100 shadow-emerald-500/5' :
+                      phase.status === 'in-progress' ? 'border-harx-alt-100 shadow-harx-alt-500/10' :
+                        'border-gray-50 opacity-80'
+                    } border`}>
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center">
+                        <div className={`p-4 rounded-2xl shadow-sm transition-transform duration-500 group-hover/phase:scale-110 ${
+                          phase.status === 'completed' ? 'bg-emerald-50 text-emerald-500' :
+                            phase.status === 'in-progress' ? 'bg-harx-alt-50 text-harx-alt-500' :
+                              'bg-gray-50 text-gray-400'
+                          }`}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+                        <div className="ml-5">
+                          <h3 className="text-xl font-black text-gray-900 flex items-center tracking-tight uppercase">
+                            {t(phase.nameKey)}
+                            {!isAvailable && !isComingSoon && (
+                              <div className="ml-3 p-1.5 bg-amber-50 rounded-lg border border-amber-100">
+                                <Lock className="w-3 h-3 text-amber-600" />
+                              </div>
+                            )}
+                          </h3>
+                          <p className="mt-1 text-xs font-bold text-gray-600 uppercase tracking-widest">
+                            {t('repOnboarding.phaseLabel', { number: index + 1, description: t(phase.descriptionKey) })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        {isComingSoon ? (
+                          <div className="flex items-center text-purple-600 bg-purple-50 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
+                            <Clock className="w-4 h-4 mr-2" />
+                            {t('repOnboarding.statuses.comingSoon')}
+                          </div>
+                        ) : phase.status === 'completed' ? (
+                          <div className="flex items-center text-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-100 shadow-sm shadow-emerald-500/5">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            {t('repOnboarding.statuses.completed')}
+                          </div>
+                        ) : phase.status === 'in-progress' ? (
+                          <button
+                            onClick={() => handlePhaseAction(phase)}
+                            className="inline-flex items-center px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/30 transition-all hover:-translate-y-0.5"
+                          >
+                            {t('repOnboarding.actionsUi.continue')}
+                            {isExternalLink ? (
+                              <ExternalLink className="ml-2 w-4 h-4" />
+                            ) : (
+                              <ArrowRight className="ml-2 w-4 h-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => isAvailable && handlePhaseAction(phase)}
+                            className={`inline-flex items-center px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isAvailable
+                              ? 'bg-gradient-harx text-white hover:shadow-lg hover:shadow-harx-500/30 hover:-translate-y-0.5'
+                              : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed'
+                              }`}
+                            disabled={!isAvailable}
+                            title={!isAvailable ? t('repOnboarding.completePreviousFirst') : ''}
+                          >
+                            {isAvailable ? (
+                              <>
+                                {t('repOnboarding.actionsUi.startStep')}
+                                {isExternalLink ? (
+                                  <ExternalLink className="ml-2 w-4 h-4" />
+                                ) : (
+                                  <ArrowRight className="ml-2 w-4 h-4" />
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {t('repOnboarding.statuses.locked')}
+                                <Lock className="ml-2 w-3.5 h-3.5" />
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isAvailable && index > 0 && (
+                      <div className="mb-4 p-3 bg-amber-50 text-amber-800 rounded-md text-sm flex items-start">
+                        <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <p>
+                          {t('repOnboarding.unlockPhase', { number: index })}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-6 border-t border-white pt-6">
+                      {/* Required Actions */}
+                      <h4 className="text-xs font-black text-gray-600 uppercase tracking-[0.2em] mb-4 flex items-center">
+                        <ListChecks className="w-3.5 h-3.5 mr-2 text-gray-500" />
+                        {t('repOnboarding.requiredActions')}
+                        <span className="ml-3 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 text-[8px] font-black">{t('repOnboarding.mustComplete')}</span>
+                      </h4>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                        {phase.requiredActionKeys.map((actionKey, actionIndex) => {
+                          const isCompleted = phase.completedActions?.includes(actionIndex);
+
+                          return (
+                            <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
+                              isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 
+                               phase.status === 'in-progress' ? 'bg-white/50 border-white text-gray-800' : 'bg-gray-50/50 border-gray-100 text-gray-600'
+                            }`}>
+                              <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 rotate-0' :
+                                phase.status === 'in-progress' ? 'bg-white border-2 border-harx-alt-600 rotate-0' : 'bg-gray-100 border-2 border-gray-400 rotate-0'
+                                }`}>
+                                {isCompleted && (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
+                              </div>
+                              <span className="text-xs font-black">{t(actionKey)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+
+                      {/* Optional Actions */}
+                      {phase.optionalActionKeys.length > 0 && (
+                        <>
+                          <h4 className="text-xs font-black text-gray-600 uppercase tracking-[0.2em] mb-4 flex items-center">
+                            <Clock className="w-3.5 h-3.5 mr-2 text-gray-500" />
+                            {t('repOnboarding.optionalActions')}
+                          </h4>
+                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {phase.optionalActionKeys.map((actionKey, actionIndex) => {
+                              // Calculate the actual index in the completedActions array
+                              const actualIndex = phase.requiredActionKeys.length + actionIndex;
+                              const isCompleted = phase.completedActions?.includes(actualIndex);
+
+                              return (
+                                <li key={actionIndex} className={`flex items-center p-3 rounded-2xl border transition-all duration-300 ${
+                                  isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 'bg-white/30 border-white/40 text-gray-700'
+                                }`}>
+                                  <div className={`w-6 h-6 rounded-lg mr-4 flex items-center justify-center transition-all duration-500 ${isCompleted ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-2 border-gray-400'
+                                    }`}>
+                                    {isCompleted && (
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-black">{t(actionKey)}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Floating "Next step" guide — points to the next incomplete phase */}
+      {nextActionablePhase && (
+        <OnboardingNextStepButton
+          title={t(nextActionablePhase.nameKey)}
+          onClick={() => handlePhaseAction(nextActionablePhase)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default Dashboard;

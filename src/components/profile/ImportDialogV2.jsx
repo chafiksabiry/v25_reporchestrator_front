@@ -1,0 +1,591 @@
+import React, { useState, useRef } from 'react';
+import { Dialog } from '@headlessui/react';
+import { CVParser } from '../../lib/parsers/cvParser';
+import { useProfile } from '../../hooks/useProfile';
+import { getLanguageByCode, getAllLanguages } from '../../lib/api/languages';
+import {
+  extractBasicInfo,
+  analyzeExperience,
+  analyzeSkills,
+  analyzeAchievements,
+  analyzeAvailability,
+  generateSummary
+} from '../../lib/api/profiles';
+
+import Cookies from 'js-cookie';
+
+import { chunkText, safeJSONParse, retryOperation } from '../../lib/utils/textProcessing';
+import { useTranslation } from 'react-i18next';
+import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18nText';
+
+function ImportDialog({ isOpen, onClose, onImport }) {
+  const { t, i18n } = useTranslation();
+  const activeLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
+  const { createProfile } = useProfile();
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [importType, setImportType] = useState('cv');
+  const fileInputRef = useRef(null);
+  const [progress, setProgress] = useState(0);
+  const [showGuidance, setShowGuidance] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [analysisSteps, setAnalysisSteps] = useState([]);
+  // Flag used to abort the in-flight analysis flow when the user cancels.
+  const cancelledRef = useRef(false);
+
+  const addAnalysisStep = (text, error = false) => {
+    setAnalysisSteps(prev => [...prev, { text, error, timestamp: new Date().toISOString() }]);
+  };
+
+  const resetState = () => {
+    setText('');
+    setLoading(false);
+    setError('');
+    setProgress(0);
+    setShowGuidance(false);
+    setCurrentStep(1);
+    setUploadSuccess(false);
+    setAnalysisSteps([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Close the modal: abort any running analysis and reset the form.
+  const handleClose = () => {
+    cancelledRef.current = true;
+    resetState();
+    onClose();
+  };
+
+  const steps = [
+    {
+      title: t('profileImportDialog.step1Title'),
+      description: t('profileImportDialog.step1Desc')
+    },
+    {
+      title: t('profileImportDialog.step2Title'),
+      description: t('profileImportDialog.step2Desc')
+    },
+    {
+      title: t('profileImportDialog.step3Title'),
+      description: t('profileImportDialog.step3Desc')
+    }
+  ];
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(t('profileImportDialog.errors.fileTooLarge'));
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setProgress(25);
+      setShowGuidance(false);
+      const cvParser = new CVParser();
+      const extractedText = await cvParser.parse(file);
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error(t('profileImportDialog.errors.noText'));
+      }
+
+      setText(extractedText);
+      setError('');
+      setProgress(100);
+      setUploadSuccess(true);
+      setCurrentStep(2);
+    } catch (err) {
+      setError(t('profileImportDialog.errors.readFailed'));
+      console.error('File upload error:', err);
+    } finally {
+      setLoading(false);
+      setProgress(0);
+    }
+  };
+
+
+  const generateProfileSummary = async (data) => {
+    return await generateSummary(data);
+  };
+
+  const parseProfile = async (contentToProcess = text) => {
+    cancelledRef.current = false;
+    setLoading(true);
+    setError('');
+    setProgress(0);
+    setCurrentStep(3);
+    setAnalysisSteps([]);
+
+    // Bail out early if the user clicked Cancel mid-analysis.
+    const ensureNotCancelled = () => {
+      if (cancelledRef.current) throw new Error('__CANCELLED__');
+    };
+
+    try {
+      console.log("contentToProcess :", contentToProcess);
+      if (!contentToProcess.trim()) {
+        throw new Error(t('profileImportDialog.errors.noContent'));
+      }
+
+      addAnalysisStep(t('profileImportDialog.analysis.starting'));
+
+      // Initial analysis to extract basic information
+      const basicInfo = await extractBasicInfo(contentToProcess);
+      ensureNotCancelled();
+      addAnalysisStep(t('profileImportDialog.analysis.basicInfo'));
+      setProgress(20);
+
+      // Analyze work experience
+      const experience = await analyzeExperience(contentToProcess);
+      ensureNotCancelled();
+      addAnalysisStep(t('profileImportDialog.analysis.experience'));
+      setProgress(40);
+
+      // Extract and categorize skills
+      const skills = await analyzeSkills(contentToProcess);
+      ensureNotCancelled();
+      console.log("languages extracted :", skills.languages);
+      console.log("🔍 analyzeSkills result:", skills);
+      console.log("🔍 analyzeExperience result:", experience);
+      if (skills.languages.length === 0) {
+        throw new Error(t('profileImportDialog.errors.languagesRequired'));
+      }
+
+      // Match extracted languages with database languages
+      addAnalysisStep(t('profileImportDialog.analysis.matchingLanguages'));
+      const matchedLanguages = [];
+
+      // Load the full DB language list once so we can fall back to a name match
+      // when the AI-provided ISO code is missing or doesn't resolve. This avoids
+      // silently dropping languages the CV clearly mentions.
+      let allDbLanguages = [];
+      try {
+        allDbLanguages = (await getAllLanguages()) || [];
+      } catch (error) {
+        console.warn('Could not preload language list for name fallback:', error);
+      }
+      const norm = (v) => String(v || '').trim().toLowerCase();
+      const findDbByName = (name) => {
+        const target = norm(name);
+        if (!target) return null;
+        return (
+          allDbLanguages.find((l) => norm(l.name) === target || norm(l.nativeName) === target) ||
+          null
+        );
+      };
+
+      // CEFR level -> initial estimated score (0-100). The CV gives us a level
+      // but no measured score, so we seed a reasonable estimate per language so
+      // each card shows data immediately. These are flagged source:'cv' and stay
+      // "to verify" until the rep records an experience video.
+      const CEFR_BASE_SCORE = { A1: 30, A2: 45, B1: 60, B2: 75, C1: 88, C2: 96 };
+      const buildCvAssessment = (proficiency) => {
+        const base = CEFR_BASE_SCORE[String(proficiency || '').toUpperCase()] ?? 50;
+        return {
+          fluency: { score: base, feedback: '' },
+          proficiency: { score: base, feedback: '' },
+          completeness: { score: base, feedback: '' },
+          overall: { score: base, strengths: '', areasForImprovement: '' },
+          source: 'cv',
+        };
+      };
+
+      const seenLanguageIds = new Set();
+      for (const extractedLang of skills.languages) {
+        let dbLanguage = null;
+
+        if (extractedLang.iso639_1) {
+          try {
+            dbLanguage = await getLanguageByCode(extractedLang.iso639_1);
+          } catch (error) {
+            console.warn(`Code lookup failed for ${extractedLang.iso639_1} (${extractedLang.language}), trying name match:`, error);
+          }
+        }
+
+        // Fall back to a name-based match (covers missing/unknown ISO codes).
+        if (!dbLanguage) {
+          dbLanguage = findDbByName(extractedLang.language);
+        }
+
+        if (!dbLanguage) {
+          console.warn(`Could not match language "${extractedLang.language}" (${extractedLang.iso639_1 || 'no code'}) with the database.`);
+          continue;
+        }
+
+        // Avoid duplicates when code + name resolve to the same DB language.
+        const dedupeKey = dbLanguage._id || dbLanguage.code || norm(dbLanguage.name);
+        if (seenLanguageIds.has(dedupeKey)) continue;
+        seenLanguageIds.add(dedupeKey);
+
+        matchedLanguages.push({
+          language: dbLanguage,
+          proficiency: extractedLang.proficiency,
+          assessmentResults: buildCvAssessment(extractedLang.proficiency)
+        });
+        console.log(`Matched language: ${extractedLang.language} (${extractedLang.iso639_1 || 'name'}) -> ${dbLanguage.name}`);
+      }
+
+      if (matchedLanguages.length === 0) {
+        throw new Error(t('profileImportDialog.errors.languagesUnmatched'));
+      }
+
+      addAnalysisStep(t('profileImportDialog.analysis.skills'));
+      setProgress(60);
+
+      // Extract achievements and projects
+      const achievements = await analyzeAchievements(contentToProcess);
+      ensureNotCancelled();
+      addAnalysisStep(t('profileImportDialog.analysis.achievements'));
+      setProgress(80);
+
+      // Extract availability information
+      const availability = await analyzeAvailability(contentToProcess);
+      ensureNotCancelled();
+      addAnalysisStep(t('profileImportDialog.analysis.availability'));
+      setProgress(85);
+
+      // Ensure all arrays exist with default empty arrays
+      const defaultArrays = {
+        technical: [],
+        professional: [],
+        soft: [],
+        languages: [],
+        keyAreas: [],
+        notableCompanies: [],
+        roles: [],
+        items: []
+      };
+
+      // Default availability if none found in CV
+      const defaultAvailability = {
+        schedule: [],
+        timeZone: null,
+        flexibility: []
+      };
+
+      // Resolve a categorized skill list from whichever source/naming the AI
+      // returned. Prefer the dedicated skills analyzer over experience.
+      const pickSkillList = (key) => {
+        const candidates = [
+          skills?.[key],
+          skills?.[`${key}Skills`],
+          experience?.[`${key}Skills`],
+          experience?.[key],
+        ];
+        const found = candidates.find((c) => Array.isArray(c) && c.length > 0);
+        return found || [];
+      };
+
+      // keyAreas may come back bilingual ({ en, fr }[]) from analyzeExperience — flatten
+      // to string[] for Mongoose keyExpertise while keeping the _i18n mirror.
+      const keyAreasN = normalizeBilingualList(experience.keyAreas || [], activeLang);
+
+      const rawTimeZone = availability?.timeZone;
+      const safeTimeZone =
+        rawTimeZone && String(rawTimeZone).trim() ? rawTimeZone : defaultAvailability.timeZone;
+
+      // Combine all data with proper error handling and defaults
+      const combinedData = {
+        personalInfo: {
+          name: basicInfo.name || '',
+          country: basicInfo.country || '',
+          email: basicInfo.email || '',
+          phone: basicInfo.phone || '',
+          languages: matchedLanguages || defaultArrays.languages
+        },
+        professionalSummary: {
+          yearsOfExperience: Number(basicInfo.yearsOfExperience) || 0,
+          currentRole: basicInfo.currentRole || '',
+          industries: [],
+          activities: [],
+          keyExpertise: keyAreasN.active,
+          keyExpertise_i18n: keyAreasN.i18n,
+          notableCompanies: experience.notableCompanies || defaultArrays.notableCompanies
+        },
+        availability: {
+          schedule: Array.isArray(availability?.schedule) ? availability.schedule : defaultAvailability.schedule,
+          timeZone: safeTimeZone,
+          flexibility: Array.isArray(availability?.flexibility) ? availability.flexibility : defaultAvailability.flexibility,
+        },
+        // Categorized skills come from analyzeSkills (the dedicated skills
+        // analyzer); fall back to analyzeExperience for backwards-compat. Both
+        // naming conventions (`technical` / `technicalSkills`) are supported.
+        skills: {
+          technical: pickSkillList('technical'),
+          professional: pickSkillList('professional'),
+          soft: pickSkillList('soft')
+        },
+        experience: (experience.roles || defaultArrays.roles).map(role => {
+          const startDate = new Date(role.startDate);
+          let endDate = role.endDate === 'present' ? 'present' : new Date(role.endDate);
+
+          if (endDate !== 'present' && isNaN(endDate.getTime())) {
+            throw new Error(`Invalid end date: ${role.endDate}`);
+          }
+
+          // Free-text fields may come back bilingual ({ en, fr }) from the AI.
+          // Store the active-language value plus an _i18n mirror.
+          const titleN = normalizeBilingualText(role.title, activeLang);
+          const respN = normalizeBilingualList(role.responsibilities, activeLang);
+          const achN = normalizeBilingualList(role.achievements, activeLang);
+
+          return {
+            title: titleN.active,
+            title_i18n: titleN.i18n,
+            company: role.company,
+            startDate,
+            endDate,
+            responsibilities: respN.active,
+            responsibilities_i18n: respN.i18n,
+            achievements: achN.active,
+            achievements_i18n: achN.i18n
+          };
+        })
+      };
+
+      addAnalysisStep(t('profileImportDialog.analysis.summary'));
+      setProgress(90);
+
+      // Generate optimized summary (bilingual { en, fr } from the backend).
+      const summaryRaw = await generateProfileSummary(combinedData);
+      ensureNotCancelled();
+      console.log("Generated summary:", summaryRaw);
+
+      // Ensure we have a valid summary
+      if (!summaryRaw) {
+        throw new Error(t('profileImportDialog.errors.summaryFailed'));
+      }
+
+      // Normalize to active string + { en, fr } mirror.
+      const summaryN = normalizeBilingualText(summaryRaw, activeLang);
+      combinedData.professionalSummary.profileDescription = summaryN.active;
+      combinedData.professionalSummary.profileDescription_i18n = summaryN.i18n;
+
+      addAnalysisStep(t('profileImportDialog.analysis.complete'));
+      setProgress(100);
+
+      // Create profile in database and get MongoDB document
+      console.log('Data to store in DB : ', combinedData);
+      const createdProfile = await createProfile(combinedData);
+      ensureNotCancelled();
+      Cookies.set('agentId', createdProfile._id);
+      onImport({ ...createdProfile, generatedSummary: summaryN.active });
+
+      console.log("createdProfile : ", createdProfile);
+      console.log("summary : ", summaryN.active);
+
+      onClose();
+    } catch (err) {
+      // Silent exit when the user cancelled — modal is already closed.
+      if (err.message === '__CANCELLED__' || cancelledRef.current) {
+        return;
+      }
+      console.error('Profile parsing error:', err);
+      const displayError = err.message || t('profileImportDialog.errors.parseFailed');
+      setError(displayError);
+      addAnalysisStep(t('profileImportDialog.analysis.error', { message: displayError }), true);
+    } finally {
+      if (!cancelledRef.current) setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] relative flex flex-col shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="relative px-7 pt-7 pb-5 flex-shrink-0">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-harx-500 to-harx-alt-500 text-white shadow-lg shadow-harx-500/25">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </span>
+                <div>
+                  <Dialog.Title className="text-xl font-extrabold text-gray-900 leading-tight">
+                    {t('profileImportDialog.title')}
+                  </Dialog.Title>
+                  <p className="text-sm text-gray-400 mt-0.5">{t('profileImportDialog.subtitle')}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleClose}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                aria-label={t('profileImportDialog.close')}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* How it works toggle */}
+            <button
+              onClick={() => setShowGuidance((v) => !v)}
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-harx-600 hover:text-harx-700 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {showGuidance ? t('profileImportDialog.hideHowItWorks') : t('profileImportDialog.howItWorks')}
+              <svg
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${showGuidance ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="px-7 pb-2 overflow-y-auto flex-grow">
+            {showGuidance && (
+              <div className="mb-6 rounded-2xl bg-harx-50/70 p-5">
+                <p className="text-sm text-gray-600 mb-4">
+                  {t('profileImportDialog.guidanceDesc')}
+                </p>
+                <div className="space-y-3.5">
+                  {steps.map((step, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 h-6 w-6 rounded-full bg-harx-600 flex items-center justify-center text-white text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <h4 className="text-gray-900 font-semibold text-sm">{step.title}</h4>
+                        <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{step.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-5">
+              <div
+                className={`rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
+                    ? 'bg-green-50'
+                    : 'bg-gray-50 hover:bg-harx-50'
+                  }`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept=".txt,.pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                />
+                {uploadSuccess ? (
+                  <div className="text-green-600">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                    <p className="mt-3 text-lg font-semibold">{t('profileImportDialog.success')}</p>
+                    <p className="text-sm text-green-500 mt-0.5">{t('profileImportDialog.uploadDifferent')}</p>
+                  </div>
+                ) : (
+                  <>
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-sm">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </span>
+                    <p className="mt-4 text-lg font-semibold text-gray-900">{t('profileImportDialog.dropCV')}</p>
+                    <p className="mt-1 text-sm text-gray-500">{t('profileImportDialog.browseFiles')}</p>
+                    <p className="text-xs text-gray-400 mt-2">{t('profileImportDialog.supports')}</p>
+                  </>
+                )}
+              </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 rounded-2xl">
+                  <div className="flex items-start gap-3">
+                    <svg className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-800">{t('profileImportDialog.errorTitle')}</h3>
+                      <p className="text-sm text-red-700 mt-0.5">{error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loading && (
+                <div className="space-y-3">
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>{t('profileImportDialog.stepNof3', { currentStep })}</span>
+                    <span>
+                      {progress < 25 && t('profileImportDialog.preparing')}
+                      {progress >= 25 && progress < 50 && t('profileImportDialog.analyzing')}
+                      {progress >= 50 && progress < 75 && t('profileImportDialog.extracting')}
+                      {progress >= 75 && t('profileImportDialog.generating')}
+                    </span>
+                  </div>
+                  {analysisSteps.length > 0 && (
+                    <div className="mt-3 space-y-1.5 rounded-2xl bg-gray-50 p-4">
+                      {analysisSteps.map((step, index) => (
+                        <div
+                          key={index}
+                          className={`text-sm ${step.error ? 'text-red-600' : 'text-gray-600'}`}
+                        >
+                          {step.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-7 py-5 flex justify-end gap-3 flex-shrink-0 bg-white">
+            <button
+              className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+              onClick={handleClose}
+            >
+              {loading ? t('profileImportDialog.cancelClose') : t('profileImportDialog.cancel')}
+            </button>
+            {text && (
+              <button
+                className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 transition-all duration-200"
+                onClick={() => parseProfile()}
+                disabled={loading || !text}
+              >
+                {loading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {t('profileImportDialog.processing')}
+                  </span>
+                ) : (
+                  t('profileImportDialog.generateSummary')
+                )}
+              </button>
+            )}
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
+  );
+}
+
+export default ImportDialog;

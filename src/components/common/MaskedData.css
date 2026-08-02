@@ -1,0 +1,247 @@
+/**
+ * Styles pour les composants de données masquées
+ */
+
+/* Styles communs pour toutes les données masquées */
+.masked-phone,
+.masked-email,
+.masked-name,
+.masked-amount {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'tnum'; /* Chiffres tabulaires */
+}
+
+/* Téléphone masqué */
+.masked-phone {
+  color: #6B7280;
+  letter-spacing: 0.025em;
+}
+
+.masked-phone .icon {
+  margin-right: 0.5rem;
+  opacity: 0.7;
+}
+
+/* Email masqué */
+.masked-email {
+  color: #6B7280;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 0.95em;
+}
+
+.masked-email .icon {
+  margin-right: 0.5rem;
+  opacity: 0.7;
+}
+
+/* Nom masqué */
+.masked-name {
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Montant masqué */
+.masked-amount {
+  color: #6B7280;
+  font-weight: 600;
+  font-feature-settings: 'tnum';
+  cursor: help;
+  position: relative;
+}
+
+.masked-amount:hover {
+  color: #374151;
+}
+
+/* Composant avec toggle */
+.toggle-masked-data {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #F9FAFB;
+  border-radius: 0.375rem;
+  transition: background-color 0.2s;
+}
+
+.toggle-masked-data:hover {
+  background: #F3F4F6;
+}
+
+.toggle-masked-data .data-value {
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.toggle-masked-data .toggle-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 1rem;
+  opacity: 0.6;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toggle-masked-data .toggle-button:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.toggle-masked-data .toggle-button:active {
+  transform: scale(0.95);
+}
+
+/* Carte de contact masquée */
+.masked-contact-card {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.masked-contact-card .contact-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.masked-contact-card .contact-email,
+.masked-contact-card .contact-phone {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #6B7280;
+}
+
+/* État de confidentialité */
+.privacy-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #059669;
+  background: #D1FAE5;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.privacy-indicator::before {
+  content: '🔒';
+  font-size: 0.875rem;
+}
+
+/* Mode sombre */
+@media (prefers-color-scheme: dark) {
+  .masked-phone,
+  .masked-email,
+  .masked-amount {
+    color: #9CA3AF;
+  }
+
+  .masked-name {
+    color: #D1D5DB;
+  }
+
+  .toggle-masked-data {
+    background: #1F2937;
+  }
+
+  .toggle-masked-data:hover {
+    background: #374151;
+  }
+
+  .toggle-masked-data .data-value {
+    color: #E5E7EB;
+  }
+
+  .masked-contact-card {
+    background: #1F2937;
+    border-color: #374151;
+  }
+
+  .masked-contact-card .contact-name {
+    color: #F9FAFB;
+  }
+
+  .masked-contact-card .contact-email,
+  .masked-contact-card .contact-phone {
+    color: #9CA3AF;
+  }
+
+  .privacy-indicator {
+    background: #064E3B;
+    color: #6EE7B7;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.masked-phone,
+.masked-email,
+.masked-name,
+.masked-amount {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Tooltip pour montrer la donnée complète (admin uniquement) */
+.masked-data-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1F2937;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  margin-bottom: 0.5rem;
+}
+
+.masked-data-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 0.375rem solid transparent;
+  border-top-color: #1F2937;
+}
+
+.masked-amount:hover .masked-data-tooltip {
+  opacity: 1;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .masked-contact-card {
+    padding: 0.75rem;
+  }
+
+  .masked-contact-card .contact-name {
+    font-size: 1rem;
+  }
+
+  .toggle-masked-data {
+    font-size: 0.875rem;
+  }
+}
