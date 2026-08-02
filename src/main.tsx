@@ -1,79 +1,82 @@
-import React from 'react';
-import './public-path';  // For proper Qiankun integration
-import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
-
+import './public-path'; // For proper Qiankun integration
+import { renderWithQiankun, qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { StrictMode } from 'react';
+import './i18n';
+import { initVisitorTrackingScripts } from '@/lib/tracking/initVisitorTrackingScripts';
+import { syncPageHead } from '@/lib/tracking/visitorTracking';
 
+initVisitorTrackingScripts();
 
 // Store the root instance for proper unmounting
 let root: ReturnType<typeof createRoot> | null = null;
 
-function render(props: { container?: HTMLElement }) {
+function render(props: { container?: HTMLElement } = {}) {
   const { container } = props;
   const rootElement = container
     ? container.querySelector('#root')
     : document.getElementById('root');
 
   if (rootElement) {
-    console.log('[App-rep-orchestrator] Rendering in container:', rootElement);
-    // Create the root instance if it doesn't exist
+    syncPageHead();
     if (!root) {
-      root = createRoot(rootElement);
+      root = createRoot(rootElement as HTMLElement);
     }
-    root.render(
-      <StrictMode>
-        <App />
-      </StrictMode>
-    );
+    root.render(<App />);
   } else {
-    console.warn('[App-rep-orchestrator] Root element not found!');
+    console.warn('[reporchestrator] Root element not found!');
   }
 }
 
-export async function bootstrap() {
-  console.time('[App-rep-orchestrator] bootstrap');
-  console.log('[App-rep-orchestrator] Bootstrapping...');
-  return Promise.resolve();
-}
-
-export async function mount(props: any) {
-  console.log('[App-rep-orchestrator] Mounting...', props);
-  const { container } = props;
-  if (container) {
-    console.log('[App-rep-orchestrator] Found container for mounting:', container);
-  } else {
-    console.warn('[App-rep-orchestrator] No container found for mounting');
-  }
-  render(props);
-  return Promise.resolve();
-}
-
-export async function unmount(props: any) {
-  console.log('[App-rep-orchestrator] Unmounting...', props);
+function destroy(props: { container?: HTMLElement } = {}) {
   const { container } = props;
   const rootElement = container
     ? container.querySelector('#root')
     : document.getElementById('root');
 
   if (rootElement && root) {
-    console.log('[App-rep-orchestrator] Unmounting from container:', rootElement);
     root.unmount();
-    root = null;  // Reset the root instance
+    root = null;
   } else {
-    console.warn('[App-rep-orchestrator] Root element not found for unmounting!');
+    console.warn('[reporchestrator] Root element not found for unmounting!');
   }
-  return Promise.resolve();
 }
 
-// Standalone mode: If the app is running outside Qiankun, it will use this code
+// Register the lifecycles with qiankun via the plugin helper. This is what
+// actually exposes bootstrap/mount/unmount to qiankun's single-spa wrapper;
+// bare `export function bootstrap` are NOT picked up with the `es` build
+// format, which left the bootstrap promise unresolved forever (single-spa
+// "#31 bootstrap timeout" warnings looping in the host console).
+renderWithQiankun({
+  bootstrap() {
+    return Promise.resolve();
+  },
+  mount(props: any) {
+    render(props);
+    return Promise.resolve();
+  },
+  unmount(props: any) {
+    destroy(props || {});
+    return Promise.resolve();
+  },
+  update() {
+    return Promise.resolve();
+  },
+});
+
+// Render immediately in both standalone and qiankun modes. The host
+// (process_connections) loads this micro-app as a script and the immediate
+// render guarantees the UI shows; qiankun's lifecycles above resolve the
+// bootstrap/mount promises so single-spa stops warning.
 if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
-  console.log('[App-rep-orchestrator] Running in standalone mode');
-  render({});
+  console.log('[reporchestrator] Running in standalone mode');
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => render());
+  } else {
+    render();
+  }
 } else {
-  console.log('[App-rep-orchestrator] Running inside Qiankun');
-  // Qiankun will control the lifecycle
-  render({});
+  console.log('[reporchestrator] Running inside Qiankun');
+  render();
 }

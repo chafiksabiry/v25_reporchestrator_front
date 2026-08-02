@@ -1,0 +1,220 @@
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
+import { NotificationsProvider } from '../contexts/NotificationsContext';
+import { ScriptRequirementNotificationsSync } from '../components/dashboard/ScriptRequirementNotificationsSync';
+import { Sidebar } from '../components/dashboard/Sidebar';
+import { TopBar } from '../components/dashboard/TopBar';
+import { Dashboard } from '../components/dashboard/pages/Dashboard';
+import { GigsMarketplace } from '../components/dashboard/pages/GigsMarketplace';
+import { GigDetails } from '../components/dashboard/pages/GigDetails';
+import { CompanyProfile } from '../components/dashboard/pages/CompanyProfile';
+import { Profile } from '../components/dashboard/pages/Profile';
+import { AccountSettings } from '../components/dashboard/pages/AccountSettings';
+import { Payouts } from '../components/dashboard/pages/Payouts';
+import { Learning } from '../components/dashboard/pages/Learning';
+import { Training } from '../components/dashboard/pages/Training';
+import { CertificationPage } from '../components/dashboard/pages/CertificationPage';
+import { Operations } from '../components/dashboard/pages/Operations';
+import { Workspace } from '../components/dashboard/pages/Workspace';
+import { Community } from '../components/dashboard/pages/Community';
+import { WalletPage } from '../components/dashboard/pages/Wallet';
+import { ImportLeads } from '../components/dashboard/pages/ImportLeads';
+import { SessionPlanning } from '../components/dashboard/pages/SessionPlanning';
+import { Calls } from '../components/dashboard/pages/Calls';
+import CallReportCard from '../components/dashboard/CallReport';
+import { fetchProfileFromAPI } from '../utils/profileUtils';
+import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
+import { getAgentId } from '../utils/authUtils';
+import api from '../utils/client';
+import { HARX_NAVBAR_BG } from '../utils/harxBrand';
+import { connectRepEscrowSocket } from '../lib/escrowSocket';
+import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
+import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
+import { usePageTitle } from '../lib/tracking/usePageTitle';
+import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
+
+async function syncRepWalletBalance() {
+  const agentId = getAgentId();
+  if (!agentId) return;
+  try {
+    const res = await api.get(`/escrow/agent/wallet/${agentId}`);
+    if (res.data?.success) {
+      const available = Number(res.data.data.availableBalance ?? 0);
+      localStorage.setItem('rep_available_balance', String(available));
+      localStorage.setItem('rep_pending_balance', String(Number(res.data.data.pendingCommissions ?? 0)));
+      window.dispatchEvent(new Event('WALLET_BALANCE_UPDATED'));
+      // Let the wallet page (if open) refetch its full state.
+      window.dispatchEvent(new Event('REP_WALLET_REFRESH'));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function DashboardAppContent() {
+  useAuth();
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const initializeProfileData = async () => {
+      try {
+        const profileData = await fetchProfileFromAPI();
+        setUserProfile(profileData);
+        setLoading(false);
+        await syncRepWalletBalance();
+      } catch {
+        setLoading(false);
+      }
+    };
+
+    initializeProfileData();
+
+    // Live wallet updates over WebSocket: refresh as soon as the backend books
+    // new commissions for this rep (after a validated call/sale).
+    const disposeSocket = connectRepEscrowSocket(
+      () => {
+        void syncRepWalletBalance();
+      },
+      {
+        onEvent: (data) => {
+          handleCallAnalysisCompleteMessage(data);
+        },
+      }
+    );
+
+    return () => {
+      disposeSocket();
+    };
+  }, []);
+
+  return (
+    <RepTrainingNavProvider>
+      <NotificationsProvider>
+        <ScriptRequirementNotificationsSync />
+        <DashboardRoutingWrapper
+          userProfile={userProfile}
+          loading={loading}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+        />
+      </NotificationsProvider>
+    </RepTrainingNavProvider>
+  );
+}
+
+function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
+  const location = useLocation();
+  const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
+
+  usePageTitle(
+    buildRepPageTitle(resolveRepTabTitle(location.pathname, `${location.search}${location.hash}`)),
+    'Espace rep HARX.',
+  );
+
+  return (
+    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+      {!isProfileEdit && (
+        <>
+          <Sidebar
+            phases={userProfile?.onboardingProgress?.phases}
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            isCollapsed={false}
+            setIsCollapsed={() => {}}
+          />
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 z-20 bg-slate-950/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 cursor-pointer"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+        </>
+      )}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+        {!isProfileEdit && (
+          <TopBar
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+          />
+        )}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
+          <PageContainer variant={resolvePageContainerVariant(location.pathname)}>
+          {loading ? (
+            <div className="flex justify-center items-center min-h-[50vh]">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
+            </div>
+          ) : (
+          <Routes>
+            <Route path="/" element={<Dashboard profile={userProfile} />} />
+            <Route path="/dashboard" element={<Dashboard profile={userProfile} />} />
+            <Route path="/marketplace" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <GigsMarketplace />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/gig/:gigId" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <GigDetails />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/company/:companyId" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <CompanyProfile />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/account-settings" element={<AccountSettings />} />
+            <Route path="/payouts" element={<Payouts />} />
+            <Route path="/learning" element={<Learning />} />
+            <Route path="/training" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <Training />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/certification/journey/:journeyId" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <CertificationPage />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/certification/:certificateId" element={<CertificationPage />} />
+            <Route path="/operations" element={<Operations />} />
+            <Route path="/workspace" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+                <Workspace />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/community" element={<Community />} />
+            <Route path="/import-leads" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={5}>
+                <ImportLeads />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/session-planning" element={<SessionPlanning />} />
+            <Route path="/calls" element={<Calls />} />
+            <Route path="/call-report" element={
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={5}>
+                <CallReportCard />
+              </PhaseProtectedRoute>
+            } />
+            <Route path="/wallet" element={<WalletPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          )}
+          </PageContainer>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardRoutes() {
+  return (
+    <AuthProvider>
+      <DashboardAppContent />
+    </AuthProvider>
+  );
+}

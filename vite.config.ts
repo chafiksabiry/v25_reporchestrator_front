@@ -3,65 +3,74 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import qiankun from 'vite-plugin-qiankun';
 import * as cheerio from 'cheerio';
+import { stripHostManagedTrackingScripts } from './scripts/stripTrackingFromMicrofrontendHtml';
 
-// Plugin to remove React Refresh preamble
+// Plugin to remove the React Refresh preamble that breaks the UMD build
+// consumed by qiankun.
 const removeReactRefreshScript = () => {
   return {
     name: 'remove-react-refresh',
-    transformIndexHtml(html: any) {
+    transformIndexHtml(html: string) {
       const $ = cheerio.load(html);
       $('script[src="/@react-refresh"]').remove();
+      stripHostManagedTrackingScripts($);
       return $.html();
     },
   };
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const isQiankun = mode === 'qiankun';
+
+  // In dev (`vite`/`command === 'serve'`) the host must load chunks/assets from
+  // the LOCAL dev server, otherwise the browser fetches the production Netlify
+  // bundle and local source changes never appear. Only the production build
+  // keeps the absolute Netlify base.
+  const isDev = command === 'serve';
 
   return {
-    base: 'https://prod-rep-orchestrator.harx.ai/',
+    // Absolute base so the host (qiankun) loads chunks/assets from the
+    // micro-app's own origin (local in dev, Netlify in production builds).
+    base: isDev ? 'http://localhost:5174/' : 'https://harx26reporchestratorfront-dev.netlify.app/',
     plugins: [
-      react({
-        jsxRuntime: 'classic',
-      }),
-      qiankun('reporchestrator', {
+      react(),
+      qiankun('reps', {
         useDevMode: true,
       }),
-      removeReactRefreshScript(), // Add the script removal plugin
+      removeReactRefreshScript(),
     ],
-
     define: {
       'import.meta.env': env,
-      __POWERED_BY_QIANKUN__: isQiankun,
     },
     server: {
-      port: 5185,
+      port: 5174,
+      strictPort: true,
       cors: true,
+      hmr: false,
       headers: {
         'Access-Control-Allow-Origin': '*',
       },
-      hmr: false,
       fs: {
-        strict: true, // Ensure static assets are correctly resolved
+        strict: true,
       },
     },
     build: {
       target: 'esnext',
+      outDir: 'dist',
       cssCodeSplit: false,
       rollupOptions: {
         output: {
-          format: 'umd',
-          name: 'reporchestrator',
-          entryFileNames: 'index.js', // Fixed name for the JS entry file
-          chunkFileNames: 'chunk-[name].js', // Fixed name for chunks
+          format: 'es',
+          entryFileNames: 'index.js',
+          chunkFileNames: 'chunk-[name].js',
           assetFileNames: (assetInfo) => {
-            // Ensure CSS files are consistently named
-            if (assetInfo.name?.endsWith('.css')) {
+            const isCss =
+              assetInfo.name?.endsWith('.css') ||
+              (assetInfo.names && assetInfo.names.some((n) => n.endsWith('.css')));
+            if (isCss) {
               return 'index.css';
             }
-            return '[name].[ext]'; // Default for other asset types
+            return '[name].[ext]';
           },
         },
       },

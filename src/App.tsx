@@ -1,152 +1,81 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
-import { LogOut } from 'lucide-react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import AuthTest from './components/AuthTest';
-import Dashboard from './components/Dashboard';
-import SignUp from './components/SignUp';
-import Profile from './components/Profile';
-import SkillsAssessment from './components/SkillsAssessment';
-import Subscription from './components/Subscription';
-import Marketplace from './components/Marketplace';
-import Operations from './components/Operations';
-import Support from './components/Support';
-import QualityControl from './components/QualityControl';
-import CareerTrack from './components/CareerTrack';
-import WalletDashboard from './components/WalletDashboard';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
+import { getRouterBasename } from './utils/routerBasename';
+import VisitorTracker from './lib/VisitorTracker';
 
-// Component principal de l'app avec navigation
-const AppContent: React.FC = () => {
-  const { logout } = useAuth();
-  
-  // Add basename for qiankun routing
-  const basename = config.isStandalone ? '/' : '/reporchestrator';
-  
-  // Get REP dashboard URL for profile redirect
-  const repDashboardUrl = import.meta.env.VITE_RUN_MODE === 'standalone' 
-    ? import.meta.env.VITE_REP_DASHBOARD_URL_STANDALONE || ''
-    : import.meta.env.VITE_REP_DASHBOARD_URL || '';
+import OnboardingShell from './components/layout/OnboardingShell';
+import OnboardingDashboard from './components/onboarding/Dashboard';
+import SignUp from './components/onboarding/SignUp';
+import OnboardingProfile from './components/onboarding/Profile';
+import SkillsAssessment from './components/onboarding/SkillsAssessment';
+import Subscription from './components/onboarding/Subscription';
+import Marketplace from './components/onboarding/Marketplace';
+import OnboardingOperations from './components/onboarding/Operations';
+import Support from './components/onboarding/Support';
+import QualityControl from './components/onboarding/QualityControl';
+import CareerTrack from './components/onboarding/CareerTrack';
+import WalletDashboard from './components/onboarding/WalletDashboard';
 
+import DashboardRoutes from './routes/DashboardRoutes.tsx';
+import AssessmentRoutes from './routes/AssessmentRoutes.tsx';
+import ProfileRoutes from './routes/ProfileRoutes.tsx';
+import WizardRoutes from './routes/WizardRoutes.tsx';
+
+function App() {
   useEffect(() => {
-    // Log config information on app startup
-    console.log('window.__POWERED_BY_QIANKUN__', window.__POWERED_BY_QIANKUN__);
-    console.log('🚀 REPS Platform initializing...');
-    console.log(`📋 Run Mode: ${config.runMode} (${config.isStandalone ? 'Standalone' : 'In-App'})`);
+    console.log('REPS Unified App initializing...');
+    console.log(`Run Mode: ${config.runMode}`);
 
-    // Get and log user data
     const userData = config.getUserData();
-    console.log('👤 User Data:', {
-      userId: userData.userId,
-      agentId: userData.agentId,
-      tokenExists: !!userData.token
-    });
-
-    // Fetch agent data from API
-    const fetchInitialAgentData = async () => {
-      try {
-        console.log('🔍 Fetching initial agent data from API...');
-        const agentData = await getAgentData();
-        console.log('👤 Agent data retrieved from API:', {
-          id: agentData.id,
-          hasProfile: !!agentData.name,
-          status: agentData.status,
-          hasOnboardingProgress: !!agentData.onboardingProgress
-        });
-
-        if (agentData.onboardingProgress) {
-          let actionsCompletedCount = 0;
-
-          if (agentData.onboardingProgress.completedActions) {
-            Object.values(agentData.onboardingProgress.completedActions).forEach(actions => {
-              if (Array.isArray(actions)) {
-                actionsCompletedCount += actions.length;
-              }
-            });
-          }
-
-          console.log('📋 Agent onboarding progress:', {
-            currentPhase: agentData.onboardingProgress.currentPhase,
-            completedPhases: agentData.onboardingProgress.completedPhases?.length || 0,
-            actionsCompletedCount
-          });
-        }
-      } catch (error) {
-        console.error('❌ Error fetching initial agent data:', error);
-        console.log('⚠️ Will fall back to local progress tracking');
-      }
-    };
-
     if (userData.agentId) {
-      fetchInitialAgentData();
-    } else {
-      console.warn('⚠️ No agent ID available, skipping agent data fetch');
+      getAgentData().catch((error) => {
+        console.error('Error fetching initial agent data:', error);
+      });
     }
   }, []);
 
   return (
-    <Router basename={basename}>
-      <div className="min-h-screen bg-gray-50">
-        {/* Top Navigation */}
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex items-center">
-                <Link to="/" className="flex items-center">
-                  <img 
-                    src={`${import.meta.env.VITE_FRONT_URL}logo_harx.jpg`}
-                    alt="HARX" 
-                    className="h-8 w-auto"
-                  />
-                </Link>
-              </div>
-              <div className="flex items-center space-x-4">
-                {repDashboardUrl ? (
-                  <a 
-                    href={repDashboardUrl} 
-                    className="text-gray-600 hover:text-gray-900"
-                  >
-                    Profile
-                  </a>
-                ) : (
-                  <Link to="/profile" className="text-gray-600 hover:text-gray-900">Profile</Link>
-                )}
-                <button 
-                  onClick={logout} 
-                  className="text-gray-600 hover:text-gray-900 flex items-center space-x-1"
-                  title="Logout"
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span className="text-sm">Logout</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-        
-        {/* Main Content - All routes are protected */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ProtectedRoute>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/skills" element={<SkillsAssessment />} />
-              <Route path="/subscription" element={<Subscription />} />
-              <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/operations" element={<Operations />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/quality" element={<QualityControl />} />
-              <Route path="/career" element={<CareerTrack />} />
-              <Route path="/wallet" element={<WalletDashboard />} />
-              <Route path="/auth-test" element={<AuthTest />} />
-            </Routes>
-          </ProtectedRoute>
-        </main>
-      </div>
+    <Router basename={getRouterBasename()}>
+      <VisitorTracker />
+      <Routes>
+        {/* Onboarding orchestrator (shared Sidebar + TopBar shell).
+            The orchestrator home now lives at `/orchestrator` so the root `/`
+            falls through to the dashboard catch-all below. */}
+        <Route element={<OnboardingShell />}>
+          <Route path="/orchestrator" element={<OnboardingDashboard />} />
+          <Route path="/orchestrator/signup" element={<SignUp />} />
+          <Route path="/orchestrator/profile" element={<OnboardingProfile />} />
+          <Route path="/orchestrator/skills" element={<SkillsAssessment />} />
+          <Route path="/orchestrator/subscription" element={<Subscription />} />
+          <Route path="/orchestrator/marketplace" element={<Marketplace />} />
+          <Route path="/orchestrator/operations" element={<OnboardingOperations />} />
+          <Route path="/orchestrator/support" element={<Support />} />
+          <Route path="/orchestrator/quality" element={<QualityControl />} />
+          <Route path="/orchestrator/career" element={<CareerTrack />} />
+          <Route path="/orchestrator/wallet" element={<WalletDashboard />} />
+
+          {/* Profile creation v2 — inside the shared shell so it keeps the
+              global Sidebar + TopBar. */}
+          <Route path="/profile-import" element={<ProfileRoutes />} />
+          <Route path="/profile-editor" element={<ProfileRoutes />} />
+        </Route>
+
+        {/* Assessments */}
+        <Route path="/assessment/*" element={<AssessmentRoutes />} />
+
+        {/* Wizard v1 */}
+        <Route path="/profile-wizard/*" element={<WizardRoutes />} />
+        <Route path="/linkedin-callback" element={<WizardRoutes />} />
+        <Route path="/reps-profile/*" element={<WizardRoutes />} />
+
+        {/* Rep dashboard (merged from v25_dash_rep_front).
+            Mounted once via a root splat so its internal <Routes> (absolute
+            paths like /profile, /wallet, /marketplace) match the full
+            path. Explicit routes above keep priority over this catch-all. */}
+        <Route path="*" element={<DashboardRoutes />} />
+      </Routes>
     </Router>
   );
 };

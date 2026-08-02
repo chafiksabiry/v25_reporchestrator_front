@@ -1,0 +1,1509 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
+import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan } from '../../utils/profileUtils';
+import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { repApiUrl } from '../../utils/repApiUrl';
+import { repWizardApi, Timezone } from '../../services/api/repWizard';
+import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
+import { fetchAllLanguages, Language as LanguageOption } from '../../services/api/languages';
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
+
+// Components
+import { ProfileNavbar } from './profile/ProfileNavbar';
+import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
+import { AssessmentProvider } from '../../contexts/AssessmentContext';
+import { LanguageVideoModal } from './profile/LanguageVideoModal';
+
+// Tabs
+import { ProfileTab } from './profile/tabs/ProfileTab';
+import { SkillsTab } from './profile/tabs/SkillsTab';
+import { ExperienceTab } from './profile/tabs/ExperienceTab';
+import { LanguagesTab } from './profile/tabs/LanguagesTab';
+import { OnboardingTab } from './profile/tabs/OnboardingTab';
+import { SpecializationTab } from './profile/tabs/SpecializationTab';
+import { AvailabilityTab } from './profile/tabs/AvailabilityTab';
+import { EmbeddedRepSubscriptionFlow } from './EmbeddedRepSubscriptionFlow';
+
+// Shared Interface Redefinitions (if needed by tabs)
+export interface AssessmentResults {
+  score?: number;
+  fluency?: { score: number };
+  proficiency?: { score: number };
+  completeness?: { score: number };
+  keyMetrics?: {
+    professionalism: number;
+    effectiveness: number;
+    customerFocus: number;
+  };
+}
+
+export interface Language {
+  language: string;
+  proficiency: string;
+  iso639_1?: string;
+  assessmentResults?: AssessmentResults;
+}
+
+export interface ContactCenterSkill {
+  skill: string;
+  proficiency?: string;
+  assessmentResults?: AssessmentResults;
+}
+
+export interface Plan {
+  _id: string;
+  name: string;
+  price: number;
+  targetUserType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanResponse {
+  _id: string;
+  userId: string;
+  plan: Partial<Plan>;
+}
+
+export const ProfileView: React.FC<{
+  profile: any,
+  onEditClick: (tab?: string) => void,
+  onDeleteSkill?: (type: 'technical' | 'professional' | 'soft', index: number) => void,
+  onAddSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onDeleteLanguage?: (index: number) => void,
+  onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string; code?: string }) => void | Promise<void>,
+  onUpdateLanguageProficiency?: (index: number, proficiency: string) => void | Promise<void>,
+  onDeleteExperience?: (index: number) => void,
+  onAddExperience?: (item: {
+    title: string;
+    company: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+  }) => void,
+  onUpdateExperience?: (index: number, item: {
+    title: string;
+    company: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+  }) => void,
+  onDeleteSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', index: number) => void,
+  onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
+  onProfileUpdate?: (updatedProfile: any) => void,
+  onVideoAnalysisComplete?: () => void
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const getInitialTab = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      const allowed = ['profile', 'experience', 'languages', 'skills', 'specialization', 'availability', 'onboarding'];
+      if (tab && allowed.includes(tab)) return tab;
+    } catch {
+      // ignore
+    }
+    return 'profile';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [inlineAssessment, setInlineAssessment] = useState<
+    | { type: 'contact-center'; skillId: string; category: string; skillName: string }
+    | null
+  >(null);
+  const [languageVideoModal, setLanguageVideoModal] = useState<{
+    language: string;
+    code: string;
+    proficiency: string;
+    languageId: string;
+  } | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [planData, setPlanData] = useState<PlanResponse | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [countryData, setCountryData] = useState<Timezone | null>(null);
+  const [timezoneData, setTimezoneData] = useState<Timezone | null>(null);
+  const [allTimezones, setAllTimezones] = useState<Timezone[]>([]);
+  const [countries, setCountries] = useState<Timezone[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<LanguageOption[]>([]);
+  const [skillNameById, setSkillNameById] = useState<Record<string, string>>({});
+
+  const [countryMismatch, setCountryMismatch] = useState<{
+    hasMismatch: boolean;
+    firstLoginCountry?: string;
+    selectedCountry?: string;
+    firstLoginCountryCode?: string;
+  } | null>(null);
+  const [checkingCountryMismatch, setCheckingCountryMismatch] = useState(false);
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
+  const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const closePlanModal = useCallback(async () => {
+    setIsPlanModalOpen(false);
+    if (!profile?._id) return;
+    try {
+      const data = await getProfilePlan(profile._id);
+      setPlanData({
+        _id: String(data._id),
+        userId: String(data.userId),
+        plan: data.plan,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [profile?._id]);
+
+  const handlePlanSubscribed = useCallback(
+    (activatedPlan?: { _id: string; name: string; price?: number }) => {
+      if (activatedPlan && profile?._id) {
+        setPlanData((prev) => ({
+          _id: prev?._id || String(profile._id),
+          userId: prev?.userId || String(profile.userId || ''),
+          plan: {
+            _id: activatedPlan._id,
+            name: activatedPlan.name,
+            price: activatedPlan.price ?? prev?.plan?.price ?? 0,
+            targetUserType: 'representative',
+            createdAt: prev?.plan?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+      }
+      void closePlanModal();
+    },
+    [closePlanModal, profile?._id, profile?.userId]
+  );
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [publicInfoDraft, setPublicInfoDraft] = useState({
+    country: '',
+    countryId: '',
+    phone: '',
+    growthPlanId: ''
+  });
+  const [imgSrc, setImgSrc] = useState('');
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Load countries and all timezones on component mount
+  useEffect(() => {
+    const loadLocationData = async () => {
+      try {
+        const [countriesData, timezonesData] = await Promise.all([
+          repWizardApi.getCountries(),
+          repWizardApi.getTimezones()
+        ]);
+        setCountries(countriesData);
+        setAllTimezones(timezonesData);
+      } catch (error) {
+        console.error('Error loading location data:', error);
+      }
+    };
+    loadLocationData();
+  }, []);
+
+  // Fetch plan data
+  useEffect(() => {
+    const fetchPlanData = async () => {
+      try {
+        if (!profile?._id) return;
+        const data = await getProfilePlan(profile._id);
+        const planResponse: PlanResponse = {
+          _id: String(data._id),
+          userId: String(data.userId),
+          plan: data.plan
+        };
+        setPlanData(planResponse);
+      } catch (error) {
+        console.error('Error fetching plan data:', error);
+        setPlanError(error instanceof Error ? error.message : 'Failed to fetch plan data');
+      }
+    };
+    fetchPlanData();
+  }, [profile?._id]);
+
+  useEffect(() => {
+    const loadLanguages = async () => {
+      try {
+        const languages = await fetchAllLanguages();
+        setAvailableLanguages(languages);
+      } catch (error) {
+        console.error('Error loading languages list:', error);
+      }
+    };
+    loadLanguages();
+  }, []);
+
+  useEffect(() => {
+    const loadSkillDictionary = async () => {
+      try {
+        const skills = await fetchAllSkills();
+        const mapFromCategory = (category: SkillsByCategory) =>
+          Object.values(category || {}).flat().reduce((acc, skill: Skill) => {
+            acc[skill._id] = skill.name;
+            return acc;
+          }, {} as Record<string, string>);
+
+        setSkillNameById({
+          ...mapFromCategory(skills.technical),
+          ...mapFromCategory(skills.professional),
+          ...mapFromCategory(skills.soft),
+        });
+      } catch (error) {
+        console.error('Error loading skills dictionary for profile view:', error);
+      }
+    };
+
+    loadSkillDictionary();
+  }, []);
+
+  useEffect(() => {
+    const hydrateAgentSkillNamesById = async () => {
+      if (!profile?.skills) return;
+
+      const normalizeId = (raw: any): string | null => {
+        if (!raw) return null;
+        if (typeof raw === 'string') return raw;
+        if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid;
+        if (typeof raw === 'object' && typeof raw._id === 'string') return raw._id;
+        if (typeof raw === 'object' && typeof raw.id === 'string') return raw.id;
+        return null;
+      };
+
+      const collectIds = (arr: any[]): string[] =>
+        (arr || [])
+          .map((item: any) => normalizeId(item?.skill) || normalizeId(item?._id) || normalizeId(item?.id))
+          .filter((id: string | null): id is string => !!id);
+
+      const byType: Record<SkillType, string[]> = {
+        technical: collectIds(profile.skills.technical || []),
+        professional: collectIds(profile.skills.professional || []),
+        soft: collectIds(profile.skills.soft || []),
+      };
+
+      const toFetch: Array<{ id: string; type: SkillType }> = [];
+      (Object.keys(byType) as SkillType[]).forEach((type) => {
+        byType[type].forEach((id) => {
+          if (!skillNameById[id]) toFetch.push({ id, type });
+        });
+      });
+
+      if (toFetch.length === 0) return;
+
+      try {
+        const tryResolveSkillAcrossTypes = async (id: string, preferredType: SkillType): Promise<string | null> => {
+          const orderedTypes: SkillType[] = [
+            preferredType,
+            ...(['technical', 'professional', 'soft'] as SkillType[]).filter(t => t !== preferredType)
+          ];
+
+          for (const type of orderedTypes) {
+            try {
+              const skill = await fetchSkillById(id, type);
+              if (skill?.name) return skill.name;
+            } catch {
+              // continue trying other types
+            }
+          }
+          return null;
+        };
+
+        const fetched = await Promise.all(
+          toFetch.map(async ({ id, type }) => {
+            const resolvedName = await tryResolveSkillAcrossTypes(id, type);
+            return { id, name: resolvedName };
+          })
+        );
+
+        const additions = fetched.reduce((acc, curr) => {
+          if (curr.name) acc[curr.id] = curr.name;
+          return acc;
+        }, {} as Record<string, string>);
+
+        const unresolved = fetched.filter((f) => !f.name).map((f) => f.id);
+        if (unresolved.length > 0) {
+          console.warn('[ProfileView] Unresolved skill IDs after cross-type lookup:', unresolved);
+        }
+
+        if (Object.keys(additions).length > 0) {
+          setSkillNameById((prev) => ({ ...prev, ...additions }));
+        }
+      } catch (error) {
+        console.error('Error hydrating agent skills by id:', error);
+      }
+    };
+
+    hydrateAgentSkillNamesById();
+  }, [profile?.skills, skillNameById]);
+
+  // Load specific country and timezone data based on profile
+  useEffect(() => {
+    const loadSpecificLocationDetails = async () => {
+      try {
+        if (profile?.personalInfo?.country) {
+          if (typeof profile.personalInfo.country === 'string') {
+            const country = await repWizardApi.getTimezoneById(profile.personalInfo.country);
+            setCountryData(country);
+          } else {
+            setCountryData(profile.personalInfo.country);
+          }
+        }
+        if (profile?.availability?.timeZone) {
+          if (typeof profile.availability.timeZone === 'string') {
+            const timezone = await repWizardApi.getTimezoneById(profile.availability.timeZone);
+            setTimezoneData(timezone);
+          } else {
+            setTimezoneData(profile.availability.timeZone);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile location details:', error);
+      }
+    };
+    loadSpecificLocationDetails();
+  }, [profile?.personalInfo?.country, profile?.availability?.timeZone]);
+
+  // Check country mismatch
+  useEffect(() => {
+    const checkMismatch = async () => {
+      if (!countryData || countries.length === 0) return;
+      try {
+        setCheckingCountryMismatch(true);
+        const spinnerTimer = setTimeout(() => setShowLoadingSpinner(true), 800);
+        const mismatchResult = await checkCountryMismatch(countryData.countryCode, countries);
+        clearTimeout(spinnerTimer);
+        if (mismatchResult) setCountryMismatch(mismatchResult);
+      } catch (error) {
+        console.error('Error checking country mismatch:', error);
+      } finally {
+        setCheckingCountryMismatch(false);
+        setShowLoadingSpinner(false);
+      }
+    };
+    checkMismatch();
+  }, [countryData, countries]);
+
+  if (!profile) return null;
+
+  // Helper functions used by tabs
+  const getProficiencyStars = (proficiency: string): number => {
+    const map: Record<string, number> = { 'A1': 1, 'Basic': 1, 'A2': 2, 'B1': 3, 'Intermediate': 3, 'B2': 4, 'C1': 5, 'Advanced': 5, 'C2': 6, 'Native': 6 };
+    return map[proficiency] || 0;
+  };
+
+  const getTimezoneMismatchInfo = () => {
+    const tz = profile.availability?.timeZone;
+    // NB: typeof null === 'object', so guard against null before reading _id.
+    const currentTimezoneId = tz && typeof tz === 'object' ? tz._id : tz;
+    const selectedTimezoneData = allTimezones.find(t => t && t._id === currentTimezoneId);
+    if (!countryData || !selectedTimezoneData || !currentTimezoneId) return null;
+    if (selectedTimezoneData.countryCode !== countryData.countryCode) {
+      const timezoneCountryData = countries.find(c => c.countryCode === selectedTimezoneData.countryCode);
+      return {
+        timezoneCountry: timezoneCountryData?.countryName || selectedTimezoneData.countryCode,
+        selectedCountry: countryData.countryName,
+        timezoneName: selectedTimezoneData.zoneName
+      };
+    }
+    return null;
+  };
+
+  const calculateOverallScore = () => {
+    const scores: number[] = [];
+
+    // 1. Formal Contact Center assessments (canonical REPS key metrics).
+    (profile.skills?.contactCenter || []).forEach((skill: any) => {
+      const m = skill?.assessmentResults?.keyMetrics;
+      if (!m) return;
+      scores.push(Math.round(((m.professionalism || 0) + (m.effectiveness || 0) + (m.customerFocus || 0)) / 3));
+    });
+
+    // 2. Video-verified language scores already merged into the profile.
+    (profile.personalInfo?.languages || []).forEach((lang: any) => {
+      const ar = lang?.assessmentResults;
+      if (!ar || ar.source === 'cv') return;
+      if (ar.source !== 'video' && ar.source !== 'language' && ar.source !== 'experience') return;
+      if (typeof ar.overall?.score === 'number') {
+        scores.push(Math.round(ar.overall.score));
+        return;
+      }
+      const fluency = ar.fluency?.score ?? 0;
+      const proficiency = ar.proficiency?.score ?? 0;
+      const completeness = ar.completeness?.score ?? 0;
+      if (fluency || proficiency || completeness) {
+        scores.push(Math.round((fluency + proficiency + completeness) / 3));
+      }
+    });
+
+    // 3. Experience video analyses (when not yet reflected on profile languages).
+    if (scores.length === 0) {
+      (profile.experience || []).forEach((exp: any) => {
+        (exp?.videoLanguageAssessment?.languages || []).forEach((l: any) => {
+          if (typeof l.overallScore === 'number' && l.overallScore > 0) {
+            scores.push(Math.round(l.overallScore));
+          }
+        });
+        const analysis = exp?.videoAnalysis;
+        if (!analysis) return;
+        if (typeof analysis.overallConfidence === 'number' && analysis.overallConfidence > 0) {
+          scores.push(Math.round(analysis.overallConfidence));
+        }
+        const cc = analysis.contactCenterSkills;
+        if (cc && typeof cc === 'object') {
+          const ccScores = Object.values(cc)
+            .map((v: any) => v?.score)
+            .filter((s: unknown): s is number => typeof s === 'number' && s > 0);
+          if (ccScores.length > 0) {
+            scores.push(Math.round(ccScores.reduce((a, b) => a + b, 0) / ccScores.length));
+          }
+        }
+      });
+    }
+
+    if (scores.length === 0) return 'N/A';
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+
+  const findSkillData = (skillName: string) => {
+    return profile.skills?.contactCenter?.find((s: any) => s.skill === skillName) || null;
+  };
+
+  const formatSkillsForDisplay = (skillsData: any) => {
+    if (!Array.isArray(skillsData)) return [];
+    const readNameFromObject = (obj: any): string | null =>
+      obj?.name || obj?.label || obj?.title || null;
+
+    const normalizeId = (raw: any): string | null => {
+      if (!raw) return null;
+      if (typeof raw === 'string') return raw;
+      if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid;
+      if (typeof raw === 'object' && typeof raw._id === 'string') return raw._id;
+      if (typeof raw === 'object' && typeof raw.id === 'string') return raw.id;
+      return null;
+    };
+
+    return skillsData.map(item => {
+      if (typeof item === 'string') {
+        const resolvedFromMap = skillNameById[item];
+        return { name: resolvedFromMap || item };
+      }
+      if (item?.skill && typeof item.skill === 'object') {
+        const embeddedName = readNameFromObject(item.skill);
+        if (embeddedName) return { name: embeddedName };
+      }
+
+      const directName = readNameFromObject(item);
+      if (directName) return { name: directName };
+
+      const skillId = normalizeId(item?._id) || normalizeId(item?.id) || normalizeId(item?.skill);
+      const resolvedById = skillId ? skillNameById[skillId] : null;
+      const detailsFallback = typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
+      return { name: resolvedById || detailsFallback || (typeof item?.skill === 'string' ? item.skill : null) || t('profile.common.unknown') };
+    });
+  };
+
+  useEffect(() => {
+    if (!profile?.skills) return;
+
+    const normalizeId = (raw: any): string | null => {
+      if (!raw) return null;
+      if (typeof raw === 'string') return raw;
+      if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid;
+      if (typeof raw === 'object' && typeof raw._id === 'string') return raw._id;
+      if (typeof raw === 'object' && typeof raw.id === 'string') return raw.id;
+      return null;
+    };
+
+  }, [profile?.skills, skillNameById]);
+
+  const takeLanguageAssessment = (
+    language: string,
+    iso639_1Code?: string,
+    proficiency?: string,
+    languageId?: string
+  ) => {
+    setLanguageVideoModal({
+      language,
+      code: iso639_1Code || '',
+      proficiency: proficiency || 'B1',
+      languageId: languageId || '',
+    });
+  };
+
+  const closeLanguageVideoModal = () => setLanguageVideoModal(null);
+
+  const handleLanguageVideoComplete = async () => {
+    try {
+      const updated = await fetchProfileFromAPI();
+      if (onProfileUpdate && updated) onProfileUpdate(updated);
+    } catch (e) {
+      console.error('Error refreshing profile after language video:', e);
+    }
+  };
+
+  const takeContactCenterSkillAssessment = (skillName: string, categoryName?: string) => {
+    const formattedSkill = skillName.toLowerCase().replace(/\s+/g, '-');
+    setInlineAssessment({
+      type: 'contact-center',
+      skillId: formattedSkill,
+      category: categoryName || t('profile.common.unknown'),
+      skillName,
+    });
+  };
+
+  const closeInlineAssessment = () => setInlineAssessment(null);
+
+  const handleInlineAssessmentComplete = async () => {
+    try {
+      const updated = await fetchProfileFromAPI();
+      if (onProfileUpdate && updated) onProfileUpdate(updated);
+    } catch (e) {
+      console.error('Error refreshing profile after assessment:', e);
+    } finally {
+      setInlineAssessment(null);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!profile?._id) return;
+    try {
+      setIsPublishing(true);
+      const updatedData = await updateProfileData(profile._id, { status: 'completed' });
+      if (onProfileUpdate) onProfileUpdate(updatedData);
+    } catch (error) {
+      console.error('Error publishing profile:', error);
+      alert(t('profile.errors.publish'));
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+
+  const getCountryDisplayName = () => {
+    if (countryData?.countryName) return countryData.countryName;
+    const country = (profile as any)?.personalInfo?.country;
+    if (!country) return t('profile.common.notSpecified');
+    if (typeof country === 'string') return country;
+    if (typeof country === 'object') return country.countryName || country.zoneName || t('profile.common.notSpecified');
+    return t('profile.common.notSpecified');
+  };
+
+  const handleInlineUpdate = async (payload: any, buildNextProfile: (prev: any) => any) => {
+    if (!profile?._id) return;
+    try {
+      await updateProfileData(profile._id, payload);
+      onProfileUpdate?.(buildNextProfile(profile));
+    } catch (error) {
+      console.error('Inline update failed:', error);
+      window.alert(t('profile.errors.update'));
+    }
+  };
+
+  const handleSaveAvailability = async (payload: { timeZone?: string; schedule: Array<{ day: string; hours: { start: string; end: string } }> }) => {
+    await handleInlineUpdate(
+      {
+        availability: {
+          ...(profile.availability || {}),
+          timeZone: payload.timeZone || profile.availability?.timeZone,
+          schedule: payload.schedule || [],
+        },
+      },
+      (prev) => ({
+        ...prev,
+        availability: {
+          ...(prev.availability || {}),
+          timeZone:
+            allTimezones.find((tz) => tz._id === (payload.timeZone || ''))
+            || payload.timeZone
+            || prev.availability?.timeZone,
+          schedule: payload.schedule || [],
+        },
+      })
+    );
+  };
+
+  const openPublicInfoEditor = () => {
+    const currentPlanId = String(planData?.plan?._id || '');
+    const currentCountryId =
+      typeof profile.personalInfo?.country === 'object'
+        ? String(profile.personalInfo?.country?._id || '')
+        : (typeof profile.personalInfo?.country === 'string' && profile.personalInfo.country.length === 24
+          ? profile.personalInfo.country
+          : '');
+
+    setPublicInfoDraft({
+      country: getCountryDisplayName(),
+      countryId: currentCountryId,
+      email: String(profile.personalInfo?.email || ''),
+      phone: String(profile.personalInfo?.phone || ''),
+      growthPlanId: currentPlanId
+    });
+    setIsEditingPublicInfo(true);
+  };
+
+  const savePublicInfoInline = async () => {
+    if (!profile?._id) return;
+    setIsSavingPublicInfo(true);
+
+    const selectedCountry =
+      countries.find((country) => country._id === publicInfoDraft.countryId)
+      || countries.find((country) => String(country.countryName || '').toLowerCase() === String(publicInfoDraft.country || '').toLowerCase());
+
+    const countryIdToPersist =
+      selectedCountry?._id
+      || (typeof profile.personalInfo?.country === 'object'
+        ? profile.personalInfo?.country?._id
+        : (typeof profile.personalInfo?.country === 'string' && profile.personalInfo.country.length === 24
+          ? profile.personalInfo.country
+          : ''));
+
+    const payload = {
+      personalInfo: {
+        ...profile.personalInfo,
+        country: countryIdToPersist,
+        email: publicInfoDraft.email,
+        phone: publicInfoDraft.phone,
+      }
+    };
+    try {
+      await handleInlineUpdate(payload, (prev) => ({
+        ...prev,
+        personalInfo: {
+          ...(prev.personalInfo || {}),
+          country: selectedCountry || prev.personalInfo?.country,
+          email: publicInfoDraft.email,
+          phone: publicInfoDraft.phone,
+        }
+      }));
+
+      if (publicInfoDraft.growthPlanId && publicInfoDraft.growthPlanId !== String(planData?.plan?._id || '')) {
+        await updateProfilePlan(profile._id, publicInfoDraft.growthPlanId);
+        const updatedPlan = await getProfilePlan(profile._id);
+        setPlanData({
+          _id: String(updatedPlan._id),
+          userId: String(updatedPlan.userId),
+          plan: updatedPlan.plan
+        });
+      }
+
+      const refreshed = await fetchProfileFromAPI();
+      onProfileUpdate?.(refreshed);
+      setIsEditingPublicInfo(false);
+    } finally {
+      setIsSavingPublicInfo(false);
+    }
+  };
+
+  const handleSaveAbout = async (value: string) => {
+    await handleInlineUpdate(
+      {
+        professionalSummary: {
+          ...profile.professionalSummary,
+          profileDescription: value,
+        }
+      },
+      (prev) => ({
+        ...prev,
+        professionalSummary: {
+          ...(prev.professionalSummary || {}),
+          profileDescription: value,
+        }
+      })
+    );
+  };
+
+  const handleReplaceVideo = async (file: File) => {
+    if (!file || !profile?._id) return;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.alert(t('profile.errors.authToken'));
+      return;
+    }
+
+    try {
+      setIsUploadingVideo(true);
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}/video`), {
+        method: 'PUT',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Video upload failed with status ${response.status}`);
+      }
+
+      const refreshed = await fetchProfileFromAPI();
+      onProfileUpdate?.(refreshed);
+      window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
+    } catch (error) {
+      console.error('Error uploading presentation video:', error);
+      window.alert(t('profile.errors.uploadVideo'));
+    } finally {
+      setIsUploadingVideo(false);
+    }
+  };
+
+  const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        setImgSrc(reader.result?.toString() || '');
+        setIsCropModalOpen(true);
+      });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const crop = centerCrop(
+      makeAspectCrop(
+        {
+          unit: '%',
+          width: 90,
+        },
+        1,
+        width,
+        height
+      ),
+      width,
+      height
+    );
+    setCrop(crop);
+  };
+
+  const getCroppedImg = async (image: HTMLImageElement, pixelCrop: PixelCrop): Promise<Blob> => {
+    const canvas = document.createElement('canvas');
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+
+    // Set canvas size to the actual cropped pixels in the original image for high quality
+    canvas.width = pixelCrop.width * scaleX;
+    canvas.height = pixelCrop.height * scaleY;
+
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('No 2d context');
+    }
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x * scaleX,
+      pixelCrop.y * scaleY,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY,
+      0,
+      0,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg', 0.95);
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!imgRef.current || !completedCrop || !profile?._id) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.alert(t('profile.errors.authToken'));
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+      setIsCropModalOpen(false);
+
+      const croppedBlob = await getCroppedImg(imgRef.current, completedCrop);
+      const formData = new FormData();
+      formData.append('photo', croppedBlob, 'profile.jpg');
+
+      const response = await fetch(repApiUrl(`/profiles/${profile._id}/photo`), {
+        method: 'PUT',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Photo upload failed with status ${response.status}`);
+      }
+
+      const refreshed = await fetchProfileFromAPI();
+      onProfileUpdate?.(refreshed);
+      window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
+    } catch (error) {
+      console.error('Error uploading cropped photo:', error);
+      window.alert(t('profile.errors.uploadPhoto'));
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
+    }
+  };
+
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'profile': return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
+      case 'skills': return (
+        <SkillsTab
+          profile={profile}
+          formatSkillsForDisplay={formatSkillsForDisplay}
+          findSkillData={findSkillData}
+          takeContactCenterSkillAssessment={takeContactCenterSkillAssessment}
+          onEditItemClick={() => onEditClick('skills')}
+          onDeleteSkill={(type, index) => onDeleteSkill?.(type, index)}
+          onAddSkill={(type, skillId) => onAddSkill?.(type, skillId)}
+          onAddSpecializationItem={(section, value) => onAddSpecializationItem?.(section, value)}
+          onDeleteSpecializationItem={(section, index) => onDeleteSpecializationItem?.(section, index)}
+        />
+      );
+      case 'experience': return (
+        <ExperienceTab
+          profile={profile}
+          onVideoAnalysisComplete={onVideoAnalysisComplete}
+          onAddItemClick={(item) => onAddExperience?.(item)}
+          onUpdateItemClick={(index, item) => onUpdateExperience?.(index, item)}
+          onDeleteItemClick={(index) => onDeleteExperience?.(index)}
+        />
+      );
+      case 'languages': return (
+        <LanguagesTab
+          profile={profile}
+          availableLanguages={availableLanguages}
+          getProficiencyStars={getProficiencyStars}
+          onRecordLanguageVideo={takeLanguageAssessment}
+          onAddItemClick={async (item) => {
+            await onAddLanguage?.(item);
+            takeLanguageAssessment(
+              item.language,
+              undefined,
+              item.proficiency,
+              item.languageId
+            );
+          }}
+          onUpdateProficiency={(index, proficiency) => onUpdateLanguageProficiency?.(index, proficiency)}
+          onDeleteItemClick={(index) => onDeleteLanguage?.(index)}
+        />
+      );
+      case 'onboarding': return (
+        <OnboardingTab
+          profile={profile}
+          countryMismatch={countryMismatch}
+          checkingCountryMismatch={checkingCountryMismatch}
+          showLoadingSpinner={showLoadingSpinner}
+          timezoneData={timezoneData}
+          allTimezones={allTimezones}
+          getTimezoneMismatchInfo={getTimezoneMismatchInfo}
+          repWizardApi={repWizardApi}
+          onSaveAvailability={handleSaveAvailability}
+        />
+      );
+      case 'specialization': return (
+        <SpecializationTab
+          profile={profile}
+          onDeleteItemClick={(section, index) => onDeleteSpecializationItem?.(section, index)}
+          onAddItemClick={(section, value) => onAddSpecializationItem?.(section, value)}
+          onGoToExperience={() => setActiveTab('experience')}
+        />
+      );
+      case 'availability': return (
+        <AvailabilityTab
+          profile={profile}
+          countryMismatch={countryMismatch}
+          checkingCountryMismatch={checkingCountryMismatch}
+          showLoadingSpinner={showLoadingSpinner}
+          timezoneData={timezoneData}
+          allTimezones={allTimezones}
+          getTimezoneMismatchInfo={getTimezoneMismatchInfo}
+          repWizardApi={repWizardApi}
+          onSaveAvailability={handleSaveAvailability}
+        />
+      );
+
+      default: return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
+    }
+  };
+
+  const headerContentMap: Record<string, { title: string; subtitle: string }> = {
+    profile: {
+      title: t('profile.tabs.profile.title'),
+      subtitle: t('profile.tabs.profile.subtitle')
+    },
+    skills: {
+      title: t('profile.tabs.skills.title'),
+      subtitle: t('profile.tabs.skills.subtitle')
+    },
+    experience: {
+      title: t('profile.tabs.experience.title'),
+      subtitle: t('profile.tabs.experience.subtitle')
+    },
+    languages: {
+      title: t('profile.tabs.languages.title'),
+      subtitle: t('profile.tabs.languages.subtitle')
+    },
+    specialization: {
+      title: t('profile.tabs.specialization.title'),
+      subtitle: t('profile.tabs.specialization.subtitle')
+    },
+    onboarding: {
+      title: t('profile.tabs.onboarding.title'),
+      subtitle: t('profile.tabs.onboarding.subtitle')
+    },
+    availability: {
+      title: t('profile.tabs.availability.title'),
+      subtitle: t('profile.tabs.availability.subtitle')
+    }
+  };
+
+  const currentHeader = headerContentMap[activeTab] || headerContentMap.profile;
+  const filteredCountries = countries
+    .filter((country) =>
+      String(country.countryName || '')
+        .toLowerCase()
+        .includes(String(publicInfoDraft.country || '').toLowerCase())
+    )
+    .sort((a, b) => String(a.countryName || '').localeCompare(String(b.countryName || '')))
+    .slice(0, 120);
+
+  if (inlineAssessment) {
+    return (
+      <div className="min-h-full bg-[#f8fafc]">
+        <div className="max-w-5xl mx-auto px-6 py-4 lg:px-10 lg:py-6 space-y-6">
+          <button
+            type="button"
+            onClick={closeInlineAssessment}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
+          >
+            <ArrowRight size={16} className="rotate-180" />
+            {t('profile.header.backTo', { destination: t(activeTab === 'languages' ? 'profile.nav.languages' : 'profile.nav.profile') })}
+          </button>
+          <div className="glass-card rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div className="bg-gradient-harx px-10 py-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+              <h1 className="text-2xl lg:text-3xl font-black text-white tracking-widest uppercase relative z-10">
+                {t('profile.header.assessment', { category: inlineAssessment.category, skill: inlineAssessment.skillName })}
+              </h1>
+            </div>
+            <div className="p-6">
+              <AssessmentProvider>
+                <ContactCenterAssessment
+                  skillId={inlineAssessment.skillId}
+                  category={inlineAssessment.category}
+                  skillName={inlineAssessment.skillName}
+                  onComplete={handleInlineAssessmentComplete}
+                  onExit={closeInlineAssessment}
+                />
+              </AssessmentProvider>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-[#f8fafc]">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Page Title & Phrase - Dynamic */}
+        <div className="mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2 animate-in fade-in slide-in-from-left-4 duration-500">
+            {currentHeader.title}
+          </h1>
+          <p className="text-slate-500 font-medium tracking-tight animate-in fade-in slide-in-from-left-6 duration-700">
+            {currentHeader.subtitle}
+          </p>
+        </div>
+
+        {/* Navigation Tabs at the Top */}
+        <div className="w-full">
+          <ProfileNavbar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            warningTabs={[
+              ...((profile?.personalInfo?.languages || []).some((l: any) => {
+                const ar = l?.assessmentResults;
+                if (!ar || ar.source === 'cv') return true;
+                const verified = String(ar.verifiedProficiency || l.proficiency || '').toUpperCase();
+                return String(l.proficiency || '').toUpperCase() !== verified;
+              })
+                ? ['languages']
+                : []),
+              ...(((profile?.professionalSummary?.industries?.length || 0) === 0 ||
+                (profile?.professionalSummary?.activities?.length || 0) === 0)
+                ? ['specialization']
+                : []),
+            ]}
+            warningMessages={{
+              languages: t('profile.nav.languageWarning'),
+              specialization: t('profile.nav.specializationWarning'),
+            }}
+          />
+        </div>
+
+        {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
+        {activeTab === 'profile' && (
+          <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-8 lg:p-10 shadow-sm border border-harx-100/70 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex flex-col md:flex-row gap-10 items-start">
+              {/* Photo management */}
+              <div className="relative group shrink-0">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+                <div
+                  className="w-40 h-40 rounded-[32px] shadow-xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
+                  onClick={() => profile.personalInfo?.photo?.url && setShowImageModal(true)}
+                >
+                  {profile.personalInfo?.photo?.url ? (
+                    <img
+                      src={profile.personalInfo.photo.url}
+                      alt={t('profile.header.profilePhotoAlt')}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-5xl font-black text-gray-200 bg-gray-50 uppercase tracking-tighter">
+                      {profile.personalInfo?.name?.charAt(0) || '?'}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
+                    <div className="text-white text-xs font-black uppercase tracking-widest bg-white/20 px-4 py-2 rounded-full border border-white/30 truncate">{t('profile.header.viewPhoto')}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !isUploadingPhoto && photoInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-harx text-white shadow-lg hover:opacity-90 disabled:opacity-60"
+                  title={t('profile.header.changePhoto')}
+                >
+                  {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Properties Grid */}
+              <div className="flex-1 w-full relative">
+                {/* Onboarding banners (phases 1–4 + gig apply). Hidden once published —
+                    status "completed" is the source of truth after logout/login. */}
+                {!isRepProfilePublished(profile) && (
+                isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
+                  profile.status !== 'completed' ? (
+                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                          <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-base font-black tracking-tight">
+                            {t('profile.header.publishReady')}
+                          </p>
+                          <p className="text-xs font-medium text-white/85 mt-0.5">
+                            {t('profile.header.publishReadyDescription')}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handlePublish}
+                        disabled={isPublishing}
+                        className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap"
+                      >
+                        {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                        {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
+                      </button>
+                    </div>
+                  ) : null
+                ) : isRepCoreOnboardingDone(profile) ? (
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-black text-amber-900">
+                          {t('profile.header.finalStep')}
+                        </p>
+                        <p className="text-xs font-medium text-amber-800 mt-0.5">
+                          {t('profile.header.finalStepDescription')}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate('/marketplace')}
+                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+                    >
+                      {t('profile.header.browseMissions')}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <div className="flex items-start gap-3">
+                      <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-black text-emerald-800">
+                          {t('profile.header.phase2Complete')}
+                        </p>
+                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                          {t('profile.header.phase2CompleteDescription')}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(getRepOnboardingStep(profile).path)}
+                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
+                    >
+                      {t('profile.header.continueOnboarding')}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-black text-yellow-800">
+                        {t('profile.header.completePhase2')}
+                      </p>
+                      <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                        {t('profile.header.completePhase2Description')}
+                      </p>
+                    </div>
+                  </div>
+                )
+                )}
+                {/* Action Buttons Top Right */}
+                <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
+                    <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
+                  </div>
+                  {profile.status === 'completed' && (
+                    <div className="flex items-center gap-3">
+                      <div className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl flex items-center gap-2">
+                        <Check className="w-4 h-4" strokeWidth={3} />
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          {t('profile.header.published')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end mb-3">
+                  {!isEditingPublicInfo ? (
+                    <button
+                      type="button"
+                      onClick={openPublicInfoEditor}
+                      className="inline-flex items-center justify-center p-2 rounded-lg bg-gradient-harx text-white hover:opacity-90 transition-all"
+                      title={t('profile.header.editPublicProperties')}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPublicInfo(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+                      >
+                        {t('profile.common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={savePublicInfoInline}
+                        disabled={isSavingPublicInfo}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-60"
+                      >
+                        {isSavingPublicInfo ? t('profile.common.saving') : t('profile.common.save')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  {/* Location */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.currentCountry')}</label>
+                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-200 transition-colors">
+                      <MapPin className="w-3.5 h-3.5 text-harx-400" />
+                      {isEditingPublicInfo ? (
+                        <div className="relative w-full">
+                          <input
+                            type="text"
+                            value={publicInfoDraft.country}
+                            onChange={(e) => {
+                              setPublicInfoDraft((prev) => ({ ...prev, country: e.target.value, countryId: '' }));
+                              setIsCountryDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsCountryDropdownOpen(true)}
+                            onBlur={() => {
+                              setTimeout(() => setIsCountryDropdownOpen(false), 160);
+                            }}
+                            placeholder={t('profile.header.searchCountry')}
+                            className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
+                          />
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          {isCountryDropdownOpen && (
+                            <div className="absolute z-50 mt-2 w-full bg-white border border-harx-100 rounded-xl shadow-xl overflow-hidden">
+                              <div className="max-h-56 overflow-y-auto">
+                                {filteredCountries.length > 0 ? (
+                                  filteredCountries.map((country) => (
+                                    <button
+                                      key={country._id || country.countryCode || country.zoneName}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setPublicInfoDraft((prev) => ({
+                                          ...prev,
+                                          country: String(country.countryName || ''),
+                                          countryId: String(country._id || '')
+                                        }));
+                                        setIsCountryDropdownOpen(false);
+                                      }}
+                                      className="w-full text-left px-3 py-2.5 hover:bg-harx-50 border-b border-harx-50 last:border-b-0 transition-colors"
+                                    >
+                                      <div className="text-xs font-bold text-slate-800">{country.countryName}</div>
+                                      <div className="text-[10px] text-slate-500">{country.countryCode || ''}</div>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-2.5 text-xs text-slate-500">{t('profile.header.noCountries')}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-900">{getCountryDisplayName()}</span>
+                      )}
+                      {countryMismatch?.hasMismatch && (
+                        <div className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse" title={t('profile.header.locationMismatch')} />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.directContact')}</label>
+                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
+                      {isEditingPublicInfo ? (
+                        <input
+                          type="email"
+                          value={publicInfoDraft.email}
+                          onChange={(e) => setPublicInfoDraft((prev) => ({ ...prev, email: e.target.value }))}
+                          className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
+                        />
+                      ) : (
+                        <span className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{profile.personalInfo?.email || 'N/A'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.phoneLine')}</label>
+                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
+                      {isEditingPublicInfo ? (
+                        <input
+                          type="text"
+                          value={publicInfoDraft.phone}
+                          onChange={(e) => setPublicInfoDraft((prev) => ({ ...prev, phone: e.target.value }))}
+                          className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
+                        />
+                      ) : (
+                        <span className="text-sm font-bold text-slate-900">{profile.personalInfo?.phone || 'N/A'}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Stats Grid (Score & Plan) */}
+                <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-harx-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-100/40 transition-colors"></div>
+                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-500 relative z-10">
+                      <Target size={24} className="animate-pulse" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="text-[10px] font-black text-harx-400 uppercase tracking-widest">{t('profile.header.scoreOverall')}</div>
+                      <div className="text-2xl font-black text-harx-900 tracking-tighter leading-none mt-0.5">{calculateOverallScore()} / 100</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-harx-alt-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-alt-100/40 transition-colors"></div>
+                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-alt-500 relative z-10">
+                      <Briefcase size={24} />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="text-[10px] font-black text-harx-alt-400 uppercase tracking-widest">{t('profile.header.growthPlan')}</div>
+                      {isEditingPublicInfo ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsPlanModalOpen(true)}
+                          className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors underline underline-offset-2"
+                        >
+                          {planData?.plan?.name || t('profile.header.choosePlan')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsPlanModalOpen(true)}
+                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
+                        >
+                          {planData?.plan?.name || t('profile.header.defaultPlan')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="w-full">
+          <div className="flex-1 min-h-[600px]">
+            {renderActiveTab()}
+          </div>
+        </div>
+      </div>
+
+      {/* Image Modal */}
+      {showImageModal && profile.personalInfo?.photo?.url && (
+        <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 backdrop-blur-md" onClick={() => setShowImageModal(false)}>
+          <div className="relative max-w-2xl w-full bg-slate-100 rounded-3xl overflow-hidden shadow-2xl border border-slate-200/50" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-4 right-4 p-2 bg-slate-900/20 hover:bg-slate-900/40 text-white rounded-full transition-colors z-10" onClick={() => setShowImageModal(false)}>
+              <X size={24} />
+            </button>
+            <img src={profile.personalInfo.photo.url} alt={t('profile.header.profilePhotoAlt')} className="w-full h-auto object-contain" style={{ maxHeight: '80vh' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Plan Selection Modal — embedded Stripe (no redirect) */}
+      {isPlanModalOpen && (
+        <div
+          className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => void closePlanModal()}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[92vh] rounded-3xl border border-harx-100 bg-white shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 px-5 py-4 border-b border-harx-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-harx-900">{t('profile.header.selectPlan')}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => void closePlanModal()}
+                className="p-1.5 rounded-lg bg-harx-50 text-harx-700 hover:bg-harx-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+              <EmbeddedRepSubscriptionFlow
+                agentId={profile?._id ? String(profile._id) : undefined}
+                customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
+                currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
+                onSubscribed={handlePlanSubscribed}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Crop Modal */}
+      {isCropModalOpen && imgSrc && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-900">{t('profile.header.cropPhoto')}</h3>
+              <button
+                onClick={() => setIsCropModalOpen(false)}
+                className="p-2 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6 bg-slate-50/50 flex justify-center items-center">
+              <ReactCrop
+                crop={crop}
+                onChange={c => setCrop(c)}
+                onComplete={c => setCompletedCrop(c)}
+                aspect={1}
+                circularCrop
+              >
+                <img
+                  ref={imgRef}
+                  src={imgSrc}
+                  alt={t('profile.header.cropAlt')}
+                  onLoad={onImageLoad}
+                  className="max-w-full max-h-[50vh] object-contain"
+                />
+              </ReactCrop>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
+              <button
+                onClick={() => setIsCropModalOpen(false)}
+                className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+              >
+                {t('profile.common.cancel')}
+              </button>
+              <button
+                onClick={handleCropComplete}
+                className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-harx-500/20 active:scale-95"
+              >
+                {t('profile.header.savePhoto')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {languageVideoModal && profile?._id && (
+        <LanguageVideoModal
+          isOpen
+          onClose={closeLanguageVideoModal}
+          profileId={profile._id}
+          languageName={languageVideoModal.language}
+          languageCode={languageVideoModal.code}
+          languageId={languageVideoModal.languageId}
+          expectedProficiency={languageVideoModal.proficiency}
+          referencePhotoUrl={profile.personalInfo?.photo?.url}
+          onAnalysisComplete={handleLanguageVideoComplete}
+        />
+      )}
+    </div>
+  );
+};
