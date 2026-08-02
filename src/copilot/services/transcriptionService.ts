@@ -79,7 +79,7 @@ export class TranscriptionService {
 
     const callApi: string =
       import.meta.env.VITE_API_URL_CALL ||
-      'https://v25dashcallsbackend-production.up.railway.app/api';
+      'https://v25dashcallsbackend-development.up.railway.app/api';
     const host = callApi.replace(/\/+$/, '').replace(/\/api$/, '');
     return `${host.replace(/^http/, 'ws')}/speech-to-text`;
   }
@@ -268,8 +268,8 @@ export class TranscriptionService {
       // Setup WebSocket connection
       await this.getDestinationZone(); // Ensure zone is set
       const baseUrl = this.destinationZone === 'US'
-        ? 'https://v25dashcallsbackend-production.up.railway.app'
-        : 'https://v25dashcallsbackend-production.up.railway.app'; // Fallback to US/Prod for now as EU url might differ
+        ? 'https://v25dashcallsbackend-development.up.railway.app'
+        : 'https://v25dashcallsbackend-development.up.railway.app'; // Dev shell — keep EU/US on development until split
 
       const wsUrl = baseUrl.replace('http', 'ws');
       this.ws = new WebSocket(`${wsUrl}/speech-to-text`);

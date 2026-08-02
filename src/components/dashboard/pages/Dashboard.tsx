@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
@@ -57,7 +58,7 @@ function normalizeGigEntry(raw: any): GigFilterOption | null {
   };
 }
 
-function mergeGigOptions(...lists: any[][]): GigFilterOption[] {
+function mergeGigOptions(lists: any[][], locale = 'fr'): GigFilterOption[] {
   const map = new Map<string, GigFilterOption>();
   for (const list of lists) {
     for (const item of list) {
@@ -73,7 +74,7 @@ function mergeGigOptions(...lists: any[][]): GigFilterOption[] {
       });
     }
   }
-  return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title, locale));
 }
 
 function resolveCallRefId(call: any): string | null {
@@ -108,18 +109,6 @@ const clickableCallRowClass =
   'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-[0.99]';
 
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
-
-const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
-  { key: 'today', label: "Aujourd'hui" },
-  { key: 'week', label: 'Cette semaine' },
-  { key: 'month', label: 'Ce mois' },
-  { key: 'quarter', label: 'Ce trimestre' },
-  { key: 'year', label: 'Cette année' },
-  { key: 'all', label: 'Tout' },
-];
-
-const fmtMoney = (value: number) =>
-  value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
@@ -156,54 +145,37 @@ const getPeriodStart = (period: PeriodKey): number => {
   }
 };
 
-const getPeriodStartTitle = (period: PeriodKey): string => {
-  switch (period) {
-    case 'today':
-      return 'Début de journée';
-    case 'week':
-      return 'Début de semaine';
-    case 'month':
-      return 'Début de mois';
-    case 'quarter':
-      return 'Début de trimestre';
-    case 'year':
-      return "Début d'année";
-    case 'all':
-    default:
-      return 'Solde initial';
-  }
-};
-
-const getPeriodStartHint = (period: PeriodKey): string => {
-  switch (period) {
-    case 'today':
-      return 'Déjà dans le portefeuille ce matin';
-    case 'week':
-      return 'Déjà dans le portefeuille lundi matin';
-    case 'month':
-      return 'Déjà dans le portefeuille au 1er du mois';
-    case 'quarter':
-      return 'Déjà dans le portefeuille au début du trimestre';
-    case 'year':
-      return 'Déjà dans le portefeuille au 1er janvier';
-    case 'all':
-    default:
-      return 'Avant les nouveaux gains de la période';
-  }
-};
-
-const getPeriodStartDateLabel = (period: PeriodKey): string => {
-  const start = getPeriodStart(period);
-  if (!start) return '';
-  return new Date(start).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
 export function Dashboard({ profile }: DashboardProps) {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const dateLocale = i18n.language?.startsWith('fr') ? 'fr-FR' : 'en-US';
+  const fmtMoney = (value: number) =>
+    value.toLocaleString(dateLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = useMemo(() => [
+    { key: 'today', label: t('dashboard.home.periods.today') },
+    { key: 'week', label: t('dashboard.home.periods.week') },
+    { key: 'month', label: t('dashboard.home.periods.month') },
+    { key: 'quarter', label: t('dashboard.home.periods.quarter') },
+    { key: 'year', label: t('dashboard.home.periods.year') },
+    { key: 'all', label: t('dashboard.home.periods.all') },
+  ], [t]);
+
+  const getPeriodStartTitle = (period: PeriodKey): string =>
+    t(`dashboard.home.periodStart.${period}`);
+
+  const getPeriodStartHint = (period: PeriodKey): string =>
+    t(`dashboard.home.periodStartHint.${period}`);
+
+  const getPeriodStartDateLabel = (period: PeriodKey): string => {
+    const start = getPeriodStart(period);
+    if (!start) return '';
+    return new Date(start).toLocaleDateString(dateLocale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
   const [callsData, setCallsData] = useState<any[]>([]);
   const [gigsData, setGigsData] = useState<any[]>([]);
   const [reservationsData, setReservationsData] = useState<Reservation[]>([]);
@@ -301,7 +273,7 @@ export function Dashboard({ profile }: DashboardProps) {
         const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
         setCallsData(callsList);
-        setGigsData(mergeGigOptions(
+        setGigsData(mergeGigOptions([
           Array.isArray(gigs.data) ? gigs.data : [],
           profileGigs,
           matchingGigs,
@@ -311,7 +283,7 @@ export function Dashboard({ profile }: DashboardProps) {
             _id: tx.gigId,
             title: tx.gig?.title,
           })),
-        ));
+        ], i18n.language));
         setReservationsData(Array.isArray(reservationsRes) ? reservationsRes : []);
 
         if (walletRes?.data?.success && walletRes.data.data) {
@@ -339,7 +311,7 @@ export function Dashboard({ profile }: DashboardProps) {
     };
 
     fetchData();
-  }, [profile]);
+  }, [profile, i18n.language]);
 
   const periodStartTs = useMemo(() => getPeriodStart(selectedPeriod), [selectedPeriod]);
 
@@ -504,6 +476,8 @@ export function Dashboard({ profile }: DashboardProps) {
     selectedPeriod,
     selectedGigId,
     walletStats.availableBalance,
+    t,
+    dateLocale,
   ]);
 
   const focusClientValidationPending = () => {
@@ -760,7 +734,7 @@ export function Dashboard({ profile }: DashboardProps) {
         return d >= monthStart.getTime();
       }).length;
       return {
-        label: 'Tous les Gigs',
+        label: t('dashboard.home.allGigs'),
         current: monthCalls,
         target: 0,
         bonusAmount: 0,
@@ -786,24 +760,24 @@ export function Dashboard({ profile }: DashboardProps) {
 
     const progressPct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
     return {
-      label: gig?.title || 'Gig',
+      label: gig?.title || t('dashboard.home.gigFallback'),
       current,
       target,
       bonusAmount: bonusRepShare,
       progressPct
     };
-  }, [selectedGigId, gigsData, callsData]);
+  }, [selectedGigId, gigsData, callsData, t]);
 
-  const displayName = profile?.personalInfo?.name ? profile.personalInfo.name.split(' ')[0] : 'User';
+  const displayName = profile?.personalInfo?.name ? profile.personalInfo.name.split(' ')[0] : t('dashboard.home.defaultUser');
 
   const selectedGigLabel = useMemo(() => {
-    if (selectedGigId === 'all') return 'Tous les Gigs';
-    return gigsData.find((g) => g._id === selectedGigId)?.title || 'Gig';
-  }, [selectedGigId, gigsData]);
+    if (selectedGigId === 'all') return t('dashboard.home.allGigs');
+    return gigsData.find((g) => g._id === selectedGigId)?.title || t('dashboard.home.gigFallback');
+  }, [selectedGigId, gigsData, t]);
 
   const selectedPeriodLabel = useMemo(
-    () => PERIOD_OPTIONS.find((p) => p.key === selectedPeriod)?.label || 'Ce mois',
-    [selectedPeriod]
+    () => PERIOD_OPTIONS.find((p) => p.key === selectedPeriod)?.label || t('dashboard.home.periods.month'),
+    [selectedPeriod, PERIOD_OPTIONS, t]
   );
 
   const readGigDropdownPos = () => {
@@ -911,18 +885,18 @@ export function Dashboard({ profile }: DashboardProps) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
-              Bonjour, {displayName} 👋
+              {t('dashboard.home.greeting', { name: displayName })}
             </h1>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-              Suivi en temps réel de vos indicateurs de performance commerciale
+              {t('dashboard.home.subtitle')}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <div className="relative flex items-center gap-2.5">
               <Briefcase size={16} className="text-purple-600 animate-pulse" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gig :</span>
-              <div className="relative min-w-[220px] max-w-[320px]">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.gigLabel')}</span>
+              <div className="relative w-full min-w-0 sm:min-w-[220px] sm:max-w-[320px]">
                 <button
                   ref={gigTriggerRef}
                   type="button"
@@ -949,7 +923,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         maxWidth: 'min(420px, calc(100vw - 2rem))',
                       }}
                       role="listbox"
-                      aria-label="Filtrer par gig"
+                      aria-label={t('dashboard.home.filterByGig')}
                     >
                       <button
                         type="button"
@@ -969,7 +943,7 @@ export function Dashboard({ profile }: DashboardProps) {
                           }`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selectedGigId === 'all' ? 'bg-purple-500' : 'bg-slate-300'}`} />
-                          Tous les Gigs
+                          {t('dashboard.home.allGigs')}
                         </span>
                       </button>
 
@@ -1012,8 +986,8 @@ export function Dashboard({ profile }: DashboardProps) {
 
             <div className="relative flex items-center gap-2.5">
               <CalendarDays size={16} className="text-blue-600" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Période :</span>
-              <div className="relative min-w-[180px] max-w-[240px]">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.periodLabel')}</span>
+              <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[240px]">
                 <button
                   ref={periodTriggerRef}
                   type="button"
@@ -1040,7 +1014,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         maxWidth: 'min(320px, calc(100vw - 2rem))',
                       }}
                       role="listbox"
-                      aria-label="Filtrer par période"
+                      aria-label={t('dashboard.home.filterByPeriod')}
                     >
                       {PERIOD_OPTIONS.map((opt) => {
                         const isSelected = selectedPeriod === opt.key;
@@ -1105,7 +1079,7 @@ export function Dashboard({ profile }: DashboardProps) {
         <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              Solde disponible
+              {t('dashboard.home.pipeline.availableBalance')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
               <WalletIcon size={14} />
@@ -1115,7 +1089,7 @@ export function Dashboard({ profile }: DashboardProps) {
             {fmtMoney(earningsPipeline.availableBalance)} €
           </p>
           <p className="text-[10px] font-semibold text-emerald-600 mt-auto pt-2">
-            Prêt au retrait
+            {t('dashboard.home.pipeline.readyToWithdraw')}
           </p>
         </div>
 
@@ -1129,11 +1103,11 @@ export function Dashboard({ profile }: DashboardProps) {
               ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
               : 'border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 hover:border-emerald-300 hover:shadow-md'
           } ${earningsPipeline.validatedInPeriod === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label="Voir les commissions validées"
+          aria-label={t('dashboard.home.pipeline.ariaValidated')}
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
-              Gains validés
+              {t('dashboard.home.pipeline.validatedEarnings')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
               <ShieldCheck size={14} />
@@ -1143,9 +1117,9 @@ export function Dashboard({ profile }: DashboardProps) {
             +{fmtMoney(earningsPipeline.validatedInPeriod)} €
           </p>
           <p className="text-[10px] text-emerald-600/80 mt-auto pt-2 truncate">
-            {earningsPipeline.validatedCallsCount} appel{earningsPipeline.validatedCallsCount !== 1 ? 's' : ''}
+            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount })}
             {' · '}
-            {earningsPipeline.validatedSalesCount} vente{earningsPipeline.validatedSalesCount !== 1 ? 's' : ''}
+            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
           </p>
         </button>
 
@@ -1159,11 +1133,11 @@ export function Dashboard({ profile }: DashboardProps) {
               ? 'border-orange-400 bg-orange-50 ring-2 ring-orange-400/30'
               : 'border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 hover:border-orange-300 hover:shadow-md'
           } ${earningsPipeline.retractionCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label="Voir les ventes en période de rétractation"
+          aria-label={t('dashboard.home.pipeline.ariaRetraction')}
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
-              Rétractation
+              {t('dashboard.home.pipeline.retraction')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
               <RotateCcw size={14} />
@@ -1174,8 +1148,8 @@ export function Dashboard({ profile }: DashboardProps) {
           </p>
           <p className="text-[10px] text-orange-600/80 mt-auto pt-2">
             {earningsPipeline.retractionCount > 0
-              ? `${earningsPipeline.retractionCount} vente(s) · 14 jours`
-              : 'Aucune vente'}
+              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
+              : t('dashboard.home.pipeline.noSales')}
           </p>
         </button>
 
@@ -1189,11 +1163,11 @@ export function Dashboard({ profile }: DashboardProps) {
               ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-400/30'
               : 'border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 hover:border-amber-300 hover:shadow-md'
           } ${earningsPipeline.clientValidationCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label="Voir les commissions en attente de validation entreprise"
+          aria-label={t('dashboard.home.pipeline.ariaClientValidation')}
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
-              Validation client
+              {t('dashboard.home.pipeline.clientValidation')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
               <Building2 size={14} />
@@ -1204,8 +1178,8 @@ export function Dashboard({ profile }: DashboardProps) {
           </p>
           <p className="text-[10px] text-amber-600/80 mt-auto pt-2">
             {earningsPipeline.clientValidationCount > 0
-              ? `${earningsPipeline.clientValidationCount} en attente`
-              : 'Rien en attente'}
+              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
+              : t('dashboard.home.pipeline.nothingPending')}
           </p>
         </button>
 
@@ -1214,7 +1188,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
           <div className="relative z-10 flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 leading-tight">
-              Total période
+              {t('dashboard.home.pipeline.periodTotal')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
               <Trophy size={14} />
@@ -1237,9 +1211,9 @@ export function Dashboard({ profile }: DashboardProps) {
                   <Receipt size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">Transactions</h2>
+                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.transactions.title')}</h2>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    Vos commissions & paiements
+                    {t('dashboard.home.transactions.subtitle')}
                   </p>
                 </div>
               </div>
@@ -1251,11 +1225,11 @@ export function Dashboard({ profile }: DashboardProps) {
             {/* Filter pills */}
             <div className="flex flex-wrap gap-2">
               {([
-                { key: 'all', label: 'Tous', accent: 'slate', count: transactionStats.all.count },
-                { key: 'earned', label: 'Payé', accent: 'emerald', count: transactionStats.earned.count },
-                { key: 'pending_retraction', label: 'Rétractation', accent: 'amber', count: transactionStats.pending_retraction.count },
-                { key: 'paid', label: 'Versé', accent: 'blue', count: transactionStats.paid.count },
-                { key: 'refused', label: 'Refusé', accent: 'rose', count: transactionStats.refused.count },
+                { key: 'all', label: t('dashboard.home.transactions.filterAll'), accent: 'slate', count: transactionStats.all.count },
+                { key: 'earned', label: t('dashboard.home.transactions.filterEarned'), accent: 'emerald', count: transactionStats.earned.count },
+                { key: 'pending_retraction', label: t('dashboard.home.transactions.filterRetraction'), accent: 'amber', count: transactionStats.pending_retraction.count },
+                { key: 'paid', label: t('dashboard.home.transactions.filterPaid'), accent: 'blue', count: transactionStats.paid.count },
+                { key: 'refused', label: t('dashboard.home.transactions.filterRefused'), accent: 'rose', count: transactionStats.refused.count },
               ] as { key: TransactionFilter; label: string; accent: string; count: number }[]).map((tab) => {
                 const active = transactionFilter === tab.key;
                 return (
@@ -1296,32 +1270,32 @@ export function Dashboard({ profile }: DashboardProps) {
                 <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
                   <Inbox size={22} />
                 </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aucune transaction</p>
-                <p className="text-[11px] text-slate-400 mt-1">Aucun résultat pour ce filtre</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('dashboard.home.transactions.empty')}</p>
+                <p className="text-[11px] text-slate-400 mt-1">{t('dashboard.home.transactions.emptyFilter')}</p>
               </div>
             ) : (
               <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
                 {visibleTransactions.map((tx) => {
                   const statusMeta =
                     tx.status === 'earned'
-                      ? { label: 'Payé', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
+                      ? { label: t('dashboard.home.transactions.statusEarned'), cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
                       : tx.status === 'paid'
-                      ? { label: 'Versé', cls: 'bg-blue-50 text-blue-700 border-blue-100' }
+                      ? { label: t('dashboard.home.transactions.statusPaid'), cls: 'bg-blue-50 text-blue-700 border-blue-100' }
                       : tx.status === 'pending_retraction'
-                      ? { label: 'Rétractation', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
-                      : { label: 'Refusé', cls: 'bg-rose-50 text-rose-700 border-rose-100' };
+                      ? { label: t('dashboard.home.transactions.statusRetraction'), cls: 'bg-amber-50 text-amber-800 border-amber-200' }
+                      : { label: t('dashboard.home.transactions.statusRefused'), cls: 'bg-rose-50 text-rose-700 border-rose-100' };
                   const typeLabel =
-                    tx.type === 'call_validated' ? 'Appel validé'
-                    : tx.type === 'transaction' ? 'Vente'
-                    : 'Bonus';
-                  const gigTitle = tx.gig?.title || (gigsData.find((g: any) => (g._id || g.id) === tx.gigId)?.title) || 'Gig';
+                    tx.type === 'call_validated' ? t('dashboard.home.transactions.typeCallValidated')
+                    : tx.type === 'transaction' ? t('dashboard.home.transactions.typeSale')
+                    : t('dashboard.home.transactions.typeBonus');
+                  const gigTitle = tx.gig?.title || (gigsData.find((g: any) => (g._id || g.id) === tx.gigId)?.title) || t('dashboard.home.gigFallback');
                   return (
                     <li key={tx._id}>
                       <button
                         type="button"
                         onClick={() => openTransactionDetails(tx)}
                         className={clickableRowClass}
-                        aria-label={`Voir la transaction ${typeLabel}`}
+                        aria-label={t('dashboard.home.transactions.ariaView', { type: typeLabel })}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -1330,7 +1304,7 @@ export function Dashboard({ profile }: DashboardProps) {
                           <div className="min-w-0">
                             <p className="text-sm font-black text-slate-900 truncate">{typeLabel} · {gigTitle}</p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {new Date(tx.createdAt).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
                           </div>
                         </div>
@@ -1368,26 +1342,26 @@ export function Dashboard({ profile }: DashboardProps) {
                   <Phone size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">Appels</h2>
+                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.callsSection.title')}</h2>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                     {callFilter === 'pending_client'
-                      ? 'En attente validation entreprise'
-                      : 'Historique & validation IA'}
+                      ? t('dashboard.home.callsSection.subtitlePending')
+                      : t('dashboard.home.callsSection.subtitle')}
                   </p>
                 </div>
               </div>
               <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                {callStats.all} appel{callStats.all > 1 ? 's' : ''}
+                {t('dashboard.home.callsSection.count', { count: callStats.all })}
               </span>
             </div>
 
             {/* Filter pills */}
             <div className="flex flex-wrap gap-2">
               {([
-                { key: 'all', label: 'Tous', accent: 'slate', count: callStats.all },
-                { key: 'valid', label: 'Validés', accent: 'emerald', count: callStats.valid },
-                { key: 'invalid', label: 'Non validés', accent: 'rose', count: callStats.invalid },
-                { key: 'pending_client', label: 'Ventes en attente', accent: 'amber', count: callStats.pending_client },
+                { key: 'all', label: t('dashboard.home.callsSection.filterAll'), accent: 'slate', count: callStats.all },
+                { key: 'valid', label: t('dashboard.home.callsSection.filterValid'), accent: 'emerald', count: callStats.valid },
+                { key: 'invalid', label: t('dashboard.home.callsSection.filterInvalid'), accent: 'rose', count: callStats.invalid },
+                { key: 'pending_client', label: t('dashboard.home.callsSection.filterPending'), accent: 'amber', count: callStats.pending_client },
               ] as { key: CallFilter; label: string; accent: string; count: number }[]).map((tab) => {
                 const active = callFilter === tab.key;
                 return (
@@ -1427,12 +1401,14 @@ export function Dashboard({ profile }: DashboardProps) {
                   <Inbox size={22} />
                 </div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {callFilter === 'pending_client' ? 'Aucun en attente client' : 'Aucun appel'}
+                  {callFilter === 'pending_client'
+                    ? t('dashboard.home.callsSection.emptyPending')
+                    : t('dashboard.home.callsSection.empty')}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
                   {callFilter === 'pending_client'
-                    ? 'Aucune commission en attente de validation entreprise'
-                    : 'Aucun résultat pour ce filtre'}
+                    ? t('dashboard.home.callsSection.emptyPendingDetail')
+                    : t('dashboard.home.callsSection.emptyFilter')}
                 </p>
               </div>
             ) : (
@@ -1441,7 +1417,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   const isValid = call.valid === true || call.validByAI === true;
                   const contact = (call.lead?.First_Name || call.lead?.Last_Name)
                     ? `${call.lead.First_Name || ''} ${call.lead.Last_Name || ''}`.trim()
-                    : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || 'Contact inconnu');
+                    : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || t('dashboard.home.callsSection.unknownContact'));
                   const phoneNum = call.lead?.phone || call.lead?.Phone || call.to || call.from || call.phoneNumber;
                   const hasLeadName = !!(call.lead?.First_Name || call.lead?.Last_Name || call.lead?.name);
                   const durationSec = Number(call.duration || 0);
@@ -1462,7 +1438,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         type="button"
                         onClick={() => openCallDetails(call)}
                         className={clickableCallRowClass}
-                        aria-label={`Voir l'appel ${contact}`}
+                        aria-label={t('dashboard.home.callsSection.ariaView', { contact })}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
@@ -1478,7 +1454,7 @@ export function Dashboard({ profile }: DashboardProps) {
                               )}
                             </p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                              {dateStr ? new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
+                              {dateStr ? new Date(dateStr).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' }) : '—'}
                               {billedMin > 0 && ` · ${billedMin} min`}
                               {gigTitle && ` · ${gigTitle}`}
                             </p>
@@ -1488,12 +1464,12 @@ export function Dashboard({ profile }: DashboardProps) {
                           {inRetraction && (
                             <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-800 border-amber-200 inline-flex items-center gap-1">
                               <RotateCcw size={10} />
-                              Rétractation · +{txCommission.toFixed(2)}€
+                              {t('dashboard.home.callsSection.retractionBadge', { amount: txCommission.toFixed(2) })}
                             </span>
                           )}
                           {callFilter === 'pending_client' || isPendingClient ? (
                             <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                              Vente en attente
+                              {t('dashboard.home.callsSection.pendingSale')}
                             </span>
                           ) : (
                             <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
@@ -1501,7 +1477,7 @@ export function Dashboard({ profile }: DashboardProps) {
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                 : 'bg-rose-50 text-rose-700 border-rose-100'
                             }`}>
-                              {isValid ? 'Validé' : 'Non validé'}
+                              {isValid ? t('dashboard.home.callsSection.validated') : t('dashboard.home.callsSection.notValidated')}
                             </span>
                           )}
                           <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
@@ -1524,73 +1500,73 @@ export function Dashboard({ profile }: DashboardProps) {
               <CalendarCheck size={18} />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">Mes Réservations</h2>
+              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.reservations.title')}</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                Sessions planifiées & heures travaillées
+                {t('dashboard.home.reservations.subtitle')}
               </p>
             </div>
           </div>
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            {reservationStats.total} réservation{reservationStats.total > 1 ? 's' : ''} sur la période
+            {t('dashboard.home.reservations.count', { count: reservationStats.total })}
           </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.total')}</span>
               <CalendarDays size={16} className="text-slate-500" />
             </div>
             <span className="text-2xl font-black text-slate-900 tracking-tighter">{reservationStats.total}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">Sessions</p>
+            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.sessions')}</p>
           </div>
 
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">À venir</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.upcoming')}</span>
               <CalendarClock size={16} className="text-blue-500" />
             </div>
             <span className="text-2xl font-black text-blue-600 tracking-tighter">{reservationStats.upcoming}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">Planifiées</p>
+            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.scheduled')}</p>
           </div>
 
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Effectuées</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.completed')}</span>
               <CheckCircle2 size={16} className="text-emerald-500" />
             </div>
             <span className="text-2xl font-black text-emerald-600 tracking-tighter">{reservationStats.completed}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">Honorées</p>
+            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.honored')}</p>
           </div>
 
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Manquées</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.missed')}</span>
               <CalendarX size={16} className="text-rose-500" />
             </div>
             <span className="text-2xl font-black text-rose-600 tracking-tighter">{reservationStats.noShow + reservationStats.cancelled}</span>
             <p className="text-[10px] font-bold text-slate-500 mt-1">
-              {reservationStats.cancelled} annul. · {reservationStats.noShow} no-show
+              {t('dashboard.home.reservations.missedDetail', { cancelled: reservationStats.cancelled, noShow: reservationStats.noShow })}
             </p>
           </div>
 
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Heures travaillées</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.hoursWorked')}</span>
               <Timer size={16} className="text-amber-500" />
             </div>
             <span className="text-2xl font-black text-amber-600 tracking-tighter">{reservationStats.workedHours}h</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">/ {reservationStats.scheduledHours}h prévues</p>
+            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.hoursScheduled', { hours: reservationStats.scheduledHours })}</p>
           </div>
 
           <div className="bg-slate-950 text-white border border-slate-800 rounded-[24px] p-5 shadow-xl shadow-slate-900/30 relative overflow-hidden">
             <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/30 blur-2xl" />
             <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Assiduité</span>
+              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.reservations.attendance')}</span>
               <Award size={16} className="text-harx-400" />
             </div>
             <span className="text-2xl font-black tracking-tighter relative z-10">{reservationStats.attendanceRate}%</span>
-            <p className="text-[10px] font-bold text-white/60 mt-1 relative z-10">Taux d'assiduité</p>
+            <p className="text-[10px] font-bold text-white/60 mt-1 relative z-10">{t('dashboard.home.reservations.attendanceRate')}</p>
           </div>
         </div>
 
@@ -1598,14 +1574,14 @@ export function Dashboard({ profile }: DashboardProps) {
         {upcomingReservations.length > 0 && (
           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-6 shadow-xl shadow-slate-200/20">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Prochaines sessions</h3>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.reservations.upcomingSessions')}</h3>
               <Clock size={14} className="text-slate-400" />
             </div>
             <ul className="space-y-2.5">
               {upcomingReservations.map((r: any) => {
                 const dateStr = r.reservationDate || r.date;
                 const d = new Date(dateStr);
-                const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || 'Gig') : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || 'Gig');
+                const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || t('dashboard.home.gigFallback')) : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || t('dashboard.home.gigFallback'));
                 return (
                   <li key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}>
                     <button
@@ -1623,7 +1599,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         <div className="min-w-0">
                           <p className="text-sm font-black text-slate-900 truncate">{gigTitle}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
+                            {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
                           </p>
                         </div>
                       </div>
@@ -1650,9 +1626,9 @@ export function Dashboard({ profile }: DashboardProps) {
               <Target size={18} />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">Mes Objectifs</h2>
+              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                Suivi des cibles quotidiennes, hebdomadaires et mensuelles
+                {t('dashboard.home.goals.subtitle')}
               </p>
             </div>
           </div>
@@ -1664,7 +1640,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone size={14} className="text-cyan-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Objectif du jour</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.dailyTitle')}</span>
               </div>
               <span className="text-[10px] font-black text-slate-700">{multiObjectifs.daily.progressPct}%</span>
             </div>
@@ -1672,7 +1648,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <span className="text-2xl font-black text-slate-900 tracking-tighter">
                 {multiObjectifs.daily.current}<span className="text-base text-slate-400">/{multiObjectifs.daily.target}</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Appels aujourd'hui</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.dailyLabel')}</span>
             </div>
             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -1691,7 +1667,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarDays size={14} className="text-indigo-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Objectif hebdo</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.weeklyTitle')}</span>
               </div>
               <span className="text-[10px] font-black text-slate-700">{multiObjectifs.weekly.progressPct}%</span>
             </div>
@@ -1699,7 +1675,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <span className="text-2xl font-black text-slate-900 tracking-tighter">
                 {multiObjectifs.weekly.current}<span className="text-base text-slate-400">/{multiObjectifs.weekly.target}</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Appels cette semaine</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.weeklyLabel')}</span>
             </div>
             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -1718,7 +1694,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarCheck size={14} className="text-violet-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sessions hebdo</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
               </div>
               <span className="text-[10px] font-black text-slate-700">{multiObjectifs.reservationsWeekly.progressPct}%</span>
             </div>
@@ -1726,7 +1702,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <span className="text-2xl font-black text-slate-900 tracking-tighter">
                 {multiObjectifs.reservationsWeekly.current}<span className="text-base text-slate-400">/{multiObjectifs.reservationsWeekly.target}</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Réservations actives</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.sessionsLabel')}</span>
             </div>
             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -1751,7 +1727,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <Target size={22} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">Objectif du mois</h3>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">{t('dashboard.home.gigGoal.title')}</h3>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
                 {objectif.label}
               </p>
@@ -1761,7 +1737,7 @@ export function Dashboard({ profile }: DashboardProps) {
           {objectif.target > 0 ? (
             <div className="text-right shrink-0">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                Bonus à débloquer
+                {t('dashboard.home.gigGoal.bonusUnlock')}
               </span>
               <span className="text-2xl font-black text-emerald-600 tracking-tighter block mt-1 flex items-center justify-end gap-1.5">
                 <Flame size={18} className="text-emerald-500" />
@@ -1770,7 +1746,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           ) : (
             <span className="text-[10px] font-bold text-slate-400 italic">
-              Sélectionnez un Gig pour voir l'objectif
+              {t('dashboard.home.gigGoal.selectGig')}
             </span>
           )}
         </div>
@@ -1782,7 +1758,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <span className="text-slate-900 text-base font-black">{objectif.current}</span>
                 {' '}/{' '}
                 <span>{objectif.target}</span>
-                {' appels validés ce mois-ci'}
+                {' '}{t('dashboard.home.gigGoal.validatedCalls')}
               </span>
               <span className="font-black text-slate-900">{objectif.progressPct}%</span>
             </div>
@@ -1798,11 +1774,11 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
             {objectif.progressPct >= 100 ? (
               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 size={12} /> Objectif atteint — bonus crédité
+                <CheckCircle2 size={12} /> {t('dashboard.home.gigGoal.achieved')}
               </p>
             ) : (
               <p className="text-[10px] font-bold text-slate-500">
-                Plus que {objectif.target - objectif.current} appels validés pour décrocher votre bonus.
+                {t('dashboard.home.gigGoal.remaining', { count: objectif.target - objectif.current })}
               </p>
             )}
           </div>
@@ -1827,49 +1803,53 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="pointer-events-auto w-full max-w-md bg-white rounded-[28px] border border-slate-200 shadow-2xl overflow-hidden">
               <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Détail transaction</h3>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.transactionModal.title')}</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
-                    {selectedTransaction.type === 'bonus' ? 'Bonus' : selectedTransaction.type === 'transaction' ? 'Vente' : 'Commission'}
+                    {selectedTransaction.type === 'bonus'
+                      ? t('dashboard.home.transactionModal.typeBonus')
+                      : selectedTransaction.type === 'transaction'
+                        ? t('dashboard.home.transactionModal.typeSale')
+                        : t('dashboard.home.transactionModal.typeCommission')}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedTransaction(null)}
                   className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                  aria-label="Fermer"
+                  aria-label={t('dashboard.home.transactionModal.close')}
                 >
                   <X size={18} />
                 </button>
               </div>
               <div className="px-6 py-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Montant rep</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.transactionModal.repAmount')}</span>
                   <span className="text-xl font-black text-emerald-600">+{(selectedTransaction.repShare || 0).toFixed(2)} €</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Statut</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.status')}</span>
                   <span className="text-xs font-bold text-slate-700 capitalize">
                     {selectedTransaction.status === 'pending_retraction'
-                      ? 'Rétractation (14 jours)'
+                      ? t('dashboard.home.transactionModal.statusRetraction')
                       : selectedTransaction.status === 'earned'
-                        ? 'Payé'
+                        ? t('dashboard.home.transactionModal.statusEarned')
                         : selectedTransaction.status === 'paid'
-                          ? 'Versé'
+                          ? t('dashboard.home.transactionModal.statusPaid')
                           : selectedTransaction.status === 'refused'
-                            ? 'Refusé'
+                            ? t('dashboard.home.transactionModal.statusRefused')
                             : selectedTransaction.status}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Gig</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.gig')}</span>
                   <span className="text-xs font-semibold text-slate-700 text-right">
                     {selectedTransaction.gig?.title || gigsData.find((g) => g._id === selectedTransaction.gigId)?.title || '—'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Date</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.date')}</span>
                   <span className="text-xs font-semibold text-slate-700">
-                    {new Date(selectedTransaction.createdAt).toLocaleString('fr-FR')}
+                    {new Date(selectedTransaction.createdAt).toLocaleString(dateLocale)}
                   </span>
                 </div>
                 {selectedTransaction.description && (
@@ -1879,7 +1859,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 )}
                 {selectedTransaction.status === 'pending_retraction' && (
                   <p className="text-xs font-medium text-amber-800 leading-relaxed bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                    Commission en rétractation légale (14 jours). Elle sera créditée au solde après ce délai.
+                    {t('dashboard.home.transactionModal.retractionNote')}
                   </p>
                 )}
               </div>
@@ -1889,7 +1869,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   onClick={() => setSelectedTransaction(null)}
                   className="w-full py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
                 >
-                  Fermer
+                  {t('dashboard.home.transactionModal.close')}
                 </button>
               </div>
             </div>

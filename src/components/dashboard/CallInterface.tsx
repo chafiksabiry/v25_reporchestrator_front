@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Phone, Mic, MicOff, Volume2, VolumeX, StopCircle } from 'lucide-react';
-import { Device, Call } from '@twilio/voice-sdk';
+import { TelnyxRTC } from '@telnyx/webrtc';
 import axios from 'axios';
 import ReactDOM from 'react-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -64,8 +64,8 @@ export function CallInterface({ phoneNumber, agentId, onEnd, onCallSaved, provid
   const [hasTransaction, setHasTransaction] = useState<boolean | null>(null);
   const isTransactionRef = useRef<boolean | null>(null);
   const [callStatus, setCallStatus] = useState<CallStatus>("idle");
-  const [connection, setConnection] = useState<Call | null>(null);
-  const [device, setDevice] = useState<Device | null>(null);
+  const [connection, setConnection] = useState<any>(null);
+  const [device, setDevice] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [callSid, setCallSid] = useState<string | null>(null);
   const [recognition, setRecognition] = useState<any>(null);
@@ -202,56 +202,46 @@ export function CallInterface({ phoneNumber, agentId, onEnd, onCallSaved, provid
       console.log('Initiating the call...');
 
       try {
-        // Twilio implementation
-        const response = await axios.get(`${import.meta.env.VITE_API_URL_CALL}/api/calls/token`);
-        const token = response.data.token;
+        // Telnyx implementation
+        const response = await axios.post(`${import.meta.env.VITE_API_URL_CALL}/api/calls/get-login-token`);
+        const token = response.data.login_token;
 
-        const newDevice = new Device(token, {
-          codecPreferences: ['pcmu', 'pcma'] as any,
-          edge: ['ashburn', 'dublin', 'sydney']
+        const newDevice = new TelnyxRTC({
+          login_token: token
         });
         
-        await newDevice.register();
-        const conn = await newDevice.connect({
-          params: { 
-            To: phoneNumber,
-            MediaStream: true,
-          },
-          rtcConfiguration: { 
-            sdpSemantics: "unified-plan",
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' }
-            ]
-          },
-          audio: {
-            echoCancellation: true,
-            autoGainControl: true,
-            noiseSuppression: true
-          }
-        } as any);
+        newDevice.connect();
+        setDevice(newDevice);
 
-        setConnection(conn);
-        setCallStatus("initiating");
+        newDevice.on('telnyx.ready', () => {
+          console.log("✅ Telnyx ready, initiating call...");
+          setCallStatus("initiating");
+          const conn = newDevice.newCall({
+            destinationNumber: phoneNumber,
+            audio: true,
+            callerNumber: '+33423330953' // FIXME: Use actual gig number
+          });
 
-        conn.on('connect', () => {
-          const callSid = conn.parameters.CallSid;
-          console.log("CallSid:", callSid);
-        });
+          setConnection(conn);
 
-        conn.on('accept', () => {
-          console.log("✅ Call accepted");
-          const Sid = conn.parameters.CallSid;
-          console.log("CallSid recupéré", Sid);
-          // Set call details in global state
-          AIAssistantAPI.setCallDetails(Sid, agentId, callId);
-          setCallStatus("active");
-
-          // Wait a moment for the media stream to be ready
-          setTimeout(() => {
-            const stream = conn.getRemoteStream();
-            console.log("mediaStream:", stream);
+          newDevice.on('telnyx.notification', (notification: any) => {
+            const call = notification.call;
             
-            if (stream) {
+            if (notification.type === 'callUpdate') {
+              if (call.state === 'active') {
+                console.log("✅ Call accepted");
+                // The Session ID (Call Control ID) can be retrieved from the call object
+                const Sid = call.options?.customHeaders?.find((h:any) => h.name === 'X-Call-Control-Id')?.value || call.id;
+                console.log("CallSid recupéré", Sid);
+                AIAssistantAPI.setCallDetails(Sid, agentId, callId);
+                setCallStatus("active");
+
+                // Wait a moment for the media stream to be ready
+                setTimeout(() => {
+                  const stream = call.remoteStream;
+                  console.log("mediaStream:", stream);
+                  
+                  if (stream) {
               try {
                 // Create an audio context to process the stream
                 const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -470,36 +460,41 @@ export function CallInterface({ phoneNumber, agentId, onEnd, onCallSaved, provid
                 // Update WebSocket message handler
                 newWs.onmessage = handleWebSocketMessage;
 
-                // Set up cleanup for call end
-                conn.on("disconnect", async () => {
-                  console.log("❌ Call disconnected - Starting cleanup and save process");
-                  
-                  const currentCallSid = conn.parameters.CallSid;
-                  onEnd();
-                  try {
-                    // First do the cleanup to ensure resources are released
+              }
+            } else if (call.state === 'destroy') {
+              console.log("❌ Call disconnected - Starting cleanup and save process");
+              const currentCallSid = call.options?.customHeaders?.find((h:any) => h.name === 'X-Call-Control-Id')?.value || call.id;
+              onEnd();
+              
+              const doCleanup = async () => {
+                try {
+                  if (typeof cleanup === 'function') {
                     await cleanup();
-                    console.log("✅ Cleanup completed, proceeding to save call details");
-
-                    // Save call details using global state
-                    if (currentCallSid) {
-                      // Use Ref to get the latest value regardless of closure
-                      const finalRecordingStatus = isRecordingRef.current;
-                      const finalTransactionStatus = isTransactionRef.current;
-                      await AIAssistantAPI.saveCallToDB(finalRecordingStatus, finalTransactionStatus);
-                      console.log(`✅ Successfully saved call details to DB (Recording: ${finalRecordingStatus}, Transaction: ${finalTransactionStatus})`);
-                      if (onCallSaved) {
-                        onCallSaved();
-                      }
-                    } else {
-                      console.warn("⚠️ No CallSid available for saving call details");
-                    }
-                  } catch (error) {
-                    console.error("❌ Error during cleanup or save:", error);
-                  } finally {
-                    setCallStatus("ended"); 
                   }
-                });
+                  console.log("✅ Cleanup completed, proceeding to save call details");
+
+                  if (currentCallSid) {
+                    const finalRecordingStatus = isRecordingRef.current;
+                    const finalTransactionStatus = isTransactionRef.current;
+                    await AIAssistantAPI.saveCallToDB(finalRecordingStatus, finalTransactionStatus);
+                    console.log(`✅ Successfully saved call details to DB`);
+                    if (onCallSaved) {
+                      onCallSaved();
+                    }
+                  } else {
+                    console.warn("⚠️ No CallSid available for saving call details");
+                  }
+                } catch (error) {
+                  console.error("❌ Error during cleanup or save:", error);
+                } finally {
+                  setCallStatus("ended"); 
+                }
+              };
+              
+              doCleanup();
+            }
+          });
+        });
 
                 // Return cleanup function for component unmount
                 return () => {
@@ -542,7 +537,11 @@ export function CallInterface({ phoneNumber, agentId, onEnd, onCallSaved, provid
 
   const handleMuteToggle = () => {
     if (connection) {
-      connection?.mute(!isMuted);
+      if (isMuted) {
+        connection.unmuteAudio();
+      } else {
+        connection.muteAudio();
+      }
       setIsMuted(!isMuted);
     }
   };
@@ -576,7 +575,7 @@ export function CallInterface({ phoneNumber, agentId, onEnd, onCallSaved, provid
       // Handle disconnection
       if (connection) {
         // The disconnect handler will handle cleanup and saving
-        connection.disconnect();
+        connection.hangup();
       }
     } catch (error) {
       console.error('❌ Error ending call:', error);

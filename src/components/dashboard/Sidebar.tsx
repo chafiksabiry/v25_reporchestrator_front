@@ -170,14 +170,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Briefcase,
       label: t('sidebar.marketplace'),
       path: '/marketplace',
-      isAccessible: () => isPhaseCompleted(4)
+      isAccessible: () => onboardingComplete
     },
 
     {
       icon: GraduationCap,
       label: t('sidebar.training'),
       path: '/training',
-      isAccessible: () => isPhaseCompleted(4),
+      isAccessible: () => onboardingComplete,
       subItems: trainingModules.map((module, idx) => ({
         label: module.title,
         sections: module.sections,
@@ -189,7 +189,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Monitor,
       label: t('sidebar.workspace'),
       path: '/workspace',
-      isAccessible: () => isPhaseCompleted(4),
+      isAccessible: () => onboardingComplete,
       subItems: [
         { label: t('sidebar.leads'), path: '/workspace?tab=voice', icon: User },
         { label: t('sidebar.callHistory'), path: '/workspace?tab=calls', icon: PhoneOutgoing },
@@ -200,7 +200,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Settings,
       label: t('sidebar.operations'),
       path: '/operations',
-      isAccessible: () => isPhaseCompleted(5)
+      isAccessible: () => onboardingComplete && isPhaseCompleted(5)
     },
     {
       icon: Calendar,
@@ -212,9 +212,18 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   const filteredNavItems = navItems.filter(item => item.isAccessible());
 
-  const group1 = filteredNavItems.filter(i => ['/dashboard', '/marketplace', '/workspace'].includes(i.path));
-  const group2 = filteredNavItems.filter(i => ['/training'].includes(i.path));
-  const group3 = filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
+  // Until onboarding is fully done, keep the sidebar as orchestrator guidance only
+  // (no Dashboard / Marketplace / Workspace / Training / Planning links).
+  const showOrchestratorOnly = !onboardingComplete || isProfileCreationPage;
+  const group1 = showOrchestratorOnly
+    ? []
+    : filteredNavItems.filter(i => ['/dashboard', '/marketplace', '/workspace'].includes(i.path));
+  const group2 = showOrchestratorOnly
+    ? []
+    : filteredNavItems.filter(i => ['/training'].includes(i.path));
+  const group3 = showOrchestratorOnly
+    ? []
+    : filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
 
   useEffect(() => {
     console.log('🔒 Access Control Status:', {
@@ -250,58 +259,52 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
-        {/* ── Mascotte (shown on the CV import / editor pages) ── */}
-        {isProfileCreationPage && !isCollapsed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute inset-0 m-auto h-28 w-28 rounded-full bg-harx-500/20 blur-2xl animate-pulse" />
-              <img
-                src={mascotte}
-                alt="HARX assistant"
-                className="relative w-28 h-auto drop-shadow-2xl animate-float"
-              />
-            </div>
-
-            <p className="relative z-10 mt-2 px-1 text-center text-[11px] leading-snug text-white/75">
-              {t(
-                'cvGuide.mascotte',
-                "Salut ! Je suis votre assistant HARX. Importez votre CV et je crée un profil percutant en quelques secondes."
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* ── Guide (hidden on CV import/editor — content is on the page itself) ── */}
-        {!onboardingComplete && !isCollapsed && !isProfileCreationPage && (
-          <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
-                <Lock className="h-4 w-4" />
+        {/* ── Orchestrator consignes only while onboarding is incomplete ── */}
+        {showOrchestratorOnly && !isCollapsed && (
+          <div className="space-y-4">
+            <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
+                  {t('onboardingGuide.title', 'Finalisez votre onboarding')}
+                </p>
               </div>
-              <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
-                {t('onboardingGuide.title', 'Finalisez votre onboarding')}
+              <p className="text-[11px] text-white/70 leading-relaxed mb-3">
+                {t(
+                  'onboardingGuide.description',
+                  'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
+                )}
               </p>
+              <button
+                type="button"
+                onClick={() => navigate('/orchestrator')}
+                className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
+              >
+                {t('onboardingGuide.cta', "Continuer l'onboarding")}
+              </button>
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
-              {t(
-                'onboardingGuide.description',
-                'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
-              )}
-            </p>
-            <button
-              onClick={() => navigate('/orchestrator')}
-              className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
-            >
-              {t('onboardingGuide.cta', 'Continuer l\'onboarding')}
-            </button>
-            <div className="pointer-events-none absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-[11px] font-medium leading-relaxed text-gray-200 opacity-0 shadow-2xl transition-opacity duration-200 group-hover/guide:opacity-100">
-              {t('onboardingGuide.tooltip', 'Terminez les 4 phases (inscription, profil, évaluations, abonnement) pour débloquer toutes les fonctionnalités.')}
-            </div>
+
+            {isProfileCreationPage && (
+              <div className="relative flex flex-col items-center text-center px-2 py-2">
+                <div className="pointer-events-none absolute inset-0 m-auto h-16 w-16 rounded-full bg-harx-500/20 blur-2xl" />
+                <img
+                  src={mascotte}
+                  alt=""
+                  aria-hidden="true"
+                  className="relative w-24 h-auto drop-shadow-xl"
+                />
+                <p className="relative mt-2 text-[11px] leading-snug text-white/80">
+                  {t('cvGuide.mascotte')}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Group 1: Main ── */}
-        {group1.length > 0 && (
+        {/* ── Group 1: Main (hidden until onboarding is complete) ── */}
+        {!showOrchestratorOnly && group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
             <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Main</p>

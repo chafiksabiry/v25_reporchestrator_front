@@ -3,11 +3,16 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAgent } from '../../contexts/AgentContext';
 import { Device } from '@twilio/voice-sdk';
+import { TelnyxRTC } from '@telnyx/webrtc';
 import { callsApiClient } from '../../../utils/client';
 import { useCallStorage } from '../../hooks/useCallStorage';
 import { useTranscription } from '../../contexts/TranscriptionContext';
 import { useLead } from '../../hooks/useLead';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
+import {
+  TelnyxCallPersist,
+  type GigPhoneLine,
+} from '../../services/telnyxCallPersist';
 import {
   Phone, Mail, Calendar, Briefcase, Mic, MicOff, Volume2, Headphones, StopCircle
 } from 'lucide-react';
@@ -34,11 +39,14 @@ export function ContactInfo() {
   // True once the call reaches conn.on('accept') — used to decide whether
   // to show the blocking "Saving…" overlay (only meaningful for real calls).
   const callReachedActiveRef = useRef(false);
+  const callStartedAtRef = useRef<number | null>(null);
+  const activeLineRef = useRef<GigPhoneLine | null>(null);
   const [isCallLoading, setIsCallLoading] = useState(false);
   const [activeConnection, setActiveConnection] = useState<any>(null);
   const [, setActiveDevice] = useState<Device | null>(null);
   const [callStatus, setCallStatus] = useState<string>('idle');
   const [currentCallSid, setCurrentCallSid] = useState<string | null>(null);
+  const [lineError, setLineError] = useState<string | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [transactionOccurred, setTransactionOccurred] = useState<boolean | null>(null);
   const transactionOccurredRef = useRef<boolean | null>(null);
@@ -202,16 +210,81 @@ export function ContactInfo() {
    console.log("Contact phone:", contact.phone);
    console.log("Call status:", callStatus); */
 
-  const initiateTwilioCall = async () => {
+  const resolveGigLine = async (): Promise<GigPhoneLine | null> => {
+    if (!contact.id) return null;
+    try {
+      const line = await TelnyxCallPersist.fetchLineForLead(contact.id);
+      activeLineRef.current = line;
+      setLineError(null);
+      return line;
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        t('workspace.call.noActiveLine', 'No active phone number for this gig');
+      setLineError(msg);
+      console.error('Failed to resolve gig phone line:', err);
+      return null;
+    }
+  };
+
+  const persistFinishedCall = async (
+    sidToSave: string,
+    recordingStatus: boolean,
+    provider: 'twilio' | 'telnyx',
+    extra?: { from?: string; to?: string }
+  ) => {
+    const gigId = (apiLead as any)?.gigId?._id || (apiLead as any)?.gigId || activeLineRef.current?.gigId || null;
+    const companyId = (apiLead as any)?.companyId || activeLineRef.current?.companyId || null;
+    const durationSec = callStartedAtRef.current
+      ? Math.max(0, Math.round((Date.now() - callStartedAtRef.current) / 1000))
+      : 0;
+
+    const savedCall = await storeCall(
+      sidToSave,
+      contact.id,
+      recordingStatus,
+      gigId,
+      companyId,
+      transactionOccurredRef.current,
+      isVoicemailRef.current,
+      appointmentAtRef.current || undefined,
+      callbackAtRef.current || undefined,
+      undefined,
+      {
+        provider,
+        from: extra?.from || activeLineRef.current?.phoneNumber,
+        to: extra?.to || contact.phone,
+        duration: durationSec,
+        startTime: callStartedAtRef.current
+          ? new Date(callStartedAtRef.current)
+          : undefined,
+        endTime: new Date(),
+        status: 'completed',
+      }
+    );
+
+    const savedCallId = (savedCall && (savedCall._id || (savedCall as any).id)) || null;
+    window.dispatchEvent(
+      new CustomEvent('harx:call-saved', {
+        detail: {
+          sid: sidToSave,
+          callId: savedCallId,
+          leadId: contact.id,
+          provider,
+        },
+      })
+    );
+    return savedCall;
+  };
+
+  const initiateTwilioCall = async (line?: GigPhoneLine | null) => {
     setTransactionOccurred(null);
     setIsVoicemail(false);
     setAppointmentAt(null);
     setCallbackAt(null);
     setShowSchedulerPopover(false);
     setSchedulerType(null);
-    /*  console.log("Contact phone number:", contact.phone);
-     console.log("Contact object:", contact);
-     console.log("Call status at start:", callStatus); */
 
     // Ensure we have valid contact data
     const phoneNumber = contact.phone;
@@ -221,9 +294,14 @@ export function ContactInfo() {
       return;
     }
 
+    if (line) {
+      activeLineRef.current = line;
+    }
+
     setIsCallLoading(true);
     setCallStatus('initiating');
     callReachedActiveRef.current = false;  // reset for each new call attempt
+    callStartedAtRef.current = null;
     console.log("Starting Twilio call to:", phoneNumber);
 
     try {
@@ -312,9 +390,6 @@ export function ContactInfo() {
 
       // Register disconnect listener once.
       // This is the SINGLE source of truth for post-hangup cleanup + save.
-      // We used to register a second `conn.on('disconnect')` further down
-      // which caused a double-save (and inconsistent UI updates). It has
-      // been removed in favour of this consolidated handler.
       conn.on('disconnect', async () => {
         console.log('🔴 Call disconnected - Starting cleanup and save');
 
@@ -322,49 +397,15 @@ export function ContactInfo() {
         const recordingStatus = isRecordingRef.current;
         const reachedActive = callReachedActiveRef.current;
 
-        // Only show the blocking overlay when the call actually connected
-        // (reached ringing/accept). If it failed before ringing (bad number,
-        // immediate reject) we save silently in background — no overlay needed.
         if (reachedActive) {
           setIsSaving(true);
         }
 
         try {
           if (sidToSave) {
-            console.log(`💾 Triggering save for SID: ${sidToSave} (Recording: ${recordingStatus})`);
-
-            // Extract IDs for root level storage
-            const gigId = (apiLead as any)?.gigId?._id || (apiLead as any)?.gigId || null;
-            const companyId = (apiLead as any)?.companyId || null;
-
-            const savedCall = await storeCall(
-              sidToSave,
-              contact.id,
-              recordingStatus,
-              gigId,
-              companyId,
-              transactionOccurredRef.current,
-              isVoicemailRef.current,
-              appointmentAtRef.current || undefined,
-              callbackAtRef.current || undefined
-            );
+            console.log(`💾 Triggering Twilio save for SID: ${sidToSave} (Recording: ${recordingStatus})`);
+            await persistFinishedCall(sidToSave, recordingStatus, 'twilio');
             console.log('✅ Call details saved successfully via disconnect handler');
-
-            // Notify the parent Workspace so it can switch to the Call
-            // History tab and auto-open the modal for this specific call.
-            // We send the Twilio SID (always known) and, when available,
-            // the Mongo _id so the modal can deep-link without a fuzzy
-            // match on the records list.
-            const savedCallId = (savedCall && (savedCall._id || (savedCall as any).id)) || null;
-            window.dispatchEvent(
-              new CustomEvent('harx:call-saved', {
-                detail: {
-                  sid: sidToSave,
-                  callId: savedCallId,
-                  leadId: contact.id,
-                },
-              })
-            );
           } else {
             console.warn('⚠️ No SID available in Ref during disconnect');
           }
@@ -377,12 +418,14 @@ export function ContactInfo() {
           setActiveConnection(null);
           setCurrentCallSid(null);
           callSidRef.current = null;
+          callStartedAtRef.current = null;
         }
       });
 
       conn.on('accept', () => {
         console.log("✅ Call accepted");
         callReachedActiveRef.current = true;  // call reached ringing → show overlay on disconnect
+        callStartedAtRef.current = Date.now();
         const Sid = conn.parameters?.CallSid;
         console.log("CallSid recupéré", Sid);
         setCurrentCallSid(Sid);
@@ -460,45 +503,234 @@ export function ContactInfo() {
     }
   };
 
-  const endCall = async () => {
-    console.log("Ending call...");
-    console.log("Contact before ending call:", contact);
-    console.log("Contact phone before ending call:", contact.phone);
+  const initiateTelnyxCall = async (line: GigPhoneLine) => {
+    setTransactionOccurred(null);
+    setIsVoicemail(false);
+    setAppointmentAt(null);
+    setCallbackAt(null);
+    setShowSchedulerPopover(false);
+    setSchedulerType(null);
 
-    if (activeConnection) {
-      activeConnection.disconnect();
+    const phoneNumber = contact.phone;
+    if (!phoneNumber) {
+      console.error('No phone number available');
+      return;
+    }
+    if (!line.phoneNumber) {
+      setLineError(t('workspace.call.noActiveLine', 'No active phone number for this gig'));
+      return;
     }
 
-    // Cleanup local stream
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
+    activeLineRef.current = line;
+    setIsCallLoading(true);
+    setCallStatus('initiating');
+    callReachedActiveRef.current = false;
+    callStartedAtRef.current = null;
+    console.log('Starting Telnyx call to:', phoneNumber, 'from:', line.phoneNumber);
+
+    let newDevice: any = null;
+    let hangupHandled = false;
+
+    const cleanupTelnyx = async () => {
+      try {
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((track) => track.stop());
+          localStreamRef.current = null;
+        }
+        await stopTranscription();
+        dispatch({ type: 'SET_MEDIA_STREAM', mediaStream: null });
+        dispatch({ type: 'CLEAR_TELNYX_CONNECTION' });
+        dispatch({ type: 'END_CALL' });
+        if (newDevice && typeof newDevice.disconnect === 'function') {
+          newDevice.disconnect();
+        }
+      } catch (err) {
+        console.warn('Telnyx cleanup warning:', err);
+      }
+      setActiveConnection(null);
+      setActiveDevice(null);
+      setCallStatus('idle');
+      setCurrentCallSid(null);
+      callSidRef.current = null;
+      callStartedAtRef.current = null;
+    };
+
+    const handleTelnyxHangup = async () => {
+      if (hangupHandled) return;
+      hangupHandled = true;
+      console.log('🔴 Telnyx call hung up — saving');
+
+      const sidToSave = callSidRef.current;
+      const recordingStatus = isRecordingRef.current;
+      const reachedActive = callReachedActiveRef.current;
+
+      if (reachedActive) {
+        setIsSaving(true);
+      }
+
+      try {
+        if (sidToSave) {
+          await persistFinishedCall(sidToSave, recordingStatus, 'telnyx', {
+            from: line.phoneNumber,
+            to: phoneNumber,
+          });
+        } else {
+          console.warn('⚠️ No Telnyx call id available during hangup');
+        }
+      } catch (error) {
+        console.error('❌ Error saving Telnyx call:', error);
+      } finally {
+        setIsSaving(false);
+        await cleanupTelnyx();
+      }
+    };
+
+    try {
+      const loginToken = await TelnyxCallPersist.getLoginToken();
+      newDevice = new TelnyxRTC({ login_token: loginToken });
+      setActiveDevice(newDevice as any);
+      newDevice.connect();
+
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Telnyx ready timeout')), 20000);
+        newDevice.on('telnyx.ready', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        newDevice.on('telnyx.error', (error: any) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+      });
+
+      const conn = newDevice.newCall({
+        destinationNumber: phoneNumber,
+        callerNumber: line.phoneNumber,
+        audio: true,
+      });
+
+      setActiveConnection(conn);
+      dispatch({ type: 'SET_TELNYX_CONNECTION', connection: conn, device: newDevice });
+
+      newDevice.on('telnyx.notification', async (notification: any) => {
+        if (notification?.type !== 'callUpdate' || !notification.call) return;
+        const call = notification.call;
+        const stateName = call.state;
+
+        if (stateName === 'active' || stateName === 'answered') {
+          if (!callReachedActiveRef.current) {
+            callReachedActiveRef.current = true;
+            callStartedAtRef.current = Date.now();
+          }
+          // Prefer Call Control id so recording webhooks / record_start match the Call doc.
+          const callControlId =
+            call.telnyxCallControlId ||
+            call.options?.telnyxCallControlId ||
+            call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
+            null;
+          const Sid = callControlId || call.id || null;
+          if (Sid) {
+            callSidRef.current = Sid;
+            setCurrentCallSid(Sid);
+          }
+          setCallStatus('active');
+          dispatch({
+            type: 'START_CALL',
+            participants: [],
+            contact,
+            sid: Sid || undefined,
+          });
+
+          if (callControlId) {
+            TelnyxCallPersist.startRecording(callControlId).catch((err) => {
+              console.warn('Telnyx record_start failed:', err?.response?.data || err?.message || err);
+            });
+          } else {
+            console.warn('Telnyx active call has no callControlId — server recording cannot start');
+          }
+
+          setTimeout(async () => {
+            try {
+              const stream = call.remoteStream;
+              if (stream) {
+                dispatch({ type: 'SET_MEDIA_STREAM', mediaStream: stream });
+                const remoteAudio = document.getElementById('call-audio') as HTMLAudioElement;
+                if (remoteAudio) {
+                  remoteAudio.srcObject = stream;
+                }
+                try {
+                  const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  localStreamRef.current = localStream;
+                  await startTranscription(stream, contact.phone, localStream);
+                } catch {
+                  await startTranscription(stream, contact.phone);
+                }
+              }
+            } catch (err) {
+              console.error('Failed to start Telnyx transcription:', err);
+            }
+          }, 500);
+        }
+
+        if (
+          stateName === 'hangup' ||
+          stateName === 'destroy' ||
+          stateName === 'purge' ||
+          stateName === 'done'
+        ) {
+          await handleTelnyxHangup();
+        }
+      });
+    } catch (err: any) {
+      console.error('Failed to initiate Telnyx call:', err);
+      setLineError(err?.message || 'Failed to start Telnyx call');
+      setCallStatus('idle');
+      await cleanupTelnyx();
+    } finally {
+      setIsCallLoading(false);
     }
-
-    // Reset call-related states only
-    setActiveConnection(null);
-    setActiveDevice(null);
-    setCallStatus('idle'); // Reset to idle instead of 'ended'
-    dispatch({ type: 'SET_MEDIA_STREAM', mediaStream: null });
-    dispatch({ type: 'CLEAR_TWILIO_CONNECTION' });
-
-    // Stop transcription
-    await stopTranscription();
-
-    // REMOVED: storeCall from here because it's now handled in conn.on('disconnect')
-    // to ensure it triggers for both agent and lead hangups.
-
-    // Ajout : dispatch END_CALL pour mettre à jour le context global
-    dispatch({ type: 'END_CALL' });
-
-    console.log("Call ended. Contact after ending call:", contact);
-    console.log("Contact phone after ending call:", contact.phone);
   };
 
-  // NOTE: Voicemail is now auto-detected by Twilio AMD — no manual handler needed.
+  const endCall = async () => {
+    console.log('Ending call...', state.callProvider || activeLineRef.current?.provider);
 
-  const handleStartCall = () => {
-    initiateTwilioCall();
+    if (activeConnection) {
+      if (typeof activeConnection.hangup === 'function') {
+        activeConnection.hangup();
+      } else if (typeof activeConnection.disconnect === 'function') {
+        activeConnection.disconnect();
+      }
+    }
+
+    // Twilio/Telnyx hangup handlers own the save + cleanup path.
+    // Keep a light local reset if no connection object exists.
+    if (!activeConnection) {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+      setActiveConnection(null);
+      setActiveDevice(null);
+      setCallStatus('idle');
+      dispatch({ type: 'SET_MEDIA_STREAM', mediaStream: null });
+      dispatch({ type: 'CLEAR_TWILIO_CONNECTION' });
+      dispatch({ type: 'CLEAR_TELNYX_CONNECTION' });
+      await stopTranscription();
+      dispatch({ type: 'END_CALL' });
+    }
+  };
+
+  const handleStartCall = async () => {
+    setLineError(null);
+    const line = await resolveGigLine();
+    if (!line) {
+      return;
+    }
+    if (line.provider === 'telnyx') {
+      await initiateTelnyxCall(line);
+      return;
+    }
+    await initiateTwilioCall(line);
   };
 
 
@@ -673,6 +905,12 @@ export function ContactInfo() {
               <Phone className="w-4 h-4 mr-2" />
               {isCallLoading || callStatus === 'initiating' ? '...' : 'Call'}
             </button>
+          )}
+
+          {lineError && (
+            <p className="mt-2 max-w-xs text-center text-[11px] font-semibold text-rose-600">
+              {lineError}
+            </p>
           )}
 
           <div className="flex items-center space-x-2 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100" title="Secure Line">
