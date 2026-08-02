@@ -1,4 +1,5 @@
 import type { CompanyProfileData } from './companyProfileStorage';
+import { getGigsApiBase } from './gigsApiBase';
 
 /** Normalize Mongo-style ids (string, { $oid }, nested _id). */
 export function normalizeEntityId(id: unknown): string | null {
@@ -15,7 +16,7 @@ export function normalizeEntityId(id: unknown): string | null {
 
 /** Same response parsing as GigDetails `fetchGigDetails`. */
 export async function fetchGigDetailsPayload(gigId: string): Promise<Record<string, unknown>> {
-  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs/${gigId}/details`);
+  const response = await fetch(`${getGigsApiBase()}/gigs/${gigId}/details`);
   if (!response.ok) {
     throw new Error(`Impossible de charger le gig (${response.status})`);
   }
@@ -28,7 +29,7 @@ export async function fetchGigDetailsPayload(gigId: string): Promise<Record<stri
 
 /** Find first populated company on public/active gig list (new tab, no gigId in URL). */
 export async function fetchCompanyFromGigsListing(targetCompanyId: string): Promise<CompanyProfileData | null> {
-  const base = import.meta.env.VITE_BACKEND_URL_GIGS;
+  const base = getGigsApiBase();
   let response = await fetch(`${base}/gigs/active`);
   if (!response.ok) {
     response = await fetch(`${base}/gigs`);
