@@ -8,6 +8,7 @@ import { fetchEnrolledGigsFromProfile, fetchPendingRequests, refreshGigStatuses 
 import { resolveGigStartRoute } from '../../../utils/gigStartRouting';
 import { getBonusPillDisplay, getTransactionPillDisplay, getResolvedAgentFacing, type GigCommissionExtended, type AgentFacingCommissionBlock } from '../../../utils/gigCommissionDisplay';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
 // Interface pour les gigs populés (même que dans GigsMarketplace)
 interface PopulatedGig {
@@ -456,7 +457,7 @@ export function GigDetails() {
 
       try {
         console.log('🔍 Fetching gig details for ID:', gigId);
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs/${gigId}/details`);
+        const response = await fetch(`${getGigsApiBase()}/gigs/${gigId}/details`);
 
         if (!response.ok) {
           const errorText = await response.text();
