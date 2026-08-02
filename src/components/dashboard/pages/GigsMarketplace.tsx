@@ -14,6 +14,7 @@ import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
 const renderCommissionInfo = (gig: any) => {
   if (!gig || !gig.commission) return null;
@@ -1347,10 +1348,12 @@ export function GigsMarketplace() {
     console.log('Component mounted, fetching data...');
     const fetchGigs = async () => {
       try {
-        const url = `${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs/active`;
+        const gigsApi = getGigsApiBase();
+        const url = `${gigsApi}/gigs/active`;
         console.log('🌐 Fetching active gigs from:', url);
         console.log('🔧 Environment variables:', {
           VITE_BACKEND_URL_GIGS: import.meta.env.VITE_BACKEND_URL_GIGS,
+          resolvedGigsApi: gigsApi,
           NODE_ENV: import.meta.env.NODE_ENV
         });
 
@@ -1370,7 +1373,7 @@ export function GigsMarketplace() {
 
           // Si l'endpoint /gigs/active ne fonctionne pas, essayer l'ancien endpoint
           console.log('⚠️ Trying fallback to /gigs endpoint...');
-          const fallbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs`);
+          const fallbackResponse = await fetch(`${gigsApi}/gigs`);
 
           if (!fallbackResponse.ok) {
             const fallbackErrorText = await fallbackResponse.text();
