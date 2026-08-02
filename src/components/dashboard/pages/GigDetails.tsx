@@ -1564,15 +1564,23 @@ export function GigDetails() {
               </div>
             )}
 
-            {/* Activities */}
-            {gig.activities?.length > 0 && (
+            {/* Activities — chips only (no long description list; dedupe duplicate ObjectIds) */}
+            {gig.activities?.length > 0 && (() => {
+              const seen = new Set<string>();
+              const uniqueActivities = gig.activities.filter((activity, index) => {
+                const id = String(activity._id || activity.name || index);
+                if (seen.has(id)) return false;
+                seen.add(id);
+                return true;
+              });
+              if (uniqueActivities.length === 0) return null;
+              return (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
                 <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Key Activities</h2>
                 <div className="flex flex-wrap gap-2">
-                  {gig.activities.map((activity, index) => {
-                    console.log('Activity item:', activity);
+                  {uniqueActivities.map((activity, index) => {
                     const activityName = activity.name || 'Activity';
-                    const activityId = activity._id || index;
+                    const activityId = String(activity._id || index);
                     return (
                       <span key={activityId} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
                         {activityName}
@@ -1580,22 +1588,9 @@ export function GigDetails() {
                     );
                   })}
                 </div>
-                {gig.activities.some(activity => activity.description) && (
-                  <div className="mt-4 space-y-2">
-                    {gig.activities.filter(activity => activity.description).map((activity, index) => {
-                      const activityId = activity._id || index;
-                      const activityName = activity.name || 'Activity';
-                      return (
-                        <div key={`desc-${activityId}`} className="text-sm">
-                          <span className="font-medium text-gray-700">{activityName}:</span>
-                          <span className="text-gray-600 ml-1">{activity.description}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
-            )}
+              );
+            })()}
             {/* Leads Information - Only for enrolled agents */}
             {isAgentEnrolled() && gig.leads?.types?.length > 0 && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
