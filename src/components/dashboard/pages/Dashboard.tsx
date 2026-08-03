@@ -13,7 +13,7 @@ import {
   resolveTransactionRepCommission,
 } from '../../../utils/commissionUtils';
 import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
-import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
 interface DashboardProps {
   profile?: any;
@@ -26,6 +26,24 @@ type GigFilterOption = {
   rewardBonus?: number;
 };
 
+function isPlaceholderGigTitle(title: string | undefined | null, id: string): boolean {
+  if (!title || !String(title).trim()) return true;
+  const t = String(title).trim();
+  const shortId = id.slice(-6);
+  if (t === `Gig ${shortId}`) return true;
+  if (t === id || t === shortId) return true;
+  if (/^Gig\s+[a-f0-9]{4,12}$/i.test(t)) return true;
+  return false;
+}
+
+function firstRealGigTitle(id: string, ...candidates: unknown[]): string {
+  const strings = candidates
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v) => v.trim());
+  const real = strings.find((t) => !isPlaceholderGigTitle(t, id));
+  return real || strings[0] || `Gig ${id.slice(-6)}`;
+}
+
 function normalizeGigEntry(raw: any): GigFilterOption | null {
   if (!raw) return null;
 
@@ -35,24 +53,36 @@ function normalizeGigEntry(raw: any): GigFilterOption | null {
 
   if (raw.gigId || raw.gig) {
     const nested = raw.gigId || raw.gig;
-    if (typeof nested === 'object') {
+    if (typeof nested === 'object' && nested) {
       const id = String(nested._id || nested.id || nested.$oid || '');
       if (!id) return null;
       return {
         _id: id,
-        title: nested.title || raw.gigTitle || `Gig ${id.slice(-6)}`,
+        title: firstRealGigTitle(
+          id,
+          nested.title,
+          nested.name,
+          raw.gigTitle,
+          raw.gigName,
+          raw.title,
+          raw.name
+        ),
         commission: nested.commission || raw.commission,
         rewardBonus: nested.rewardBonus || raw.rewardBonus,
       };
     }
-    return { _id: String(nested), title: raw.gigTitle || `Gig ${String(nested).slice(-6)}` };
+    const id = String(nested);
+    return {
+      _id: id,
+      title: firstRealGigTitle(id, raw.gigTitle, raw.gigName, raw.title, raw.name),
+    };
   }
 
   const id = String(raw._id || raw.id || '');
   if (!id) return null;
   return {
     _id: id,
-    title: raw.title || `Gig ${id.slice(-6)}`,
+    title: firstRealGigTitle(id, raw.title, raw.name, raw.gigTitle, raw.gigName),
     commission: raw.commission,
     rewardBonus: raw.rewardBonus,
   };
@@ -68,7 +98,8 @@ function mergeGigOptions(lists: any[][], locale = 'fr'): GigFilterOption[] {
       map.set(gig._id, {
         ...existing,
         ...gig,
-        title: gig.title || existing?.title || `Gig ${gig._id.slice(-6)}`,
+        // Never let a "Gig abc123" fallback overwrite a real title from another source.
+        title: firstRealGigTitle(gig._id, existing?.title, gig.title),
         commission: gig.commission ?? existing?.commission,
         rewardBonus: gig.rewardBonus ?? existing?.rewardBonus,
       });
@@ -272,8 +303,7 @@ export function Dashboard({ profile }: DashboardProps) {
         const callsList = Array.isArray(calls.data) ? calls.data : [];
         const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
-        setCallsData(callsList);
-        setGigsData(mergeGigOptions([
+        const mergedGigs = mergeGigOptions([
           Array.isArray(gigs.data) ? gigs.data : [],
           profileGigs,
           matchingGigs,
@@ -283,7 +313,46 @@ export function Dashboard({ profile }: DashboardProps) {
             _id: tx.gigId,
             title: tx.gig?.title,
           })),
-        ], i18n.language));
+        ], i18n.language);
+
+        // Resolve leftover "Gig abc123" labels from the gigs API.
+        const gigsApi = getGigsApiBase();
+        const unresolved = mergedGigs.filter((g) => isPlaceholderGigTitle(g.title, g._id));
+        if (unresolved.length > 0 && gigsApi) {
+          const titleById = new Map<string, string>();
+          await Promise.all(
+            unresolved.map(async (g) => {
+              try {
+                const res = await fetch(`${gigsApi}/gigs/${encodeURIComponent(g._id)}/details`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const payload = data?.data || data?.gig || data;
+                const title = firstRealGigTitle(
+                  g._id,
+                  payload?.title,
+                  payload?.name,
+                  data?.title,
+                  data?.name
+                );
+                if (!isPlaceholderGigTitle(title, g._id)) {
+                  titleById.set(g._id, title);
+                }
+              } catch {
+                /* ignore per-gig failures */
+              }
+            })
+          );
+          if (titleById.size > 0) {
+            for (const g of mergedGigs) {
+              const title = titleById.get(g._id);
+              if (title) g.title = title;
+            }
+            mergedGigs.sort((a, b) => a.title.localeCompare(b.title, i18n.language));
+          }
+        }
+
+        setCallsData(callsList);
+        setGigsData(mergedGigs);
         setReservationsData(Array.isArray(reservationsRes) ? reservationsRes : []);
 
         if (walletRes?.data?.success && walletRes.data.data) {
