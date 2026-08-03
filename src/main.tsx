@@ -53,6 +53,15 @@ renderWithQiankun({
     return Promise.resolve();
   },
   mount(props: any) {
+    // Remount so AuthContext re-reads token after login/logout in another MF
+    if (root) {
+      try {
+        root.unmount();
+      } catch {
+        /* ignore */
+      }
+      root = null;
+    }
     render(props);
     return Promise.resolve();
   },
