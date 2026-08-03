@@ -12,16 +12,34 @@ initVisitorTrackingScripts();
 // Store the root instance for proper unmounting
 let root: ReturnType<typeof createRoot> | null = null;
 
+function resolveRootElement(container?: HTMLElement): HTMLElement | null {
+  if (container) {
+    let el = container.querySelector('#root') as HTMLElement | null;
+    // Qiankun injects entry HTML into #container-reps; harden if #root is missing
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'root';
+      container.appendChild(el);
+    }
+    return el;
+  }
+  return document.getElementById('root');
+}
+
 function render(props: { container?: HTMLElement } = {}) {
   const { container } = props;
-  const rootElement = container
-    ? container.querySelector('#root')
-    : document.getElementById('root');
+  // Never fall back to the host document #root while inside qiankun — that
+  // replaces the shell and removes #container-reps ("container not existed after mounted").
+  if (qiankunWindow.__POWERED_BY_QIANKUN__ && !container) {
+    return;
+  }
+
+  const rootElement = resolveRootElement(container);
 
   if (rootElement) {
     syncVisitorTracking();
     if (!root) {
-      root = createRoot(rootElement as HTMLElement);
+      root = createRoot(rootElement);
     }
     root.render(<App />);
   } else {
@@ -32,11 +50,18 @@ function render(props: { container?: HTMLElement } = {}) {
 function destroy(props: { container?: HTMLElement } = {}) {
   const { container } = props;
   const rootElement = container
-    ? container.querySelector('#root')
+    ? (container.querySelector('#root') as HTMLElement | null)
     : document.getElementById('root');
 
   if (rootElement && root) {
     root.unmount();
+    root = null;
+  } else if (root) {
+    try {
+      root.unmount();
+    } catch {
+      /* ignore */
+    }
     root = null;
   } else {
     console.warn('[reporchestrator] Root element not found for unmounting!');
@@ -74,10 +99,7 @@ renderWithQiankun({
   },
 });
 
-// Render immediately in both standalone and qiankun modes. The host
-// (process_connections) loads this micro-app as a script and the immediate
-// render guarantees the UI shows; qiankun's lifecycles above resolve the
-// bootstrap/mount promises so single-spa stops warning.
+// Standalone only — in qiankun, wait for mount(props) with the real container
 if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
   console.log('[reporchestrator] Running in standalone mode');
   if (document.readyState === 'loading') {
@@ -86,6 +108,5 @@ if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
     render();
   }
 } else {
-  console.log('[reporchestrator] Running inside Qiankun');
-  render();
+  console.log('[reporchestrator] Running inside Qiankun — waiting for mount()');
 }
