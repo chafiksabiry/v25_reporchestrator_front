@@ -130,6 +130,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     location.pathname.includes('/profile-import') ||
     location.pathname.includes('/profile-editor');
 
+  // Already on the orchestrator home — "Continue onboarding" would be a no-op.
+  const isOrchestratorPage =
+    location.pathname === '/' ||
+    location.pathname.endsWith('/orchestrator') ||
+    location.pathname.includes('/orchestrator');
+
+  const hideOnboardingCta = isProfileCreationPage || isOrchestratorPage;
+
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
   const [showWarningModal, setShowWarningModal] = React.useState(false);
@@ -271,14 +279,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   {t('onboardingGuide.title', 'Finalisez votre onboarding')}
                 </p>
               </div>
-              <p className={`text-[11px] text-white/70 leading-relaxed${isProfileCreationPage ? '' : ' mb-3'}`}>
+              <p className={`text-[11px] text-white/70 leading-relaxed${hideOnboardingCta ? '' : ' mb-3'}`}>
                 {t(
                   'onboardingGuide.description',
                   'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
                 )}
               </p>
-              {/* Already on profile-import / profile-editor — CTA would leave the edit flow. */}
-              {!isProfileCreationPage && (
+              {/* Hide CTA on orchestrator / profile edit — user is already in the flow. */}
+              {!hideOnboardingCta && (
                 <button
                   type="button"
                   onClick={() => navigate('/orchestrator')}
