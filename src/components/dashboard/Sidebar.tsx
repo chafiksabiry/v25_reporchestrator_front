@@ -271,19 +271,22 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   {t('onboardingGuide.title', 'Finalisez votre onboarding')}
                 </p>
               </div>
-              <p className="text-[11px] text-white/70 leading-relaxed mb-3">
+              <p className={`text-[11px] text-white/70 leading-relaxed${isProfileCreationPage ? '' : ' mb-3'}`}>
                 {t(
                   'onboardingGuide.description',
                   'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
                 )}
               </p>
-              <button
-                type="button"
-                onClick={() => navigate('/orchestrator')}
-                className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
-              >
-                {t('onboardingGuide.cta', "Continuer l'onboarding")}
-              </button>
+              {/* Already on profile-import / profile-editor — CTA would leave the edit flow. */}
+              {!isProfileCreationPage && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/orchestrator')}
+                  className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
+                >
+                  {t('onboardingGuide.cta', "Continuer l'onboarding")}
+                </button>
+              )}
             </div>
 
             {isProfileCreationPage && (
