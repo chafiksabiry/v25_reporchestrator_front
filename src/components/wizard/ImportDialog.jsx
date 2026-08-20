@@ -13,7 +13,7 @@ const openai = new OpenAI({
 });
 
 function ImportDialog({ isOpen, onClose, onImport }) {
-  const { createProfile } = useProfile();
+  const { createProfile, updateProfileData } = useProfile();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -439,14 +439,27 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       addAnalysisStep("Analysis complete!");
       setProgress(100);
 
-      // Create profile in database and get MongoDB document
+      // Upsert: update if agent profile already exists (avoids duplicate userId).
       console.log('Data to store in DB : ', combinedData);
-      const createdProfile = await createProfile(combinedData);
-      onImport({ ...createdProfile, generatedSummary: summary });
+      const existingAgentId =
+        (typeof localStorage !== 'undefined' && localStorage.getItem('agentId')) ||
+        null;
+
+      let savedProfile;
+      if (existingAgentId) {
+        console.log('Existing agent profile found, updating:', existingAgentId);
+        savedProfile = await updateProfileData(existingAgentId, combinedData);
+      } else {
+        savedProfile = await createProfile(combinedData);
+      }
+      if (savedProfile?._id && typeof localStorage !== 'undefined') {
+        localStorage.setItem('agentId', savedProfile._id);
+      }
+      onImport({ ...savedProfile, generatedSummary: summary });
 
       //onImport({ ...combinedData, generatedSummary: summary });
 
-      console.log("createdProfile : ", createdProfile);
+      console.log("savedProfile : ", savedProfile);
       console.log("summary : ", summary);
 
       onClose();
