@@ -18,7 +18,23 @@ export const createProfile = async (profileData) => {
     const { data } = await api.post('/profiles', profileData);
     return data;
   } catch (error) {
-    throw error.response?.data || error;
+    const status = error.response?.status;
+    const payload = error.response?.data || error;
+    // Profile already exists for this userId — update instead of failing import.
+    if (status === 409 || payload?.message === 'Duplicate key error') {
+      try {
+        const existing = await getProfile();
+        const existingId = existing?._id || existing?.data?._id;
+        if (existingId) {
+          console.log('createProfile hit duplicate userId; updating existing profile:', existingId);
+          const { data } = await api.put(`/profiles/${existingId}`, profileData);
+          return data;
+        }
+      } catch (updateErr) {
+        console.error('Failed to recover from duplicate profile create:', updateErr);
+      }
+    }
+    throw payload;
   }
 };
 
