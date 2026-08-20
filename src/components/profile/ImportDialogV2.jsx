@@ -21,7 +21,7 @@ import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18n
 function ImportDialog({ isOpen, onClose, onImport }) {
   const { t, i18n } = useTranslation();
   const activeLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
-  const { createProfile } = useProfile();
+  const { createProfile, updateProfileData } = useProfile();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -368,14 +368,27 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       addAnalysisStep(t('profileImportDialog.analysis.complete'));
       setProgress(100);
 
-      // Create profile in database and get MongoDB document
+      // Upsert: if this user already has an agent profile (common on re-import),
+      // update in place to avoid Mongo duplicate-key on unique userId.
       console.log('Data to store in DB : ', combinedData);
-      const createdProfile = await createProfile(combinedData);
-      ensureNotCancelled();
-      Cookies.set('agentId', createdProfile._id);
-      onImport({ ...createdProfile, generatedSummary: summaryN.active });
+      const existingAgentId =
+        Cookies.get('agentId') ||
+        localStorage.getItem('agentId') ||
+        null;
 
-      console.log("createdProfile : ", createdProfile);
+      let savedProfile;
+      if (existingAgentId) {
+        console.log('Existing agent profile found, updating:', existingAgentId);
+        savedProfile = await updateProfileData(existingAgentId, combinedData);
+      } else {
+        savedProfile = await createProfile(combinedData);
+      }
+      ensureNotCancelled();
+      Cookies.set('agentId', savedProfile._id);
+      localStorage.setItem('agentId', savedProfile._id);
+      onImport({ ...savedProfile, generatedSummary: summaryN.active });
+
+      console.log("savedProfile : ", savedProfile);
       console.log("summary : ", summaryN.active);
 
       onClose();
