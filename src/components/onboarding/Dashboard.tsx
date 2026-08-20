@@ -161,7 +161,7 @@ const phaseTemplates = [
     nameKey: 'repOnboarding.phases.profile.name',
     descriptionKey: 'repOnboarding.phases.profile.description',
     icon: UserCircle,
-    path: '/orchestrator/profile',
+    path: '/profile-editor',
     requiredActionKeys: [
       'repOnboarding.actions.addExperience',
       'repOnboarding.actions.recordExperienceVideo'
@@ -644,12 +644,12 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // Phase 2 (Profile Creation): show the profile page (keeps sidebar + header)
+      // Phase 2 (Profile Creation): open the profile editor (not the read-only profile view)
       if (phase.id === 2) {
         if (phase.status === 'pending') {
           await progressService.updatePhaseStatus(phase.id, 'in-progress');
         }
-        navigate('/profile');
+        navigate('/profile-editor');
         return;
       }
 
