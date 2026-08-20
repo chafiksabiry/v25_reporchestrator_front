@@ -89,7 +89,7 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
 
   // Phase 2 = enrich profile (after CV import/editor)
   if (profile?.isBasicProfileCompleted === true) {
-    return { kind: 'complete-profile', path: '/orchestrator/profile' };
+    return { kind: 'complete-profile', path: '/profile-editor' };
   }
 
   if (hasRepProfileContent(profile)) {
