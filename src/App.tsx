@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import config from './config';
 import { getAgentData } from './services/apiConfig';
@@ -18,10 +18,12 @@ import QualityControl from './components/onboarding/QualityControl';
 import CareerTrack from './components/onboarding/CareerTrack';
 import WalletDashboard from './components/onboarding/WalletDashboard';
 
-import DashboardRoutes from './routes/DashboardRoutes.tsx';
 import AssessmentRoutes from './routes/AssessmentRoutes.tsx';
 import ProfileRoutes from './routes/ProfileRoutes.tsx';
 import WizardRoutes from './routes/WizardRoutes.tsx';
+
+// Heavy dashboard (includes TensorFlow.js via SessionPlanning) — defer until needed.
+const DashboardRoutes = lazy(() => import('./routes/DashboardRoutes.tsx'));
 
 function App() {
   useEffect(() => {
@@ -74,7 +76,14 @@ function App() {
             Mounted once via a root splat so its internal <Routes> (absolute
             paths like /profile, /wallet, /marketplace) match the full
             path. Explicit routes above keep priority over this catch-all. */}
-        <Route path="*" element={<DashboardRoutes />} />
+        <Route
+          path="*"
+          element={
+            <Suspense fallback={null}>
+              <DashboardRoutes />
+            </Suspense>
+          }
+        />
       </Routes>
     </Router>
   );
