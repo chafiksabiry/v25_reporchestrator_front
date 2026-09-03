@@ -24,18 +24,26 @@ export default defineConfig(({ mode, command }) => {
 
   // In dev (`vite`/`command === 'serve'`) the host must load chunks/assets from
   // the LOCAL dev server, otherwise the browser fetches the production Netlify
-  // bundle and local source changes never appear. Only the production build
-  // keeps the absolute Netlify base.
+  // bundle and local source changes never appear. Netlify build uses URL so
+  // prod/dev sites keep their own asset origin (not hardcoded *-dev).
   const isDev = command === 'serve';
+  const publicBase = isDev
+    ? 'http://localhost:5174/'
+    : `${(
+        process.env.VITE_MF_BASE_URL ||
+        process.env.URL ||
+        process.env.DEPLOY_PRIME_URL ||
+        'https://harx26reporchestratorfront-dev.netlify.app'
+      ).replace(/\/+$/, '')}/`;
 
   return {
     // Absolute base so the host (qiankun) loads chunks/assets from the
-    // micro-app's own origin (local in dev, Netlify in production builds).
-    base: isDev ? 'http://localhost:5174/' : 'https://harx26reporchestratorfront-dev.netlify.app/',
+    // micro-app's own origin (local in dev, this Netlify site in builds).
+    base: publicBase,
     plugins: [
       react(),
       qiankun('reps', {
-        useDevMode: true,
+        useDevMode: isDev,
       }),
       removeReactRefreshScript(),
     ],
