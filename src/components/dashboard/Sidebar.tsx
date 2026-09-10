@@ -121,10 +121,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   // Onboarding is considered complete (agent profile created) only when the
   // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
   // Planning and Wallet and show an onboarding guide instead.
+  const isCallCenterStaff =
+    typeof window !== 'undefined' && localStorage.getItem('callCenterStaff') === '1';
   const isOnboardingComplete = (): boolean =>
     isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
   // Published profile = onboarding funnel done (phases 1–4 + publish).
-  const onboardingComplete = isProfilePublishedInStorage() || isOnboardingComplete();
+  // Call-center staff skip marketplace onboarding — they are provisioned by employer.
+  const onboardingComplete =
+    isCallCenterStaff || isProfilePublishedInStorage() || isOnboardingComplete();
 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||
@@ -136,7 +140,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     location.pathname.endsWith('/orchestrator') ||
     location.pathname.includes('/orchestrator');
 
-  const hideOnboardingCta = isProfileCreationPage || isOrchestratorPage;
+  const hideOnboardingCta = isProfileCreationPage || isOrchestratorPage || isCallCenterStaff;
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
@@ -178,7 +182,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Briefcase,
       label: t('sidebar.marketplace'),
       path: '/marketplace',
-      isAccessible: () => onboardingComplete
+      isAccessible: () => onboardingComplete && !isCallCenterStaff
     },
 
     {
@@ -208,7 +212,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Settings,
       label: t('sidebar.operations'),
       path: '/operations',
-      isAccessible: () => onboardingComplete && isPhaseCompleted(5)
+      isAccessible: () => onboardingComplete && (isCallCenterStaff || isPhaseCompleted(5))
     },
     {
       icon: Calendar,
@@ -222,10 +226,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   // Until onboarding is fully done, keep the sidebar as orchestrator guidance only
   // (no Dashboard / Marketplace / Workspace / Training / Planning links).
-  const showOrchestratorOnly = !onboardingComplete || isProfileCreationPage;
+  const showOrchestratorOnly = !isCallCenterStaff && (!onboardingComplete || isProfileCreationPage);
   const group1 = showOrchestratorOnly
     ? []
-    : filteredNavItems.filter(i => ['/dashboard', '/marketplace', '/workspace'].includes(i.path));
+    : filteredNavItems.filter(i =>
+        isCallCenterStaff
+          ? ['/dashboard', '/workspace'].includes(i.path)
+          : ['/dashboard', '/marketplace', '/workspace'].includes(i.path)
+      );
   const group2 = showOrchestratorOnly
     ? []
     : filteredNavItems.filter(i => ['/training'].includes(i.path));
