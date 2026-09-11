@@ -33,3 +33,37 @@ export const HARX_BAR_SHADOW = '0 10px 24px -10px rgba(230, 24, 141, 0.55)';
 
 /** Subtle text shadow to keep white labels crisp over the gradient. */
 export const HARX_TEXT_SHADOW = '0 1px 2px rgba(122, 14, 80, 0.4)';
+
+/** Call-center staff (employed agents) — slate ops console, not marketplace pink. */
+export const CC_STAFF_BRAND = {
+  ink: '#0f172a',
+  inkSoft: '#1e293b',
+  emerald: '#059669',
+  emeraldDeep: '#047857',
+  teal: '#0f766e',
+} as const;
+
+export const CC_STAFF_NAVBAR_BG = `linear-gradient(135deg, ${CC_STAFF_BRAND.ink} 0%, ${CC_STAFF_BRAND.inkSoft} 55%, ${CC_STAFF_BRAND.teal} 160%)`;
+export const CC_STAFF_SIDEBAR_BG = `linear-gradient(180deg, ${CC_STAFF_BRAND.ink} 0%, ${CC_STAFF_BRAND.inkSoft} 55%, #134e4a 140%)`;
+export const CC_STAFF_BAR_SHADOW = '0 10px 24px -10px rgba(15, 23, 42, 0.55)';
+export const CC_STAFF_TEXT_SHADOW = '0 1px 2px rgba(15, 23, 42, 0.45)';
+export const CC_STAFF_HOVER_TEXT = CC_STAFF_BRAND.emeraldDeep;
+
+export function getRepShellChrome(isCcStaff: boolean) {
+  if (isCcStaff) {
+    return {
+      navbarBg: CC_STAFF_NAVBAR_BG,
+      sidebarBg: CC_STAFF_SIDEBAR_BG,
+      barShadow: CC_STAFF_BAR_SHADOW,
+      textShadow: CC_STAFF_TEXT_SHADOW,
+      hoverAccent: CC_STAFF_HOVER_TEXT,
+    };
+  }
+  return {
+    navbarBg: HARX_NAVBAR_BG,
+    sidebarBg: HARX_SIDEBAR_BG,
+    barShadow: HARX_BAR_SHADOW,
+    textShadow: HARX_TEXT_SHADOW,
+    hoverAccent: HARX_BRAND.magenta,
+  };
+}

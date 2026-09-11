@@ -28,7 +28,8 @@ import { fetchProfileFromAPI } from '../utils/profileUtils';
 import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
 import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
-import { HARX_NAVBAR_BG } from '../utils/harxBrand';
+import { getRepShellChrome } from '../utils/harxBrand';
+import { isCallCenterStaff } from '../utils/callCenterStaff';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
 import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
 import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
@@ -109,6 +110,7 @@ function DashboardAppContent() {
 function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
+  const chrome = getRepShellChrome(isCallCenterStaff());
 
   usePageTitle(
     buildRepPageTitle(resolveRepTabTitle(location.pathname, `${location.search}${location.hash}`)),
@@ -116,7 +118,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
   );
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: chrome.navbarBg }}>
       {!isProfileEdit && (
         <>
           <Sidebar
@@ -134,18 +136,18 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
           )}
         </>
       )}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: chrome.navbarBg }}>
         {!isProfileEdit && (
           <TopBar
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         )}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isCallCenterStaff() ? 'bg-slate-50' : 'bg-white'}`}>
           <PageContainer variant={resolvePageContainerVariant(location.pathname)}>
           {loading ? (
             <div className="flex justify-center items-center min-h-[50vh]">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
+              <div className={`animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 ${isCallCenterStaff() ? 'border-emerald-600' : 'border-harx-500'}`}></div>
             </div>
           ) : (
           <Routes>
