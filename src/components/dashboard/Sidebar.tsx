@@ -6,7 +6,8 @@ import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
-import { HARX_SIDEBAR_BG, HARX_BAR_SHADOW } from '../../utils/harxBrand';
+import { getRepShellChrome } from '../../utils/harxBrand';
+import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenterStaff';
 
 // Declare qiankun global variables
 declare global {
@@ -121,9 +122,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   // Onboarding is considered complete (agent profile created) only when the
   // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
   // Planning and Wallet and show an onboarding guide instead.
-  const isCallCenterStaff =
-    typeof window !== 'undefined' && localStorage.getItem('callCenterStaff') === '1';
-  const isOnboardingComplete = (): boolean =>
+  const isCallCenterStaff = readCallCenterStaff();
+  const chrome = getRepShellChrome(isCallCenterStaff);
+  const activeIconClass = isCallCenterStaff
+    ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg shadow-emerald-500/30'
+    : 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30';
+  const sectionLabelClass = isCallCenterStaff
+    ? 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-emerald-200 to-teal-100 bg-clip-text text-transparent select-none'
+    : 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none';  const isOnboardingComplete = (): boolean =>
     isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
   // Published profile = onboarding funnel done (phases 1–4 + publish).
   // Call-center staff skip marketplace onboarding — they are provisioned by employer.
@@ -171,7 +177,9 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const navItems = [
     {
       icon: LayoutDashboard,
-      label: t('sidebar.dashboard'),
+      label: isCallCenterStaff
+        ? t('sidebar.ccHome', 'Home')
+        : t('sidebar.dashboard'),
       // Must be `/dashboard`: the exact `/` route renders the onboarding
       // orchestrator (OnboardingDashboard), the real dashboard lives under
       // the DashboardRoutes catch-all at `/dashboard`.
@@ -189,7 +197,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: GraduationCap,
       label: t('sidebar.training'),
       path: '/training',
-      isAccessible: () => onboardingComplete,
+      isAccessible: () => onboardingComplete && !isCallCenterStaff,
       subItems: trainingModules.map((module, idx) => ({
         label: module.title,
         sections: module.sections,
@@ -212,13 +220,13 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Settings,
       label: t('sidebar.operations'),
       path: '/operations',
-      isAccessible: () => onboardingComplete && (isCallCenterStaff || isPhaseCompleted(5))
+      isAccessible: () => onboardingComplete && !isCallCenterStaff && isPhaseCompleted(5)
     },
     {
       icon: Calendar,
       label: t('sidebar.sessionPlanning'),
       path: '/session-planning',
-      isAccessible: () => onboardingComplete
+      isAccessible: () => onboardingComplete && !isCallCenterStaff
     },
   ];
 
@@ -234,10 +242,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           ? ['/dashboard', '/workspace'].includes(i.path)
           : ['/dashboard', '/marketplace', '/workspace'].includes(i.path)
       );
-  const group2 = showOrchestratorOnly
+  const group2 = showOrchestratorOnly || isCallCenterStaff
     ? []
     : filteredNavItems.filter(i => ['/training'].includes(i.path));
-  const group3 = showOrchestratorOnly
+  const group3 = showOrchestratorOnly || isCallCenterStaff
     ? []
     : filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
 
@@ -250,7 +258,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      style={{ backgroundImage: HARX_SIDEBAR_BG, boxShadow: HARX_BAR_SHADOW }}
+      style={{ backgroundImage: chrome.sidebarBg, boxShadow: chrome.barShadow }}
       className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out lg:relative flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full lg:translate-x-0'
           : 'translate-x-0'
@@ -271,6 +279,13 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           <X className="h-4 w-4 text-white" />
         </button>
       </div>
+      {isCallCenterStaff && !isCollapsed ? (
+        <div className="px-4 pb-2">
+          <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-200">
+            {t('sidebar.ccAgentBadge', 'Call center agent')}
+          </span>
+        </div>
+      ) : null}
 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -326,7 +341,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {!showOrchestratorOnly && group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
-            <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Main</p>
+            <p className={sectionLabelClass}>Main</p>
           )}
           {group1.map((item) => (
             <div key={item.path} className="space-y-1">
@@ -342,7 +357,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -453,7 +468,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -540,7 +555,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group2.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Training</p>
+              <p className={sectionLabelClass}>Training</p>
             )}
             {group2.map((item) => (
               <div key={item.path} className="space-y-1">
@@ -556,7 +571,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                           : 'text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                     >
-                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                         <item.icon className="h-5 w-5" />
                       </div>
                       <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -652,7 +667,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group3.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Planning</p>
+              <p className={sectionLabelClass}>Planning</p>
             )}
             {group3.map((item) => (
               <NavLink

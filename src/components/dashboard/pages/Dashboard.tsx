@@ -15,6 +15,8 @@ import {
 import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
 import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { isCallCenterStaff } from '../../../utils/callCenterStaff';
+import { CallCenterAgentHome } from './CallCenterAgentHome';
 
 interface DashboardProps {
   profile?: any;
@@ -948,16 +950,12 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [isPeriodDropdownOpen]);
 
+  if (isCallCenterStaff()) {
+    return <CallCenterAgentHome displayName={displayName} />;
+  }
+
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">
-      {typeof window !== 'undefined' && localStorage.getItem('callCenterStaff') === '1' ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900">
-          {t(
-            'dashboard.home.callCenterStaffBanner',
-            'Call center workspace — open Workspace to handle calls for your assigned projects.'
-          )}
-        </div>
-      ) : null}
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-4 bg-white/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-xl shadow-slate-200/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
