@@ -387,7 +387,9 @@ export function SessionPlanning() {
                 if (response.data) {
                     const enrolledOnly = response.data.filter((ga: EnrolledGig) => ga.status?.toLowerCase() === 'enrolled');
 
-                    const mappedGigs: Gig[] = enrolledOnly.map((gigAgent: EnrolledGig) => ({
+                    const mappedGigs: Gig[] = enrolledOnly
+                      .filter((gigAgent: EnrolledGig) => gigAgent?.gigId && typeof gigAgent.gigId === 'object')
+                      .map((gigAgent: EnrolledGig) => ({
                         id: gigAgent.gigId._id,
                         name: gigAgent.gigId.title,
                         description: gigAgent.gigId.description || '',
@@ -397,7 +399,7 @@ export function SessionPlanning() {
                         skills: [],
                         priority: 'medium',
                         availability: gigAgent.gigId.availability
-                    }));
+                      }));
 
                     setGigs(mappedGigs);
                 }
