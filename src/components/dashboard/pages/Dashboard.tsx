@@ -15,6 +15,8 @@ import {
 import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
 import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { isCallCenterStaff } from '../../../utils/callCenterStaff';
+import { CallCenterAgentHome } from './CallCenterAgentHome';
 
 interface DashboardProps {
   profile?: any;
@@ -947,6 +949,10 @@ export function Dashboard({ profile }: DashboardProps) {
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [isPeriodDropdownOpen]);
+
+  if (isCallCenterStaff()) {
+    return <CallCenterAgentHome displayName={displayName} />;
+  }
 
   return (
     <div className="space-y-10 pb-10 animate-in fade-in duration-700">

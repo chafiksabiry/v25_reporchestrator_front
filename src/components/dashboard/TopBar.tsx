@@ -7,7 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import config from '../../config';
-import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
+import { getRepShellChrome } from '../../utils/harxBrand';
+import { isCallCenterStaff } from '../../utils/callCenterStaff';
 import {
   PROFILE_UPDATE_EVENT,
   USER_FULLNAME_UPDATE_EVENT,
@@ -212,10 +213,13 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   };
 
   const initials = getInitials(userName);
+  const ccStaff = isCallCenterStaff();
+  const chrome = getRepShellChrome(ccStaff);
+  const hoverAccent = chrome.hoverAccent;
 
   return (
     <header
-      style={{ backgroundImage: HARX_NAVBAR_BG, boxShadow: HARX_BAR_SHADOW, textShadow: HARX_TEXT_SHADOW }}
+      style={{ backgroundImage: chrome.navbarBg, boxShadow: chrome.barShadow, textShadow: chrome.textShadow }}
       className="relative h-16 grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 sm:px-8 shrink-0 z-20"
     >
 
@@ -229,12 +233,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
         </button>
       </div>
 
-      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ──
-          Lives in the flexible middle column so it never overflows onto the
-          side columns. Hidden below sm where there isn't enough room. */}
+      {/* ── Col 2: Center — Wallet + Planning (marketplace reps only) ── */}
       <div className="hidden sm:flex items-center justify-center gap-2 sm:gap-3 min-w-0">
 
-        {onboardingComplete && (
+        {ccStaff ? (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+            Call center agent
+          </div>
+        ) : onboardingComplete ? (
           <>
             {/* Wallet */}
             <button
@@ -242,8 +248,11 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title="Mon Portefeuille"
             >
-              <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
-                <Wallet className="w-4 h-4" />
+              <div
+                className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white transition-all duration-200 shadow-sm"
+                style={{ ['--hover-accent' as string]: hoverAccent }}
+              >
+                <Wallet className="w-4 h-4 group-hover:text-[#E6188D]" />
               </div>
               <div className="hidden md:block text-left leading-none">
                 <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Mon Portefeuille</span>
@@ -271,7 +280,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               </div>
             </button>
           </>
-        )}
+        ) : null}
 
       </div>
 
@@ -303,8 +312,10 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
           {isDropdownOpen && (
             <div
-              style={{ backgroundImage: HARX_NAVBAR_BG }}
-              className="absolute right-0 mt-2 w-64 border border-white/20 rounded-2xl shadow-2xl shadow-[#8A1250]/40 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+              style={{ backgroundImage: chrome.navbarBg }}
+              className={`absolute right-0 mt-2 w-64 border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+                ccStaff ? 'shadow-slate-950/40' : 'shadow-[#8A1250]/40'
+              }`}
             >
 
               {/* ── Header: Photo + Name + Role ── */}
@@ -322,7 +333,9 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-black text-white truncate">{userName}</p>
-                  <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">{userRole}</p>
+                  <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">
+                    {ccStaff ? 'Call center agent' : userRole}
+                  </p>
                 </div>
               </div>
 

@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
-import ImportDialogV2 from '../components/profile/ImportDialogV2.jsx';
-import SummaryEditorV2 from '../components/profile/SummaryEditorV2.jsx';
 import ProtectedRoute from '../components/profile/ProtectedRoute.jsx';
 import { fetchProfileFromAPI } from '../utils/profileUtils';
 import harxLogo from '../assets/logo_harx.png';
@@ -12,6 +10,11 @@ import { buildRepPageTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { useTranslation } from 'react-i18next';
 import { getRepOnboardingStep } from '../utils/repOnboardingNextStep';
+
+// Heavy: PDF.js / OpenAI parsing — only needed when the import dialog opens.
+const ImportDialogV2 = lazy(() => import('../components/profile/ImportDialogV2.jsx'));
+// Heavy: large editor tree — only needed on /profile-editor.
+const SummaryEditorV2 = lazy(() => import('../components/profile/SummaryEditorV2.jsx'));
 
 const POWERED_BY_CAPABILITIES = [
   {
@@ -235,11 +238,15 @@ function ProfileImportPage({
         </div>
         </div>
 
-        <ImportDialogV2
-          isOpen={isImportOpen}
-          onClose={() => setIsImportOpen(false)}
-          onImport={onImport}
-        />
+        {isImportOpen && (
+          <Suspense fallback={null}>
+            <ImportDialogV2
+              isOpen={isImportOpen}
+              onClose={() => setIsImportOpen(false)}
+              onImport={onImport}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
@@ -258,12 +265,14 @@ function ProfileEditorPage({
 }) {
   return (
     <div className="max-w-4xl mx-auto">
-      <SummaryEditorV2
-        profileData={profileData}
-        generatedSummary={generatedSummary}
-        setGeneratedSummary={setGeneratedSummary}
-        onProfileUpdate={onProfileUpdate}
-      />
+      <Suspense fallback={<ProfileLoading />}>
+        <SummaryEditorV2
+          profileData={profileData}
+          generatedSummary={generatedSummary}
+          setGeneratedSummary={setGeneratedSummary}
+          onProfileUpdate={onProfileUpdate}
+        />
+      </Suspense>
     </div>
   );
 }
@@ -281,8 +290,9 @@ export default function ProfileRoutes() {
 
   const [profileData, setProfileData] = useState<ProfileRecord | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
-  // Start true so /profile-import does not flash Import CV before the resume redirect check.
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  // Only block the editor on profile fetch. Import CV paints immediately so the
+  // page is not blank while Qiankun + Profile API + heavy chunks finish.
+  const [loadingProfile, setLoadingProfile] = useState(isEditor);
 
   const applyProfileData = useCallback((data: ProfileRecord) => {
     const { generatedSummary: summary, ...profileInfo } = data;
@@ -307,9 +317,8 @@ export default function ProfileRoutes() {
     [applyProfileData, navigate]
   );
 
-  // When landing on /profile-editor directly (refresh, link), load profile if missing.
-  // On /profile-import, if the user already progressed past CV import, resume their
-  // current onboarding step instead of forcing Import CV again.
+  // Editor: load profile before render.
+  // Import: show UI immediately; resume-redirect runs in the background.
   useEffect(() => {
     let cancelled = false;
 
@@ -319,7 +328,10 @@ export default function ProfileRoutes() {
         return;
       }
 
-      setLoadingProfile(true);
+      if (isEditor) {
+        setLoadingProfile(true);
+      }
+
       try {
         if (isEditor) {
           const cached = localStorage.getItem('profileData');
@@ -349,7 +361,7 @@ export default function ProfileRoutes() {
       } catch (err) {
         console.error('Failed to load profile for editor:', err);
       } finally {
-        if (!cancelled) setLoadingProfile(false);
+        if (!cancelled && isEditor) setLoadingProfile(false);
       }
     };
 
@@ -372,8 +384,6 @@ export default function ProfileRoutes() {
             onProfileUpdate={handleProfileData}
           />
         )
-      ) : loadingProfile ? (
-        <ProfileLoading label={t('profileImport.loadingProfile')} />
       ) : (
         <ProfileImportPage onImport={handleProfileData} />
       )}
