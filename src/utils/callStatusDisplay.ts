@@ -185,13 +185,24 @@ export function isSingleVoiceSelfCall(aiCallScore?: AiCallScoreWithVoice): boole
   if (typeof fraudScore === 'number' && fraudScore >= 50) return false;
 
   const voiceAnalysis = aiCallScore?.['Fraud detection']?.voiceAnalysis as
-    | { distinctVoices?: number; sameSpeakerSuspected?: boolean; fraudReason?: string }
+    | {
+        distinctVoices?: number;
+        sameSpeakerSuspected?: boolean;
+        fraudReason?: string;
+        confidence?: number;
+      }
     | undefined;
   if (!voiceAnalysis) return typeof fraudScore === 'number' && fraudScore < 50;
 
-  if (voiceAnalysis.distinctVoices === 1) return true;
-  if (voiceAnalysis.sameSpeakerSuspected === true) return true;
-  return ['single_speaker_ai', 'same_voice_ai'].includes(String(voiceAnalysis.fraudReason || ''));
+  const reason = String(voiceAnalysis.fraudReason || '');
+  if (['single_speaker_ai', 'same_voice_ai', 'transcript_no_customer', 'transcript_customer_absent'].includes(reason)) {
+    return true;
+  }
+
+  const confidence = typeof voiceAnalysis.confidence === 'number' ? voiceAnalysis.confidence : 0;
+  if (voiceAnalysis.distinctVoices === 1 && confidence >= 75) return true;
+  if (voiceAnalysis.sameSpeakerSuspected === true && confidence >= 75) return true;
+  return false;
 }
 
 export function getDisplayTranscript(
@@ -388,7 +399,15 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
     };
   }
 
-  if (call.transaction?.validByCompany === false) {
+  // Stale inconsistency: call is AI-valid but transaction still carries an old
+  // AI auto-reject (validByAI=false + validByCompany=false). Ignore it and
+  // fall through to disposition — company "Not signed" keeps validByAI null/true.
+  const staleAiAutoReject =
+    call.validByAI === true &&
+    call.transaction?.validByAI === false &&
+    call.transaction?.validByCompany === false;
+
+  if (call.transaction?.validByCompany === false && !staleAiAutoReject) {
     return {
       label: 'Call refused',
       tone: 'bg-rose-50 text-rose-700 border-rose-200',
