@@ -505,13 +505,25 @@ export function WorkspaceContent() {
       if (response.ok) {
         const profileData = await response.json();
         const enrolled = (Array.isArray(profileData.gigs) ? profileData.gigs : [])
-          .filter((g: any) => g.status === 'enrolled')
+          .filter((g: any) => g && g.status === 'enrolled')
           .map((g: any) => {
             const gigInfo = g.gigId;
-            const id = typeof gigInfo === 'object' ? (gigInfo._id || gigInfo.$oid) : gigInfo;
-            const title = typeof gigInfo === 'object' && gigInfo.title ? gigInfo.title : (g.gigTitle || `Gig ${id}`);
-            return { _id: String(id), title };
-          });
+            // typeof null === 'object' in JS — must reject null before reading ._id
+            let id = '';
+            let titleFromGig = '';
+            if (gigInfo && typeof gigInfo === 'object') {
+              id = String(gigInfo._id || gigInfo.$oid || '').trim();
+              titleFromGig = gigInfo.title ? String(gigInfo.title) : '';
+            } else if (gigInfo != null && gigInfo !== '') {
+              id = String(gigInfo).trim();
+            }
+            if (!id) return null;
+            return {
+              _id: id,
+              title: titleFromGig || g.gigTitle || `Gig ${id}`,
+            };
+          })
+          .filter((g: { _id: string; title: string } | null): g is { _id: string; title: string } => Boolean(g));
 
         setEnrolledGigs(enrolled);
 
