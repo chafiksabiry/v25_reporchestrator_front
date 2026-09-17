@@ -8,7 +8,7 @@ import axios from 'axios';
 // trailing `/api` (and slash) defensively so it works regardless of how the
 // env var is configured.
 import { stripApiSuffix, getRepApiHost } from './repApiUrl';
-import { getAgentId } from './authUtils';
+import { getAgentId, redirectToLoginIfUnauthorized } from './authUtils';
 import { isExpectedCallAnalyzeHttpError, toCallAnalyzeFailure } from './callAnalyzeErrors';
 
 const API_URL = stripApiSuffix(import.meta.env.VITE_API_URL);
@@ -122,10 +122,7 @@ const addAuthInterceptor = (axiosInstance: any) => {
       }
 
       if (error.response?.status === 401) {
-        console.warn("🔐 Unauthorized - token may be expired or invalid");
-        // Optionally clear token and redirect to login
-        // localStorage.removeItem('token');
-        // window.location.href = '/login';
+        redirectToLoginIfUnauthorized('api-401');
       }
 
       return Promise.reject(error);

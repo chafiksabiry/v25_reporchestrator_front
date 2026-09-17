@@ -194,6 +194,10 @@ export function Profile() {
         setLoading(false);
       } catch (err: any) {
         console.error('❌ Error loading profile:', err);
+        if (err?.response?.status === 401) {
+          // Global interceptor redirects to login; keep loading UI meanwhile.
+          return;
+        }
         setError(err.message || t('profile.page.loadError'));
         setLoading(false);
       }
