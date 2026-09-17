@@ -1,6 +1,6 @@
 import { profileApi } from './client.tsx';
 import Cookies from 'js-cookie';
-import { getProfileData as getCachedProfileData, setProfileData } from './authUtils';
+import { getProfileData as getCachedProfileData, setProfileData, redirectToLoginIfUnauthorized } from './authUtils';
 
 /** Fired when `users.fullName` changes — TopBar listens for instant UI update. */
 export const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
@@ -113,7 +113,7 @@ export const fetchProfileFromAPI = async () => {
 
     if (!userId) {
       console.error('❌ No userId found based on run mode:', runMode);
-      window.location.href = '/auth';
+      redirectToLoginIfUnauthorized('missing-user-id');
       throw new Error('User ID not found');
     }
 
