@@ -101,17 +101,9 @@ const ProtectedRoute = ({ children, fallback }: { children: React.ReactNode; fal
     return <LoadingScreen />;
   }
 
-  // Si non authentifié, rediriger vers la page d'accueil ou afficher un message
   if (!isAuthenticated) {
-    const redirectUrl = getMainAppUrl();
-    console.log('Utilisateur non authentifié (redirection shell désactivée):', redirectUrl);
-
-    // Au lieu de rediriger de force vers le shell, on peut soit ne rien rendre,
-    // soit rediriger vers une route locale de login si elle existe.
-    // Pour l'instant, on suit la logique "Company" qui est moins agressive.
-    // window.location.replace(redirectUrl);
-
-    return <div className="p-8 text-center">Veuillez vous connecter.</div>;
+    window.location.replace(getMainAppUrl());
+    return <LoadingScreen />;
   }
 
   // Si authentifié, afficher le contenu protégé
