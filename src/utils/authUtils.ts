@@ -1,6 +1,44 @@
 // Utilitaires pour la gestion de l'authentification et des données utilisateur
 
 import Cookies from 'js-cookie';
+import { broadcastAuthChanged } from './authSync';
+
+let redirectingToLogin = false;
+
+/** Sign-in URL on the shell (not the reps MF). */
+export const getMainAppSignInUrl = (): string =>
+  `${window.location.protocol}//${window.location.host}/auth/signin`;
+
+/**
+ * Clear session and send the user to login when auth is missing/invalid.
+ * Safe to call multiple times (deduped) and no-ops on the auth pages.
+ */
+export const redirectToLoginIfUnauthorized = (reason = 'unauthorized'): void => {
+  if (typeof window === 'undefined') return;
+  if (redirectingToLogin) return;
+
+  const path = window.location.pathname || '';
+  if (path.includes('/auth')) return;
+
+  redirectingToLogin = true;
+  console.warn('🔐 Session invalid — redirecting to login:', reason);
+
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('agentId');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('agentId');
+    Cookies.remove('userId', { path: '/' });
+    Cookies.remove('agentId', { path: '/' });
+    broadcastAuthChanged({ token: null, userId: null, source: 'reps' });
+  } catch {
+    // ignore storage errors
+  }
+
+  window.location.replace(getMainAppSignInUrl());
+};
 
 /**
  * Récupère l'agentId de l'utilisateur connecté

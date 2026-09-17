@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import Cookies from 'js-cookie';
 import { repApiClient } from '../utils/client';
-import { getAgentId, getAuthToken } from '../utils/authUtils';
+import { getAgentId, getAuthToken, getMainAppSignInUrl, redirectToLoginIfUnauthorized } from '../utils/authUtils';
 import { broadcastAuthChanged, subscribeAuthChanged } from '../utils/authSync';
 
 interface AuthContextType {
@@ -52,8 +52,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     broadcastAuthChanged({ token: null, userId: null, source: 'reps' });
 
-    // Soft SPA return to landing — auth MF remounts and picks up cleared session
-    window.location.replace(`${window.location.protocol}//${window.location.host}/`);
+    window.location.replace(getMainAppSignInUrl());
   };
 
   useEffect(() => {
@@ -76,13 +75,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const interceptorId = repApiClient.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401 && isAuthenticated) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('userId');
-          Cookies.remove('userId', { path: '/' });
+        if (error.response?.status === 401) {
           setIsAuthenticated(false);
           setUser(null);
-          broadcastAuthChanged({ token: null, userId: null, source: 'reps' });
+          redirectToLoginIfUnauthorized('auth-context-401');
         }
         return Promise.reject(error);
       }
@@ -93,7 +89,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         repApiClient.interceptors.response.eject(interceptorId);
       }
     };
-  }, [isAuthenticated]);
+  }, []);
 
   const value = {
     isAuthenticated,
