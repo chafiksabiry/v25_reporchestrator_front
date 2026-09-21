@@ -1267,9 +1267,9 @@ export function GigDetails() {
         <div className="mb-6">
           <button
             onClick={() => navigate('/marketplace')}
-            className="flex items-center text-gray-500 hover:text-harx-600 mb-6 transition-colors font-bold group"
+            className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white font-black text-xs uppercase tracking-widest shadow-[0_4px_18px_-4px_rgba(124,58,237,0.55)] hover:shadow-[0_8px_24px_-4px_rgba(192,38,211,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all group"
           >
-            <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             {t('gigDetails.backToMarketplace')}
           </button>
 
