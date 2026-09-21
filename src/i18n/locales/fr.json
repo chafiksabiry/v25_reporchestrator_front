@@ -307,8 +307,12 @@
     "reject": "Refuser",
     "remote": "Distant",
     "noFavoritesYet": "Aucun favori pour le moment",
+    "favoritesEmptyDesc": "Un gig vous plaît ? Cliquez sur le cœur pour le sauvegarder ici.",
     "enrolledEmptyTitle": "Prêt à commencer ?",
     "enrolledEmptyDesc": "Acceptez une invitation ou postulez à un gig pour voir vos projets actifs ici.",
+    "invitesEmptyTitle": "Aucune invitation pour le moment",
+    "invitesEmptyDesc": "Gardez votre profil à jour ! Quand les entreprises apprécient vos compétences, les invitations apparaîtront ici.",
+    "browseAvailable": "Voir les gigs disponibles",
     "taxonomy": {
       "Insurance": "Assurance",
       "Customer Relations & Support": "Relation client & Support",
