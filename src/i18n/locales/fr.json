@@ -278,6 +278,8 @@
   },
   "gigsMarketplace": {
     "title": "MARKETPLACE",
+    "subtitle1": "Découvrez des projets premium dans le monde entier qui correspondent à vos compétences uniques et à vos aspirations professionnelles.",
+    "subtitle2": "Prenez le contrôle de votre parcours, trouvez votre prochaine mission exclusive et commencez à gagner dès aujourd'hui.",
     "tabs": {
       "available": "Disponibles",
       "enrolled": "Inscrites",

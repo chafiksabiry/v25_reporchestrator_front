@@ -1824,8 +1824,9 @@ export function GigsMarketplace() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
           <p className="mt-2 text-gray-500 max-w-2xl text-sm leading-relaxed font-medium">
-            Discover premium projects worldwide that match your unique skills and professional aspirations.<br />
-            Take control of your journey, find your next exclusive mission, and start earning today.
+            {t('gigsMarketplace.subtitle1')}
+            <br />
+            {t('gigsMarketplace.subtitle2')}
           </p>
         </div>
       </div>
