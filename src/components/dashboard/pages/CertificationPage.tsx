@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { CertificationView } from '../CertificationView';
@@ -26,6 +26,7 @@ type CertPayload = {
 
 export function CertificationPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { certificateId, journeyId } = useParams<{ certificateId?: string; journeyId?: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +89,14 @@ export function CertificationPage() {
     };
   }, [certificateId, journeyId]);
 
-  const handleClose = () => navigate('/training');
+  const handleClose = () => {
+    const from = (searchParams.get('from') || '').toLowerCase();
+    if (from === 'certifications') {
+      navigate('/training?tab=certifications');
+      return;
+    }
+    navigate('/training');
+  };
 
   if (loading) {
     return (
@@ -107,11 +115,11 @@ export function CertificationPage() {
         <p className="text-sm text-red-800 mb-6">{error || 'Ce certificat n\'existe pas ou n\'a pas encore été émis.'}</p>
         <button
           type="button"
-          onClick={() => navigate('/training')}
+          onClick={handleClose}
           className="inline-flex items-center gap-2 rounded-xl bg-harx-600 text-white px-5 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-harx-700"
         >
           <ArrowLeft className="w-4 h-4" />
-          Retour aux formations
+          Retour
         </button>
       </div>
     );
