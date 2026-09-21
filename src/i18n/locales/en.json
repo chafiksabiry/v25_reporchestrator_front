@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "profile": "Profile",
     "marketplace": "Gigs",
+    "gigsInfo": "GIGS are the missions posted by the COMPANY",
     "calls": "Calls",
     "training": "HARX Academy",
     "workspace": "Workspace",
@@ -276,7 +277,7 @@
     "emergencyShutdown": "Emergency Shutdown"
   },
   "gigsMarketplace": {
-    "title": "Gigs Marketplace",
+    "title": "MARKETPLACE",
     "tabs": {
       "available": "Available",
       "enrolled": "Enrolled",

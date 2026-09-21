@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock, Info } from 'lucide-react';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
@@ -524,14 +524,38 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         <item.icon className="h-5 w-5" />
                       </div>
                       {!isCollapsed && (
-                        <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>
+                        <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{item.label}</span>
+                          {item.path === '/marketplace' ? (
+                            <span
+                              className="relative shrink-0 group/gigsinfo"
+                              title={t('sidebar.gigsInfo')}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              role="img"
+                              aria-label={t('sidebar.gigsInfo')}
+                            >
+                              <Info className="h-3.5 w-3.5 text-white/50 transition-colors group-hover/gigsinfo:text-white" />
+                              <span className="pointer-events-none absolute left-1/2 top-full z-[60] mt-2 hidden w-52 -translate-x-1/2 rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-[10px] font-medium normal-case tracking-normal text-white shadow-xl group-hover/gigsinfo:block whitespace-normal leading-snug">
+                                {t('sidebar.gigsInfo')}
+                              </span>
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                       {isCollapsed && item.subItems && (
                         <div className="absolute top-0 right-0 w-2 h-2 bg-harx-500 rounded-full border-2 border-slate-950 translate-x-1/2 -translate-y-1/2"></div>
                       )}
                       {isCollapsed && (
-                        <div className="absolute left-16 bg-slate-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+                        <div className="absolute left-16 bg-slate-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl border border-white/10 max-w-[14rem] whitespace-normal">
                           {item.label}
+                          {item.path === '/marketplace' ? (
+                            <span className="mt-1 block text-[10px] text-slate-300 font-medium">
+                              {t('sidebar.gigsInfo')}
+                            </span>
+                          ) : null}
                         </div>
                       )}
                     </>
