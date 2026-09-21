@@ -2254,13 +2254,13 @@ export function GigsMarketplace() {
                   {t('gigsMarketplace.noFavoritesYet')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Love a gig? Click the heart icon to save it here for later.
+                  {t('gigsMarketplace.favoritesEmptyDesc')}
                 </p>
                 <button
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  Browse Available Gigs
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
@@ -2296,9 +2296,29 @@ export function GigsMarketplace() {
                           )}
                         </button>
                         <div className="flex items-center space-x-2">
-                          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)]">
-                            🚀 {t('gigsMarketplace.applyNow')}
-                          </span>
+                          {gigStatus === 'none' ? (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleApplyToGig(gig._id);
+                              }}
+                              disabled={applyingGigId === gig._id}
+                              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${applyingGigId === gig._id
+                                ? 'bg-harx-100 text-harx-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)] animate-pulse-ring cursor-pointer'
+                                }`}
+                            >
+                              {applyingGigId === gig._id ? `⏳ ${t('gigsMarketplace.applying')}` : `🚀 ${t('gigsMarketplace.applyNow')}`}
+                            </button>
+                          ) : (
+                            <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
+                              gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
+                                'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
+                              }`}>
+                              {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
+                            </span>
+                          )}
                           <button
                             onClick={(e) => {
                               e.preventDefault();
@@ -2398,14 +2418,32 @@ export function GigsMarketplace() {
                         )}
                       </div>
 
-                      <button
-                        onClick={() => navigate(`/gig/${gig._id}`)}
-                        className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative"
-                      >
-                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
-                        <Sparkles className="w-4 h-4" />
-                        <span>{t('gigsMarketplace.viewDetails')}</span>
-                      </button>
+                      {gigStatus === 'enrolled' ? (
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => handleSmartStart(gig._id)}
+                            className="flex-[2] bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                          >
+                            <Play className="w-4 h-4 fill-current" />
+                            <span>{t('gigsMarketplace.startSession')}</span>
+                          </button>
+                          <button
+                            onClick={() => navigate(`/gig/${gig._id}`)}
+                            className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          >
+                            {t('gigsMarketplace.details')}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/gig/${gig._id}`)}
+                          className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                        >
+                          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
+                          <Sparkles className="w-4 h-4" />
+                          <span>{t('gigsMarketplace.viewDetails')}</span>
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -2424,16 +2462,16 @@ export function GigsMarketplace() {
               <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">✉️</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  No Invitations Yet
+                  {t('gigsMarketplace.invitesEmptyTitle')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Keep your profile updated! When companies love your skills, invitations will appear here.
+                  {t('gigsMarketplace.invitesEmptyDesc')}
                 </p>
                 <button
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  Browse Available Gigs
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
@@ -2657,7 +2695,7 @@ export function GigsMarketplace() {
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  {isFrMarket ? 'Voir les missions' : 'Browse Available Gigs'}
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
@@ -2967,7 +3005,7 @@ export function GigsMarketplace() {
               onClick={() => setActiveTab('available')}
               className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
             >
-              Browse Available Gigs
+              {t('gigsMarketplace.browseAvailable')}
             </button>
           </div>
         </div>
