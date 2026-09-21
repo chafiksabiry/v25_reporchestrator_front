@@ -16,6 +16,18 @@ import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay'
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
+/** Shared purple Details CTA (available / enrolled / favorites / invites / pending). */
+const DETAILS_BTN_CLASS =
+  'bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative hover:-translate-y-0.5 active:translate-y-0';
+
+const DetailsBtnInner = ({ label }: { label: string }) => (
+  <>
+    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
+    <Sparkles className="w-4 h-4 shrink-0" />
+    <span>{label}</span>
+  </>
+);
+
 const renderCommissionInfo = (gig: any, isFr: boolean) => {
   if (!gig || !gig.commission) return null;
   const comm = gig.commission as GigCommissionExtended;
@@ -2166,9 +2178,9 @@ export function GigsMarketplace() {
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
-                          className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`flex-1 ${DETAILS_BTN_CLASS}`}
                         >
-                          {t('gigsMarketplace.detailsUpper')}
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     ) : gigStatus === 'invited' ? (
@@ -2219,19 +2231,17 @@ export function GigsMarketplace() {
                         </div>
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
-                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`w-full ${DETAILS_BTN_CLASS}`}
                         >
-                          {t('gigsMarketplace.viewDetails')}
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => navigate(`/gig/${gig._id}`)}
-                        className="w-full bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                        className={`w-full ${DETAILS_BTN_CLASS}`}
                       >
-                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
-                        <Sparkles className="w-4 h-4" />
-                        <span>{t('gigsMarketplace.viewDetails')}</span>
+                        <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                       </button>
                     )}
                   </div>
@@ -2429,19 +2439,17 @@ export function GigsMarketplace() {
                           </button>
                           <button
                             onClick={() => navigate(`/gig/${gig._id}`)}
-                            className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                            className={`flex-1 ${DETAILS_BTN_CLASS}`}
                           >
-                            {t('gigsMarketplace.details')}
+                            <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
-                          className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                          className={`mt-4 w-full ${DETAILS_BTN_CLASS}`}
                         >
-                          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
-                          <Sparkles className="w-4 h-4" />
-                          <span>{t('gigsMarketplace.viewDetails')}</span>
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       )}
                     </div>
@@ -2661,9 +2669,9 @@ export function GigsMarketplace() {
                         </div>
                         <button
                           onClick={() => navigate(`/gig/${enrollment.gig._id}`)}
-                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`w-full ${DETAILS_BTN_CLASS}`}
                         >
-                          {t('gigsMarketplace.viewDetails')}
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     </div>
@@ -2765,9 +2773,9 @@ export function GigsMarketplace() {
                       </button>
                       <button
                         onClick={() => navigate(`/gig/${requestedGig.gig._id}`)}
-                        className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider"
+                        className={`flex-1 ${DETAILS_BTN_CLASS}`}
                       >
-                        {isFrMarket ? 'Détails' : 'Details'}
+                        <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                       </button>
                     </div>
                   </div>
@@ -2979,9 +2987,9 @@ export function GigsMarketplace() {
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${enrolledGig.gig._id}`)}
-                          className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`flex-1 ${DETAILS_BTN_CLASS}`}
                         >
-                          {t('gigsMarketplace.details')}
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     </div>
