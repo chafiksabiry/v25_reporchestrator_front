@@ -313,6 +313,7 @@
     "conversion": "{{rate}}% conversion",
     "leadSources": "Lead Sources:",
     "teamStructure": "Team Structure",
+    "teamSize": "Team Size:",
     "territories": "Territories:",
     "yearsExp": "{{years}} years exp.",
     "availability": "Availability",
