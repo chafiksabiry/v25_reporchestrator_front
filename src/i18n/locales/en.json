@@ -2,7 +2,7 @@
   "sidebar": {
     "dashboard": "Dashboard",
     "profile": "Profile",
-    "marketplace": "Marketplace",
+    "marketplace": "Gigs",
     "calls": "Calls",
     "training": "HARX Academy",
     "workspace": "Workspace",
@@ -375,7 +375,7 @@
       "publish": "Publish my profile",
       "finalStep": "Final step: apply to a gig",
       "finalStepDescription": "Browse the marketplace and apply to at least one gig to finish your onboarding.",
-      "browseMissions": "Browse missions",
+      "browseMissions": "Browse gigs",
       "phase2Complete": "Phase 2 completed",
       "phase2CompleteDescription": "Your profile is complete. Continue your onboarding to unlock the rest.",
       "continueOnboarding": "Continue onboarding",

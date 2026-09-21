@@ -2,7 +2,7 @@
   "sidebar": {
     "dashboard": "Tableau de Bord",
     "profile": "Profil",
-    "marketplace": "Missions",
+    "marketplace": "Gigs",
     "calls": "Appels",
     "training": "HARX Academy",
     "workspace": "Espace de Travail",
@@ -39,7 +39,7 @@
     "stats": {
       "repsScore": "Score REPS",
       "onboarding": "Intégration",
-      "gigsEnrolled": "Missions inscrites",
+      "gigsEnrolled": "Gigs inscrits",
       "callsPassed": "Appels passés",
       "current": "Actuel",
       "progress": "Progression",
@@ -276,7 +276,7 @@
     "emergencyShutdown": "Arrêt d'urgence"
   },
   "gigsMarketplace": {
-    "title": "Place de Marché des Missions",
+    "title": "Place de Marché des Gigs",
     "tabs": {
       "available": "Disponibles",
       "enrolled": "Inscrites",
@@ -375,7 +375,7 @@
       "publish": "Publier mon profil",
       "finalStep": "Dernière étape : postuler à une mission",
       "finalStepDescription": "Parcourez la place de marché et postulez à au moins une mission pour terminer votre intégration.",
-      "browseMissions": "Voir les missions",
+      "browseMissions": "Voir les gigs",
       "phase2Complete": "Phase 2 terminée",
       "phase2CompleteDescription": "Votre profil est complet. Poursuivez votre intégration pour débloquer la suite.",
       "continueOnboarding": "Poursuivre l’intégration",
