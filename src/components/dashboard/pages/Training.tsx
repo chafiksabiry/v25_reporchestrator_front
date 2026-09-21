@@ -2364,7 +2364,6 @@ export function Training() {
           {displayJourneys.map((j) => {
             const id = journeyKey(j);
             const gig = gigLabel(j);
-            const status = String(j.status || '—');
             const slides = extractSlides(j);
             const progress = id ? progressByJourney[id] : undefined;
             const engagement = Number(progress?.engagementScore);
@@ -2468,9 +2467,6 @@ export function Training() {
                     <p className="text-sm text-gray-500 mt-1 line-clamp-1">{String(j.description)}</p>
                   ) : null}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-gray-100 text-gray-600">
-                      {status}
-                    </span>
                     {gig ? (
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-harx-500/10 text-harx-700 flex items-center gap-1 max-w-full">
                         <Briefcase className="w-3 h-3 shrink-0" />
