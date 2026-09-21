@@ -1673,19 +1673,29 @@ export function GigDetails() {
               </div>
             )}
 
-            {/* Team Structure — territories only */}
-            {gig.team?.territories?.length > 0 && (
+            {/* Team Structure — size + territories (no composition) */}
+            {gig.team && (gig.team.size || gig.team.territories?.length > 0) && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
                 <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.teamStructure')}</h2>
-                <div>
-                  <span className="text-gray-600">{t('gigDetails.territories')}</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {gig.team.territories.map((territory, index) => (
-                      <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
-                        {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
-                      </span>
-                    ))}
-                  </div>
+                <div className="space-y-3">
+                  {gig.team.size != null && String(gig.team.size).trim() !== '' && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-600">{t('gigDetails.teamSize')}</span>
+                      <span className="font-medium">{gig.team.size}</span>
+                    </div>
+                  )}
+                  {gig.team.territories?.length > 0 && (
+                    <div>
+                      <span className="text-gray-600">{t('gigDetails.territories')}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {gig.team.territories.map((territory, index) => (
+                          <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
+                            {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
