@@ -2,18 +2,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Check } from 'lucide-react';
 import { HARX_BUTTON_GRADIENT } from '../../../utils/harxBrand';
+import { persistHarxLanguage } from '../../../i18n';
 
 export function LanguageSwitcher() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const languages = [
+    { code: 'fr', label: 'Français', short: 'FR', flagUrl: 'https://flagcdn.com/w320/fr.png' },
     { code: 'en', label: 'English', short: 'EN', flagUrl: 'https://flagcdn.com/w320/gb.png' },
-    { code: 'fr', label: 'Français', short: 'FR', flagUrl: 'https://flagcdn.com/w320/fr.png' }
   ];
 
-  const currentLang = languages.find(l => i18n.language.startsWith(l.code)) || languages[0];
+  const currentLang =
+    languages.find((l) => i18n.language.toLowerCase().startsWith(l.code)) || languages[0];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -26,7 +28,8 @@ export function LanguageSwitcher() {
   }, []);
 
   const selectLanguage = (code: string) => {
-    i18n.changeLanguage(code);
+    persistHarxLanguage(code);
+    void i18n.changeLanguage(code);
     setIsOpen(false);
   };
 
@@ -35,7 +38,7 @@ export function LanguageSwitcher() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 md:gap-2.5 bg-white/10 backdrop-blur-md hover:bg-white/20 p-1 md:pr-3.5 rounded-2xl border border-white/20 hover:border-white/40 shadow-lg shadow-black/10 transition-all duration-300 group text-white"
-        title="Change Language"
+        title={t('topbar.changeLanguage')}
       >
         <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/30 shadow-inner bg-white">
           <img src={currentLang.flagUrl} alt={currentLang.label} className="w-full h-full object-cover" />

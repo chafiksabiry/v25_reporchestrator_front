@@ -299,14 +299,11 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   <Lock className="h-4 w-4" />
                 </div>
                 <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
-                  {t('onboardingGuide.title', 'Finalisez votre onboarding')}
+                  {t('onboardingGuide.title')}
                 </p>
               </div>
               <p className={`text-[11px] text-white/70 leading-relaxed${hideOnboardingCta ? '' : ' mb-3'}`}>
-                {t(
-                  'onboardingGuide.description',
-                  'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
-                )}
+                {t('onboardingGuide.description')}
               </p>
               {/* Hide CTA on orchestrator / profile edit — user is already in the flow. */}
               {!hideOnboardingCta && (
@@ -315,7 +312,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   onClick={() => navigate('/orchestrator')}
                   className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
                 >
-                  {t('onboardingGuide.cta', "Continuer l'onboarding")}
+                  {t('onboardingGuide.cta')}
                 </button>
               )}
             </div>
