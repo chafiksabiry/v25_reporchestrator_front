@@ -307,8 +307,12 @@
     "reject": "Decline",
     "remote": "Remote",
     "noFavoritesYet": "No Favorites Yet",
+    "favoritesEmptyDesc": "Love a gig? Click the heart icon to save it here for later.",
     "enrolledEmptyTitle": "Ready to Start?",
     "enrolledEmptyDesc": "Accept an invitation or apply to a gig to see your active projects here.",
+    "invitesEmptyTitle": "No Invitations Yet",
+    "invitesEmptyDesc": "Keep your profile updated! When companies love your skills, invitations will appear here.",
+    "browseAvailable": "Browse Available Gigs",
     "taxonomy": {
       "Insurance": "Insurance",
       "Customer Relations & Support": "Customer Relations & Support",
