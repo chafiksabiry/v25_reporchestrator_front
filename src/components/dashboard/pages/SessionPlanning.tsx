@@ -740,14 +740,14 @@ export function SessionPlanning() {
                             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
                                 <div className="flex items-center gap-1.5 mb-3 text-slate-400">
                                     <Briefcase className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Projet sélectionné</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{t('sessionPlanning.selectedProject')}</span>
                                 </div>
                                 <WalletFilterSelect
-                                    label="Gig inscrit"
+                                    label={t('sessionPlanning.enrolledGig')}
                                     value={selectedGigId || ''}
                                     onChange={(v) => setSelectedGigId(v === '' ? null : v)}
                                     options={[
-                                        { value: '', label: 'Choisir un projet…', tone: 'neutral' as const },
+                                        { value: '', label: t('sessionPlanning.chooseProject'), tone: 'neutral' as const },
                                         ...gigs.map((gig: Gig) => ({ value: gig.id, label: gig.name, tone: 'brand' as const })),
                                     ]}
                                     className="w-full md:max-w-[460px]"
@@ -772,7 +772,7 @@ export function SessionPlanning() {
                                     <div className="h-14 w-14 rounded-2xl bg-harx-50 flex items-center justify-center mb-4">
                                         <Sparkles className="w-7 h-7 text-harx-400" />
                                     </div>
-                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">Sélectionnez un projet</p>
+                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">{t('sessionPlanning.selectProjectHint')}</p>
                                     <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
                                         Choisissez un gig ci-dessus pour afficher les créneaux disponibles à la réservation.
                                     </p>
