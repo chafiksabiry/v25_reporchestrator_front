@@ -34,14 +34,20 @@ const FALLBACK_PUBLIC_KEY =
   'pk_live_51TCj3DPJXYVCMk8pTo20zxqkRKZSes7sCY6TJjSYdXqNEjCSvrsbtprRhy52KoggYnNpiJi0se31LuahqFLqN9Ex00kbTYXVSK';
 
 function formatPrice(amount: number, currency?: string): string {
+  const cur = (currency || 'EUR').toUpperCase();
+  if (!Number.isFinite(amount)) return '—';
+  // Exact 2 decimals from a decimal string — do not Math.round euros.
+  const [whole, frac = '00'] = Number(amount).toFixed(2).split('.');
+  const normalized = `${whole}.${frac}`;
   try {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: (currency || 'EUR').toUpperCase(),
+      currency: cur,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(Number(normalized));
   } catch {
-    return `${amount} ${currency?.toUpperCase() || 'EUR'}`;
+    return `${normalized} ${cur}`;
   }
 }
 

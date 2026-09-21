@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,6 +63,7 @@ interface ProfileData {
 
 // Add event listener for profile updates
 export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
+  const { t } = useTranslation();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -238,7 +240,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
         {ccStaff ? (
           <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
-            Call center agent
+            {t('topbar.callCenterAgent')}
           </div>
         ) : onboardingComplete ? (
           <>
@@ -246,7 +248,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             <button
               onClick={() => navigate('/wallet')}
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
-              title="Mon Portefeuille"
+              title={t('topbar.myWallet')}
             >
               <div
                 className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white transition-all duration-200 shadow-sm"
@@ -255,7 +257,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                 <Wallet className="w-4 h-4 group-hover:text-[#E6188D]" />
               </div>
               <div className="hidden md:block text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Mon Portefeuille</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">{t('topbar.myWallet')}</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
                   {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                 </span>
@@ -269,14 +271,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             <button
               onClick={() => navigate('/session-planning')}
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
-              title="Session Planning"
+              title={t('topbar.sessionPlanning')}
             >
               <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Calendar className="w-4 h-4" />
               </div>
               <div className="hidden md:block text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Planning</span>
-                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">{t('topbar.planning')}</span>
+                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">{t('topbar.sessions')}</span>
               </div>
             </button>
           </>

@@ -341,7 +341,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {!showOrchestratorOnly && group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
-            <p className={sectionLabelClass}>Main</p>
+            <p className={sectionLabelClass}>{t('sidebar.sectionMain')}</p>
           )}
           {group1.map((item) => (
             <div key={item.path} className="space-y-1">
@@ -555,7 +555,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group2.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className={sectionLabelClass}>Training</p>
+              <p className={sectionLabelClass}>{t('sidebar.sectionTraining')}</p>
             )}
             {group2.map((item) => (
               <div key={item.path} className="space-y-1">
@@ -667,7 +667,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group3.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className={sectionLabelClass}>Planning</p>
+              <p className={sectionLabelClass}>{t('sidebar.sectionPlanning')}</p>
             )}
             {group3.map((item) => (
               <NavLink
