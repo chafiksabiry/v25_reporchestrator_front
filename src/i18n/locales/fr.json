@@ -4,7 +4,7 @@
     "profile": "Profil",
     "marketplace": "Missions",
     "calls": "Appels",
-    "training": "Formation",
+    "training": "HARX Academy",
     "workspace": "Espace de Travail",
     "leads": "Prospects",
     "callHistory": "Historique",
@@ -16,7 +16,7 @@
     "activeGuide": "Guide Actif",
     "interactiveStep": "Étape Interactive",
     "sectionMain": "Principal",
-    "sectionTraining": "Formation",
+    "sectionTraining": "HARX Academy",
     "sectionPlanning": "Planification"
   },
   "onboardingGuide": {
@@ -951,7 +951,7 @@
     }
   },
   "trainingPage": {
-    "title": "Formation",
+    "title": "HARX Academy",
     "subtitle": "Formations liées aux gigs auxquels vous êtes inscrit, et parcours assignés directement par votre entreprise.",
     "myGigsAndPaths": "Mes gigs & parcours",
     "enrolledGigLabel": "Gig inscrit (Marketplace)",
