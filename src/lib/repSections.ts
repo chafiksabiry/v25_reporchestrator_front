@@ -19,7 +19,7 @@ const REP_ROUTE_TITLES: Array<{ test: (path: string, search: string) => boolean;
   { test: (p, s) => p.startsWith('/workspace') && s.includes('tab=calls'), label: 'Historique' },
   { test: (p, s) => p.startsWith('/workspace') && s.includes('tab=copilot'), label: 'COCKPIT' },
   { test: (p) => p.startsWith('/workspace'), label: 'Espace de travail' },
-  { test: (p) => p.startsWith('/marketplace'), label: 'Gigs' },
+  { test: (p) => p.startsWith('/marketplace'), label: 'MARKETPLACE' },
   { test: (p) => /^\/gig\/[^/]+$/.test(p), label: 'Mission' },
   { test: (p) => /^\/company\/[^/]+$/.test(p), label: 'Entreprise' },
   { test: (p) => p.startsWith('/training'), label: 'HARX Academy' },
