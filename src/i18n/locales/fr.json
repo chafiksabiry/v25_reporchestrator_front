@@ -14,7 +14,10 @@
     "wallet": "Portefeuille & Gains",
     "logout": "Déconnexion",
     "activeGuide": "Guide Actif",
-    "interactiveStep": "Étape Interactive"
+    "interactiveStep": "Étape Interactive",
+    "sectionMain": "Principal",
+    "sectionTraining": "Formation",
+    "sectionPlanning": "Planification"
   },
   "onboardingGuide": {
     "title": "Finalisez votre intégration",
@@ -25,7 +28,12 @@
   "topbar": {
     "changeLanguage": "Changer de langue",
     "userRole": "Représentant HARX",
-    "defaultUser": "Utilisateur"
+    "defaultUser": "Utilisateur",
+    "myWallet": "Mon portefeuille",
+    "planning": "Planification",
+    "sessions": "Sessions",
+    "sessionPlanning": "Planification des sessions",
+    "callCenterAgent": "Agent call center"
   },
   "dashboard": {
     "stats": {
@@ -223,6 +231,33 @@
   },
   "workspace": {
     "title": "Espace de Travail",
+    "activeGig": "Gig actif",
+    "allMyGigs": "Tous mes gigs",
+    "tabLeads": "Prospects",
+    "tabCallHistory": "Historique",
+    "tabCockpit": "COCKPIT",
+    "leadsTitle": "Prospects",
+    "call": "Appeler",
+    "details": "Détails",
+    "filter": "Filtrer",
+    "filterAll": "Tous",
+    "filterCalled": "Appelé",
+    "filterRdv": "RDV",
+    "filterSigned": "Signé",
+    "noPhone": "Pas de téléphone",
+    "noEmail": "Pas d'email",
+    "alreadySigned": "Déjà signé",
+    "busy": "Occupé",
+    "checkingPermissions": "Vérification des permissions d'appel…",
+    "cockpitLocked": "COCKPIT verrouillé",
+    "cannotPlaceCalls": "Vous ne pouvez pas passer d'appels pour le moment.",
+    "activeReservedWindow": "Créneau réservé actif : {{window}}",
+    "prospectBusy": "Prospect occupé",
+    "backToLeads": "Retour aux prospects",
+    "noLeadSelected": "Aucun prospect sélectionné",
+    "selectLeadHint": "Sélectionnez un prospect dans l'onglet Prospects pour démarrer un appel.",
+    "viewSignedDetails": "Voir les détails de la vente signée",
+    "leadLockedByOther": "Ce prospect est ouvert dans le cockpit d’un autre agent",
     "savingCall": {
       "title": "Sauvegarde de l'appel…",
       "subtitle": "Veuillez patienter quelques secondes — nous finalisons l'enregistrement et préparons l'analyse IA.",
@@ -230,7 +265,11 @@
     }
   },
   "sessionPlanning": {
-    "title": "Planification de Session"
+    "title": "Planification de Session",
+    "selectedProject": "Projet sélectionné",
+    "enrolledGig": "Mission inscrite",
+    "chooseProject": "Choisir un projet…",
+    "selectProjectHint": "Sélectionnez un projet"
   },
   "operations": {
     "title": "Panneau des Opérations",
@@ -518,7 +557,7 @@
     "checkSessionDesc": "Planifier et réserver un créneau de temps pour la mission dans l'agenda.",
     "understandButton": "Compris, je finalise mes étapes",
     "recentLeads": "Prospects Récents",
-    "searchLeads": "Rechercher des leads...",
+    "searchLeads": "Rechercher des prospects...",
     "noSearchResults": "Aucun prospect ne correspond à votre recherche."
   },
   "trainingAllGigsGuard": {
@@ -910,6 +949,40 @@
       "defaultHint": "Passez à l’étape suivante",
       "close": "Fermer"
     }
+  },
+  "trainingPage": {
+    "title": "Formation",
+    "subtitle": "Formations liées aux gigs auxquels vous êtes inscrit, et parcours assignés directement par votre entreprise.",
+    "myGigsAndPaths": "Mes gigs & parcours",
+    "enrolledGigLabel": "Gig inscrit (Marketplace)",
+    "allEnrolledGigs": "Tous les gigs inscrits",
+    "noEnrolledGigs": "Aucun gig inscrit",
+    "showingFor": "Formations affichées pour :",
+    "noEnrolledGigsHint": "Aucun gig inscrit via l’API matching — vérifiez le Marketplace ou votre connexion.",
+    "tabTrainings": "Formations",
+    "tabCertifications": "Certifications",
+    "progressGig": "Progression (formations du gig)",
+    "loadingForGig": "Chargement des formations de ce gig…",
+    "loading": "Chargement des formations…",
+    "emptyAllTitle": "Aucune formation trouvée pour vos gigs inscrits.",
+    "emptyAllDesc": "S’inscrire à un gig ne crée pas une formation automatiquement : l’entreprise doit publier une formation pour ce gig (statut actif, répétition ou terminé). La liste peut rester vide même si le Marketplace affiche « Inscrit ».",
+    "emptyGigTitle": "Aucune formation pour ce gig pour le moment.",
+    "emptyGigOk": "Le service de formation a répondu correctement mais n’a aucun parcours publié pour ce gig. Votre organisation prépare peut-être encore le contenu, le parcours est encore en brouillon, ou il est lié à un autre identifiant de gig que celui du Marketplace. Tous les parcours liés à ce gig sont affichés, y compris les brouillons.",
+    "emptyGigNotFound": "L’API formation a renvoyé 404 pour GET /training_journeys/gig/:gigId. Déployez le dernier backend formation ou vérifiez le routage API et l’URL de base VITE_TRAINING_*.",
+    "emptyGigError": "Impossible de joindre l’API formation pour ce gig (réseau, CORS ou authentification). Vérifiez votre connexion, reconnectez-vous, et confirmez que VITE_TRAINING_* pointe vers le service formation.",
+    "emptyGigRetry": "Resélectionnez le gig ou actualisez la page. Si le problème continue, vérifiez l’URL de l’API formation et que vous êtes connecté.",
+    "progress": "Progression",
+    "continue": "Continuer",
+    "script": "Script",
+    "certificate": "Certificat",
+    "noCertificationsTitle": "Aucune certification pour le moment",
+    "noCertificationsDesc": "Terminez une formation à 100 % pour débloquer votre certificat. Vos certifications apparaîtront ici.",
+    "seeMyTrainings": "Voir mes formations",
+    "certificationsIntro": "Formations complétées à 100 %. Consultez ou téléchargez vos certificats.",
+    "validated": "Validé · 100%",
+    "fallbackTitle": "Formation",
+    "backToList": "Retour à la liste",
+    "viewCertificate": "Voir le certificat"
   },
   "auth": {
     "verifying": "Vérification de l'authentification..."

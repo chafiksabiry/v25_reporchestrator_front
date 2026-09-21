@@ -635,16 +635,16 @@ export function WorkspaceContent() {
   };
 
   const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
-    { id: 'all', label: 'Tous' },
-    { id: 'called', label: 'Appelé' },
-    { id: 'rdv', label: 'RDV' },
-    { id: 'signed', label: 'Signé' },
+    { id: 'all', label: t('workspace.filterAll') },
+    { id: 'called', label: t('workspace.filterCalled') },
+    { id: 'rdv', label: t('workspace.filterRdv') },
+    { id: 'signed', label: t('workspace.filterSigned') },
   ];
 
   const workspaceTools = [
-    { id: 'voice', label: 'Leads', icon: User },
-    { id: 'calls', label: 'Call History', icon: PhoneOutgoing },
-    { id: 'copilot', label: 'COCKPIT', icon: Phone },
+    { id: 'voice', label: t('workspace.tabLeads'), icon: User },
+    { id: 'calls', label: t('workspace.tabCallHistory'), icon: PhoneOutgoing },
+    { id: 'copilot', label: t('workspace.tabCockpit'), icon: Phone },
   ];
 
   const renderWorkspace = () => {
@@ -654,7 +654,7 @@ export function WorkspaceContent() {
           <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 flex flex-col shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <div className="flex flex-col">
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">Leads</h2>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">{t('workspace.leadsTitle')}</h2>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -817,7 +817,7 @@ export function WorkspaceContent() {
                   </div>
                   {activeEnrolledGigId && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">Filtrer</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">{t('workspace.filter')}</span>
                       {leadStatusFilters.map((filter) => (
                         <button
                           key={filter.id}
@@ -907,11 +907,11 @@ export function WorkspaceContent() {
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Phone className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest">{lead.Telephony || (lead as any).Phone || 'No phone'}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest">{lead.Telephony || (lead as any).Phone || t('workspace.noPhone')}</p>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Mail className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">{lead.Email_1 || 'No email'}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">{lead.Email_1 || t('workspace.noEmail')}</p>
                                 </div>
                               </div>
                             </div>
@@ -919,25 +919,25 @@ export function WorkspaceContent() {
                               {isSignedByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
                                   <CheckCircle2 className="w-3 h-3" />
-                                  Déjà signé
+                                  {t('workspace.alreadySigned')}
                                 </span>
                               )}
                               {isRdvByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-violet-50 text-violet-700 border border-violet-100 flex items-center gap-1.5">
                                   <Calendar className="w-3 h-3" />
-                                  RDV
+                                  {t('workspace.filterRdv')}
                                 </span>
                               )}
                               {isCalledByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5">
                                   <PhoneOutgoing className="w-3 h-3" />
-                                  Appelé
+                                  {t('workspace.filterCalled')}
                                 </span>
                               )}
                               {leadLockedByOther && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1.5">
                                   <Clock className="w-3 h-3" />
-                                  Occupé
+                                  {t('workspace.busy')}
                                 </span>
                               )}
                               {lead.Stage && lead.Stage !== 'New' && (
@@ -968,9 +968,9 @@ export function WorkspaceContent() {
                                 }}
                                 title={
                                   isSignedByMe
-                                    ? 'Voir les détails de la vente signée'
+                                    ? t('workspace.viewSignedDetails')
                                     : leadLockedByOther
-                                      ? 'Ce prospect est ouvert dans le cockpit d’un autre agent'
+                                      ? t('workspace.leadLockedByOther')
                                       : !canUseCopilot && copilotGuard.reason
                                         ? copilotGuard.reason
                                         : ''
@@ -982,7 +982,7 @@ export function WorkspaceContent() {
                                   <Phone className="w-3.5 h-3.5" />
                                 )}
                                 <span>
-                                  {claimingCockpit ? '...' : isSignedByMe ? 'Détails' : 'Call'}
+                                  {claimingCockpit ? '...' : isSignedByMe ? t('workspace.details') : t('workspace.call')}
                                 </span>
                               </button>
                             </div>
@@ -1193,25 +1193,25 @@ export function WorkspaceContent() {
           <div className="w-full relative bg-white/80 backdrop-blur-md rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300" style={{ minHeight: '600px' }}>
             {copilotGuard.loading ? (
               <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400">
-                <p className="text-sm font-bold uppercase tracking-widest">Checking call permissions...</p>
+                <p className="text-sm font-bold uppercase tracking-widest">{t('workspace.checkingPermissions')}</p>
               </div>
             ) : !canUseCopilot ? (
               <div className="flex flex-col items-center justify-center h-full pt-24 text-center px-8">
                 <Phone className="w-12 h-12 mb-4 text-gray-300" />
-                <p className="text-sm font-black uppercase tracking-widest text-gray-700">COCKPIT Locked</p>
+                <p className="text-sm font-black uppercase tracking-widest text-gray-700">{t('workspace.cockpitLocked')}</p>
                 <p className="text-xs mt-2 text-gray-500 max-w-xl">
-                  {copilotGuard.reason || 'You cannot place calls right now.'}
+                  {copilotGuard.reason || t('workspace.cannotPlaceCalls')}
                 </p>
                 {copilotGuard.reservationWindowLabel && (
                   <p className="text-xs mt-2 text-emerald-600 font-bold">
-                    Active reserved window: {copilotGuard.reservationWindowLabel}
+                    {t('workspace.activeReservedWindow', { window: copilotGuard.reservationWindowLabel })}
                   </p>
                 )}
               </div>
             ) : cockpitAccessDenied ? (
               <div className="flex flex-col items-center justify-center h-full pt-24 text-center px-8">
                 <AlertTriangle className="w-12 h-12 mb-4 text-amber-500" />
-                <p className="text-sm font-black uppercase tracking-widest text-gray-700">Prospect occupé</p>
+                <p className="text-sm font-black uppercase tracking-widest text-gray-700">{t('workspace.prospectBusy')}</p>
                 <p className="text-xs mt-2 text-gray-500 max-w-xl">{cockpitAccessDenied}</p>
                 <button
                   type="button"
@@ -1224,7 +1224,7 @@ export function WorkspaceContent() {
                   }}
                   className="mt-6 px-6 py-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
                 >
-                  Retour aux leads
+                  {t('workspace.backToLeads')}
                 </button>
               </div>
             ) : (selectedLead || urlLeadId) ? (
@@ -1232,8 +1232,8 @@ export function WorkspaceContent() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in">
                 <Phone className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-sm font-bold uppercase tracking-widest">No lead selected</p>
-                <p className="text-xs mt-2">Please select a lead from the Leads tab to start a call.</p>
+                <p className="text-sm font-bold uppercase tracking-widest">{t('workspace.noLeadSelected')}</p>
+                <p className="text-xs mt-2">{t('workspace.selectLeadHint')}</p>
               </div>
             )}
           </div>
@@ -1307,7 +1307,7 @@ export function WorkspaceContent() {
           <div className="flex flex-col items-start space-y-1 relative">
             <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1 flex items-center gap-1.5">
               <Filter className="w-2.5 h-2.5" />
-              Active Gig
+              {t('workspace.activeGig')}
             </span>
 
             <div className="relative w-full md:w-[480px]">
@@ -1322,7 +1322,7 @@ export function WorkspaceContent() {
                   <span className="truncate text-left font-bold text-slate-700 text-xs">
                     {selectedGigId
                       ? enrolledGigs.find(g => g._id === selectedGigId)?.title
-                      : 'All My Gigs'}
+                      : t('workspace.allMyGigs')}
                   </span>
                 </div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-500 ${isGigDropdownOpen ? 'rotate-180 text-rose-500' : ''}`} />
@@ -1350,7 +1350,7 @@ export function WorkspaceContent() {
                       className={`w-full px-5 py-3 text-left text-xs font-black uppercase tracking-wider transition-all flex items-center gap-3 hover:bg-slate-50/80 ${!selectedGigId ? 'text-rose-600 bg-rose-50/30' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       <div className={`w-2 h-2 rounded-full ${!selectedGigId ? 'bg-rose-500 ring-4 ring-rose-500/20' : 'bg-slate-300'}`}></div>
-                      All My Gigs
+                      {t('workspace.allMyGigs')}
                     </button>
                     <div className="h-px bg-slate-100 mx-4 my-1 opacity-60"></div>
                     {enrolledGigs.map((g) => (

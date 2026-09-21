@@ -14,7 +14,10 @@
     "wallet": "Wallet & Payouts",
     "logout": "Logout",
     "activeGuide": "Active Guide",
-    "interactiveStep": "Interactive Step"
+    "interactiveStep": "Interactive Step",
+    "sectionMain": "Main",
+    "sectionTraining": "Training",
+    "sectionPlanning": "Planning"
   },
   "onboardingGuide": {
     "title": "Complete your onboarding",
@@ -25,7 +28,12 @@
   "topbar": {
     "changeLanguage": "Change Language",
     "userRole": "HARX Rep",
-    "defaultUser": "User"
+    "defaultUser": "User",
+    "myWallet": "My wallet",
+    "planning": "Planning",
+    "sessions": "Sessions",
+    "sessionPlanning": "Session planning",
+    "callCenterAgent": "Call center agent"
   },
   "dashboard": {
     "stats": {
@@ -223,6 +231,33 @@
   },
   "workspace": {
     "title": "Workspace",
+    "activeGig": "Active gig",
+    "allMyGigs": "All my gigs",
+    "tabLeads": "Leads",
+    "tabCallHistory": "Call history",
+    "tabCockpit": "COCKPIT",
+    "leadsTitle": "Leads",
+    "call": "Call",
+    "details": "Details",
+    "filter": "Filter",
+    "filterAll": "All",
+    "filterCalled": "Called",
+    "filterRdv": "Appt",
+    "filterSigned": "Signed",
+    "noPhone": "No phone",
+    "noEmail": "No email",
+    "alreadySigned": "Already signed",
+    "busy": "Busy",
+    "checkingPermissions": "Checking call permissions…",
+    "cockpitLocked": "COCKPIT locked",
+    "cannotPlaceCalls": "You cannot place calls right now.",
+    "activeReservedWindow": "Active reserved window: {{window}}",
+    "prospectBusy": "Lead busy",
+    "backToLeads": "Back to leads",
+    "noLeadSelected": "No lead selected",
+    "selectLeadHint": "Please select a lead from the Leads tab to start a call.",
+    "viewSignedDetails": "View signed deal details",
+    "leadLockedByOther": "This lead is open in another agent's cockpit",
     "savingCall": {
       "title": "Saving the call…",
       "subtitle": "Hang on a few seconds — we're finalising the recording and preparing the AI analysis.",
@@ -230,7 +265,11 @@
     }
   },
   "sessionPlanning": {
-    "title": "Session Planning"
+    "title": "Session Planning",
+    "selectedProject": "Selected project",
+    "enrolledGig": "Enrolled gig",
+    "chooseProject": "Choose a project…",
+    "selectProjectHint": "Select a project"
   },
   "operations": {
     "title": "Operations Panel",
@@ -910,6 +949,40 @@
       "defaultHint": "Move on to the next step",
       "close": "Close"
     }
+  },
+  "trainingPage": {
+    "title": "Training",
+    "subtitle": "Trainings linked to gigs you are enrolled in, plus journeys your company assigned to you directly.",
+    "myGigsAndPaths": "My gigs & paths",
+    "enrolledGigLabel": "Enrolled gig (Marketplace)",
+    "allEnrolledGigs": "All enrolled gigs",
+    "noEnrolledGigs": "No enrolled gigs",
+    "showingFor": "Showing trainings for:",
+    "noEnrolledGigsHint": "No enrolled gigs from the matching API — check the Marketplace or your connection.",
+    "tabTrainings": "Trainings",
+    "tabCertifications": "Certifications",
+    "progressGig": "Progress (gig trainings)",
+    "loadingForGig": "Loading trainings for this gig…",
+    "loading": "Loading trainings…",
+    "emptyAllTitle": "No trainings found for your enrolled gigs.",
+    "emptyAllDesc": "Enrolling in a gig does not create a training by itself: the company must publish a training for that gig (status active, rehearsal, or completed). The list can stay empty even if the Marketplace shows “Enrolled”.",
+    "emptyGigTitle": "No trainings for this gig yet.",
+    "emptyGigOk": "The training service responded successfully but has no published journeys for this gig. Your org may still be preparing content, the journey may still be in draft, or the journey may be linked to a different gig id than the one in the Marketplace. All journeys linked to this gig are shown, including draft/not published.",
+    "emptyGigNotFound": "The training API returned 404 for GET /training_journeys/gig/:gigId. Deploy the latest training backend or verify API routing and the base URL in VITE_TRAINING_*.",
+    "emptyGigError": "Could not reach the training API for this gig (network error, CORS, or missing auth). Check your connection, sign in again, and confirm VITE_TRAINING_* points at the training service.",
+    "emptyGigRetry": "Select the gig again or refresh the page. If this persists, verify the training API URL and that you are signed in.",
+    "progress": "Progress",
+    "continue": "Continue",
+    "script": "Script",
+    "certificate": "Certificate",
+    "noCertificationsTitle": "No certifications yet",
+    "noCertificationsDesc": "Complete a training at 100% to unlock your certificate. Your certifications will appear here.",
+    "seeMyTrainings": "See my trainings",
+    "certificationsIntro": "Trainings completed at 100%. View or download your certificates.",
+    "validated": "Validated · 100%",
+    "fallbackTitle": "Training",
+    "backToList": "Back to list",
+    "viewCertificate": "View certificate"
   },
   "auth": {
     "verifying": "Verifying authentication..."
