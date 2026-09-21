@@ -340,10 +340,33 @@ export function GigDetails() {
   const { t, i18n } = useTranslation();
   const bonusLang: 'fr' | 'en' = (i18n.language || 'fr').toLowerCase().startsWith('en') ? 'en' : 'fr';
   const dayLabel = (day: string) => {
-    const key = `gigDetails.days.${day}`;
+    const raw = String(day || '').trim();
+    if (!raw) return '';
+    const normalized = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    const aliases: Record<string, string> = {
+      Mon: 'Monday',
+      Tue: 'Tuesday',
+      Wed: 'Wednesday',
+      Thu: 'Thursday',
+      Fri: 'Friday',
+      Sat: 'Saturday',
+      Sun: 'Sunday',
+      Lundi: 'Monday',
+      Mardi: 'Tuesday',
+      Mercredi: 'Wednesday',
+      Jeudi: 'Thursday',
+      Vendredi: 'Friday',
+      Samedi: 'Saturday',
+      Dimanche: 'Sunday',
+    };
+    const enKey = aliases[normalized] || aliases[raw] || normalized;
+    const key = `gigDetails.days.${enKey}`;
     const translated = t(key);
-    return translated === key ? day : translated;
+    return translated === key ? raw : translated;
   };
+
+  const hasHourValue = (v: unknown): boolean =>
+    v !== undefined && v !== null && String(v).trim() !== '';
   const [gig, setGig] = useState<PopulatedGig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1451,11 +1474,10 @@ export function GigDetails() {
                               <span>{bonusPill.primary}</span>
                               <span className="text-[10px] font-black uppercase tracking-widest opacity-95">{t('gigDetails.bonus')}</span>
                             </span>
-                            {bonusPill.secondary && (
-                              <span className="text-[10px] font-semibold uppercase tracking-widest opacity-90 mt-0.5">
-                                {bonusPill.secondary}
-                              </span>
-                            )}
+                            <span className="text-[10px] font-semibold uppercase tracking-widest opacity-90 mt-0.5">
+                              {(bonusPill.secondary || t('gigDetails.bonusPerTransaction'))
+                                .replace(/\b(calls?|appels?)\b/gi, bonusLang === 'fr' ? 'transactions' : 'transactions')}
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1642,42 +1664,19 @@ export function GigDetails() {
               </div>
             )}
 
-            {/* Team Structure */}
-            {gig.team && (gig.team.size || gig.team.territories?.length > 0 || gig.team.structure?.length > 0) && (
+            {/* Team Structure — territories only */}
+            {gig.team?.territories?.length > 0 && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
                 <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.teamStructure')}</h2>
-                <div className="space-y-3">
-                  {gig.team.size && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">{t('gigDetails.teamSize')}</span>
-                      <span className="font-medium">{gig.team.size}</span>
-                    </div>
-                  )}
-                  {gig.team.territories?.length > 0 && (
-                    <div>
-                      <span className="text-gray-600">{t('gigDetails.territories')}</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {gig.team.territories.map((territory, index) => (
-                          <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
-                            {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {gig.team.structure?.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="font-medium text-gray-800 mb-2">{t('gigDetails.teamComposition')}</h3>
-                      <div className="space-y-2">
-                        {gig.team.structure.map((role, index) => (
-                          <div key={index} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
-                            <span>{role.count}x {role.seniority?.level || 'N/A'}</span>
-                            <span className="text-gray-600">{t('gigDetails.yearsExp', { years: role.seniority?.yearsExperience || 'N/A' })}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div>
+                  <span className="text-gray-600">{t('gigDetails.territories')}</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {gig.team.territories.map((territory, index) => (
+                      <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
+                        {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -1708,27 +1707,27 @@ export function GigDetails() {
                 </div>
               )}
 
-              {/* Minimum Hours */}
+              {/* Minimum Hours — show Daily even when value is 0 */}
               {gig.availability?.minimumHours && (
                 <div className="mb-4">
                   <h3 className="font-medium text-gray-800 mb-2">{t('gigDetails.minimumHours')}</h3>
                   <div className="space-y-1 text-sm">
-                    {gig.availability.minimumHours.daily && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">{t('gigDetails.daily')}</span>
-                        <span>{gig.availability.minimumHours.daily}h</span>
+                    {hasHourValue(gig.availability.minimumHours.daily) && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600 shrink-0">{t('gigDetails.daily')}</span>
+                        <span className="font-medium">{gig.availability.minimumHours.daily}h</span>
                       </div>
                     )}
-                    {gig.availability.minimumHours.weekly && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">{t('gigDetails.weekly')}</span>
-                        <span>{gig.availability.minimumHours.weekly}h</span>
+                    {hasHourValue(gig.availability.minimumHours.weekly) && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600 shrink-0">{t('gigDetails.weekly')}</span>
+                        <span className="font-medium">{gig.availability.minimumHours.weekly}h</span>
                       </div>
                     )}
-                    {gig.availability.minimumHours.monthly && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">{t('gigDetails.monthly')}</span>
-                        <span>{gig.availability.minimumHours.monthly}h</span>
+                    {hasHourValue(gig.availability.minimumHours.monthly) && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600 shrink-0">{t('gigDetails.monthly')}</span>
+                        <span className="font-medium">{gig.availability.minimumHours.monthly}h</span>
                       </div>
                     )}
                   </div>
