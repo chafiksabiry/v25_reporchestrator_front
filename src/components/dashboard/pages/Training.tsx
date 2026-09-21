@@ -2425,6 +2425,14 @@ export function Training() {
             const openFormation = () => {
               if (!id) return;
               const slideCount = viewerSlideCountFromJourney(j);
+              // Completed formation → always restart from the beginning.
+              // In progress → resume where the REP left off.
+              if (isCompleted) {
+                setFormationViewerSlideIndex(0);
+                setSelectedJourneyId(id);
+                setActiveSlide(0);
+                return;
+              }
               const fromSummary =
                 slideRow != null &&
                 typeof slideRow.currentSlideIndex === 'number' &&
