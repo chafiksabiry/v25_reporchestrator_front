@@ -1509,7 +1509,10 @@ export function GigDetails() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.technicalSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.technical.map((skill, i) => {
-                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillName =
+                          localizeTaxonomyEntity(skill.skill, taxLang) ||
+                          skill.details ||
+                          t('gigDetails.skill');
                         const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-50 text-harx-600 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1526,7 +1529,10 @@ export function GigDetails() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.professionalSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.professional.map((skill, i) => {
-                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillName =
+                          localizeTaxonomyEntity(skill.skill, taxLang) ||
+                          skill.details ||
+                          t('gigDetails.skill');
                         const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1543,7 +1549,10 @@ export function GigDetails() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.softSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.soft.map((skill, i) => {
-                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillName =
+                          localizeTaxonomyEntity(skill.skill, taxLang) ||
+                          skill.details ||
+                          t('gigDetails.skill');
                         const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-alt-100/50 text-harx-alt-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1560,7 +1569,10 @@ export function GigDetails() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.languages')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.languages.map((lang, i) => {
-                        const langName = lang.language?.name || lang.iso639_1?.toUpperCase() || t('gigDetails.language');
+                        const langName =
+                          localizeTaxonomyEntity(lang.language, taxLang) ||
+                          lang.iso639_1?.toUpperCase() ||
+                          t('gigDetails.language');
                         const proficiency = lang.proficiency || 'N/A';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black uppercase tracking-wider">
