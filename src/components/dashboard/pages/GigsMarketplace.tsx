@@ -15,6 +15,11 @@ import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import {
+  gigTaxonomyLocale,
+  localizeTaxonomyEntity,
+  localizeTaxonomyName,
+} from '../../../utils/taxonomyI18n';
 
 /** Shared purple Details CTA (available / enrolled / favorites / invites / pending). */
 const DETAILS_BTN_CLASS =
@@ -250,6 +255,7 @@ interface PopulatedGig {
   activities: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -259,6 +265,7 @@ interface PopulatedGig {
   industries: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -500,12 +507,22 @@ export function GigsMarketplace() {
   const navigate = useNavigate();
   const agentId = getAgentId();
 
-  const taxonomyLabel = (raw: string | undefined | null): string => {
+  const taxonomyLabel = (raw: string | undefined | null, gig?: any): string => {
     const name = String(raw || '').trim();
     if (!name) return '';
+    const lang = gigTaxonomyLocale(gig, i18n.language);
+    const fromDb = localizeTaxonomyName(name, lang);
+    if (fromDb && fromDb !== name) return fromDb;
     const key = `gigsMarketplace.taxonomy.${name}`;
     const translated = t(key);
-    return translated === key ? name : translated;
+    if (translated !== key) return translated;
+    return fromDb || name;
+  };
+
+  const taxonomyEntityLabel = (entity: any, gig?: any): string => {
+    if (!entity) return '';
+    const lang = gigTaxonomyLocale(gig, i18n.language);
+    return localizeTaxonomyEntity(entity, lang) || taxonomyLabel(entity.name, gig);
   };
 
   const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
@@ -2090,7 +2107,7 @@ export function GigsMarketplace() {
                       {gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                      {taxonomyLabel(gig.category)}
+                      {taxonomyLabel(gig.category, gig)}
                     </p>
                     {/* Commission pills — hero visuel */}
                     {renderCommissionInfo(gig, isFrMarket)}
@@ -2119,7 +2136,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-wrap gap-1">
                           {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                             <span key={industry._id} className="px-2 py-1 bg-harx-alt-100/50 rounded-lg text-[10px] font-bold text-harx-alt-700">
-                              {taxonomyLabel(industry.name)}
+                              {taxonomyEntityLabel(industry, gig)}
                             </span>
                           ))}
                           {gig.industries.length > 3 && (
@@ -2145,7 +2162,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-wrap gap-1">
                           {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                             <span key={activity._id} className="px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700">
-                              {taxonomyLabel(activity.name)}
+                              {taxonomyEntityLabel(activity, gig)}
                             </span>
                           ))}
                           {gig.activities.length > 3 && (
@@ -2353,7 +2370,7 @@ export function GigsMarketplace() {
                           {gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {taxonomyLabel(gig.category)}
+                          {taxonomyLabel(gig.category, gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(gig, isFrMarket)}
@@ -2382,7 +2399,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {taxonomyLabel(industry.name)}
+                                  {taxonomyEntityLabel(industry, gig)}
                                 </span>
                               ))}
                               {gig.industries.length > 3 && (
@@ -2408,7 +2425,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {taxonomyLabel(activity.name)}
+                                  {taxonomyEntityLabel(activity, gig)}
                                 </span>
                               ))}
                               {gig.activities.length > 3 && (
@@ -2547,7 +2564,7 @@ export function GigsMarketplace() {
                           {enrollment.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {taxonomyLabel(enrollment.gig.category)}
+                          {taxonomyLabel(enrollment.gig.category, enrollment.gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(enrollment.gig, isFrMarket)}
@@ -2576,7 +2593,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrollment.gig._id] ? enrollment.gig.industries : enrollment.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {taxonomyLabel(industry.name)}
+                                  {taxonomyEntityLabel(industry, enrollment.gig)}
                                 </span>
                               ))}
                               {enrollment.gig.industries.length > 3 && (
@@ -2602,7 +2619,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrollment.gig._id] ? enrollment.gig.activities : enrollment.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {taxonomyLabel(activity.name)}
+                                  {taxonomyEntityLabel(activity, enrollment.gig)}
                                 </span>
                               ))}
                               {enrollment.gig.activities.length > 3 && (
@@ -2749,7 +2766,7 @@ export function GigsMarketplace() {
                       {requestedGig.gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider ${gigStyle.category} mb-3`}>
-                      {taxonomyLabel(requestedGig.gig.category)}
+                      {taxonomyLabel(requestedGig.gig.category, requestedGig.gig)}
                     </p>
 
                     {renderCommissionInfo(requestedGig.gig, isFrMarket)}
@@ -2868,7 +2885,7 @@ export function GigsMarketplace() {
                           {enrolledGig.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {taxonomyLabel(enrolledGig.gig.category)}
+                          {taxonomyLabel(enrolledGig.gig.category, enrolledGig.gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(enrolledGig.gig, isFrMarket)}
@@ -2897,7 +2914,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrolledGig.gig._id] ? enrolledGig.gig.industries : enrolledGig.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {taxonomyLabel(industry.name)}
+                                  {taxonomyEntityLabel(industry, enrolledGig.gig)}
                                 </span>
                               ))}
                               {enrolledGig.gig.industries.length > 3 && (
@@ -2923,7 +2940,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrolledGig.gig._id] ? enrolledGig.gig.activities : enrolledGig.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {taxonomyLabel(activity.name)}
+                                  {taxonomyEntityLabel(activity, enrolledGig.gig)}
                                 </span>
                               ))}
                               {enrolledGig.gig.activities.length > 3 && (
