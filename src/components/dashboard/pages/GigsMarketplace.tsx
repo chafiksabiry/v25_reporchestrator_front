@@ -106,7 +106,7 @@ const renderCommissionInfo = (gig: any, isFr: boolean) => {
           <Briefcase className="w-3.5 h-3.5 fill-white animate-float" />
           <div className="flex flex-col leading-none">
             <span className="font-black text-xs">{transType === '%' ? transDisplay : `${transDisplay}${currencySymbol}`}</span>
-            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ {transType === '%' ? 'Transaction' : transType}</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ {transType === '%' ? '%' : (isFr ? 'transaction' : 'transaction')}</span>
           </div>
         </div>
       )}
@@ -487,6 +487,14 @@ export function GigsMarketplace() {
   const isFrMarket = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
   const agentId = getAgentId();
+
+  const taxonomyLabel = (raw: string | undefined | null): string => {
+    const name = String(raw || '').trim();
+    if (!name) return '';
+    const key = `gigsMarketplace.taxonomy.${name}`;
+    const translated = t(key);
+    return translated === key ? name : translated;
+  };
 
   const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
@@ -2070,7 +2078,7 @@ export function GigsMarketplace() {
                       {gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                      {gig.category}
+                      {taxonomyLabel(gig.category)}
                     </p>
                     {/* Commission pills — hero visuel */}
                     {renderCommissionInfo(gig, isFrMarket)}
@@ -2099,7 +2107,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-wrap gap-1">
                           {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                             <span key={industry._id} className="px-2 py-1 bg-harx-alt-100/50 rounded-lg text-[10px] font-bold text-harx-alt-700">
-                              {industry.name}
+                              {taxonomyLabel(industry.name)}
                             </span>
                           ))}
                           {gig.industries.length > 3 && (
@@ -2125,7 +2133,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-wrap gap-1">
                           {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                             <span key={activity._id} className="px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700">
-                              {activity.name}
+                              {taxonomyLabel(activity.name)}
                             </span>
                           ))}
                           {gig.activities.length > 3 && (
@@ -2154,7 +2162,7 @@ export function GigsMarketplace() {
                           className="flex-[2] bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
                         >
                           <Play className="w-4 h-4 fill-current" />
-                          <span>START</span>
+                          <span>{t('gigsMarketplace.startSession')}</span>
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
@@ -2183,7 +2191,7 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <Check className="w-4 h-4" strokeWidth={3} />
-                                <span>Accept</span>
+                                <span>{t('gigsMarketplace.accept')}</span>
                               </>
                             )}
                           </button>
@@ -2204,7 +2212,7 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <X className="w-4 h-4" strokeWidth={3} />
-                                <span>Decline</span>
+                                <span>{t('gigsMarketplace.reject')}</span>
                               </>
                             )}
                           </button>
@@ -2213,7 +2221,7 @@ export function GigsMarketplace() {
                           onClick={() => navigate(`/gig/${gig._id}`)}
                           className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
-                          View Details
+                          {t('gigsMarketplace.viewDetails')}
                         </button>
                       </div>
                     ) : (
@@ -2315,7 +2323,7 @@ export function GigsMarketplace() {
                           {gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {gig.category}
+                          {taxonomyLabel(gig.category)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(gig, isFrMarket)}
@@ -2344,7 +2352,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyLabel(industry.name)}
                                 </span>
                               ))}
                               {gig.industries.length > 3 && (
@@ -2370,7 +2378,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyLabel(activity.name)}
                                 </span>
                               ))}
                               {gig.activities.length > 3 && (
@@ -2396,7 +2404,7 @@ export function GigsMarketplace() {
                       >
                         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
                         <Sparkles className="w-4 h-4" />
-                        <span>View Details</span>
+                        <span>{t('gigsMarketplace.viewDetails')}</span>
                       </button>
                     </div>
                   );
@@ -2493,7 +2501,7 @@ export function GigsMarketplace() {
                           {enrollment.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {enrollment.gig.category}
+                          {taxonomyLabel(enrollment.gig.category)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(enrollment.gig, isFrMarket)}
@@ -2522,7 +2530,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrollment.gig._id] ? enrollment.gig.industries : enrollment.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyLabel(industry.name)}
                                 </span>
                               ))}
                               {enrollment.gig.industries.length > 3 && (
@@ -2548,7 +2556,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrollment.gig._id] ? enrollment.gig.activities : enrollment.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyLabel(activity.name)}
                                 </span>
                               ))}
                               {enrollment.gig.activities.length > 3 && (
@@ -2587,7 +2595,7 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <Check className="w-4 h-4" strokeWidth={3} />
-                                <span>Accept</span>
+                                <span>{t('gigsMarketplace.accept')}</span>
                               </>
                             )}
                           </button>
@@ -2608,7 +2616,7 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <X className="w-4 h-4" strokeWidth={3} />
-                                <span>Decline</span>
+                                <span>{t('gigsMarketplace.reject')}</span>
                               </>
                             )}
                           </button>
@@ -2617,7 +2625,7 @@ export function GigsMarketplace() {
                           onClick={() => navigate(`/gig/${enrollment.gig._id}`)}
                           className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
-                          View Details
+                          {t('gigsMarketplace.viewDetails')}
                         </button>
                       </div>
                     </div>
@@ -2695,7 +2703,7 @@ export function GigsMarketplace() {
                       {requestedGig.gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider ${gigStyle.category} mb-3`}>
-                      {requestedGig.gig.category}
+                      {taxonomyLabel(requestedGig.gig.category)}
                     </p>
 
                     {renderCommissionInfo(requestedGig.gig, isFrMarket)}
@@ -2814,7 +2822,7 @@ export function GigsMarketplace() {
                           {enrolledGig.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {enrolledGig.gig.category}
+                          {taxonomyLabel(enrolledGig.gig.category)}
                         </p>
                         {/* Commission pills — hero visuel */}
                         {renderCommissionInfo(enrolledGig.gig, isFrMarket)}
@@ -2843,7 +2851,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrolledGig.gig._id] ? enrolledGig.gig.industries : enrolledGig.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyLabel(industry.name)}
                                 </span>
                               ))}
                               {enrolledGig.gig.industries.length > 3 && (
@@ -2869,7 +2877,7 @@ export function GigsMarketplace() {
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrolledGig.gig._id] ? enrolledGig.gig.activities : enrolledGig.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyLabel(activity.name)}
                                 </span>
                               ))}
                               {enrolledGig.gig.activities.length > 3 && (

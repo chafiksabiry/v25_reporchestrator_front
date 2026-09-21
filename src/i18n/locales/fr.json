@@ -296,17 +296,28 @@
     "less": "Moins",
     "details": "Détails",
     "detailsUpper": "DÉTAILS",
-    "viewDetails": "VOIR DÉTAILS",
+    "viewDetails": "Voir détails",
     "startSession": "Commencer",
     "applyNow": "Postuler",
     "applying": "Candidature…",
     "enrolledBadge": "Inscrite",
     "invitedBadge": "Invité",
     "pendingBadge": "En attente",
+    "accept": "Accepter",
+    "reject": "Refuser",
     "remote": "Distant",
     "noFavoritesYet": "Aucun favori pour le moment",
     "enrolledEmptyTitle": "Prêt à commencer ?",
-    "enrolledEmptyDesc": "Acceptez une invitation ou postulez à un gig pour voir vos projets actifs ici."
+    "enrolledEmptyDesc": "Acceptez une invitation ou postulez à un gig pour voir vos projets actifs ici.",
+    "taxonomy": {
+      "Insurance": "Assurance",
+      "Customer Relations & Support": "Relation client & Support",
+      "Prospecting & Acquisition": "Prospection & Acquisition",
+      "Advisory & Pre-sales": "Conseil & Avant-vente",
+      "FOLLOW-UP CALLS": "Appels de suivi",
+      "Follow-up Calls": "Appels de suivi",
+      "Collections": "Recouvrement"
+    }
   },
   "profile": {
     "page": {
