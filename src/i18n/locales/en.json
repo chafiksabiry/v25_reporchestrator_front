@@ -284,8 +284,29 @@
       "available": "Available",
       "enrolled": "Enrolled",
       "favorite": "Favorite",
-      "invited": "Invited"
-    }
+      "invited": "Invited",
+      "requested": "Requested"
+    },
+    "hoursPerWeek": "{{hours}}h/wk",
+    "hoursNA": "N/A h/wk",
+    "industries": "Industries:",
+    "activities": "Activities:",
+    "showLess": "Show less",
+    "more": "+{{count}} more",
+    "less": "Less",
+    "details": "Details",
+    "detailsUpper": "DETAILS",
+    "viewDetails": "VIEW DETAILS",
+    "startSession": "START SESSION",
+    "applyNow": "Apply Now",
+    "applying": "Applying…",
+    "enrolledBadge": "Enrolled",
+    "invitedBadge": "Invited",
+    "pendingBadge": "Pending",
+    "remote": "Remote",
+    "noFavoritesYet": "No Favorites Yet",
+    "enrolledEmptyTitle": "Ready to Start?",
+    "enrolledEmptyDesc": "Accept an invitation or apply to a gig to see your active projects here."
   },
   "profile": {
     "page": {

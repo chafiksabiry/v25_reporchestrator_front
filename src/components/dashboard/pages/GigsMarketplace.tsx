@@ -16,7 +16,7 @@ import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay'
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 
-const renderCommissionInfo = (gig: any) => {
+const renderCommissionInfo = (gig: any, isFr: boolean) => {
   if (!gig || !gig.commission) return null;
   const comm = gig.commission as GigCommissionExtended;
   const currencySymbol = typeof comm.currency === 'object' ? comm.currency?.symbol || '€' : comm.currency || '€';
@@ -53,20 +53,19 @@ const renderCommissionInfo = (gig: any) => {
 
   let bonusConditionStr = '';
   if (comm.minimumVolume?.amount) {
-    const unit = String(comm.minimumVolume?.unit || '').toUpperCase();
-    const translatedUnit = unit === 'CALLS' || unit === 'APPELS' ? 'APPELS' :
-      unit === 'TRANSACTIONS' ? 'TRANSACTIONS' :
-        unit === 'SALES' || unit === 'VENTES' ? 'VENTES' : unit;
-    bonusConditionStr = `POUR ${comm.minimumVolume.amount} ${translatedUnit}`;
+    // Bonus threshold is always shown as transactions (never calls).
+    bonusConditionStr = isFr
+      ? `POUR ${comm.minimumVolume.amount} TRANSACTIONS`
+      : `FOR ${comm.minimumVolume.amount} TRANSACTIONS`;
   }
 
   const bonusPeriodRaw = comm.bonusPeriod || comm.bonusType || comm.minimumVolume?.period || '';
   let bonusPeriodStr = 'BONUS';
   if (bonusPeriodRaw) {
     const p = String(bonusPeriodRaw).toLowerCase();
-    if (p.includes('month') || p.includes('mois')) bonusPeriodStr = 'BONUS / MOIS';
-    else if (p.includes('week') || p.includes('semaine')) bonusPeriodStr = 'BONUS / SEMAINE';
-    else if (p.includes('day') || p.includes('jour')) bonusPeriodStr = 'BONUS / JOUR';
+    if (p.includes('month') || p.includes('mois')) bonusPeriodStr = isFr ? 'BONUS / MOIS' : 'BONUS / MONTH';
+    else if (p.includes('week') || p.includes('semaine')) bonusPeriodStr = isFr ? 'BONUS / SEMAINE' : 'BONUS / WEEK';
+    else if (p.includes('day') || p.includes('jour')) bonusPeriodStr = isFr ? 'BONUS / JOUR' : 'BONUS / DAY';
     else bonusPeriodStr = `BONUS / ${bonusPeriodRaw}`.toUpperCase();
   }
 
@@ -97,7 +96,7 @@ const renderCommissionInfo = (gig: any) => {
           <Phone className="w-3.5 h-4 fill-white animate-float" />
           <div className="flex flex-col leading-none">
             <span className="font-black text-xs">{perCall}{currencySymbol}</span>
-            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ appel</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">{isFr ? '/ appel' : '/ call'}</span>
           </div>
         </div>
       )}
@@ -2030,14 +2029,14 @@ export function GigsMarketplace() {
                             : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)] animate-pulse-ring cursor-pointer'
                             }`}
                         >
-                          {applyingGigId === gig._id ? '⏳ Applying...' : '🚀 Apply Now'}
+                          {applyingGigId === gig._id ? `⏳ ${t('gigsMarketplace.applying')}` : `🚀 ${t('gigsMarketplace.applyNow')}`}
                         </button>
                       ) : (
                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
                           gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
                             'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
                           }`}>
-                          {gigStatus === 'enrolled' ? '✓ Enrolled' : gigStatus === 'invited' ? '✉ Invited' : '⌛ Pending'}
+                          {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
                         </span>
                       )}
 
@@ -2074,7 +2073,7 @@ export function GigsMarketplace() {
                       {gig.category}
                     </p>
                     {/* Commission pills — hero visuel */}
-                    {renderCommissionInfo(gig)}
+                    {renderCommissionInfo(gig, isFrMarket)}
                   </div>
 
                   <div className="mt-1 space-y-2">
@@ -2082,12 +2081,12 @@ export function GigsMarketplace() {
                     <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                       <div className="flex items-center gap-1 shrink-0">
                         <Globe className="w-3 h-3 opacity-70" />
-                        <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || 'Remote' : gig.destination_zone || 'Remote'}</span>
+                        <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : gig.destination_zone || t('gigsMarketplace.remote')}</span>
                       </div>
                       <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                       <div className="flex items-center gap-1 shrink-0">
                         <Calendar className="w-3 h-3 opacity-70" />
-                        <span>{gig.availability?.minimumHours?.weekly || 'N/A'}h/wk</span>
+                        <span>{gig.availability?.minimumHours?.weekly != null ? t('gigsMarketplace.hoursPerWeek', { hours: gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                       </div>
                     </div>
                   </div>
@@ -2096,7 +2095,7 @@ export function GigsMarketplace() {
                     {/* Industries */}
                     {gig.industries && gig.industries.length > 0 && (
                       <div className="mb-4">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Industries:</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{t('gigsMarketplace.industries')}</p>
                         <div className="flex flex-wrap gap-1">
                           {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                             <span key={industry._id} className="px-2 py-1 bg-harx-alt-100/50 rounded-lg text-[10px] font-bold text-harx-alt-700">
@@ -2112,7 +2111,7 @@ export function GigsMarketplace() {
                               }}
                               className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs text-gray-600 transition-colors cursor-pointer"
                             >
-                              {expandedIndustries[gig._id] ? 'Show less' : `+${gig.industries.length - 3} more`}
+                              {expandedIndustries[gig._id] ? t('gigsMarketplace.showLess') : t('gigsMarketplace.more', { count: gig.industries.length - 3 })}
                             </button>
                           )}
                         </div>
@@ -2122,7 +2121,7 @@ export function GigsMarketplace() {
                     {/* Activities */}
                     {gig.activities && gig.activities.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Activities:</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{t('gigsMarketplace.activities')}</p>
                         <div className="flex flex-wrap gap-1">
                           {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                             <span key={activity._id} className="px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700">
@@ -2138,7 +2137,7 @@ export function GigsMarketplace() {
                               }}
                               className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs text-gray-600 transition-colors cursor-pointer"
                             >
-                              {expandedActivities[gig._id] ? 'Show less' : `+${gig.activities.length - 3} more`}
+                              {expandedActivities[gig._id] ? t('gigsMarketplace.showLess') : t('gigsMarketplace.more', { count: gig.activities.length - 3 })}
                             </button>
                           )}
                         </div>
@@ -2161,7 +2160,7 @@ export function GigsMarketplace() {
                           onClick={() => navigate(`/gig/${gig._id}`)}
                           className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
-                          DETAILS
+                          {t('gigsMarketplace.detailsUpper')}
                         </button>
                       </div>
                     ) : gigStatus === 'invited' ? (
@@ -2224,7 +2223,7 @@ export function GigsMarketplace() {
                       >
                         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
                         <Sparkles className="w-4 h-4" />
-                        <span>VIEW DETAILS</span>
+                        <span>{t('gigsMarketplace.viewDetails')}</span>
                       </button>
                     )}
                   </div>
@@ -2244,7 +2243,7 @@ export function GigsMarketplace() {
               <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">❤️</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  No Favorites Yet
+                  {t('gigsMarketplace.noFavoritesYet')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
                   Love a gig? Click the heart icon to save it here for later.
@@ -2290,7 +2289,7 @@ export function GigsMarketplace() {
                         </button>
                         <div className="flex items-center space-x-2">
                           <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)]">
-                            🚀 Apply Now
+                            🚀 {t('gigsMarketplace.applyNow')}
                           </span>
                           <button
                             onClick={(e) => {
@@ -2319,7 +2318,7 @@ export function GigsMarketplace() {
                           {gig.category}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(gig)}
+                        {renderCommissionInfo(gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2327,12 +2326,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || 'Remote' : gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{gig.availability?.minimumHours?.weekly || 'N/A'}h/wk</span>
+                            <span>{gig.availability?.minimumHours?.weekly != null ? t('gigsMarketplace.hoursPerWeek', { hours: gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2341,7 +2340,7 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {gig.industries && gig.industries.length > 0 && (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
@@ -2357,7 +2356,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[gig._id] ? 'Less' : `+${gig.industries.length - 3}`}
+                                  {expandedIndustries[gig._id] ? t('gigsMarketplace.less') : `+${gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2367,7 +2366,7 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {gig.activities && gig.activities.length > 0 && (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
@@ -2383,7 +2382,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[gig._id] ? 'Less' : `+${gig.activities.length - 3}`}
+                                  {expandedActivities[gig._id] ? t('gigsMarketplace.less') : `+${gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2462,7 +2461,7 @@ export function GigsMarketplace() {
                         </button>
                         <div className="flex items-center space-x-1">
                           <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-600 text-white border border-indigo-400 shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)]">
-                            ✉ Invited
+                            ✉ {t('gigsMarketplace.invitedBadge')}
                           </span>
                           <button
                             onClick={(e) => {
@@ -2497,7 +2496,7 @@ export function GigsMarketplace() {
                           {enrollment.gig.category}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(enrollment.gig)}
+                        {renderCommissionInfo(enrollment.gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2505,12 +2504,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof enrollment.gig.destination_zone === 'object' ? enrollment.gig.destination_zone?.name?.common || enrollment.gig.destination_zone?.cca2 || 'Remote' : enrollment.gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof enrollment.gig.destination_zone === 'object' ? enrollment.gig.destination_zone?.name?.common || enrollment.gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : enrollment.gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{('availability' in enrollment.gig && enrollment.gig.availability?.minimumHours?.weekly) ? `${enrollment.gig.availability.minimumHours.weekly}h/wk` : 'N/A h/wk'}</span>
+                            <span>{('availability' in enrollment.gig && enrollment.gig.availability?.minimumHours?.weekly != null) ? t('gigsMarketplace.hoursPerWeek', { hours: enrollment.gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2519,7 +2518,7 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {('industries' in enrollment.gig && enrollment.gig.industries && enrollment.gig.industries.length > 0) ? (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrollment.gig._id] ? enrollment.gig.industries : enrollment.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
@@ -2535,7 +2534,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[enrollment.gig._id] ? 'Less' : `+${enrollment.gig.industries.length - 3}`}
+                                  {expandedIndustries[enrollment.gig._id] ? t('gigsMarketplace.less') : `+${enrollment.gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2545,7 +2544,7 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {('activities' in enrollment.gig && enrollment.gig.activities && enrollment.gig.activities.length > 0) ? (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrollment.gig._id] ? enrollment.gig.activities : enrollment.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
@@ -2561,7 +2560,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[enrollment.gig._id] ? 'Less' : `+${enrollment.gig.activities.length - 3}`}
+                                  {expandedActivities[enrollment.gig._id] ? t('gigsMarketplace.less') : `+${enrollment.gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2699,7 +2698,7 @@ export function GigsMarketplace() {
                       {requestedGig.gig.category}
                     </p>
 
-                    {renderCommissionInfo(requestedGig.gig)}
+                    {renderCommissionInfo(requestedGig.gig, isFrMarket)}
 
                     <p className="mt-3 text-[11px] text-amber-700 font-medium bg-amber-50/80 border border-amber-100 rounded-xl px-3 py-2">
                       {isFrMarket
@@ -2742,10 +2741,10 @@ export function GigsMarketplace() {
               <div className="bg-emerald-50/50 rounded-3xl p-12 max-w-sm w-full border border-emerald-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">🚀</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  Ready to Start?
+                  {t('gigsMarketplace.enrolledEmptyTitle')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Accept an invitation or apply to a gig to see your active projects here.
+                  {t('gigsMarketplace.enrolledEmptyDesc')}
                 </p>
               </div>
             </div>
@@ -2782,7 +2781,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
                           <div className="flex items-center space-x-1">
                             <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-400 shadow-[0_2px_10px_-2px_rgba(16,185,129,0.4)]">
-                              ✓ Enrolled
+                              ✓ {t('gigsMarketplace.enrolledBadge')}
                             </span>
                             <button
                               onClick={(e) => {
@@ -2818,7 +2817,7 @@ export function GigsMarketplace() {
                           {enrolledGig.gig.category}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(enrolledGig.gig)}
+                        {renderCommissionInfo(enrolledGig.gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2826,12 +2825,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof enrolledGig.gig.destination_zone === 'object' ? enrolledGig.gig.destination_zone?.name?.common || enrolledGig.gig.destination_zone?.cca2 || 'Remote' : enrolledGig.gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof enrolledGig.gig.destination_zone === 'object' ? enrolledGig.gig.destination_zone?.name?.common || enrolledGig.gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : enrolledGig.gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{('availability' in enrolledGig.gig && enrolledGig.gig.availability?.minimumHours?.weekly) ? `${enrolledGig.gig.availability.minimumHours.weekly}h/wk` : 'N/A h/wk'}</span>
+                            <span>{('availability' in enrolledGig.gig && enrolledGig.gig.availability?.minimumHours?.weekly != null) ? t('gigsMarketplace.hoursPerWeek', { hours: enrolledGig.gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2840,7 +2839,7 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {('industries' in enrolledGig.gig && enrolledGig.gig.industries && enrolledGig.gig.industries.length > 0) ? (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrolledGig.gig._id] ? enrolledGig.gig.industries : enrolledGig.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
@@ -2856,7 +2855,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[enrolledGig.gig._id] ? 'Less' : `+${enrolledGig.gig.industries.length - 3}`}
+                                  {expandedIndustries[enrolledGig.gig._id] ? t('gigsMarketplace.less') : `+${enrolledGig.gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2866,7 +2865,7 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {('activities' in enrolledGig.gig && enrolledGig.gig.activities && enrolledGig.gig.activities.length > 0) ? (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrolledGig.gig._id] ? enrolledGig.gig.activities : enrolledGig.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
@@ -2882,7 +2881,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[enrolledGig.gig._id] ? 'Less' : `+${enrolledGig.gig.activities.length - 3}`}
+                                  {expandedActivities[enrolledGig.gig._id] ? t('gigsMarketplace.less') : `+${enrolledGig.gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2930,13 +2929,13 @@ export function GigsMarketplace() {
                           <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
                             <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[7px] border-l-white border-b-[4px] border-b-transparent ml-0.5" />
                           </div>
-                          <span>START SESSION</span>
+                          <span>{t('gigsMarketplace.startSession')}</span>
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${enrolledGig.gig._id}`)}
                           className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
                         >
-                          Details
+                          {t('gigsMarketplace.details')}
                         </button>
                       </div>
                     </div>
