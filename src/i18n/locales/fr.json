@@ -3,6 +3,7 @@
     "dashboard": "Tableau de Bord",
     "profile": "Profil",
     "marketplace": "Gigs",
+    "gigsInfo": "Les GIGS sont les missions postées par la COMPANY",
     "calls": "Appels",
     "training": "HARX Academy",
     "workspace": "Espace de Travail",
@@ -276,7 +277,7 @@
     "emergencyShutdown": "Arrêt d'urgence"
   },
   "gigsMarketplace": {
-    "title": "Place de Marché des Gigs",
+    "title": "MARKETPLACE",
     "tabs": {
       "available": "Disponibles",
       "enrolled": "Inscrites",

@@ -1840,7 +1840,7 @@ export function GigsMarketplace() {
                 <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
-                    {isFrMarket ? 'Étape 5 · Place de marché' : 'Step 5 · Marketplace'}
+                    {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
                   </p>
                   <p className="text-sm font-black text-yellow-800 mt-0.5">
                     {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
@@ -3010,7 +3010,7 @@ export function GigsMarketplace() {
           title={
             hasMarketplaceGigEngagement
               ? (isFrMarket ? 'Publier mon profil' : 'Publish my profile')
-              : (isFrMarket ? 'Place de marché' : 'Marketplace')
+              : 'MARKETPLACE'
           }
           hint={
             hasMarketplaceGigEngagement
