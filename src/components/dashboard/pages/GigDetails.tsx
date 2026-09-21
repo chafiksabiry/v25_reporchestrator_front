@@ -1673,26 +1673,55 @@ export function GigDetails() {
               </div>
             )}
 
-            {/* Team Structure — size + territories (no composition) */}
+            {/* Team Structure — compact size + territories */}
             {gig.team && (gig.team.size || gig.team.territories?.length > 0) && (
-              <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.teamStructure')}</h2>
-                <div className="space-y-3">
+              <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+                <h2 className="text-xl font-black text-gray-900 mb-5 tracking-tight">{t('gigDetails.teamStructure')}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {gig.team.size != null && String(gig.team.size).trim() !== '' && (
-                    <div className="flex justify-between gap-4">
-                      <span className="text-gray-600">{t('gigDetails.teamSize')}</span>
-                      <span className="font-medium">{gig.team.size}</span>
+                    <div className="flex items-center gap-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 px-4 py-3.5">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-500/25">
+                        <Users className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                          {t('gigDetails.teamSize').replace(/\s*:?\s*$/, '')}
+                        </p>
+                        <p className="text-2xl font-black tabular-nums text-indigo-950 leading-tight">
+                          {gig.team.size}
+                        </p>
+                      </div>
                     </div>
                   )}
                   {gig.team.territories?.length > 0 && (
-                    <div>
-                      <span className="text-gray-600">{t('gigDetails.territories')}</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {gig.team.territories.map((territory, index) => (
-                          <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
-                            {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
-                          </span>
-                        ))}
+                    <div className="flex flex-col justify-center gap-2 rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-pink-50 px-4 py-3.5 sm:col-span-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-500/30">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">
+                          {t('gigDetails.territories').replace(/\s*:?\s*$/, '')}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {gig.team.territories.map((territory, index) => {
+                          const label =
+                            typeof territory === 'object'
+                              ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown')
+                              : territory;
+                          const flag = typeof territory === 'object' ? territory?.flags?.png : undefined;
+                          return (
+                            <span
+                              key={index}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 border border-rose-100 text-[10px] font-black uppercase tracking-wider text-rose-700 shadow-sm"
+                            >
+                              {flag ? (
+                                <img src={flag} alt="" className="h-3 w-4 rounded-[2px] object-cover" />
+                              ) : null}
+                              {label}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
