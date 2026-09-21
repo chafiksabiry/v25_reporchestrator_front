@@ -10,6 +10,11 @@ import { resolveGigStartRoute } from '../../../utils/gigStartRouting';
 import { getBonusPillDisplay, getTransactionPillDisplay, getResolvedAgentFacing, type GigCommissionExtended, type AgentFacingCommissionBlock } from '../../../utils/gigCommissionDisplay';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import {
+  gigTaxonomyLocale,
+  localizeTaxonomyEntity,
+  localizeTaxonomyName,
+} from '../../../utils/taxonomyI18n';
 
 // Interface pour les gigs populés (même que dans GigsMarketplace)
 interface PopulatedGig {
@@ -106,6 +111,7 @@ interface PopulatedGig {
   activities: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -115,6 +121,7 @@ interface PopulatedGig {
   industries: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -330,8 +337,13 @@ interface LeadsResponse {
 export function GigDetails() {
   const { gigId } = useParams<{ gigId: string }>();
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const bonusLang: 'fr' | 'en' = (i18n.language || 'fr').toLowerCase().startsWith('en') ? 'en' : 'fr';
+  const dayLabel = (day: string) => {
+    const key = `gigDetails.days.${day}`;
+    const translated = t(key);
+    return translated === key ? day : translated;
+  };
   const [gig, setGig] = useState<PopulatedGig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -911,13 +923,13 @@ export function GigDetails() {
 
     if (!agentId || !token) {
       setApplicationStatus('error');
-      setApplicationMessage('You must be logged in to apply');
+      setApplicationMessage(t('gigDetails.mustBeLoggedIn'));
       return;
     }
 
     if (!gigId) {
       setApplicationStatus('error');
-      setApplicationMessage('Gig ID not found');
+      setApplicationMessage(t('gigDetails.gigIdMissing'));
       return;
     }
 
@@ -953,7 +965,7 @@ export function GigDetails() {
         if (response.status === 400 && errorText.includes('Cannot request enrollment for this gig at this time')) {
           console.log('⏳ Gig is already pending, refreshing enrollment status...');
           setApplicationStatus('idle');
-          setApplicationMessage('This gig is already pending. Refreshing status...');
+          setApplicationMessage(t('gigDetails.alreadyPendingRefresh'));
 
           // Rafraîchir le statut d'enrollment après un court délai
           setTimeout(() => {
@@ -989,12 +1001,12 @@ export function GigDetails() {
                       console.log('⏳ Found pending enrollment, updating status');
                       setPendingGigIds(prev => [...prev, gigId!]);
                       setApplicationStatus('success');
-                      setApplicationMessage('Status updated: This gig is already pending');
+                      setApplicationMessage(t('gigDetails.statusAlreadyPending'));
                     } else if (enrollmentForThisGig.status === 'accepted' || enrollmentForThisGig.status === 'enrolled') {
                       console.log('✅ Found accepted enrollment, updating status');
                       setEnrolledGigIds(prev => [...prev, gigId!]);
                       setApplicationStatus('success');
-                      setApplicationMessage('Status updated: You are now enrolled in this gig');
+                      setApplicationMessage(t('gigDetails.statusNowEnrolled'));
                     }
                   } else {
                     console.log('ℹ️ No enrollment found for this gig');
@@ -1020,7 +1032,7 @@ export function GigDetails() {
       console.log('✅ Application successful:', data);
 
       setApplicationStatus('success');
-      setApplicationMessage(data.message || 'Application sent successfully!');
+      setApplicationMessage(data.message || t('gigDetails.applicationSent'));
 
       // Mise à jour optimiste pour affichage immédiat
       setPendingGigIds(prev => [...prev, gigId!]);
@@ -1031,7 +1043,7 @@ export function GigDetails() {
     } catch (err) {
       console.error('❌ Error applying to gig:', err);
       setApplicationStatus('error');
-      setApplicationMessage(err instanceof Error ? err.message : 'Error during application');
+      setApplicationMessage(err instanceof Error ? err.message : t('gigDetails.applicationError'));
     } finally {
       setApplying(false);
     }
@@ -1043,12 +1055,12 @@ export function GigDetails() {
 
     if (!invitationId) {
       setApplicationStatus('error');
-      setApplicationMessage('Invitation introuvable. Veuillez rafraîchir la page.');
+      setApplicationMessage(t('gigDetails.invitationNotFound'));
       return;
     }
     if (!token) {
       setApplicationStatus('error');
-      setApplicationMessage('Vous devez être connecté pour répondre à l\'invitation');
+      setApplicationMessage(t('gigDetails.mustBeLoggedInInvite'));
       return;
     }
 
@@ -1080,13 +1092,13 @@ export function GigDetails() {
       setInvitedGigIds(prev => prev.filter(id => id !== gigId));
       setEnrolledGigIds(prev => (prev.includes(gigId!) ? prev : [...prev, gigId!]));
       setApplicationStatus('success');
-      setApplicationMessage('Invitation acceptée ! Vous êtes maintenant inscrit à ce gig.');
+      setApplicationMessage(t('gigDetails.invitationAccepted'));
 
       await refreshGigStatuses();
     } catch (err) {
       console.error('❌ Error accepting invitation:', err);
       setApplicationStatus('error');
-      setApplicationMessage(err instanceof Error ? err.message : 'Erreur lors de l\'acceptation');
+      setApplicationMessage(err instanceof Error ? err.message : t('gigDetails.acceptError'));
     } finally {
       setRespondingInvitation(null);
     }
@@ -1098,12 +1110,12 @@ export function GigDetails() {
 
     if (!invitationId) {
       setApplicationStatus('error');
-      setApplicationMessage('Invitation introuvable. Veuillez rafraîchir la page.');
+      setApplicationMessage(t('gigDetails.invitationNotFound'));
       return;
     }
     if (!token) {
       setApplicationStatus('error');
-      setApplicationMessage('Vous devez être connecté pour répondre à l\'invitation');
+      setApplicationMessage(t('gigDetails.mustBeLoggedInInvite'));
       return;
     }
 
@@ -1135,13 +1147,13 @@ export function GigDetails() {
       setInvitedGigIds(prev => prev.filter(id => id !== gigId));
       setInvitationId(null);
       setApplicationStatus('success');
-      setApplicationMessage('Invitation refusée.');
+      setApplicationMessage(t('gigDetails.invitationDeclined'));
 
       await refreshGigStatuses();
     } catch (err) {
       console.error('❌ Error rejecting invitation:', err);
       setApplicationStatus('error');
-      setApplicationMessage(err instanceof Error ? err.message : 'Erreur lors du refus');
+      setApplicationMessage(err instanceof Error ? err.message : t('gigDetails.declineError'));
     } finally {
       setRespondingInvitation(null);
     }
@@ -1195,13 +1207,13 @@ export function GigDetails() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="bg-white p-12 rounded-3xl shadow-xl border border-gray-100 text-center max-w-md">
           <div className="text-5xl mb-6">🔍</div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Gig Not Found</h2>
-          <p className="text-gray-500 mb-8 font-medium">{error || 'The requested gig could not be found or has been archived.'}</p>
+          <h2 className="text-2xl font-black text-gray-900 mb-2">{t('gigDetails.notFoundTitle')}</h2>
+          <p className="text-gray-500 mb-8 font-medium">{error || t('gigDetails.notFoundDesc')}</p>
           <button
             onClick={() => navigate('/marketplace')}
             className="w-full bg-gradient-harx text-white py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-harx-500/20 transition-all font-black text-sm uppercase tracking-wider hover:-translate-y-0.5"
           >
-            Back to Marketplace
+            {t('gigDetails.backToMarketplace')}
           </button>
         </div>
       </div>
@@ -1223,6 +1235,7 @@ export function GigDetails() {
   );
   const hasAdditionalCommissionDetails = Boolean(gig.commission?.additionalDetails);
   const showCommissionDetailsColumn = hasCommissionPills || hasAdditionalCommissionDetails;
+  const taxLang = gigTaxonomyLocale(gig, i18n.language);
 
   return (
     <div className="min-h-screen bg-transparent py-4 sm:py-8">
@@ -1234,7 +1247,7 @@ export function GigDetails() {
             className="flex items-center text-gray-500 hover:text-harx-600 mb-6 transition-colors font-bold group"
           >
             <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-            Back to Marketplace
+            {t('gigDetails.backToMarketplace')}
           </button>
 
           <div className="bg-white/80 backdrop-blur-md rounded-3xl p-4 sm:p-6 lg:p-8 shadow-sm border border-gray-100">
@@ -1246,13 +1259,13 @@ export function GigDetails() {
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 tracking-tight">{gig.title}</h1>
                     {getAgentStatus() === 'invited' && (
                       <span className="inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-harx-50 text-harx-600 border border-harx-100 shadow-sm">
-                        ✉ Invited
+                        ✉ {t('gigDetails.invitedBadge')}
                       </span>
                     )}
                   </div>
                   {gig.category && (
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500 mt-2">
-                      {gig.category}
+                      {localizeTaxonomyName(gig.category, taxLang)}
                     </p>
                   )}
                 </div>
@@ -1279,11 +1292,11 @@ export function GigDetails() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-extrabold text-slate-900 leading-tight">
-                      {gig.companyId?.name || (gig as any).company || gig.userId?.fullName || 'Unknown'}
+                      {gig.companyId?.name || (gig as any).company || gig.userId?.fullName || t('gigDetails.unknown')}
                     </p>
                     {gig.companyId?._id && (
                       <p className="text-[10px] font-bold text-indigo-400/90 mt-1 uppercase tracking-wider">
-                        View company profile →
+                        {t('gigDetails.viewCompanyProfile')} →
                       </p>
                     )}
                   </div>
@@ -1315,17 +1328,17 @@ export function GigDetails() {
                     >
                       <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
                       <Play className="w-4 h-4 fill-current" />
-                      START
+                      {t('gigDetails.start')}
                     </button>
                   </div>
                 ) : getAgentStatus() === 'pending' ? (
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-xs uppercase tracking-widest border border-amber-400 shadow-[0_2px_10px_-2px_rgba(245,158,11,0.4)]">
-                    ⌛ Pending Review
+                    ⌛ {t('gigDetails.pendingReview')}
                   </span>
                 ) : getAgentStatus() === 'invited' ? (
                   <div className="flex flex-col items-stretch gap-2 w-full lg:min-w-[220px] lg:w-auto lg:max-w-xs">
                     <span className="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest border border-indigo-100">
-                      ✉ You're invited
+                      ✉ {t('gigDetails.youreInvited')}
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -1345,7 +1358,7 @@ export function GigDetails() {
                         ) : (
                           <>
                             <Check className="w-4 h-4" strokeWidth={3} />
-                            <span>Accept</span>
+                            <span>{t('gigDetails.accept')}</span>
                           </>
                         )}
                       </button>
@@ -1366,7 +1379,7 @@ export function GigDetails() {
                         ) : (
                           <>
                             <X className="w-4 h-4" strokeWidth={3} />
-                            <span>Decline</span>
+                            <span>{t('gigDetails.decline')}</span>
                           </>
                         )}
                       </button>
@@ -1385,12 +1398,12 @@ export function GigDetails() {
                     {applying ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-harx-400" />
-                        <span>Applying...</span>
+                        <span>{t('gigDetails.applying')}</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        <span>Apply Now</span>
+                        <span>{t('gigDetails.applyNow')}</span>
                       </>
                     )}
                   </button>
@@ -1402,12 +1415,12 @@ export function GigDetails() {
               className={`mt-8 grid gap-8 animate-fade-in ${showCommissionDetailsColumn ? 'lg:grid-cols-2 lg:gap-10' : ''}`}
             >
               <div className="min-w-0">
-                <h2 className="text-xl font-black text-gray-900 mb-4 tracking-tight">Job Description</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-4 tracking-tight">{t('gigDetails.jobDescription')}</h2>
                 <p className="text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">{gig.description}</p>
               </div>
               {showCommissionDetailsColumn && (
                 <div className="min-w-0 lg:pl-8 lg:border-l lg:border-slate-100">
-                  <h2 className="text-xl font-black text-gray-900 mb-4 tracking-tight">Commission & details</h2>
+                  <h2 className="text-xl font-black text-gray-900 mb-4 tracking-tight">{t('gigDetails.commissionDetails')}</h2>
                   {hasCommissionPills && (
                     <div className="flex flex-wrap gap-2 mb-4">
                       {commissionPerCall && Number(commissionPerCall) > 0 && (
@@ -1417,7 +1430,7 @@ export function GigDetails() {
                             {commissionPerCall}
                             {commissionCurrencySymbol}
                           </span>
-                          <span className="text-[10px] font-semibold uppercase tracking-widest opacity-80">/ APPEL</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-widest opacity-80">{t('gigDetails.perCall')}</span>
                         </div>
                       )}
                       {transactionPill && (
@@ -1427,7 +1440,7 @@ export function GigDetails() {
                             {transactionPill.primary}
                             {!transactionPill.isPercent ? commissionCurrencySymbol : ''}
                           </span>
-                          <span className="text-[10px] font-semibold uppercase tracking-widest opacity-80">/ TRANSACTION</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-widest opacity-80">{t('gigDetails.perTransaction')}</span>
                         </div>
                       )}
                       {bonusPill && (
@@ -1436,7 +1449,7 @@ export function GigDetails() {
                           <div className="flex flex-col leading-tight min-w-0">
                             <span className="font-black text-sm inline-flex flex-wrap items-baseline gap-x-2 gap-y-0">
                               <span>{bonusPill.primary}</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest opacity-95">BONUS</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest opacity-95">{t('gigDetails.bonus')}</span>
                             </span>
                             {bonusPill.secondary && (
                               <span className="text-[10px] font-semibold uppercase tracking-widest opacity-90 mt-0.5">
@@ -1467,16 +1480,15 @@ export function GigDetails() {
             {/* Skills */}
             {(gig.skills?.technical?.length > 0 || gig.skills?.professional?.length > 0 || gig.skills?.soft?.length > 0 || gig.skills?.languages?.length > 0) && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Required Skills</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.requiredSkills')}</h2>
 
                 {gig.skills.technical?.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Technical Skills</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.technicalSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.technical.map((skill, i) => {
-                        console.log('Technical skill item:', skill);
-                        const skillName = skill.skill?.name || skill.details || 'Skill';
-                        const skillLevel = skill.level > 0 ? ` (Level ${skill.level})` : '';
+                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-50 text-harx-600 rounded-xl text-xs font-black uppercase tracking-wider">
                             {skillName}{skillLevel}
@@ -1489,12 +1501,11 @@ export function GigDetails() {
 
                 {gig.skills.professional?.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Professional Skills</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.professionalSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.professional.map((skill, i) => {
-                        console.log('Professional skill item:', skill);
-                        const skillName = skill.skill?.name || skill.details || 'Skill';
-                        const skillLevel = skill.level > 0 ? ` (Level ${skill.level})` : '';
+                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
                             {skillName}{skillLevel}
@@ -1507,12 +1518,11 @@ export function GigDetails() {
 
                 {gig.skills.soft?.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Soft Skills</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.softSkills')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.soft.map((skill, i) => {
-                        console.log('Soft skill item:', skill);
-                        const skillName = skill.skill?.name || skill.details || 'Skill';
-                        const skillLevel = skill.level > 0 ? ` (Level ${skill.level})` : '';
+                        const skillName = skill.skill?.name || skill.details || t('gigDetails.skill');
+                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-alt-100/50 text-harx-alt-700 rounded-xl text-xs font-black uppercase tracking-wider">
                             {skillName}{skillLevel}
@@ -1525,11 +1535,10 @@ export function GigDetails() {
 
                 {gig.skills.languages?.length > 0 && (
                   <div className="mb-0">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Languages</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.languages')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.skills.languages.map((lang, i) => {
-                        console.log('Language item:', lang);
-                        const langName = lang.language?.name || lang.iso639_1?.toUpperCase() || 'Language';
+                        const langName = lang.language?.name || lang.iso639_1?.toUpperCase() || t('gigDetails.language');
                         const proficiency = lang.proficiency || 'N/A';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1546,11 +1555,10 @@ export function GigDetails() {
             {/* Industries */}
             {gig.industries?.length > 0 && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Industries</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.industries')}</h2>
                 <div className="flex flex-wrap gap-2">
                   {gig.industries.map((industry, index) => {
-                    console.log('Industry item:', industry);
-                    const industryName = industry.name || 'Industry';
+                    const industryName = localizeTaxonomyEntity(industry, taxLang) || t('gigDetails.industry');
                     const industryId = industry._id || index;
                     return (
                       <span key={industryId} className="px-3 py-1.5 bg-harx-alt-100/50 text-harx-alt-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1561,7 +1569,7 @@ export function GigDetails() {
                 </div>
                 {gig.industries.length > 3 && (
                   <p className="text-sm text-gray-600 mt-2">
-                    Working across {gig.industries.length} different industries
+                    {t('gigDetails.workingAcrossIndustries', { count: gig.industries.length })}
                   </p>
                 )}
               </div>
@@ -1579,10 +1587,10 @@ export function GigDetails() {
               if (uniqueActivities.length === 0) return null;
               return (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Key Activities</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.keyActivities')}</h2>
                 <div className="flex flex-wrap gap-2">
                   {uniqueActivities.map((activity, index) => {
-                    const activityName = activity.name || 'Activity';
+                    const activityName = localizeTaxonomyEntity(activity, taxLang) || t('gigDetails.activity');
                     const activityId = String(activity._id || index);
                     return (
                       <span key={activityId} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1597,7 +1605,7 @@ export function GigDetails() {
             {/* Leads Information - Only for enrolled agents */}
             {isAgentEnrolled() && gig.leads?.types?.length > 0 && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Lead Types</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.leadTypes')}</h2>
                 <div className="space-y-3">
                   {gig.leads.types.map((leadType, index) => (
                     <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -1613,7 +1621,7 @@ export function GigDetails() {
                       <div className="text-right">
                         <p className="font-medium">{leadType.percentage}%</p>
                         {leadType.conversionRate && (
-                          <p className="text-xs text-gray-500">{leadType.conversionRate}% conversion</p>
+                          <p className="text-xs text-gray-500">{t('gigDetails.conversion', { rate: leadType.conversionRate })}</p>
                         )}
                       </div>
                     </div>
@@ -1621,7 +1629,7 @@ export function GigDetails() {
                 </div>
                 {gig.leads.sources?.length > 0 && (
                   <div className="mt-4">
-                    <h3 className="font-medium text-gray-800 mb-2">Lead Sources:</h3>
+                    <h3 className="font-medium text-gray-800 mb-2">{t('gigDetails.leadSources')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {gig.leads.sources.map((source, index) => (
                         <span key={index} className="px-2 py-1 bg-indigo-100 rounded-full text-xs text-indigo-700">
@@ -1637,21 +1645,21 @@ export function GigDetails() {
             {/* Team Structure */}
             {gig.team && (gig.team.size || gig.team.territories?.length > 0 || gig.team.structure?.length > 0) && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Team Structure</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.teamStructure')}</h2>
                 <div className="space-y-3">
                   {gig.team.size && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Team Size:</span>
+                      <span className="text-gray-600">{t('gigDetails.teamSize')}</span>
                       <span className="font-medium">{gig.team.size}</span>
                     </div>
                   )}
                   {gig.team.territories?.length > 0 && (
                     <div>
-                      <span className="text-gray-600">Territories:</span>
+                      <span className="text-gray-600">{t('gigDetails.territories')}</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {gig.team.territories.map((territory, index) => (
                           <span key={index} className="px-3 py-1 bg-harx-alt-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-harx-alt-700">
-                            {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || 'Unknown' : territory}
+                            {typeof territory === 'object' ? territory?.name?.common || territory?.cca2 || t('gigDetails.unknown') : territory}
                           </span>
                         ))}
                       </div>
@@ -1659,12 +1667,12 @@ export function GigDetails() {
                   )}
                   {gig.team.structure?.length > 0 && (
                     <div className="mt-4">
-                      <h3 className="font-medium text-gray-800 mb-2">Team Composition:</h3>
+                      <h3 className="font-medium text-gray-800 mb-2">{t('gigDetails.teamComposition')}</h3>
                       <div className="space-y-2">
                         {gig.team.structure.map((role, index) => (
                           <div key={index} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
                             <span>{role.count}x {role.seniority?.level || 'N/A'}</span>
-                            <span className="text-gray-600">{role.seniority?.yearsExperience || 'N/A'} years exp.</span>
+                            <span className="text-gray-600">{t('gigDetails.yearsExp', { years: role.seniority?.yearsExperience || 'N/A' })}</span>
                           </div>
                         ))}
                       </div>
@@ -1679,7 +1687,7 @@ export function GigDetails() {
           <div className="xl:col-span-2 space-y-8">
             {/* Schedule & Availability */}
             <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Availability</h2>
+              <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.availability')}</h2>
 
               {/* Timezone */}
               {gig.availability?.time_zone && (
@@ -1703,23 +1711,23 @@ export function GigDetails() {
               {/* Minimum Hours */}
               {gig.availability?.minimumHours && (
                 <div className="mb-4">
-                  <h3 className="font-medium text-gray-800 mb-2">Minimum Hours:</h3>
+                  <h3 className="font-medium text-gray-800 mb-2">{t('gigDetails.minimumHours')}</h3>
                   <div className="space-y-1 text-sm">
                     {gig.availability.minimumHours.daily && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Daily:</span>
+                        <span className="text-gray-600">{t('gigDetails.daily')}</span>
                         <span>{gig.availability.minimumHours.daily}h</span>
                       </div>
                     )}
                     {gig.availability.minimumHours.weekly && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Weekly:</span>
+                        <span className="text-gray-600">{t('gigDetails.weekly')}</span>
                         <span>{gig.availability.minimumHours.weekly}h</span>
                       </div>
                     )}
                     {gig.availability.minimumHours.monthly && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Monthly:</span>
+                        <span className="text-gray-600">{t('gigDetails.monthly')}</span>
                         <span>{gig.availability.minimumHours.monthly}h</span>
                       </div>
                     )}
@@ -1730,11 +1738,11 @@ export function GigDetails() {
               {/* Schedule */}
               {gig.availability?.schedule?.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Schedule:</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.schedule')}</h3>
                   <div className="space-y-2">
                     {gig.availability.schedule.map((schedule, i) => (
                       <div key={i} className="flex justify-between text-sm bg-harx-50/50 p-3 rounded-xl border border-harx-100/50">
-                        <span className="font-black text-gray-700">{schedule.day}</span>
+                        <span className="font-black text-gray-700">{dayLabel(schedule.day)}</span>
                         <span className="text-harx-600 font-black">{schedule.hours.start} - {schedule.hours.end}</span>
                       </div>
                     ))}
@@ -1745,7 +1753,7 @@ export function GigDetails() {
               {/* Flexibility */}
               {gig.availability?.flexibility?.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Flexibility:</h3>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.flexibility')}</h3>
                   <div className="flex flex-wrap gap-2">
                     {gig.availability.flexibility.map((flex, index) => (
                       <span key={index} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
@@ -1760,11 +1768,11 @@ export function GigDetails() {
             {/* Documentation */}
             {((gig.documentation?.product?.length ?? 0) > 0 || (gig.documentation?.process?.length ?? 0) > 0 || (gig.documentation?.training?.length ?? 0) > 0) && (
               <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Documentation & Resources</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-6 tracking-tight">{t('gigDetails.documentation')}</h2>
 
                 {(gig.documentation?.product?.length ?? 0) > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Product Documentation:</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.productDocs')}</h3>
                     <div className="space-y-2">
                       {gig.documentation?.product?.map((doc, index) => (
                         <a key={index} href={doc.url} target="_blank" rel="noopener noreferrer"
@@ -1779,7 +1787,7 @@ export function GigDetails() {
 
                 {(gig.documentation?.process?.length ?? 0) > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Process Documentation:</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.processDocs')}</h3>
                     <div className="space-y-2">
                       {gig.documentation?.process?.map((doc, index) => (
                         <a key={index} href={doc.url} target="_blank" rel="noopener noreferrer"
@@ -1794,7 +1802,7 @@ export function GigDetails() {
 
                 {(gig.documentation?.training?.length ?? 0) > 0 && (
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Training Materials:</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">{t('gigDetails.trainingMaterials')}</h3>
                     <div className="space-y-2">
                       {gig.documentation?.training?.map((doc, index) => (
                         <a key={index} href={doc.url} target="_blank" rel="noopener noreferrer"
