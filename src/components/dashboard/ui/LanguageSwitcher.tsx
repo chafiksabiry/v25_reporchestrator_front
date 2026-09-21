@@ -28,7 +28,7 @@ export function LanguageSwitcher() {
   }, []);
 
   const selectLanguage = (code: string) => {
-    persistHarxLanguage(code);
+    persistHarxLanguage(code, { explicit: true });
     void i18n.changeLanguage(code);
     setIsOpen(false);
   };
