@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Award, Download, Share2, CheckCircle, Calendar, X } from 'lucide-react';
+import { Award, CheckCircle, Calendar, X } from 'lucide-react';
 import harxLogo from '../../assets/logo-pink.png';
 
 interface CertificationViewProps {
@@ -34,11 +34,9 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
   trainingTitle,
   completionDate,
   certificateId,
-  shareUrl,
   onClose,
 }) => {
   const [showContent, setShowContent] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   const certId = useMemo(
     () => certificateId || buildCertId(`${traineeName}|${trainingTitle}|${completionDate}`),
@@ -73,82 +71,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  const handleShare = async () => {
-    const pageUrl =
-      shareUrl ||
-      (typeof window !== 'undefined' ? window.location.href : '');
-    const shareData = {
-      title: 'Certification HARX Academy',
-      text: `${traineeName} vient d'obtenir la certification « ${trainingTitle} » sur HARX Academy ! 🎓`,
-      url: pageUrl,
-    };
-    try {
-      if (typeof navigator !== 'undefined' && (navigator as any).share) {
-        await (navigator as any).share(shareData);
-        return;
-      }
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        setShareFeedback('Lien copié !');
-        setTimeout(() => setShareFeedback(null), 2500);
-      }
-    } catch {
-      // l'utilisateur a annulé le partage — rien à faire
-    }
-  };
-
-  const handleDownload = () => {
-    const win = window.open('', '_blank', 'width=1100,height=800');
-    if (!win) return;
-    const safe = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    win.document.write(`<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"/>
-<title>Certificat - ${safe(traineeName)}</title>
-<style>
-  @page { size: A4 landscape; margin: 0; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0b1025; }
-  .cert { width: 297mm; height: 210mm; padding: 18mm; position: relative;
-    background: radial-gradient(circle at 20% 15%, rgba(244,63,94,.18), transparent 45%),
-                radial-gradient(circle at 85% 85%, rgba(99,102,241,.18), transparent 45%), #0b1025;
-    color: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .frame { position: absolute; inset: 9mm; border: 2px solid rgba(236,72,153,.5); border-radius: 14px; }
-  .frame:before { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; }
-  .brand img { height: 52px; object-fit: contain; margin: 6mm auto 8mm; display: block; }
-  .seal { display: none; }
-  .sub { text-transform: uppercase; letter-spacing: .35em; color: #94a3b8; font-size: 12px; }
-  .name { font-size: 46px; font-weight: 900; margin: 6mm 0 2mm;
-    background: linear-gradient(90deg,#ff6b6b,#ff4d4d,#ec4899); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .desc { color: #cbd5e1; max-width: 180mm; line-height: 1.6; font-size: 15px; }
-  .title { font-size: 22px; font-weight: 700; margin: 5mm 0; padding: 4mm 8mm; border: 1px solid rgba(255,255,255,.15);
-    border-radius: 12px; display: inline-block; }
-  .meta { display: flex; gap: 18mm; margin-top: 8mm; }
-  .meta div span { display: block; }
-  .meta .k { color: #64748b; text-transform: uppercase; letter-spacing: .2em; font-size: 10px; margin-bottom: 3px; }
-  .meta .v { font-weight: 700; font-size: 14px; }
-  .footer { position: absolute; bottom: 14mm; left: 0; right: 0; color: #64748b; font-size: 11px; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head>
-<body>
-  <div class="cert">
-    <div class="frame"></div>
-    <div class="brand"><img src="${harxLogo}" alt="HARX" /></div>
-    <div class="sub">Certificat de réussite</div>
-    <div class="name">${safe(traineeName)}</div>
-    <div class="desc">a complété avec succès l'ensemble des modules et évaluations de la formation</div>
-    <div class="title">${safe(trainingTitle)}</div>
-    <div class="meta">
-      <div><span class="k">Date</span><span class="v">${safe(completionDate)}</span></div>
-      <div><span class="k">Statut</span><span class="v">Validé</span></div>
-      <div><span class="k">Niveau</span><span class="v">Expert</span></div>
-    </div>
-    <div class="footer">Certifié par HARX Academy • ID : ${certId}</div>
-  </div>
-  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
-</body></html>`);
-    win.document.close();
-  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#060a18]/95 backdrop-blur-md overflow-y-auto">
@@ -198,13 +120,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
           {/* Top action buttons */}
           <div className="absolute top-6 right-6 flex items-center gap-2">
             <button
-              onClick={handleShare}
-              title="Partager"
-              className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-            >
-              <Share2 className="w-5 h-5" />
-            </button>
-            <button
               onClick={onClose}
               title="Fermer"
               className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
@@ -212,12 +127,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
-
-          {shareFeedback && (
-            <div className="absolute top-20 right-6 px-4 py-2 rounded-xl bg-emerald-500/90 text-white text-sm font-semibold shadow-lg animate-fade-in">
-              {shareFeedback}
-            </div>
-          )}
 
           <div className="flex justify-center mb-6 pt-2">
             <img
@@ -265,13 +174,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            {/* <button
-              onClick={handleDownload}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-alt-600 text-white font-bold text-sm md:text-base shadow-lg shadow-harx-500/25 hover:shadow-harx-500/45 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2.5"
-            >
-              <Download className="w-5 h-5" />
-              Télécharger le Certificat
-            </button> */}
             <button
               onClick={onClose}
               className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-sm md:text-base hover:bg-white/10 transition-all duration-300 flex items-center justify-center gap-2.5"
