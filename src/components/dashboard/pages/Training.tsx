@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -723,6 +724,7 @@ async function fetchEnrolledGigsForAgent(
 }
 
 export function Training() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const repId = getAgentId();
@@ -2190,23 +2192,22 @@ export function Training() {
         <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Training</h1>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">{t('trainingPage.title')}</h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">
-            Trainings linked to gigs you are enrolled in, plus journeys your company assigned to you
-            directly.
+            {t('trainingPage.subtitle')}
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-[280px] sm:items-end">
           <div className="flex items-center gap-2 rounded-xl bg-harx-500/10 border border-harx-500/20 px-4 py-2 text-harx-700 self-start sm:self-end">
             <BookOpen className="w-5 h-5 shrink-0" />
-            <span className="text-xs font-black uppercase tracking-widest">My gigs & paths</span>
+            <span className="text-xs font-black uppercase tracking-widest">{t('trainingPage.myGigsAndPaths')}</span>
           </div>
           <div className="w-full sm:w-auto">
             <label
               htmlFor="training-gig-filter"
               className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400"
             >
-              Enrolled gig (Marketplace)
+              {t('trainingPage.enrolledGigLabel')}
             </label>
             <div className="relative">
               <select
@@ -2218,8 +2219,8 @@ export function Training() {
               >
                 <option value="__all__">
                   {enrolledGigs.length === 0 && !loading
-                    ? 'No enrolled gigs'
-                    : 'All enrolled gigs'}
+                    ? t('trainingPage.noEnrolledGigs')
+                    : t('trainingPage.allEnrolledGigs')}
                 </option>
                 {enrolledGigs.map((g) => (
                   <option key={g.gigId} value={g.gigId}>
@@ -2231,12 +2232,12 @@ export function Training() {
             </div>
             {gigFilter !== '__all__' && selectedGigTitle && !listLoading && (
               <p className="mt-2 text-xs font-semibold text-harx-700">
-                Showing trainings for: <span className="text-gray-900">{selectedGigTitle}</span>
+                {t('trainingPage.showingFor')} <span className="text-gray-900">{selectedGigTitle}</span>
               </p>
             )}
             {enrolledGigs.length === 0 && !loading && !error && (
               <p className="mt-2 text-xs text-amber-700 font-medium">
-                No enrolled gigs from the matching API — check the Marketplace or your connection.
+                {t('trainingPage.noEnrolledGigsHint')}
               </p>
             )}
           </div>
@@ -2253,7 +2254,7 @@ export function Training() {
           }`}
         >
           <BookOpen className="w-4 h-4" />
-          Formations
+          {t('trainingPage.tabTrainings')}
           {displayJourneys.length > 0 && (
             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
               trainingTab === 'trainings' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
@@ -2273,7 +2274,7 @@ export function Training() {
           }`}
         >
           <Award className="w-4 h-4" />
-          Certifications
+          {t('trainingPage.tabCertifications')}
           {completedJourneys.length > 0 && (
             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
               trainingTab === 'certifications' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
@@ -2295,7 +2296,7 @@ export function Training() {
         slideProgressSummary.trainingCount > 0 && (
           <div className="rounded-2xl border border-harx-200 bg-gradient-to-br from-harx-50/90 to-white p-5 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-              Progression (formations du gig)
+              {t('trainingPage.progressGig')}
             </p>
             {selectedGigTitle ? (
               <p className="mt-1 text-xs font-semibold text-gray-600 truncate">{selectedGigTitle}</p>
@@ -2311,8 +2312,8 @@ export function Training() {
           <Loader2 className="w-6 h-6 animate-spin text-harx-500" />
           <span className="font-medium">
             {gigFilter !== '__all__' && gigFetchLoading
-              ? 'Loading trainings for this gig…'
-              : 'Loading trainings…'}
+              ? t('trainingPage.loadingForGig')
+              : t('trainingPage.loading')}
           </span>
         </div>
       )}
@@ -2326,46 +2327,22 @@ export function Training() {
 
       {!listLoading && !error && gigFilter === '__all__' && journeys.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm text-center text-gray-500">
-          <p className="font-medium">No trainings found for your enrolled gigs.</p>
-          <p className="text-sm mt-2">
-            Enrolling in a gig does not create a training by itself: the company must publish a
-            training for that gig (status active, rehearsal, or completed). The list can stay empty
-            even if the Marketplace shows “Enrolled”.
-          </p>
+          <p className="font-medium">{t('trainingPage.emptyAllTitle')}</p>
+          <p className="text-sm mt-2">{t('trainingPage.emptyAllDesc')}</p>
         </div>
       )}
 
       {!listLoading && !error && gigFilter !== '__all__' && displayJourneys.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm text-center text-gray-500">
-          <p className="font-medium">No trainings for this gig yet.</p>
+          <p className="font-medium">{t('trainingPage.emptyGigTitle')}</p>
           {gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'ok' ? (
-            <p className="text-sm mt-2">
-              The training service responded successfully but has no published journeys for this
-              gig. Your org may still be preparing content, the journey may still be in draft, or
-              the journey may be linked to a different gig id than the one in the Marketplace.
-              All journeys linked to this gig are shown, including draft/not published.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigOk')}</p>
           ) : gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'not_found' ? (
-            <p className="text-sm mt-2">
-              The training API returned 404 for{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
-                GET /training_journeys/gig/:gigId
-              </code>
-              . Deploy the latest training backend or verify API routing and the base URL in{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">VITE_TRAINING_*</code>.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigNotFound')}</p>
           ) : gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'error' ? (
-            <p className="text-sm mt-2">
-              Could not reach the training API for this gig (network error, CORS, or missing auth).
-              Check your connection, sign in again, and confirm{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">VITE_TRAINING_*</code>{' '}
-              points at the training service.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigError')}</p>
           ) : (
-            <p className="text-sm mt-2">
-              Select the gig again or refresh the page. If this persists, verify the training API URL
-              and that you are signed in.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigRetry')}</p>
           )}
         </div>
       )}
@@ -2491,7 +2468,7 @@ export function Training() {
                   </div>
                   <div className="mt-3">
                     <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-gray-500">
-                      <span>Progress</span>
+                      <span>{t('trainingPage.progress')}</span>
                       <span className="tabular-nums">
                         {showProgressFigure ? `${slidePercent}%` : '—'}
                       </span>
@@ -2511,7 +2488,7 @@ export function Training() {
                     onClick={openFormation}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-harx-600 text-white px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors disabled:opacity-40"
                   >
-                    Continue
+                    {t('trainingPage.continue')}
                   </button>
                   {showScriptCta && (
                     <button
@@ -2521,7 +2498,7 @@ export function Training() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-amber-100 transition-colors disabled:opacity-40"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      Script
+                      {t('trainingPage.script')}
                     </button>
                   )}
                   {isCompleted && (
@@ -2531,7 +2508,7 @@ export function Training() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-harx-200 bg-harx-50 text-harx-700 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-colors"
                     >
                       <Award className="w-4 h-4" />
-                      Certificat
+                      {t('trainingPage.certificate')}
                     </button>
                   )}
                 </div>
@@ -2558,10 +2535,9 @@ export function Training() {
           <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-harx-500/10 flex items-center justify-center">
             <Award className="w-7 h-7 text-harx-500" />
           </div>
-          <h3 className="text-lg font-black text-gray-900">Aucune certification pour le moment</h3>
+          <h3 className="text-lg font-black text-gray-900">{t('trainingPage.noCertificationsTitle')}</h3>
           <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-            Terminez une formation à 100&nbsp;% pour débloquer votre certificat. Vos certifications
-            apparaîtront ici.
+            {t('trainingPage.noCertificationsDesc')}
           </p>
           <button
             type="button"
@@ -2569,7 +2545,7 @@ export function Training() {
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-harx-600 text-white px-5 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors"
           >
             <BookOpen className="w-4 h-4" />
-            Voir mes formations
+            {t('trainingPage.seeMyTrainings')}
           </button>
         </div>
       )}
@@ -2577,7 +2553,7 @@ export function Training() {
       {!listLoading && !error && completedJourneys.length > 0 && (
         <section>
           <p className="text-sm text-gray-500 mb-4">
-            Formations complétées à 100&nbsp;%. Consultez ou téléchargez vos certificats.
+            {t('trainingPage.certificationsIntro')}
           </p>
           <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {completedJourneys.map((j) => {
@@ -2608,7 +2584,7 @@ export function Training() {
                       ) : null}
                       <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
                         <CheckCircle className="w-3.5 h-3.5" />
-                        Validé · 100%
+                        {t('trainingPage.validated')}
                       </div>
                     </div>
                   </div>
@@ -2624,7 +2600,7 @@ export function Training() {
                     className="relative mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-alt-600 text-white px-4 py-2.5 text-xs font-black uppercase tracking-widest hover:-translate-y-0.5 transition-transform shadow-sm"
                   >
                     <Award className="w-4 h-4" />
-                    Voir le certificat
+                    {t('trainingPage.viewCertificate')}
                   </button>
                 </li>
               );
@@ -2661,7 +2637,7 @@ export function Training() {
                     boxShadow: viewerThemeTokens.accentShadow,
                   }}
                 >
-                  Back to list
+                  {t('trainingPage.backToList')}
                 </button>
                 <h3 className="min-w-0 flex-1 truncate text-sm font-black text-white">
                   {journeyTitle(selectedJourney)}
