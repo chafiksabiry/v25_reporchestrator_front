@@ -35,22 +35,10 @@ export function applyAgentCut(val: unknown): number | null {
 }
 
 function unitLabelBonus(unitRaw: string | undefined, lang: 'fr' | 'en'): string {
-  const u = String(unitRaw || '').toUpperCase();
-  // Bonus volume is always shown as transactions (never "calls").
-  if (
-    !u ||
-    u === 'CALLS' ||
-    u === 'APPEL' ||
-    u === 'APPELS' ||
-    u === 'TRANSACTIONS' ||
-    u === 'TRANSACTION'
-  ) {
-    return 'transactions';
-  }
-  if (u === 'SALES' || u === 'VENTES' || u === 'VENTE') {
-    return lang === 'en' ? 'sales' : 'ventes';
-  }
-  return u.toLowerCase();
+  // Bonus volume is always shown as transactions (never "calls" / "appels"),
+  // even when the DB still stores unit: "Calls".
+  void unitRaw;
+  return lang === 'en' ? 'transactions' : 'transactions';
 }
 
 function periodLabel(periodRaw: string | undefined, lang: 'fr' | 'en'): string | null {
@@ -142,8 +130,12 @@ export function formatBonusVolumeLine(
     return `pour ${amount} ${unit}`;
   }
   const fallbackPeriod = periodLabel(comm.bonusPeriod || comm.bonusType, lang);
-  if (fallbackPeriod) return lang === 'en' ? `per ${fallbackPeriod}` : `par ${fallbackPeriod}`;
-  return null;
+  if (fallbackPeriod) {
+    return lang === 'en'
+      ? `per transaction / ${fallbackPeriod}`
+      : `par transaction / ${fallbackPeriod}`;
+  }
+  return lang === 'en' ? 'per transaction' : 'par transaction';
 }
 
 export type TransactionPillDisplay = {
