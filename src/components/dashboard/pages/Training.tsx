@@ -922,10 +922,15 @@ export function Training() {
     });
   }, [displayJourneys, structuredProgressByJourney, progressByJourney]);
 
-  const openCertificate = useCallback((j: JourneyRow) => {
-    const id = journeyKey(j);
-    if (id) navigate(`/certification/journey/${encodeURIComponent(id)}`);
-  }, [navigate]);
+  const openCertificate = useCallback(
+    (j: JourneyRow, from: 'trainings' | 'certifications' = 'trainings') => {
+      const id = journeyKey(j);
+      if (!id) return;
+      const qs = from === 'certifications' ? '?from=certifications' : '?from=trainings';
+      navigate(`/certification/journey/${encodeURIComponent(id)}${qs}`);
+    },
+    [navigate]
+  );
 
   // When user picks a gig, refetch trainings for that gig so the list updates even if the initial bulk load failed
   useEffect(() => {
@@ -2511,7 +2516,7 @@ export function Training() {
                   {isCompleted && (
                     <button
                       type="button"
-                      onClick={() => openCertificate(j)}
+                      onClick={() => openCertificate(j, 'trainings')}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-harx-200 bg-harx-50 text-harx-700 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-colors"
                     >
                       <Award className="w-4 h-4" />
@@ -2603,7 +2608,7 @@ export function Training() {
                   )}
                   <button
                     type="button"
-                    onClick={() => openCertificate(j)}
+                    onClick={() => openCertificate(j, 'certifications')}
                     className="relative mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-alt-600 text-white px-4 py-2.5 text-xs font-black uppercase tracking-widest hover:-translate-y-0.5 transition-transform shadow-sm"
                   >
                     <Award className="w-4 h-4" />
@@ -3351,7 +3356,7 @@ export function Training() {
                               section: slide.section,
                             });
                           }
-                          if (selectedJourney) openCertificate(selectedJourney);
+                          if (selectedJourney) openCertificate(selectedJourney, 'trainings');
                         }}
                         className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110"
                         style={{

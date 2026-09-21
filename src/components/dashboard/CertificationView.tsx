@@ -172,15 +172,6 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={onClose}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-sm md:text-base hover:bg-white/10 transition-all duration-300 flex items-center justify-center gap-2.5"
-            >
-              Retour aux formations
-            </button>
-          </div>
         </div>
 
         {/* Footer */}
