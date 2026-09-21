@@ -1212,13 +1212,94 @@ export function Training() {
       if (state.timedOut) return;
       if (state.selected !== null && state.selected === q.correctAnswer) row.correct += 1;
     });
+    let localFullyAnswered = true;
+    let localPassed = true;
     for (const row of byQuiz.values()) {
-      if (row.answered < row.total) return false;
+      if (row.answered < row.total) {
+        localFullyAnswered = false;
+        break;
+      }
       const percent = row.total > 0 ? (row.correct / row.total) * 100 : 0;
-      if (percent < 70) return false;
+      if (percent < 70) localPassed = false;
     }
-    return true;
-  }, [currentFormationViewerSlide, formationViewerQuizState]);
+    if (localFullyAnswered && localPassed) return true;
+
+    // Reprise / formation déjà validée : le backend a le quiz passé, pas l’état local.
+    if (selectedJourney && selectedJourneyId) {
+      const modules = extractModules(selectedJourney);
+      const mod = modules[currentFormationViewerSlide.moduleIndex] as ModuleRow | undefined;
+      const moduleId =
+        normalizeMongoId((mod as any)?._id) || normalizeMongoId((mod as any)?.id) || '';
+      const mp =
+        moduleId && /^[a-f\d]{24}$/i.test(moduleId)
+          ? (progressByJourney[selectedJourneyId]?.modules?.[moduleId] as
+              | Record<string, unknown>
+              | undefined)
+          : undefined;
+      const quizzes = Array.isArray(mod?.quizzes) ? mod.quizzes : [];
+      let anyOnSlide = false;
+      let allPassed = true;
+      let qxi = 0;
+      for (const qz of quizzes) {
+        const qs = Array.isArray((qz as { questions?: unknown })?.questions)
+          ? (qz as { questions: unknown[] }).questions
+          : [];
+        if (qs.length === 0) continue;
+        const qid =
+          normalizeMongoId((qz as { _id?: unknown; id?: unknown })?._id) ||
+          normalizeMongoId((qz as { _id?: unknown; id?: unknown })?.id);
+        const title = String((qz as { title?: unknown })?.title || '').trim();
+        const onSlide = questions.some((q) => {
+          if (qid && (q.quizId === qid || String(q.quizKey || '') === qid)) return true;
+          if (title && String(q.quizTitle || '').trim() === title) return true;
+          if (title && String(q.quizKey || '').includes(title)) return true;
+          return false;
+        });
+        if (!onSlide) {
+          qxi += 1;
+          continue;
+        }
+        anyOnSlide = true;
+        if (!quizIsPassedFromProgress(qz, qxi, mp)) allPassed = false;
+        qxi += 1;
+      }
+      if (anyOnSlide && allPassed) return true;
+    }
+    return false;
+  }, [
+    currentFormationViewerSlide,
+    formationViewerQuizState,
+    selectedJourney,
+    selectedJourneyId,
+    progressByJourney,
+  ]);
+
+  /** Dernière slide + tout validé (local ou formation 100 %) → Certificat, pas Suivant. */
+  const isSelectedFormationFullyDone = useMemo(() => {
+    if (!selectedJourneyId || !selectedJourney) return false;
+    if (structuredProgressByJourney[selectedJourneyId]?.status === 'completed') return true;
+    const row = progressByJourney[selectedJourneyId];
+    if (Number(row?.progressPercentage) >= 100) return true;
+    if (
+      row &&
+      hasStructuredResumeMergeEvidence(row) &&
+      formationResumeSlideIndexFromRepRow(selectedJourney, row) === null
+    ) {
+      return true;
+    }
+    return false;
+  }, [selectedJourneyId, selectedJourney, structuredProgressByJourney, progressByJourney]);
+
+  const showFormationCertificateCta = useMemo(() => {
+    if (!atLastFormationSlide || isNextModuleLocked) return false;
+    if (isSelectedFormationFullyDone) return true;
+    return isCurrentQuizPassed;
+  }, [
+    atLastFormationSlide,
+    isNextModuleLocked,
+    isSelectedFormationFullyDone,
+    isCurrentQuizPassed,
+  ]);
 
   const repViewerTheme = useMemo(
     () => resolveRepViewerTheme(selectedJourney, selectedJourneyId || ''),
@@ -3350,7 +3431,7 @@ export function Training() {
                     >
                       {formationViewerSlideIndex + 1} / {formationViewerSlides.length}
                     </span>
-                    {atLastFormationSlide && isCurrentQuizPassed && !isNextModuleLocked ? (
+                    {showFormationCertificateCta ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -3435,7 +3516,9 @@ export function Training() {
                       </button>
                     )}
                   </div>
-                  {currentFormationViewerSlide?.kind === 'quiz_group' && !isCurrentQuizPassed ? (
+                  {currentFormationViewerSlide?.kind === 'quiz_group' &&
+                  !isCurrentQuizPassed &&
+                  !showFormationCertificateCta ? (
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
                         ? 'Nombre maximum de tentatives atteint. Le chrono « module » est en pause ; en cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
