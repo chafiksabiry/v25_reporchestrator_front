@@ -34,21 +34,31 @@ export function applyAgentCut(val: unknown): number | null {
   return Number((num * AGENT_COMMISSION_MULTIPLIER).toFixed(2));
 }
 
-function unitLabelFr(unitRaw: string | undefined): string {
+function unitLabelBonus(unitRaw: string | undefined, lang: 'fr' | 'en'): string {
   const u = String(unitRaw || '').toUpperCase();
-  if (u === 'CALLS' || u === 'APPEL' || u === 'APPELS') return 'appels';
-  if (u === 'TRANSACTIONS' || u === 'TRANSACTION') return 'transactions';
-  if (u === 'SALES' || u === 'VENTES' || u === 'VENTE') return 'ventes';
-  if (!u) return 'unités';
+  // Bonus volume is always shown as transactions (never "calls").
+  if (
+    !u ||
+    u === 'CALLS' ||
+    u === 'APPEL' ||
+    u === 'APPELS' ||
+    u === 'TRANSACTIONS' ||
+    u === 'TRANSACTION'
+  ) {
+    return 'transactions';
+  }
+  if (u === 'SALES' || u === 'VENTES' || u === 'VENTE') {
+    return lang === 'en' ? 'sales' : 'ventes';
+  }
   return u.toLowerCase();
 }
 
-function periodLabelFr(periodRaw: string | undefined): string | null {
+function periodLabel(periodRaw: string | undefined, lang: 'fr' | 'en'): string | null {
   const p = String(periodRaw || '').toLowerCase();
   if (!p) return null;
-  if (p.includes('month') || p === 'monthly' || p === 'mois') return 'mois';
-  if (p.includes('week') || p === 'weekly' || p.includes('semaine')) return 'semaine';
-  if (p.includes('day') || p === 'daily' || p.includes('jour')) return 'jour';
+  if (p.includes('month') || p === 'monthly' || p === 'mois') return lang === 'en' ? 'month' : 'mois';
+  if (p.includes('week') || p === 'weekly' || p.includes('semaine')) return lang === 'en' ? 'week' : 'semaine';
+  if (p.includes('day') || p === 'daily' || p.includes('jour')) return lang === 'en' ? 'day' : 'jour';
   return periodRaw!.trim();
 }
 
@@ -110,21 +120,29 @@ export function getResolvedAgentFacing(comm: GigCommissionExtended | undefined):
 }
 
 /**
- * Second line for the bonus pill (e.g. "chaque 25 appels / mois") from minimumVolume / bonusPeriod.
+ * Second line for the bonus pill (e.g. "pour 25 transactions / mois") from minimumVolume / bonusPeriod.
+ * Bonus thresholds are always expressed in transactions, not calls.
  */
-export function formatBonusVolumeLine(comm: GigCommissionLike | undefined): string | null {
+export function formatBonusVolumeLine(
+  comm: GigCommissionLike | undefined,
+  lang: 'fr' | 'en' = 'fr'
+): string | null {
   if (!comm) return null;
   const mv = comm.minimumVolume;
   const amount = mv?.amount !== undefined && mv?.amount !== null ? String(mv.amount).trim() : '';
   if (amount && amount !== '0') {
-    const unit = unitLabelFr(mv?.unit);
+    const unit = unitLabelBonus(mv?.unit, lang);
     const periodSrc = comm.bonusPeriod || comm.bonusType || mv?.period;
-    const period = periodLabelFr(periodSrc);
-    if (period) return `chaque ${amount} ${unit} / ${period}`;
-    return `chaque ${amount} ${unit}`;
+    const period = periodLabel(periodSrc, lang);
+    if (lang === 'en') {
+      if (period) return `for ${amount} ${unit} / ${period}`;
+      return `for ${amount} ${unit}`;
+    }
+    if (period) return `pour ${amount} ${unit} / ${period}`;
+    return `pour ${amount} ${unit}`;
   }
-  const fallbackPeriod = periodLabelFr(comm.bonusPeriod || comm.bonusType);
-  if (fallbackPeriod) return `par ${fallbackPeriod}`;
+  const fallbackPeriod = periodLabel(comm.bonusPeriod || comm.bonusType, lang);
+  if (fallbackPeriod) return lang === 'en' ? `per ${fallbackPeriod}` : `par ${fallbackPeriod}`;
   return null;
 }
 
@@ -198,7 +216,8 @@ export type BonusPillDisplay = { primary: string; secondary: string | null };
 
 export function getBonusPillDisplay(
   comm: GigCommissionExtended | undefined,
-  currencySymbol: string
+  currencySymbol: string,
+  lang: 'fr' | 'en' = 'fr'
 ): BonusPillDisplay | null {
   const resolved = getResolvedAgentFacing(comm);
   const effBonus = resolved?.bonusAmount ?? resolved?.bonus;
@@ -207,7 +226,7 @@ export function getBonusPillDisplay(
     if (!Number.isNaN(cut) && cut > 0) {
       const sym = String(effBonus).includes('€') ? '' : currencySymbol;
       const primary = `+${cut}${sym}`;
-      const secondary = formatBonusVolumeLine(comm);
+      const secondary = formatBonusVolumeLine(comm, lang);
       return { primary, secondary };
     }
   }
@@ -222,7 +241,7 @@ export function getBonusPillDisplay(
 
   const sym = String(raw).includes('€') ? '' : currencySymbol;
   const primary = `+${cut}${sym}`;
-  const secondary = formatBonusVolumeLine(comm);
+  const secondary = formatBonusVolumeLine(comm, lang);
   return { primary, secondary };
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, DollarSign, Users, Globe, Calendar, Building, MapPin, Target, Phone, Mail, ChevronLeft, ChevronRight, Repeat, Star, FileText, Play, Sparkles, Check, X } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
@@ -329,6 +330,8 @@ interface LeadsResponse {
 export function GigDetails() {
   const { gigId } = useParams<{ gigId: string }>();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const bonusLang: 'fr' | 'en' = (i18n.language || 'fr').toLowerCase().startsWith('en') ? 'en' : 'fr';
   const [gig, setGig] = useState<PopulatedGig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1212,7 +1215,7 @@ export function GigDetails() {
   const resolvedFacing = getResolvedAgentFacing(gig.commission as GigCommissionExtended);
   const commissionPerCall = resolvedFacing?.commission_per_call;
   const transactionPill = getTransactionPillDisplay(gig.commission, commissionCurrencySymbol);
-  const bonusPill = getBonusPillDisplay(gig.commission, commissionCurrencySymbol);
+  const bonusPill = getBonusPillDisplay(gig.commission, commissionCurrencySymbol, bonusLang);
   const hasCommissionPills = Boolean(
     (commissionPerCall && Number(commissionPerCall) > 0) ||
       transactionPill !== null ||

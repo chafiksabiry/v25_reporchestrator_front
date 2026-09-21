@@ -284,8 +284,29 @@
       "available": "Disponibles",
       "enrolled": "Inscrites",
       "favorite": "Favoris",
-      "invited": "Invitations"
-    }
+      "invited": "Invitations",
+      "requested": "En attente"
+    },
+    "hoursPerWeek": "{{hours}}h/sem",
+    "hoursNA": "N/A h/sem",
+    "industries": "Secteurs :",
+    "activities": "Activités :",
+    "showLess": "Réduire",
+    "more": "+{{count}} de plus",
+    "less": "Moins",
+    "details": "Détails",
+    "detailsUpper": "DÉTAILS",
+    "viewDetails": "VOIR DÉTAILS",
+    "startSession": "LANCER LA SESSION",
+    "applyNow": "Postuler",
+    "applying": "Candidature…",
+    "enrolledBadge": "Inscrite",
+    "invitedBadge": "Invité",
+    "pendingBadge": "En attente",
+    "remote": "Distant",
+    "noFavoritesYet": "Aucun favori pour le moment",
+    "enrolledEmptyTitle": "Prêt à commencer ?",
+    "enrolledEmptyDesc": "Acceptez une invitation ou postulez à un gig pour voir vos projets actifs ici."
   },
   "profile": {
     "page": {
