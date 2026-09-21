@@ -88,7 +88,7 @@ export function CertificationPage() {
     };
   }, [certificateId, journeyId]);
 
-  const handleClose = () => navigate('/training?tab=certifications');
+  const handleClose = () => navigate('/training');
 
   if (loading) {
     return (
