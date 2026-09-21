@@ -342,7 +342,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           )}
           {group1.map((item) => (
             <div key={item.path} className="space-y-1">
-              {item.label === 'Training' && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
+              {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                 <>
                   <button
                     onClick={() => {
