@@ -129,7 +129,8 @@ type ViewerSlide =
         question: any;
         correctAnswer: number;
       }>;
-    };
+    }
+  | { key: string; kind: 'completion'; title: string };
 
 type ModulePlanItem = { durationMinutes?: unknown };
 
@@ -406,7 +407,7 @@ function viewerSlideCountFromJourney(journey: JourneyRow): number {
     );
     if (hasQuestions) count += 1; // quiz_group
   });
-  return count;
+  return count + 1; // completion (« Bravo »)
 }
 
 function readQuizMaxAttemptsFromJourneyDoc(qz: unknown): number {
@@ -1103,6 +1104,11 @@ export function Training() {
         });
       }
     });
+    slides.push({
+      key: 'completion',
+      kind: 'completion',
+      title: journeyTitle(selectedJourney),
+    });
     return slides;
   }, [selectedJourney]);
   const formationViewerSlideIndexByKey = useMemo(() => {
@@ -1128,7 +1134,7 @@ export function Training() {
   const isNextModuleLocked = useMemo(() => {
     if (!selectedJourneyId || !currentFormationViewerSlide) return false;
     const nextSlide = formationViewerSlides[formationViewerSlideIndex + 1];
-    if (!nextSlide || nextSlide.kind === 'overview') return false;
+    if (!nextSlide || nextSlide.kind === 'overview' || nextSlide.kind === 'completion') return false;
     const nextModuleIndex = nextSlide.moduleIndex;
     const selected = selectedJourney ? extractModules(selectedJourney) : [];
     const nextModule = selected[nextModuleIndex];
@@ -1164,8 +1170,9 @@ export function Training() {
   const blockFormationNextByEndPosition = useMemo(() => {
     if (formationViewerSlides.length === 0) return false;
     if (formationViewerSlideIndex < formationViewerSlides.length - 1) return false;
-    return currentFormationViewerSlide?.kind !== 'section';
-  }, [formationViewerSlides, formationViewerSlideIndex, currentFormationViewerSlide]);
+    // Sur Bravo / dernière slide non-section : pas de « Suivant ».
+    return true;
+  }, [formationViewerSlides, formationViewerSlideIndex]);
 
   /** Toutes les questions du bloc ont une réponse verrouillée (peu importe la note). Sert à envoyer quiz/submit même en échec sous 70 %. */
   const isCurrentQuizFullyAnswered = useMemo(() => {
@@ -1290,15 +1297,47 @@ export function Training() {
     return false;
   }, [selectedJourneyId, selectedJourney, structuredProgressByJourney, progressByJourney]);
 
+  const atCompletionSlide = currentFormationViewerSlide?.kind === 'completion';
+
   const showFormationCertificateCta = useMemo(() => {
-    if (!atLastFormationSlide || isNextModuleLocked) return false;
-    if (isSelectedFormationFullyDone) return true;
-    return isCurrentQuizPassed;
+    if (isNextModuleLocked) return false;
+    // CTA certificat uniquement sur la slide Bravo (fin de parcours).
+    if (atCompletionSlide) return true;
+    return false;
+  }, [isNextModuleLocked, atCompletionSlide]);
+
+  /** Index de la slide Bravo (toujours la dernière). */
+  const completionSlideIndex = useMemo(() => {
+    const idx = formationViewerSlides.findIndex((s) => s.kind === 'completion');
+    return idx >= 0 ? idx : Math.max(0, formationViewerSlides.length - 1);
+  }, [formationViewerSlides]);
+
+  /** Après succès du dernier quiz (ou formation déjà 100 %), aller sur Bravo — pas rester sur le quiz. */
+  useEffect(() => {
+    if (!selectedJourneyId || formationViewerSlides.length === 0) return;
+    const cur = formationViewerSlides[formationViewerSlideIndex];
+    if (!cur) return;
+
+    if (isSelectedFormationFullyDone && cur.kind === 'quiz_group') {
+      setFormationViewerSlideIndex(completionSlideIndex);
+      return;
+    }
+
+    const next = formationViewerSlides[formationViewerSlideIndex + 1];
+    if (
+      cur.kind === 'quiz_group' &&
+      next?.kind === 'completion' &&
+      isCurrentQuizPassed
+    ) {
+      setFormationViewerSlideIndex(completionSlideIndex);
+    }
   }, [
-    atLastFormationSlide,
-    isNextModuleLocked,
+    selectedJourneyId,
+    formationViewerSlides,
+    formationViewerSlideIndex,
     isSelectedFormationFullyDone,
     isCurrentQuizPassed,
+    completionSlideIndex,
   ]);
 
   const repViewerTheme = useMemo(
@@ -1359,6 +1398,7 @@ export function Training() {
   const currentModuleIndex = useMemo(() => {
     if (!currentFormationViewerSlide) return null;
     if (currentFormationViewerSlide.kind === 'overview') return 0;
+    if (currentFormationViewerSlide.kind === 'completion') return null;
     return currentFormationViewerSlide.moduleIndex;
   }, [currentFormationViewerSlide]);
 
@@ -1417,6 +1457,7 @@ export function Training() {
     if (!repId || !selectedJourneyId || !selectedJourney) return;
     const slide = formationViewerSlides[formationViewerSlideIndex];
     if (!slide) return;
+    if (slide.kind === 'completion') return;
     const modules = extractModules(selectedJourney);
     const moduleIndex = slide.kind === 'overview' ? 0 : slide.moduleIndex;
     const mod = modules[moduleIndex];
@@ -2509,10 +2550,11 @@ export function Training() {
               // Completed formation → open on the last section.
               // In progress → resume where the REP left off.
               if (isCompleted) {
-                const lastSlide = Math.max(0, slideCount - 1);
-                setFormationViewerSlideIndex(lastSlide);
+                // Formation terminée → slide Bravo (dernière), pas le dernier quiz.
+                const bravoSlide = Math.max(0, slideCount - 1);
+                setFormationViewerSlideIndex(bravoSlide);
                 setSelectedJourneyId(id);
-                setActiveSlide(lastSlide);
+                setActiveSlide(bravoSlide);
                 return;
               }
               const fromSummary =
@@ -3134,7 +3176,42 @@ export function Training() {
                             </div>
                           );
                         })()
-                      ) : (
+                      ) : currentFormationViewerSlide.kind === 'completion' ? (
+                        <div
+                          className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border px-6 py-12 text-center sm:px-10"
+                          style={{
+                            borderColor: viewerThemeTokens.accentBorder,
+                            background:
+                              'linear-gradient(160deg, rgba(16,185,129,0.18) 0%, rgba(11,16,37,0.95) 45%, rgba(99,102,241,0.12) 100%)',
+                            boxShadow: viewerThemeTokens.accentShadow,
+                          }}
+                        >
+                          <div
+                            className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border"
+                            style={{
+                              borderColor: 'rgba(52,211,153,0.45)',
+                              background: 'rgba(16,185,129,0.2)',
+                            }}
+                          >
+                            <Award className="h-8 w-8 text-emerald-300" />
+                          </div>
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                            {t('trainingPage.validated')}
+                          </p>
+                          <h3 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                            {t('trainingPage.bravoTitle')}
+                          </h3>
+                          <p className="mt-2 text-base font-semibold text-slate-100">
+                            {t('trainingPage.bravoSubtitle')}
+                          </p>
+                          <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-300">
+                            {t('trainingPage.bravoDesc')}
+                          </p>
+                          <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            {currentFormationViewerSlide.title}
+                          </p>
+                        </div>
+                      ) : currentFormationViewerSlide.kind === 'quiz_group' ? (
                         (() => {
                           const slide = currentFormationViewerSlide;
                           const totalQuestions = slide.questions.length;
@@ -3388,7 +3465,7 @@ export function Training() {
                             </div>
                           );
                         })()
-                      )}
+                      ) : null}
                     </div>
                   );
                 })()}
@@ -3414,7 +3491,21 @@ export function Training() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => setFormationViewerSlideIndex((i) => Math.max(0, i - 1))}
+                      onClick={() => {
+                        // Depuis Bravo (formation terminée) : ne pas remonter sur un quiz.
+                        if (
+                          currentFormationViewerSlide?.kind === 'completion' &&
+                          isSelectedFormationFullyDone
+                        ) {
+                          for (let i = formationViewerSlideIndex - 1; i >= 0; i--) {
+                            if (formationViewerSlides[i]?.kind !== 'quiz_group') {
+                              setFormationViewerSlideIndex(i);
+                              return;
+                            }
+                          }
+                        }
+                        setFormationViewerSlideIndex((i) => Math.max(0, i - 1));
+                      }}
                       disabled={formationViewerSlideIndex <= 0}
                       className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-slate-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
@@ -3466,10 +3557,19 @@ export function Training() {
                             });
                           }
                           if (atLastFormationSlideSection) return;
-                          const nextIndex = Math.min(
+                          let nextIndex = Math.min(
                             formationViewerSlides.length - 1,
                             formationViewerSlideIndex + 1
                           );
+                          // Formation terminée : ne pas rouvrir un quiz — aller direct à Bravo.
+                          if (isSelectedFormationFullyDone) {
+                            while (
+                              nextIndex < formationViewerSlides.length &&
+                              formationViewerSlides[nextIndex]?.kind === 'quiz_group'
+                            ) {
+                              nextIndex += 1;
+                            }
+                          }
                           setFormationViewerSlideIndex(nextIndex);
                           const nextSlide = formationViewerSlides[nextIndex];
                           if (
@@ -3511,7 +3611,11 @@ export function Training() {
                           boxShadow: viewerThemeTokens.accentShadow,
                         }}
                       >
-                        {atLastFormationSlideSection ? 'Terminer la section' : 'Suivant'}{' '}
+                        {formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
+                          ? t('trainingPage.bravoTitle')
+                          : atLastFormationSlideSection
+                            ? 'Terminer la section'
+                            : 'Suivant'}{' '}
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     )}
@@ -3522,8 +3626,9 @@ export function Training() {
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
                         ? 'Nombre maximum de tentatives atteint. Le chrono « module » est en pause ; en cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
-                        : atLastFormationSlide
-                          ? 'Répondez à toutes les questions (40 s max par question). Le bouton Certificat s’active dès une note ≥ 70 %.'
+                        : atLastFormationSlide ||
+                            formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
+                          ? 'Répondez à toutes les questions (40 s max par question). Le bouton Bravo s’active dès une note ≥ 70 %.'
                           : 'Répondez à toutes les questions (40 s max par question). Le bouton Suivant s’active dès une note ≥ 70 %.'}
                     </p>
                   ) : null}
