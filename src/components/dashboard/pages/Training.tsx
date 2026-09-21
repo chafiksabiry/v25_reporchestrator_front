@@ -1149,6 +1149,13 @@ export function Training() {
     return currentFormationViewerSlide?.kind === 'section';
   }, [formationViewerSlides, formationViewerSlideIndex, currentFormationViewerSlide]);
 
+  const atLastFormationSlide = useMemo(() => {
+    return (
+      formationViewerSlides.length > 0 &&
+      formationViewerSlideIndex >= formationViewerSlides.length - 1
+    );
+  }, [formationViewerSlides, formationViewerSlideIndex]);
+
   const blockFormationNextByEndPosition = useMemo(() => {
     if (formationViewerSlides.length === 0) return false;
     if (formationViewerSlideIndex < formationViewerSlides.length - 1) return false;
@@ -2630,12 +2637,7 @@ export function Training() {
                     setSelectedJourneyId(null);
                     void fetchSlideProgressSummary();
                   }}
-                  className="rounded-xl border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-100 transition hover:-translate-y-0.5"
-                  style={{
-                    borderColor: viewerThemeTokens.accentBorder,
-                    background: viewerThemeTokens.cardBg,
-                    boxShadow: viewerThemeTokens.accentShadow,
-                  }}
+                  className="rounded-xl border border-white/90 bg-white px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-harx-700 shadow-md transition hover:-translate-y-0.5 hover:bg-harx-50 hover:text-harx-800"
                 >
                   {t('trainingPage.backToList')}
                 </button>
@@ -3338,71 +3340,98 @@ export function Training() {
                     >
                       {formationViewerSlideIndex + 1} / {formationViewerSlides.length}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const slide = currentFormationViewerSlide;
-                        if (slide?.kind === 'section') {
-                          void completeSectionProgressAtLeave({
-                            moduleIndex: slide.moduleIndex,
-                            section: slide.section,
-                          });
-                        }
-                        if (atLastFormationSlideSection) return;
-                        const nextIndex = Math.min(
-                          formationViewerSlides.length - 1,
-                          formationViewerSlideIndex + 1
-                        );
-                        setFormationViewerSlideIndex(nextIndex);
-                        const nextSlide = formationViewerSlides[nextIndex];
-                        if (
-                          nextSlide?.kind === 'section' &&
-                          selectedJourneyId &&
-                          selectedJourney
-                        ) {
-                          const modules = extractModules(selectedJourney);
-                          const moduleRow = modules[nextSlide.moduleIndex];
-                          const moduleId =
-                            normalizeMongoId((moduleRow as any)?._id) ||
-                            normalizeMongoId((moduleRow as any)?.id) ||
-                            '';
-                          const sectionMongoId =
-                            normalizeMongoId((nextSlide.section as any)?._id) ||
-                            normalizeMongoId((nextSlide.section as any)?.id) ||
-                            '';
-                          if (
-                            /^[a-f\d]{24}$/i.test(moduleId) &&
-                            /^[a-f\d]{24}$/i.test(sectionMongoId)
-                          ) {
-                            void ensureSectionStarted({
-                              courseId: selectedJourneyId,
-                              moduleId,
-                              sectionId: sectionMongoId,
+                    {atLastFormationSlide && isCurrentQuizPassed && !isNextModuleLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const slide = currentFormationViewerSlide;
+                          if (slide?.kind === 'section') {
+                            void completeSectionProgressAtLeave({
+                              moduleIndex: slide.moduleIndex,
+                              section: slide.section,
                             });
                           }
+                          if (selectedJourney) openCertificate(selectedJourney);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110"
+                        style={{
+                          borderColor: viewerThemeTokens.accentBorder,
+                          background: viewerThemeTokens.accentBg,
+                          boxShadow: viewerThemeTokens.accentShadow,
+                        }}
+                      >
+                        <Award className="h-4 w-4" />
+                        {t('trainingPage.certificate')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const slide = currentFormationViewerSlide;
+                          if (slide?.kind === 'section') {
+                            void completeSectionProgressAtLeave({
+                              moduleIndex: slide.moduleIndex,
+                              section: slide.section,
+                            });
+                          }
+                          if (atLastFormationSlideSection) return;
+                          const nextIndex = Math.min(
+                            formationViewerSlides.length - 1,
+                            formationViewerSlideIndex + 1
+                          );
+                          setFormationViewerSlideIndex(nextIndex);
+                          const nextSlide = formationViewerSlides[nextIndex];
+                          if (
+                            nextSlide?.kind === 'section' &&
+                            selectedJourneyId &&
+                            selectedJourney
+                          ) {
+                            const modules = extractModules(selectedJourney);
+                            const moduleRow = modules[nextSlide.moduleIndex];
+                            const moduleId =
+                              normalizeMongoId((moduleRow as any)?._id) ||
+                              normalizeMongoId((moduleRow as any)?.id) ||
+                              '';
+                            const sectionMongoId =
+                              normalizeMongoId((nextSlide.section as any)?._id) ||
+                              normalizeMongoId((nextSlide.section as any)?.id) ||
+                              '';
+                            if (
+                              /^[a-f\d]{24}$/i.test(moduleId) &&
+                              /^[a-f\d]{24}$/i.test(sectionMongoId)
+                            ) {
+                              void ensureSectionStarted({
+                                courseId: selectedJourneyId,
+                                moduleId,
+                                sectionId: sectionMongoId,
+                              });
+                            }
+                          }
+                        }}
+                        disabled={
+                          blockFormationNextByEndPosition ||
+                          !isCurrentQuizPassed ||
+                          isNextModuleLocked
                         }
-                      }}
-                      disabled={
-                        blockFormationNextByEndPosition ||
-                        !isCurrentQuizPassed ||
-                        isNextModuleLocked
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                      style={{
-                        borderColor: viewerThemeTokens.accentBorder,
-                        background: viewerThemeTokens.accentBg,
-                        boxShadow: viewerThemeTokens.accentShadow,
-                      }}
-                    >
-                      {atLastFormationSlideSection ? 'Terminer la section' : 'Suivant'}{' '}
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                        style={{
+                          borderColor: viewerThemeTokens.accentBorder,
+                          background: viewerThemeTokens.accentBg,
+                          boxShadow: viewerThemeTokens.accentShadow,
+                        }}
+                      >
+                        {atLastFormationSlideSection ? 'Terminer la section' : 'Suivant'}{' '}
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                   {currentFormationViewerSlide?.kind === 'quiz_group' && !isCurrentQuizPassed ? (
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
                         ? 'Nombre maximum de tentatives atteint. Le chrono « module » est en pause ; en cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
-                        : 'Répondez à toutes les questions (40 s max par question). Le bouton Suivant s’active dès une note ≥ 70 %.'}
+                        : atLastFormationSlide
+                          ? 'Répondez à toutes les questions (40 s max par question). Le bouton Certificat s’active dès une note ≥ 70 %.'
+                          : 'Répondez à toutes les questions (40 s max par question). Le bouton Suivant s’active dès une note ≥ 70 %.'}
                     </p>
                   ) : null}
                   {isNextModuleLocked ? (
