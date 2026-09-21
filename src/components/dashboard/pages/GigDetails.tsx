@@ -11,7 +11,6 @@ import { getBonusPillDisplay, getTransactionPillDisplay, getResolvedAgentFacing,
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 import {
-  gigTaxonomyLocale,
   localizeTaxonomyEntity,
   localizeTaxonomyName,
 } from '../../../utils/taxonomyI18n';
@@ -1258,7 +1257,8 @@ export function GigDetails() {
   );
   const hasAdditionalCommissionDetails = Boolean(gig.commission?.additionalDetails);
   const showCommissionDetailsColumn = hasCommissionPills || hasAdditionalCommissionDetails;
-  const taxLang = gigTaxonomyLocale(gig, i18n.language);
+  // Catalog labels (skills, industries, activities, languages, category) follow the UI language switcher.
+  const taxLang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
 
   return (
     <div className="min-h-screen bg-transparent py-4 sm:py-8">
@@ -1513,10 +1513,9 @@ export function GigDetails() {
                           localizeTaxonomyEntity(skill.skill, taxLang) ||
                           skill.details ||
                           t('gigDetails.skill');
-                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-50 text-harx-600 rounded-xl text-xs font-black uppercase tracking-wider">
-                            {skillName}{skillLevel}
+                            {skillName}
                           </span>
                         );
                       })}
@@ -1533,10 +1532,9 @@ export function GigDetails() {
                           localizeTaxonomyEntity(skill.skill, taxLang) ||
                           skill.details ||
                           t('gigDetails.skill');
-                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
-                            {skillName}{skillLevel}
+                            {skillName}
                           </span>
                         );
                       })}
@@ -1553,10 +1551,9 @@ export function GigDetails() {
                           localizeTaxonomyEntity(skill.skill, taxLang) ||
                           skill.details ||
                           t('gigDetails.skill');
-                        const skillLevel = skill.level > 0 ? ` (${t('gigDetails.level', { level: skill.level })})` : '';
                         return (
                           <span key={i} className="px-3 py-1.5 bg-harx-alt-100/50 text-harx-alt-700 rounded-xl text-xs font-black uppercase tracking-wider">
-                            {skillName}{skillLevel}
+                            {skillName}
                           </span>
                         );
                       })}

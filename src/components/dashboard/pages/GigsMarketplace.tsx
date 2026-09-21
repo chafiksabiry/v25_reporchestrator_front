@@ -16,7 +16,6 @@ import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay'
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 import {
-  gigTaxonomyLocale,
   localizeTaxonomyEntity,
   localizeTaxonomyName,
 } from '../../../utils/taxonomyI18n';
@@ -507,10 +506,10 @@ export function GigsMarketplace() {
   const navigate = useNavigate();
   const agentId = getAgentId();
 
-  const taxonomyLabel = (raw: string | undefined | null, gig?: any): string => {
+  const taxonomyLabel = (raw: string | undefined | null, _gig?: any): string => {
     const name = String(raw || '').trim();
     if (!name) return '';
-    const lang = gigTaxonomyLocale(gig, i18n.language);
+    const lang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
     const fromDb = localizeTaxonomyName(name, lang);
     if (fromDb && fromDb !== name) return fromDb;
     const key = `gigsMarketplace.taxonomy.${name}`;
@@ -519,10 +518,10 @@ export function GigsMarketplace() {
     return fromDb || name;
   };
 
-  const taxonomyEntityLabel = (entity: any, gig?: any): string => {
+  const taxonomyEntityLabel = (entity: any, _gig?: any): string => {
     if (!entity) return '';
-    const lang = gigTaxonomyLocale(gig, i18n.language);
-    return localizeTaxonomyEntity(entity, lang) || taxonomyLabel(entity.name, gig);
+    const lang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
+    return localizeTaxonomyEntity(entity, lang) || taxonomyLabel(entity.name);
   };
 
   const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
