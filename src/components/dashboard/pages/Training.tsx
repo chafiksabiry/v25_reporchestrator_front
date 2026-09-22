@@ -28,10 +28,13 @@ import {
 } from '../../../utils/trainingViewerTheme';
 import { GigScriptReaderModal } from '../GigScriptReaderModal';
 import {
+  fetchScriptReadsFromApi,
   gigIdFromJourney,
+  hydrateScriptReadCache,
   isScriptRequirementModule,
   journeyHasScriptModule,
   markScriptReadLocal,
+  markScriptReadRemote,
   scriptModuleMeta,
   scriptModuleStillPending,
   shouldShowScriptCta,
@@ -1613,6 +1616,20 @@ export function Training() {
     void fetchTrainingProgressRows();
   }, [fetchTrainingProgressRows]);
 
+  useEffect(() => {
+    if (!repId) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchScriptReadsFromApi(repId);
+      if (cancelled) return;
+      hydrateScriptReadCache(rows);
+      setScriptReadTick((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [repId]);
+
   const fetchSlideProgressSummary = useCallback(async () => {
     if (!repId) return;
     const base = trainingApiBase();
@@ -1812,7 +1829,17 @@ export function Training() {
       return;
     }
     const { journeyId, gigId } = scriptReader;
-    markScriptReadLocal(journeyId, gigId);
+
+    // Persist in DB (source of truth). Cache updates only on success.
+    if (gigId) {
+      const ok = await markScriptReadRemote({ repId, gigId, journeyId });
+      if (!ok) {
+        setScriptReader(null);
+        return;
+      }
+    } else if (journeyId) {
+      markScriptReadLocal(journeyId);
+    }
     setScriptReadTick((n) => n + 1);
 
     const j = displayJourneys.find((row) => journeyKey(row) === journeyId);
@@ -1851,7 +1878,7 @@ export function Training() {
           fetchStructuredProgress(journeyId),
         ]);
       } catch {
-        /* marquage local déjà appliqué */
+        /* script-read row already persisted when API succeeded */
       }
     }
 
