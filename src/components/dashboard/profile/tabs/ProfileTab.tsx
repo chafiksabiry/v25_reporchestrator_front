@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calendar, Clock, Info, Loader2, Pencil, RefreshCw, RotateCcw, Video, Plus, X } from 'lucide-react';
+import { Calendar, Clock, Info, Loader2, Pencil, RefreshCw, RotateCcw, Sparkles, Video, Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { generateSummary } from '../../../../lib/api/profiles';
+import { normalizeBilingualText } from '../../../../utils/i18nText';
 
 const MAX_RECORDING_MS = 10 * 60 * 1000;
 
@@ -13,7 +15,7 @@ const formatMmSs = (ms: number) => {
 
 interface ProfileTabProps {
   profile: any;
-  onSaveAbout?: (value: string) => Promise<void> | void;
+  onSaveAbout?: (value: string, i18n?: { en: string; fr: string } | null) => Promise<void> | void;
   onReplaceVideo?: (file: File) => Promise<void> | void;
   isUploadingVideo?: boolean;
   onAddNotableCompany?: (value: string) => void;
@@ -21,11 +23,15 @@ interface ProfileTabProps {
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, onReplaceVideo, isUploadingVideo = false, onAddNotableCompany, onDeleteNotableCompany }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const [notableCompanyInput, setNotableCompanyInput] = useState('');
   const [isEditingAbout, setIsEditingAbout] = useState(false);
   const [isEditingVideo, setIsEditingVideo] = useState(false);
   const [aboutDraft, setAboutDraft] = useState('');
+  const [aboutDraftI18n, setAboutDraftI18n] = useState<{ en: string; fr: string } | null>(null);
+  const [isGeneratingAbout, setIsGeneratingAbout] = useState(false);
+  const [generateAboutError, setGenerateAboutError] = useState('');
   const [isRecorderReady, setIsRecorderReady] = useState(false);
   const [isRecordingNow, setIsRecordingNow] = useState(false);
   const [wantsToRerecord, setWantsToRerecord] = useState(false);
@@ -43,7 +49,28 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
 
   useEffect(() => {
     setAboutDraft(String(profile?.professionalSummary?.profileDescription || ''));
+    setAboutDraftI18n(null);
   }, [profile?.professionalSummary?.profileDescription]);
+
+  const regenerateAboutWithAi = async () => {
+    if (!profile || isGeneratingAbout) return;
+    setIsGeneratingAbout(true);
+    setGenerateAboutError('');
+    try {
+      const newSummary = await generateSummary(profile);
+      const { active, i18n: bilingual } = normalizeBilingualText(newSummary, uiLang);
+      if (!active?.trim()) {
+        throw new Error('Empty summary');
+      }
+      setAboutDraft(active);
+      setAboutDraftI18n(bilingual);
+    } catch (err) {
+      console.error('Failed to regenerate profile summary:', err);
+      setGenerateAboutError(t('profile.overview.generateFailed'));
+    } finally {
+      setIsGeneratingAbout(false);
+    }
+  };
 
   const clearRecordingTimers = () => {
     if (recordingTickRef.current) {
@@ -237,30 +264,59 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
         <div className="mb-6">
           {isEditingAbout ? (
             <div className="space-y-3">
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={regenerateAboutWithAi}
+                  disabled={isGeneratingAbout}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-harx-100 bg-white text-harx-700 text-xs font-bold uppercase tracking-wider hover:bg-harx-50 disabled:opacity-50 transition-colors"
+                >
+                  {isGeneratingAbout ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  {isGeneratingAbout ? t('profile.overview.generating') : t('profile.overview.regenerate')}
+                </button>
+              </div>
               <textarea
                 value={aboutDraft}
-                onChange={(e) => setAboutDraft(e.target.value)}
+                onChange={(e) => {
+                  setAboutDraft(e.target.value);
+                  setAboutDraftI18n(null);
+                  if (generateAboutError) setGenerateAboutError('');
+                }}
                 rows={5}
-                className="w-full px-3 py-2.5 text-sm rounded-xl border border-harx-100 bg-white text-slate-800 outline-none focus:ring-2 focus:ring-harx-200"
+                disabled={isGeneratingAbout}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-harx-100 bg-white text-slate-800 outline-none focus:ring-2 focus:ring-harx-200 disabled:opacity-60"
               />
+              {generateAboutError ? (
+                <p className="text-xs text-red-600">{generateAboutError}</p>
+              ) : null}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setAboutDraft(String(profile?.professionalSummary?.profileDescription || ''));
+                    setAboutDraftI18n(null);
+                    setGenerateAboutError('');
                     setIsEditingAbout(false);
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+                  disabled={isGeneratingAbout}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50 disabled:opacity-50"
                 >
                   {t('profile.common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={async () => {
-                    await onSaveAbout?.(aboutDraft);
+                    await onSaveAbout?.(aboutDraft, aboutDraftI18n);
+                    setGenerateAboutError('');
+                    setAboutDraftI18n(null);
                     setIsEditingAbout(false);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90"
+                  disabled={isGeneratingAbout}
+                  className="px-3 py-1.5 rounded-lg bg-gradient-harx text-white text-xs font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
                 >
                   {t('profile.common.save')}
                 </button>
