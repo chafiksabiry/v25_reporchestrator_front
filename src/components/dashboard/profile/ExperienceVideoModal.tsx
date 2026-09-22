@@ -283,9 +283,13 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   identityMatchYes: { en: 'Matches your profile photo', fr: 'Correspond à votre photo de profil' },
   identityMatchNo: { en: 'Does not match your profile photo', fr: 'Ne correspond pas à votre photo de profil' },
   identityMatchUnknown: { en: 'Could not be verified', fr: 'Non vérifiable' },
+  fraudPhotoVideoAdviceBadge: {
+    en: 'Action required',
+    fr: 'Action requise',
+  },
   fraudPhotoVideoAdvice: {
-    en: 'Recommendation: make sure your profile photo and this experience video clearly show the same person, then record again if needed.',
-    fr: 'Recommandation : assurez-vous que votre photo de profil et cette vidéo d’expérience montrent clairement la même personne, puis réenregistrez si besoin.',
+    en: 'Make sure your profile photo and this experience video clearly show the same person, then record again if needed.',
+    fr: 'Assurez-vous que votre photo de profil et cette vidéo d’expérience montrent clairement la même personne, puis réenregistrez si besoin.',
   },
   yes: { en: 'Yes', fr: 'Oui' },
   no: { en: 'No', fr: 'Non' },
@@ -1212,9 +1216,22 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       {(result.fraudCheck.fraudRisk === 'high' ||
                         result.fraudCheck.fraudRisk === 'medium' ||
                         result.fraudCheck.identityMatch === false) && (
-                        <p className="text-[11px] font-semibold text-red-700 leading-relaxed bg-red-100/70 border border-red-200 rounded-xl px-3 py-2.5">
-                          {t('fraudPhotoVideoAdvice')}
-                        </p>
+                        <div className="relative overflow-hidden rounded-xl border-2 border-yellow-300 bg-gradient-to-br from-red-600 via-rose-600 to-harx-700 p-3.5 shadow-[0_0_0_3px_rgba(248,113,113,0.45),0_10px_28px_rgba(220,38,38,0.45)]">
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_55%)]" />
+                          <div className="relative flex items-start gap-3">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-300 text-red-700 shadow-md ring-2 ring-white/80">
+                              <AlertCircle className="h-5 w-5" strokeWidth={2.75} />
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1.5">
+                              <span className="inline-flex items-center rounded-md bg-yellow-300 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-red-800 shadow-sm">
+                                {t('fraudPhotoVideoAdviceBadge')}
+                              </span>
+                              <p className="text-[13px] font-extrabold leading-snug text-white">
+                                {t('fraudPhotoVideoAdvice')}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
