@@ -306,7 +306,7 @@
   },
   "companyProfile": {
     "back": "Retour",
-    "backToMarketplace": "Retour au marketplace",
+    "backToMarketplace": "Retour marketplace",
     "loading": "Chargement du profil…",
     "notFoundTitle": "Entreprise introuvable",
     "notFoundDesc": "Ouvrez cette page depuis une fiche gig ou le marketplace, ou vérifiez que l’URL est correcte.",
@@ -321,7 +321,7 @@
     "mission": "Notre mission"
   },
   "gigDetails": {
-    "backToMarketplace": "Retour au marketplace",
+    "backToMarketplace": "Retour marketplace",
     "notFoundTitle": "Gig introuvable",
     "notFoundDesc": "Le gig demandé est introuvable ou a été archivé.",
     "invitedBadge": "Invité",
@@ -367,6 +367,16 @@
     "monthly": "Mensuel :",
     "schedule": "Planning :",
     "flexibility": "Flexibilité :",
+    "flexibilityOptions": {
+      "Remote Work Available": "Télétravail possible",
+      "Flexible Hours": "Horaires flexibles",
+      "Weekend Rotation": "Rotation le week-end",
+      "Night Shift Available": "Travail de nuit possible",
+      "Split Shifts": "Horaires fractionnés",
+      "Part-Time Options": "Temps partiel possible",
+      "Compressed Work Week": "Semaine comprimée",
+      "Shift Swapping Allowed": "Échange de créneaux autorisé"
+    },
     "documentation": "Documentation & ressources",
     "productDocs": "Documentation produit :",
     "processDocs": "Documentation process :",
