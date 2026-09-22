@@ -119,6 +119,12 @@ interface ProfileData {
       };
     }>;
   };
+  proposedSkills?: {
+    technical?: Array<{ skill: string; level: number; details?: string }>;
+    professional?: Array<{ skill: string; level: number; details?: string }>;
+    soft?: Array<{ skill: string; level: number; details?: string }>;
+  };
+  excludedProposedSkillIds?: string[];
   experience: Array<{
     title: string;
     company: string;
@@ -350,6 +356,138 @@ export function Profile() {
         updateProfileStateAndStorage(refreshed);
       } catch (refreshError) {
         console.error('Error refreshing profile after failed skill add:', refreshError);
+      }
+    }
+  };
+
+  const mapSkillPayload = (entries: any[] = []) =>
+    entries
+      .map((entry: any) => ({
+        skill: getSkillRefId(entry),
+        level: typeof entry.level === 'number' ? entry.level : 0,
+        details: entry.details || ''
+      }))
+      .filter((entry: any) => !!entry.skill);
+
+  const handleConfirmProposedSkill = async (
+    type: 'technical' | 'professional' | 'soft',
+    skillId: string
+  ) => {
+    if (!profile?._id || !skillId) return;
+
+    const proposedLevel =
+      (profile.proposedSkills?.[type] || []).find(
+        (entry: any) => getSkillRefId(entry) === skillId
+      )?.level ?? 0;
+
+    const nextSkills = {
+      technical: [...(profile.skills?.technical || [])],
+      professional: [...(profile.skills?.professional || [])],
+      soft: [...(profile.skills?.soft || [])]
+    };
+    if (!nextSkills[type].some((entry: any) => getSkillRefId(entry) === skillId)) {
+      nextSkills[type].unshift({
+        skill: skillId,
+        level: typeof proposedLevel === 'number' ? proposedLevel : 0,
+        details: ''
+      });
+    }
+
+    const nextProposed = {
+      technical: [...(profile.proposedSkills?.technical || [])],
+      professional: [...(profile.proposedSkills?.professional || [])],
+      soft: [...(profile.proposedSkills?.soft || [])]
+    };
+    nextProposed[type] = nextProposed[type].filter(
+      (entry: any) => getSkillRefId(entry) !== skillId
+    );
+
+    const payload = {
+      skills: {
+        technical: mapSkillPayload(nextSkills.technical),
+        professional: mapSkillPayload(nextSkills.professional),
+        soft: mapSkillPayload(nextSkills.soft),
+        contactCenter: profile.skills?.contactCenter || []
+      },
+      proposedSkills: {
+        technical: mapSkillPayload(nextProposed.technical),
+        professional: mapSkillPayload(nextProposed.professional),
+        soft: mapSkillPayload(nextProposed.soft)
+      }
+    };
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        skills: { ...(prev.skills || {}), ...nextSkills },
+        proposedSkills: nextProposed
+      };
+    });
+
+    try {
+      await updateProfileData(profile._id, payload);
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
+    } catch (error) {
+      console.error('Error confirming proposed skill:', error);
+      try {
+        const refreshed = await getProfileData();
+        updateProfileStateAndStorage(refreshed);
+      } catch (refreshError) {
+        console.error('Error refreshing profile after failed propose confirm:', refreshError);
+      }
+    }
+  };
+
+  const handleDismissProposedSkill = async (
+    type: 'technical' | 'professional' | 'soft',
+    skillId: string
+  ) => {
+    if (!profile?._id || !skillId) return;
+
+    const nextProposed = {
+      technical: [...(profile.proposedSkills?.technical || [])],
+      professional: [...(profile.proposedSkills?.professional || [])],
+      soft: [...(profile.proposedSkills?.soft || [])]
+    };
+    nextProposed[type] = nextProposed[type].filter(
+      (entry: any) => getSkillRefId(entry) !== skillId
+    );
+
+    const excluded = Array.from(
+      new Set([...(profile.excludedProposedSkillIds || []).map(String), skillId])
+    );
+
+    const payload = {
+      proposedSkills: {
+        technical: mapSkillPayload(nextProposed.technical),
+        professional: mapSkillPayload(nextProposed.professional),
+        soft: mapSkillPayload(nextProposed.soft)
+      },
+      excludedProposedSkillIds: excluded
+    };
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        proposedSkills: nextProposed,
+        excludedProposedSkillIds: excluded
+      };
+    });
+
+    try {
+      await updateProfileData(profile._id, payload);
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
+    } catch (error) {
+      console.error('Error dismissing proposed skill:', error);
+      try {
+        const refreshed = await getProfileData();
+        updateProfileStateAndStorage(refreshed);
+      } catch (refreshError) {
+        console.error('Error refreshing profile after failed propose dismiss:', refreshError);
       }
     }
   };
@@ -719,6 +857,8 @@ export function Profile() {
             }}
             onDeleteSkill={handleDeleteSkill}
             onAddSkill={handleAddSkill}
+            onConfirmProposedSkill={handleConfirmProposedSkill}
+            onDismissProposedSkill={handleDismissProposedSkill}
             onDeleteLanguage={handleDeleteLanguage}
             onAddLanguage={handleAddLanguage}
             onUpdateLanguageProficiency={handleUpdateLanguageProficiency}

@@ -636,7 +636,13 @@
       "search": "Rechercher et ajouter une compétence {{type}}...",
       "noneAvailable": "Aucune autre compétence disponible dans cette section.",
       "delete": "Supprimer cette compétence",
-      "deleteNamed": "Supprimer {{name}}"
+      "deleteNamed": "Supprimer {{name}}",
+      "proposals": "Suggérées depuis vos vidéos",
+      "proposalsHint": "{{count}} suggestion(s) de compétences issues de vos vidéos d’expérience — confirmez pour les ajouter au profil, ou retirez-les. Le matching des missions s’appuie surtout sur vos secteurs et activités.",
+      "confirmProposal": "Confirmer cette compétence",
+      "confirmProposalNamed": "Confirmer {{name}}",
+      "dismissProposal": "Retirer cette suggestion",
+      "dismissProposalNamed": "Retirer la suggestion {{name}}"
     },
     "languages": {
       "title": "Maîtrise des langues",
