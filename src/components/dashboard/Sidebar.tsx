@@ -156,6 +156,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const [cockpitGigOptions, setCockpitGigOptions] = React.useState<{ gigId: string; title: string }[]>([]);
   const [cockpitGigLoading, setCockpitGigLoading] = React.useState(false);
   const [selectedCockpitGigId, setSelectedCockpitGigId] = React.useState('');
+  const [isCockpitGigDropdownOpen, setIsCockpitGigDropdownOpen] = React.useState(false);
   const [openTrainingModuleIndexes, setOpenTrainingModuleIndexes] = React.useState<number[]>([]);
   const {
     trainingModules,
@@ -190,6 +191,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     setCockpitGigLoading(true);
     setSelectedCockpitGigId('');
     setCockpitGigOptions([]);
+    setIsCockpitGigDropdownOpen(false);
     try {
       const agentId = getAgentId();
       const token = getAuthToken();
@@ -783,9 +785,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       {/* Cockpit project picker */}
       {showCockpitGigModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl shadow-black/80 overflow-hidden animate-in zoom-in-95 duration-300 text-white">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl shadow-black/80 animate-in zoom-in-95 duration-300 text-white">
             <button
-              onClick={() => setShowCockpitGigModal(false)}
+              onClick={() => {
+                setIsCockpitGigDropdownOpen(false);
+                setShowCockpitGigModal(false);
+              }}
               className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-all duration-200 z-50"
               aria-label="Close"
             >
@@ -818,25 +823,82 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   {t('trainingAllGigsGuard.noGigs')}
                 </p>
               ) : (
-                <label className="block space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                <div className="block space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/80 ml-1">
                     {t('trainingAllGigsGuard.selectLabel')}
                   </span>
-                  <select
-                    value={selectedCockpitGigId}
-                    onChange={(e) => setSelectedCockpitGigId(e.target.value)}
-                    className="w-full rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-amber-400/50 focus:ring-2 focus:ring-amber-500/20"
-                  >
-                    <option value="" disabled>
-                      {t('trainingAllGigsGuard.selectPlaceholder')}
-                    </option>
-                    {cockpitGigOptions.map((g) => (
-                      <option key={g.gigId} value={g.gigId}>
-                        {g.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsCockpitGigDropdownOpen((open) => !open)}
+                      className={`w-full rounded-2xl border bg-slate-950/80 px-4 py-3.5 flex items-center justify-between gap-3 text-left outline-none transition-all duration-200 ${
+                        isCockpitGigDropdownOpen
+                          ? 'border-amber-400/60 ring-2 ring-amber-500/20 shadow-lg shadow-amber-500/10'
+                          : 'border-amber-500/30 hover:border-amber-400/50'
+                      }`}
+                      aria-haspopup="listbox"
+                      aria-expanded={isCockpitGigDropdownOpen}
+                    >
+                      <span
+                        className={`truncate text-sm font-semibold ${
+                          selectedCockpitGigId ? 'text-white' : 'text-slate-400'
+                        }`}
+                      >
+                        {selectedCockpitGigId
+                          ? cockpitGigOptions.find((g) => g.gigId === selectedCockpitGigId)?.title
+                          : t('trainingAllGigsGuard.selectPlaceholder')}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 shrink-0 transition-transform duration-300 ${
+                          isCockpitGigDropdownOpen ? 'rotate-180 text-amber-400' : 'text-amber-400/70'
+                        }`}
+                      />
+                    </button>
+
+                    {isCockpitGigDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[60]"
+                          onClick={() => setIsCockpitGigDropdownOpen(false)}
+                        />
+                        <div
+                          role="listbox"
+                          className="absolute left-0 right-0 top-full mt-2 z-[70] max-h-56 overflow-y-auto rounded-2xl border border-amber-500/25 bg-slate-950/95 backdrop-blur-xl py-1.5 shadow-2xl shadow-black/60 animate-in fade-in slide-in-from-top-2 duration-200"
+                        >
+                          {cockpitGigOptions.map((g) => {
+                            const isSelected = selectedCockpitGigId === g.gigId;
+                            return (
+                              <button
+                                key={g.gigId}
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  setSelectedCockpitGigId(g.gigId);
+                                  setIsCockpitGigDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-3 text-left text-sm font-semibold transition-all flex items-start gap-3 ${
+                                  isSelected
+                                    ? 'bg-amber-500/15 text-amber-200'
+                                    : 'text-slate-200 hover:bg-white/5 hover:text-white'
+                                }`}
+                              >
+                                <span
+                                  className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                                    isSelected
+                                      ? 'bg-amber-400 ring-4 ring-amber-400/20'
+                                      : 'bg-slate-600'
+                                  }`}
+                                />
+                                <span className="leading-snug">{g.title}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
