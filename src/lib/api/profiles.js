@@ -225,10 +225,85 @@ export const analyzeAvailability = async (contentToProcess) => {
   }
 };
 
+// Keep only the fields the summary LLM needs — dashboard profiles include
+// video transcriptions / analyses that blow past the default Express body limit.
+export const slimProfileForSummary = (profileData) => {
+  if (!profileData || typeof profileData !== 'object') return profileData;
+
+  const slimSkill = (skill) => {
+    if (skill == null) return skill;
+    if (typeof skill === 'string') return skill;
+    return {
+      name: skill.name || skill.label || skill.skillName,
+      name_i18n: skill.name_i18n,
+      category: skill.category,
+      level: skill.level || skill.proficiency,
+    };
+  };
+
+  const slimLanguage = (lang) => {
+    if (!lang || typeof lang !== 'object') return lang;
+    return {
+      language: lang.language || lang.name,
+      languageId: lang.languageId,
+      proficiency: lang.proficiency,
+      name_i18n: lang.name_i18n,
+    };
+  };
+
+  const slimExperience = (exp) => {
+    if (!exp || typeof exp !== 'object') return exp;
+    return {
+      title: exp.title,
+      company: exp.company,
+      location: exp.location,
+      startDate: exp.startDate,
+      endDate: exp.endDate,
+      isPresent: exp.isPresent,
+      description: exp.description,
+      keyResponsibilities: exp.keyResponsibilities,
+    };
+  };
+
+  const skills = profileData.skills || {};
+  const personalInfo = profileData.personalInfo || {};
+  const professionalSummary = profileData.professionalSummary || {};
+
+  return {
+    personalInfo: {
+      name: personalInfo.name,
+      firstName: personalInfo.firstName,
+      lastName: personalInfo.lastName,
+      location: personalInfo.location,
+      currentRole: personalInfo.currentRole,
+      yearsOfExperience: personalInfo.yearsOfExperience,
+      languages: Array.isArray(personalInfo.languages)
+        ? personalInfo.languages.map(slimLanguage)
+        : personalInfo.languages,
+    },
+    professionalSummary: {
+      yearsOfExperience: professionalSummary.yearsOfExperience,
+      industries: professionalSummary.industries,
+      activities: professionalSummary.activities,
+      notableCompanies: professionalSummary.notableCompanies,
+      // Omit existing profileDescription so regeneration is not biased by it.
+    },
+    skills: {
+      technical: Array.isArray(skills.technical) ? skills.technical.map(slimSkill) : [],
+      professional: Array.isArray(skills.professional) ? skills.professional.map(slimSkill) : [],
+      soft: Array.isArray(skills.soft) ? skills.soft.map(slimSkill) : [],
+    },
+    experience: Array.isArray(profileData.experience)
+      ? profileData.experience.map(slimExperience)
+      : [],
+  };
+};
+
 // Generate CV summary (returns a bilingual { en, fr } object)
 export const generateSummary = async (profileData) => {
   try {
-    const { data } = await api.post('/cv/generate-summary', { profileData });
+    const slim = slimProfileForSummary(profileData);
+    const { data } = await api.post('/cv/generate-summary', { profileData: slim });
     return data;
   } catch (error) {
     console.error('Error generating CV summary:', error);
