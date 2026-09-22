@@ -283,8 +283,8 @@ export function Profile() {
   const getSkillRefId = (entry: any): string | undefined => {
     if (!entry) return undefined;
     if (typeof entry.skill === 'string') return entry.skill;
-    if (entry.skill?._id) return entry.skill._id;
-    if (entry._id) return entry._id;
+    if (entry.skill?._id != null) return String(entry.skill._id);
+    if (entry._id != null) return String(entry._id);
     return undefined;
   };
 
@@ -385,7 +385,8 @@ export function Profile() {
       updateProfileStateAndStorage(refreshed);
     } catch (error: any) {
       console.error('Error adding skill:', error);
-      const serverMessage =
+      const detail =
+        (Array.isArray(error?.errors) && error.errors[0]) ||
         error?.message ||
         error?.error ||
         (typeof error === 'string' ? error : JSON.stringify(error));
