@@ -55,6 +55,14 @@ function toMinutes(hhmm: string): number {
     return Number(m[1]) * 60 + Number(m[2]);
 }
 
+function normalizeHHmm(hhmm: string): string {
+    const mins = toMinutes(hhmm);
+    if (Number.isNaN(mins) || mins < 0) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 /** True if intervals overlap; touching endpoints (10:00–11:00 & 11:00–12:00) do not. */
 function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
     const as = toMinutes(aStart);
@@ -62,15 +70,19 @@ function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string
     const bs = toMinutes(bStart);
     const be = toMinutes(bEnd);
     if ([as, ae, bs, be].some((n) => Number.isNaN(n))) return false;
+    if (!(ae > as && be > bs)) return false;
     return as < be && bs < ae;
 }
 
 function isActiveReservation(r: Reservation): boolean {
-    return r.status !== 'cancelled';
+    return String(r.status || '').toLowerCase() === 'reserved';
 }
 
 function reservationDateKey(r: Reservation): string {
-    return String(r.reservationDate || r.date || '').slice(0, 10);
+    const raw = String(r.reservationDate || r.date || '').trim();
+    // Only accept concrete calendar dates (ignore day-name legacy values here).
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+    return '';
 }
 
 export function AvailableSlotsGrid({
@@ -83,6 +95,7 @@ export function AvailableSlotsGrid({
     const { t, i18n } = useTranslation();
     const [slots, setSlots] = useState<Slot[]>([]);
     const [reservations, setReservations] = useState<Reservation[]>([]);
+    const [reservationsReady, setReservationsReady] = useState(false);
     const [loading, setLoading] = useState<boolean>(false);
     const [reservingSlotId, setReservingSlotId] = useState<string | null>(null);
     const [cancellingReservationId, setCancellingReservationId] = useState<string | null>(null);
@@ -99,6 +112,7 @@ export function AvailableSlotsGrid({
 
     useEffect(() => {
         if (!gigId || gigId === '') return;
+        setReservationsReady(false);
         loadSlots();
         loadReservations();
     }, [gigId, selectedDate]);
@@ -124,12 +138,18 @@ export function AvailableSlotsGrid({
 
     /** Load ALL reservations for this rep (all GIGs) so we can detect cross-gig overlaps. */
     const loadReservations = async () => {
-        if (!repId || repId === '') return;
+        if (!repId || repId === '') {
+            setReservations([]);
+            setReservationsReady(true);
+            return;
+        }
         try {
             const fetchedReservations = await slotApi.getReservations(repId);
             setReservations(Array.isArray(fetchedReservations) ? fetchedReservations : []);
         } catch (error: any) {
             console.error('Error loading reservations:', error);
+        } finally {
+            setReservationsReady(true);
         }
     };
 
@@ -149,11 +169,19 @@ export function AvailableSlotsGrid({
 
     const findCrossGigConflict = (slot: Slot, dateKey: string): Reservation | undefined => {
         const currentGig = normalizeGigId(gigId);
+        const slotStart = normalizeHHmm(slot.startTime);
+        const slotEnd = normalizeHHmm(slot.endTime);
+        if (!slotStart || !slotEnd) return undefined;
+
         return reservations.find((r) => {
             if (!isActiveReservation(r)) return false;
-            if (normalizeGigId(r.gigId) === currentGig) return false;
+            const otherGig = normalizeGigId(r.gigId);
+            if (!otherGig || otherGig === currentGig) return false;
             if (reservationDateKey(r) !== dateKey) return false;
-            return timesOverlap(slot.startTime, slot.endTime, r.startTime, r.endTime);
+            const rStart = normalizeHHmm(r.startTime);
+            const rEnd = normalizeHHmm(r.endTime);
+            if (!rStart || !rEnd) return false;
+            return timesOverlap(slotStart, slotEnd, rStart, rEnd);
         });
     };
 
@@ -493,7 +521,7 @@ export function AvailableSlotsGrid({
                                                             ? t('sessionPlanning.switching')
                                                             : t('sessionPlanning.switchHere')}
                                                     </button>
-                                                ) : isAvailable && !isSlotPast ? (
+                                                ) : isAvailable && !isSlotPast && reservationsReady ? (
                                                     <button
                                                         onClick={() => handleReserve(slot)}
                                                         disabled={reservingSlotId === slot._id}
@@ -501,6 +529,10 @@ export function AvailableSlotsGrid({
                                                     >
                                                         {reservingSlotId === slot._id ? 'Réservation…' : 'Réserver'}
                                                     </button>
+                                                ) : isAvailable && !isSlotPast && !reservationsReady ? (
+                                                    <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-400 bg-gray-100 rounded-xl">
+                                                        …
+                                                    </span>
                                                 ) : (
                                                     <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-400 bg-gray-100 rounded-xl">
                                                         {isSlotPast ? 'Expiré' : slot.status === 'full' || remaining <= 0 ? 'Complet' : 'Indisponible'}
