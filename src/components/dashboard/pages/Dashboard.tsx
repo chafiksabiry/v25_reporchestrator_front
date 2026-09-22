@@ -306,13 +306,17 @@ export function Dashboard({ profile }: DashboardProps) {
         const callsList = Array.isArray(calls.data) ? calls.data : [];
         const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
-        // Source of truth for the filter: enrolled gigs only.
-        // Calls / ledger often still reference deleted or old gig IDs and used to
-        // pollute the dropdown with placeholders like "Gig 0841e6".
-        const enrolledMerged = mergeGigOptions([profileGigs, matchingGigs], i18n.language);
+        // Matching enrollments are the source of truth (same as Training / Cockpit).
+        // Profile.gigs often still lists deleted/orphan enrollments as "Gig abc123".
+        const fromMatching = mergeGigOptions([matchingGigs], i18n.language);
+        const fromProfile = mergeGigOptions([profileGigs], i18n.language);
+        const enrolledMerged =
+          fromMatching.length > 0 ? fromMatching : fromProfile;
         const enrolledIds = new Set(enrolledMerged.map((g) => g._id));
 
-        const historicalCandidates = mergeGigOptions(
+        // Only use calls / ledger / dashboard gigs to enrich titles of enrolled IDs —
+        // never to add extra filter rows.
+        const titleHints = mergeGigOptions(
           [
             Array.isArray(gigs.data) ? gigs.data : [],
             callsList.map((call: any) => call.gigId).filter(Boolean),
@@ -325,22 +329,9 @@ export function Dashboard({ profile }: DashboardProps) {
               })),
           ],
           i18n.language
-        );
+        ).filter((g) => enrolledIds.has(g._id));
 
-        // Enrich enrolled titles from historical sources; keep non-enrolled only
-        // when they already have a real title (never bare "Gig abc123" orphans).
-        const historicalExtras = historicalCandidates.filter(
-          (g) => !enrolledIds.has(g._id) && !isPlaceholderGigTitle(g.title, g._id)
-        );
-
-        const mergedGigs = mergeGigOptions(
-          [
-            enrolledMerged,
-            historicalCandidates.filter((g) => enrolledIds.has(g._id)),
-            historicalExtras,
-          ],
-          i18n.language
-        );
+        const mergedGigs = mergeGigOptions([enrolledMerged, titleHints], i18n.language);
 
         // Resolve leftover "Gig abc123" labels from the gigs API.
         const gigsApi = getGigsApiBase();
@@ -374,12 +365,16 @@ export function Dashboard({ profile }: DashboardProps) {
               const title = titleById.get(g._id);
               if (title) g.title = title;
             }
-            mergedGigs.sort((a, b) => a.title.localeCompare(b.title, i18n.language));
           }
         }
 
+        // Drop enrollments that no longer resolve to a real gig document.
+        const liveGigs = mergedGigs
+          .filter((g) => !isPlaceholderGigTitle(g.title, g._id))
+          .sort((a, b) => a.title.localeCompare(b.title, i18n.language));
+
         setCallsData(callsList);
-        setGigsData(mergedGigs);
+        setGigsData(liveGigs);
         setReservationsData(Array.isArray(reservationsRes) ? reservationsRes : []);
 
         if (walletRes?.data?.success && walletRes.data.data) {
