@@ -1804,7 +1804,7 @@ export function GigDetails() {
                   <div className="flex flex-wrap gap-2">
                     {gig.availability.flexibility.map((flex, index) => (
                       <span key={index} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider">
-                        {flex}
+                        {t(`gigDetails.flexibilityOptions.${flex}`, { defaultValue: flex })}
                       </span>
                     ))}
                   </div>
