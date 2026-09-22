@@ -317,12 +317,20 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   confHigh: { en: 'high confidence', fr: 'confiance élevée' },
   strengths: { en: 'Strengths', fr: 'Points forts' },
   toImprove: { en: 'To improve', fr: 'À améliorer' },
-  technicalSkills: { en: 'Technical Skills', fr: 'Compétences techniques' },
-  professionalSkills: { en: 'Professional Skills', fr: 'Compétences professionnelles' },
-  softSkills: { en: 'Soft Skills', fr: 'Compétences comportementales' },
+  technicalSkills: { en: 'Technical skills (proposals)', fr: 'Compétences techniques (propositions)' },
+  professionalSkills: { en: 'Professional skills (proposals)', fr: 'Compétences professionnelles (propositions)' },
+  softSkills: { en: 'Soft skills (proposals)', fr: 'Compétences comportementales (propositions)' },
+  skillsProposalHint: {
+    en: 'These skills are suggestions only — confirm or remove them later in the Skills tab. Matching missions mainly uses your industries and activities.',
+    fr: 'Ces compétences sont des suggestions uniquement — confirmez-les ou retirez-les plus tard dans l’onglet Compétences. Le matching des missions s’appuie surtout sur vos secteurs et activités.',
+  },
+  matchingSignalsHint: {
+    en: 'Industries and activities below feed the matching algorithm so we can propose relevant missions.',
+    fr: 'Les secteurs et activités ci-dessous alimentent l’algorithme de matching pour vous proposer des missions pertinentes.',
+  },
   languages: { en: 'Languages', fr: 'Langues' },
-  industries: { en: 'Industries', fr: 'Secteurs' },
-  activities: { en: 'Activities', fr: 'Activités' },
+  industries: { en: 'Industries (matching)', fr: 'Secteurs (matching)' },
+  activities: { en: 'Activities (matching)', fr: 'Activités (matching)' },
   contactCenterSkills: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
   ccCustomerService: { en: 'Customer Service', fr: 'Service client' },
   ccCommunication: { en: 'Communication', fr: 'Communication' },
@@ -1406,42 +1414,34 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </Section>
                 )}
 
-                {/* Technical Skills */}
-                {result.analysis.technicalSkills?.length > 0 && (
-                  <Section
-                    icon={<Briefcase className="w-4 h-4" />}
-                    title={t('technicalSkills')}
-                    count={result.analysis.technicalSkills.length}
-                  >
-                    {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                {/* Matching-critical: industries & activities first */}
+                {(result.analysis.industries?.length > 0 || result.analysis.activities?.length > 0) && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-[11px] font-semibold text-emerald-900 leading-relaxed">
+                    {t('matchingSignalsHint')}
+                  </div>
+                )}
+
+                {result.analysis.industries?.length > 0 && (
+                  <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
+                    {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
+                      <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
                     ))}
                   </Section>
                 )}
 
-                {/* Professional Skills */}
-                {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
-                  <Section
-                    icon={<Briefcase className="w-4 h-4" />}
-                    title={t('professionalSkills')}
-                    count={result.analysis.professionalSkills!.length}
-                  >
-                    {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
-                    ))}
-                  </Section>
-                )}
-
-                {/* Soft Skills */}
-                {(result.analysis.softSkills?.length ?? 0) > 0 && (
-                  <Section
-                    icon={<Sparkles className="w-4 h-4" />}
-                    title={t('softSkills')}
-                    count={result.analysis.softSkills!.length}
-                  >
-                    {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
-                    ))}
+                {result.analysis.activities?.length > 0 && (
+                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length}>
+                    <div className="flex flex-wrap gap-2">
+                      {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
+                        <span
+                          key={activityLabel(act)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900"
+                        >
+                          {activityLabel(act)}
+                          <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
+                        </span>
+                      ))}
+                    </div>
                   </Section>
                 )}
 
@@ -1473,29 +1473,51 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </Section>
                 )}
 
-                {/* Industries */}
-                {result.analysis.industries?.length > 0 && (
-                  <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
-                    {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
-                      <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
+                {/* Skills are proposals only */}
+                {((result.analysis.technicalSkills?.length ?? 0) > 0 ||
+                  (result.analysis.professionalSkills?.length ?? 0) > 0 ||
+                  (result.analysis.softSkills?.length ?? 0) > 0) && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-[11px] font-semibold text-amber-900 leading-relaxed">
+                    {t('skillsProposalHint')}
+                  </div>
+                )}
+
+                {result.analysis.technicalSkills?.length > 0 && (
+                  <Section
+                    icon={<Briefcase className="w-4 h-4" />}
+                    title={t('technicalSkills')}
+                    count={result.analysis.technicalSkills.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
 
-                {/* Activities */}
-                {result.analysis.activities?.length > 0 && (
-                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length}>
-                    <div className="flex flex-wrap gap-2">
-                      {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
-                        <span
-                          key={activityLabel(act)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                        >
-                          {activityLabel(act)}
-                          <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
-                        </span>
-                      ))}
-                    </div>
+                {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Briefcase className="w-4 h-4" />}
+                    title={t('professionalSkills')}
+                    count={result.analysis.professionalSkills!.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                    ))}
+                  </Section>
+                )}
+
+                {(result.analysis.softSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Sparkles className="w-4 h-4" />}
+                    title={t('softSkills')}
+                    count={result.analysis.softSkills!.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                    ))}
                   </Section>
                 )}
 
@@ -1528,8 +1550,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         <ScoreBar
                           key={key}
                           score={val.score}
-                          label={labelKeys[key] ? t(labelKeys[key]) : key}
-                          feedback={localize(val.notes, uiLang)}
+                          label={t(labelKeys[key] || 'contactCenterSkills')}
+                          feedback={localize(val.evidence, uiLang)}
                         />
                       ))}
                     </Section>
