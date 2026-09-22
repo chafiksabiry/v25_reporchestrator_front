@@ -133,6 +133,42 @@ export const LanguageAnalysisModal: React.FC<LanguageAnalysisModalProps> = ({
               </div>
             )}
 
+            {entry?.accent && (
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black uppercase tracking-widest text-indigo-700">
+                    {isFr ? 'Accent' : 'Accent'}
+                  </span>
+                  <span className="text-[10px] font-bold text-indigo-500 uppercase">
+                    {entry.accent.category === 'mild_regional'
+                      ? isFr
+                        ? 'Régional léger'
+                        : 'Mild regional'
+                      : entry.accent.category === 'strong_regional'
+                      ? isFr
+                        ? 'Régional marqué'
+                        : 'Strong regional'
+                      : entry.accent.category === 'non_native'
+                      ? isFr
+                        ? 'Non natif'
+                        : 'Non-native'
+                      : isFr
+                      ? 'Neutre / standard'
+                      : 'Neutral / standard'}
+                  </span>
+                </div>
+                <p className="text-sm font-black text-indigo-950">
+                  {localizeText(entry.accent.variety, uiLang) ||
+                    (isFr ? 'Neutre / standard' : 'Neutral / standard')}
+                </p>
+                {localizeText(entry.accent.feedback, uiLang) && (
+                  <p className="text-[11px] text-indigo-800/80 leading-relaxed">
+                    {localizeText(entry.accent.feedback, uiLang)}
+                  </p>
+                )}
+              </div>
+            )}
+
             {summary && (
               <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">

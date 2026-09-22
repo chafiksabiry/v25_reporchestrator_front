@@ -68,6 +68,13 @@ interface SubScore {
   confidence?: 'low' | 'medium' | 'high';
 }
 
+interface AccentInfo {
+  category?: 'neutral' | 'mild_regional' | 'strong_regional' | 'non_native' | string;
+  variety?: LocalizedText | string;
+  confidence?: 'low' | 'medium' | 'high' | string;
+  feedback?: LocalizedText | string;
+}
+
 interface LanguageAssessmentEntry {
   language?: RefLabel;
   languageName?: string;
@@ -78,6 +85,7 @@ interface LanguageAssessmentEntry {
   vocabulary?: SubScore;
   coherence?: SubScore;
   pronunciationEstimate?: SubScore;
+  accent?: AccentInfo;
   strengths?: LocalizedText;
   areasForImprovement?: LocalizedText;
 }
@@ -299,6 +307,11 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   metricVocabulary: { en: 'Vocabulary', fr: 'Vocabulaire' },
   metricCoherence: { en: 'Coherence', fr: 'Cohérence' },
   metricPronunciation: { en: 'Pronunciation', fr: 'Prononciation' },
+  metricAccent: { en: 'Accent', fr: 'Accent' },
+  accentNeutral: { en: 'Neutral / standard', fr: 'Neutre / standard' },
+  accentMild: { en: 'Mild regional', fr: 'Régional léger' },
+  accentStrong: { en: 'Strong regional', fr: 'Régional marqué' },
+  accentNonNative: { en: 'Non-native', fr: 'Non natif' },
   confLow: { en: 'low confidence', fr: 'confiance faible' },
   confMedium: { en: 'medium confidence', fr: 'confiance moyenne' },
   confHigh: { en: 'high confidence', fr: 'confiance élevée' },
@@ -1319,6 +1332,46 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             </div>
 
                             <div className="p-4 space-y-3">
+                              {lang.accent && (
+                                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-black text-indigo-700 uppercase tracking-wide">
+                                      {t('metricAccent')}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-indigo-500 uppercase">
+                                      {t(
+                                        lang.accent.category === 'mild_regional'
+                                          ? 'accentMild'
+                                          : lang.accent.category === 'strong_regional'
+                                          ? 'accentStrong'
+                                          : lang.accent.category === 'non_native'
+                                          ? 'accentNonNative'
+                                          : 'accentNeutral'
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-black text-indigo-950">
+                                    {localize(lang.accent.variety, uiLang) || t('accentNeutral')}
+                                  </p>
+                                  {localize(lang.accent.feedback, uiLang) && (
+                                    <p className="text-[11px] text-indigo-800/80 leading-relaxed">
+                                      {localize(lang.accent.feedback, uiLang)}
+                                    </p>
+                                  )}
+                                  {lang.accent.confidence && (
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase">
+                                      {t(
+                                        lang.accent.confidence === 'high'
+                                          ? 'confHigh'
+                                          : lang.accent.confidence === 'medium'
+                                          ? 'confMedium'
+                                          : 'confLow'
+                                      )}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
                               <div className="space-y-2.5">
                                 {metrics.map((metric) => (
                                   <MetricTile
