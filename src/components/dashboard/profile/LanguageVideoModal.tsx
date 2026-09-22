@@ -34,6 +34,12 @@ interface LanguageAssessmentResult {
   grammar?: { score: number; feedback?: LocalizedText };
   vocabulary?: { score: number; feedback?: LocalizedText };
   coherence?: { score: number; feedback?: LocalizedText };
+  accent?: {
+    category?: string;
+    variety?: LocalizedText;
+    confidence?: string;
+    feedback?: LocalizedText;
+  };
   meetsClaimedLevel?: boolean;
   summary?: LocalizedText;
 }
@@ -634,6 +640,42 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                         </div>
                       ))}
                     </div>
+
+                    {assessment.accent && (
+                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/80 px-3 py-3 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-black text-indigo-700 uppercase tracking-wide">
+                            {isFr ? 'Accent' : 'Accent'}
+                          </span>
+                          <span className="text-[10px] font-bold text-indigo-500 uppercase">
+                            {assessment.accent.category === 'mild_regional'
+                              ? isFr
+                                ? 'Régional léger'
+                                : 'Mild regional'
+                              : assessment.accent.category === 'strong_regional'
+                              ? isFr
+                                ? 'Régional marqué'
+                                : 'Strong regional'
+                              : assessment.accent.category === 'non_native'
+                              ? isFr
+                                ? 'Non natif'
+                                : 'Non-native'
+                              : isFr
+                              ? 'Neutre / standard'
+                              : 'Neutral / standard'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-black text-indigo-950">
+                          {localize(assessment.accent.variety, uiLang) ||
+                            (isFr ? 'Neutre / standard' : 'Neutral / standard')}
+                        </p>
+                        {localize(assessment.accent.feedback, uiLang) && (
+                          <p className="text-[11px] text-indigo-800/80 leading-relaxed">
+                            {localize(assessment.accent.feedback, uiLang)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
 
