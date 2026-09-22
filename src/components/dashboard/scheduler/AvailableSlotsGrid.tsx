@@ -16,6 +16,38 @@ interface AvailableSlotsGridProps {
     onReservationMade?: () => void;
 }
 
+/** Normalize API gigId (string or populated gig doc) to an id string. */
+function normalizeGigId(gigId: unknown): string {
+    if (gigId == null || gigId === '') return '';
+    if (typeof gigId === 'string' || typeof gigId === 'number') return String(gigId).trim();
+    if (typeof gigId === 'object') {
+        const o = gigId as Record<string, unknown>;
+        const id = o._id ?? o.$oid ?? o.id;
+        if (id && typeof id === 'object') {
+            const nested = id as Record<string, unknown>;
+            return String(nested.$oid ?? nested._id ?? '').trim();
+        }
+        return String(id ?? '').trim();
+    }
+    return '';
+}
+
+/** Prefer populated title from the reservation, then the local name map. */
+function resolveGigTitle(
+    gigRef: unknown,
+    namesById: Record<string, string>,
+    fallback: string
+): string {
+    if (gigRef && typeof gigRef === 'object') {
+        const o = gigRef as Record<string, unknown>;
+        const title = String(o.title || o.name || '').trim();
+        if (title) return title;
+    }
+    const id = normalizeGigId(gigRef);
+    if (id && namesById[id]?.trim()) return namesById[id].trim();
+    return fallback;
+}
+
 /** HH:mm → minutes since midnight. */
 function toMinutes(hhmm: string): number {
     const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || '').trim());
@@ -101,25 +133,25 @@ export function AvailableSlotsGrid({
         }
     };
 
-    const resolveGigName = (otherGigId: string | undefined): string => {
-        if (!otherGigId) return t('sessionPlanning.overlapUnknownGig');
-        const name = gigNamesById[otherGigId];
-        return name?.trim() || t('sessionPlanning.overlapUnknownGig');
+    const resolveGigName = (gigRef: unknown): string => {
+        return resolveGigTitle(gigRef, gigNamesById, t('sessionPlanning.overlapUnknownGig'));
     };
 
     const findOwnReservation = (slot: Slot, dateKey: string): Reservation | undefined => {
+        const currentGig = normalizeGigId(gigId);
         return reservations.find((r) => {
             if (!isActiveReservation(r)) return false;
-            if (String(r.gigId) !== String(gigId)) return false;
+            if (normalizeGigId(r.gigId) !== currentGig) return false;
             if (r.slotId !== slot._id) return false;
             return reservationDateKey(r) === dateKey;
         });
     };
 
     const findCrossGigConflict = (slot: Slot, dateKey: string): Reservation | undefined => {
+        const currentGig = normalizeGigId(gigId);
         return reservations.find((r) => {
             if (!isActiveReservation(r)) return false;
-            if (String(r.gigId) === String(gigId)) return false;
+            if (normalizeGigId(r.gigId) === currentGig) return false;
             if (reservationDateKey(r) !== dateKey) return false;
             return timesOverlap(slot.startTime, slot.endTime, r.startTime, r.endTime);
         });
@@ -415,7 +447,7 @@ export function AvailableSlotsGrid({
                                                             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
                                                             <div className="space-y-1">
                                                                 <p className="text-xs font-black uppercase tracking-wider text-amber-800">
-                                                                    {t('sessionPlanning.overlapTitle')}
+                                                                    {t('sessionPlanning.overlapTitle', { gig: conflictGigName })}
                                                                 </p>
                                                                 <p className="text-sm font-medium leading-snug">
                                                                     {t('sessionPlanning.overlapMessage', { gig: conflictGigName })}
