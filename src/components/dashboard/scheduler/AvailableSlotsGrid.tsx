@@ -450,7 +450,9 @@ export function AvailableSlotsGrid({
                                                                     {t('sessionPlanning.overlapTitle', { gig: conflictGigName })}
                                                                 </p>
                                                                 <p className="text-sm font-medium leading-snug">
-                                                                    {t('sessionPlanning.overlapMessage', { gig: conflictGigName })}
+                                                                    {isAvailable
+                                                                        ? t('sessionPlanning.overlapMessage', { gig: conflictGigName })
+                                                                        : t('sessionPlanning.overlapFullMessage', { gig: conflictGigName })}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -480,35 +482,15 @@ export function AvailableSlotsGrid({
                                                         )}
                                                     </>
                                                 ) : hasConflict && isAvailable && !isSlotPast ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleCancel(
-                                                                conflict!,
-                                                                t('sessionPlanning.cancelOtherSuccess')
-                                                            )}
-                                                            disabled={
-                                                                cancellingReservationId === conflict?._id ||
-                                                                switchingSlotId === slot._id
-                                                            }
-                                                            className="px-4 py-2 text-xs font-black uppercase tracking-widest text-amber-900 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                        >
-                                                            {cancellingReservationId === conflict?._id
-                                                                ? 'Annulation…'
-                                                                : t('sessionPlanning.cancelOtherGig')}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleSwitch(slot, conflict!)}
-                                                            disabled={
-                                                                switchingSlotId === slot._id ||
-                                                                cancellingReservationId === conflict?._id
-                                                            }
-                                                            className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white bg-harx-600 rounded-xl hover:bg-harx-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                        >
-                                                            {switchingSlotId === slot._id
-                                                                ? t('sessionPlanning.switching')
-                                                                : t('sessionPlanning.switchHere')}
-                                                        </button>
-                                                    </>
+                                                    <button
+                                                        onClick={() => handleSwitch(slot, conflict!)}
+                                                        disabled={switchingSlotId === slot._id}
+                                                        className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white bg-harx-600 rounded-xl hover:bg-harx-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    >
+                                                        {switchingSlotId === slot._id
+                                                            ? t('sessionPlanning.switching')
+                                                            : t('sessionPlanning.switchHere')}
+                                                    </button>
                                                 ) : isAvailable && !isSlotPast ? (
                                                     <button
                                                         onClick={() => handleReserve(slot)}
@@ -519,7 +501,7 @@ export function AvailableSlotsGrid({
                                                     </button>
                                                 ) : (
                                                     <span className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-400 bg-gray-100 rounded-xl">
-                                                        {isSlotPast ? 'Expiré' : slot.status === 'full' ? 'Complet' : 'Indisponible'}
+                                                        {isSlotPast ? 'Expiré' : slot.status === 'full' || remaining <= 0 ? 'Complet' : 'Indisponible'}
                                                     </span>
                                                 )}
                                             </div>
