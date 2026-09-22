@@ -290,7 +290,15 @@
     "calendarHint": "Aperçu sur 14 jours",
     "legendReserved": "Réservés",
     "legendAvailable": "Disponibles",
-    "tzHint": "Horaires affichés dans votre fuseau ({{tz}})"
+    "tzHint": "Horaires affichés dans votre fuseau ({{tz}})",
+    "overlapTitle": "Créneau déjà réservé sur un autre GIG",
+    "overlapMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Annulez d'abord cette réservation sur l'autre GIG, ou basculez automatiquement ici.",
+    "overlapUnknownGig": "un autre GIG",
+    "cancelOtherGig": "Annuler sur l'autre GIG",
+    "switchHere": "Basculez ici",
+    "switching": "Bascule…",
+    "switchSuccess": "Réservation basculée sur ce GIG.",
+    "cancelOtherSuccess": "Réservation annulée sur l'autre GIG. Vous pouvez maintenant réserver ici."
   },
   "operations": {
     "title": "Panneau des Opérations",

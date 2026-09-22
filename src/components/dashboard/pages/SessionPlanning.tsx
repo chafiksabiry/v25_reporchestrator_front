@@ -961,6 +961,7 @@ export function SessionPlanning() {
                                     selectedDate={selectedDate}
                                     gigId={selectedGigId}
                                     gigTimeZone={selectedGig?.availability?.time_zone}
+                                    gigNamesById={Object.fromEntries(gigs.map((g) => [g.id, g.name]))}
                                     onReservationMade={refreshData}
                                 />
                             ) : (
