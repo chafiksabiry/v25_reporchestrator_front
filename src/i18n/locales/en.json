@@ -606,6 +606,9 @@
       "about": "Profile Summary",
       "editAbout": "Edit profile summary",
       "emptySummary": "No professional summary provided",
+      "regenerate": "Generate with AI",
+      "generating": "Generating…",
+      "generateFailed": "Could not generate the summary. Please try again.",
       "notableCompanies": "Notable Companies Worked For",
       "emptyCompanies": "No notable companies specified",
       "companyPlaceholder": "Type company name and press Enter..."
