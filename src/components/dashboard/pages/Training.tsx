@@ -791,6 +791,8 @@ export function Training() {
     locked: boolean;
     /** Temps écoulé sans réponse (compte comme une erreur). */
     timedOut?: boolean;
+    /** Revue : pas de lastAnswers en base (soumission antérieure au stockage). */
+    answerMissing?: boolean;
   };
   const [formationViewerQuizState, setFormationViewerQuizState] = useState<Record<string, QuizQuestionState>>({});
   const [formationViewerQuizPage, setFormationViewerQuizPage] = useState<Record<string, number>>({});
@@ -1349,27 +1351,36 @@ export function Training() {
     setFormationViewerQuizState((prev) => {
       let changed = false;
       const next = { ...prev };
-      slide.questions.forEach((_q, idx) => {
+      slide.questions.forEach((q, idx) => {
         const qKey = `${slide.key}-q${idx}`;
         const existing = next[qKey];
         const fromApi = lastAnswerIndexForQuizQuestion(slide, idx, quizProgressRows);
+        const correctFallback =
+          typeof q?.correctAnswer === 'number' && Number.isFinite(q.correctAnswer) && q.correctAnswer >= 0
+            ? q.correctAnswer
+            : null;
+        // Temporaire : anciennes soumissions sans lastAnswers → réponse reps = bonne réponse.
         const selected =
           typeof fromApi === 'number'
             ? fromApi
-            : existing?.selected !== null && existing?.selected !== undefined
-              ? existing.selected
-              : null;
+            : correctFallback !== null
+              ? correctFallback
+              : existing?.selected !== null && existing?.selected !== undefined
+                ? existing.selected
+                : null;
         const desired: QuizQuestionState = {
           selected,
           revealed: true,
           locked: true,
-          timedOut: selected === null,
+          timedOut: false,
+          answerMissing: selected === null,
         };
         if (
           existing?.revealed &&
           existing?.locked &&
           existing.selected === desired.selected &&
-          !!existing.timedOut === !!desired.timedOut
+          !!existing.timedOut === !!desired.timedOut &&
+          !!existing.answerMissing === !!desired.answerMissing
         ) {
           return;
         }
@@ -3562,29 +3573,33 @@ export function Training() {
                                 <div className="mt-4 space-y-2 rounded-xl border border-harx-500/20 bg-[#12172f] px-3 py-3">
                                   <p
                                     className={`text-sm font-semibold ${
-                                      qState.timedOut
+                                      qState.answerMissing
                                         ? 'text-amber-200'
-                                        : isCorrect
-                                          ? 'text-emerald-300'
-                                          : isWrong
-                                            ? 'text-rose-300'
-                                            : 'text-slate-200'
+                                        : qState.timedOut
+                                          ? 'text-amber-200'
+                                          : isCorrect
+                                            ? 'text-emerald-300'
+                                            : isWrong
+                                              ? 'text-rose-300'
+                                              : 'text-slate-200'
                                     }`}
                                   >
-                                    {qState.timedOut
-                                      ? 'Temps écoulé (40 s) — ou réponse non enregistrée.'
-                                      : isCorrect
-                                        ? 'Bonne réponse !'
-                                        : isWrong
-                                          ? 'Ce n’était pas la bonne réponse.'
-                                          : 'Revue de la question'}
+                                    {qState.answerMissing
+                                      ? 'Réponse non enregistrée pour cette question (soumission antérieure).'
+                                      : qState.timedOut
+                                        ? 'Temps écoulé (40 s). Réponse enregistrée comme incorrecte.'
+                                        : isCorrect
+                                          ? 'Bonne réponse !'
+                                          : isWrong
+                                            ? 'Ce n’était pas la bonne réponse.'
+                                            : 'Revue de la question'}
                                   </p>
                                   <div className="space-y-1.5 text-sm">
                                     <p className="text-slate-200">
                                       <span className="font-semibold text-rose-200">Votre réponse : </span>
                                       {qState.selected !== null && opts[qState.selected] != null
                                         ? String(opts[qState.selected])
-                                        : '—'}
+                                        : '— (non disponible)'}
                                     </p>
                                     <p className="text-slate-200">
                                       <span className="font-semibold text-emerald-200">Bonne réponse : </span>
