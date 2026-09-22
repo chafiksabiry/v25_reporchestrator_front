@@ -306,17 +306,41 @@ export function Dashboard({ profile }: DashboardProps) {
         const callsList = Array.isArray(calls.data) ? calls.data : [];
         const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
-        const mergedGigs = mergeGigOptions([
-          Array.isArray(gigs.data) ? gigs.data : [],
-          profileGigs,
-          matchingGigs,
-          callsList.map((call: any) => call.gigId).filter(Boolean),
-          ledgerList.map((tx: RepTransactionRow) => tx.gig).filter(Boolean),
-          ledgerList.filter((tx: RepTransactionRow) => tx.gigId).map((tx: RepTransactionRow) => ({
-            _id: tx.gigId,
-            title: tx.gig?.title,
-          })),
-        ], i18n.language);
+        // Source of truth for the filter: enrolled gigs only.
+        // Calls / ledger often still reference deleted or old gig IDs and used to
+        // pollute the dropdown with placeholders like "Gig 0841e6".
+        const enrolledMerged = mergeGigOptions([profileGigs, matchingGigs], i18n.language);
+        const enrolledIds = new Set(enrolledMerged.map((g) => g._id));
+
+        const historicalCandidates = mergeGigOptions(
+          [
+            Array.isArray(gigs.data) ? gigs.data : [],
+            callsList.map((call: any) => call.gigId).filter(Boolean),
+            ledgerList.map((tx: RepTransactionRow) => tx.gig).filter(Boolean),
+            ledgerList
+              .filter((tx: RepTransactionRow) => tx.gigId)
+              .map((tx: RepTransactionRow) => ({
+                _id: tx.gigId,
+                title: tx.gig?.title,
+              })),
+          ],
+          i18n.language
+        );
+
+        // Enrich enrolled titles from historical sources; keep non-enrolled only
+        // when they already have a real title (never bare "Gig abc123" orphans).
+        const historicalExtras = historicalCandidates.filter(
+          (g) => !enrolledIds.has(g._id) && !isPlaceholderGigTitle(g.title, g._id)
+        );
+
+        const mergedGigs = mergeGigOptions(
+          [
+            enrolledMerged,
+            historicalCandidates.filter((g) => enrolledIds.has(g._id)),
+            historicalExtras,
+          ],
+          i18n.language
+        );
 
         // Resolve leftover "Gig abc123" labels from the gigs API.
         const gigsApi = getGigsApiBase();
