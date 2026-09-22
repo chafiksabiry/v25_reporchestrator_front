@@ -600,6 +600,30 @@ function quizIsPassedFromProgress(qz: unknown, _qi: number, mp: Record<string, u
   return false;
 }
 
+/** Index de la réponse REP pour une question, depuis lastAnswers du quiz (API). */
+function lastAnswerIndexForQuizQuestion(
+  slide: { questions: Array<{ quizKey?: string }> },
+  questionIndex: number,
+  quizProgressRows: Array<{ quizKey?: unknown; lastAnswers?: unknown }>
+): number | null {
+  const q = slide.questions[questionIndex];
+  if (!q) return null;
+  const key = String(q.quizKey || '').trim();
+  if (!key) return null;
+  const row = quizProgressRows.find((r) => {
+    const rk = String(r?.quizKey || '').trim();
+    return rk === key || normalizeMongoId(rk) === normalizeMongoId(key);
+  });
+  const answers = Array.isArray(row?.lastAnswers) ? row!.lastAnswers : null;
+  if (!answers) return null;
+  let idxInQuiz = 0;
+  for (let i = 0; i < questionIndex; i += 1) {
+    if (String(slide.questions[i]?.quizKey || '').trim() === key) idxInQuiz += 1;
+  }
+  const raw = Number(answers[idxInQuiz]);
+  return Number.isFinite(raw) && raw >= 0 ? raw : null;
+}
+
 function hasStructuredResumeMergeEvidence(row: RepProgressRow | undefined): boolean {
   if (!row?.modules || typeof row.modules !== 'object') return false;
   for (const mp of Object.values(row.modules)) {
@@ -1300,6 +1324,69 @@ export function Training() {
     return false;
   }, [selectedJourneyId, selectedJourney, structuredProgressByJourney, progressByJourney]);
 
+  /** Formation terminée (ou quiz déjà réussi) : figer les réponses en mode revue. */
+  useEffect(() => {
+    const slide = currentFormationViewerSlide;
+    if (!slide || slide.kind !== 'quiz_group') return;
+    if (!isSelectedFormationFullyDone && !isCurrentQuizPassed) return;
+    if (!selectedJourneyId || !selectedJourney) return;
+
+    const modules = extractModules(selectedJourney);
+    const mod = modules[slide.moduleIndex];
+    const moduleId =
+      normalizeMongoId((mod as any)?._id) ||
+      normalizeMongoId((mod as any)?.id) ||
+      String(slide.moduleIndex);
+    const journeyProgress = progressByJourney[selectedJourneyId];
+    const moduleProgressAny =
+      moduleId && journeyProgress?.modules && typeof journeyProgress.modules === 'object'
+        ? (journeyProgress.modules as Record<string, any>)[moduleId]
+        : undefined;
+    const quizProgressRows = Array.isArray(moduleProgressAny?.quizProgress)
+      ? moduleProgressAny.quizProgress
+      : [];
+
+    setFormationViewerQuizState((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      slide.questions.forEach((_q, idx) => {
+        const qKey = `${slide.key}-q${idx}`;
+        const existing = next[qKey];
+        const fromApi = lastAnswerIndexForQuizQuestion(slide, idx, quizProgressRows);
+        const selected =
+          typeof fromApi === 'number'
+            ? fromApi
+            : existing?.selected !== null && existing?.selected !== undefined
+              ? existing.selected
+              : null;
+        const desired: QuizQuestionState = {
+          selected,
+          revealed: true,
+          locked: true,
+          timedOut: selected === null,
+        };
+        if (
+          existing?.revealed &&
+          existing?.locked &&
+          existing.selected === desired.selected &&
+          !!existing.timedOut === !!desired.timedOut
+        ) {
+          return;
+        }
+        next[qKey] = desired;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [
+    currentFormationViewerSlide,
+    isSelectedFormationFullyDone,
+    isCurrentQuizPassed,
+    selectedJourneyId,
+    selectedJourney,
+    progressByJourney,
+  ]);
+
   const atCompletionSlide = currentFormationViewerSlide?.kind === 'completion';
 
   const showFormationCertificateCta = useMemo(() => {
@@ -1315,16 +1402,13 @@ export function Training() {
     return idx >= 0 ? idx : Math.max(0, formationViewerSlides.length - 1);
   }, [formationViewerSlides]);
 
-  /** Après succès du dernier quiz (ou formation déjà 100 %), aller sur Bravo — pas rester sur le quiz. */
+  /** Après succès du dernier quiz (formation en cours), aller sur Bravo — pas rester sur le quiz.
+   *  Si la formation est déjà terminée, on laisse naviguer librement (revue des quizzes). */
   useEffect(() => {
     if (!selectedJourneyId || formationViewerSlides.length === 0) return;
+    if (isSelectedFormationFullyDone) return;
     const cur = formationViewerSlides[formationViewerSlideIndex];
     if (!cur) return;
-
-    if (isSelectedFormationFullyDone && cur.kind === 'quiz_group') {
-      setFormationViewerSlideIndex(completionSlideIndex);
-      return;
-    }
 
     const next = formationViewerSlides[formationViewerSlideIndex + 1];
     if (
@@ -2133,6 +2217,8 @@ export function Training() {
     if (!repId || !selectedJourneyId || !selectedJourney) return;
     const slide = currentFormationViewerSlide;
     if (!slide || slide.kind !== 'quiz_group' || !isCurrentQuizFullyAnswered) return;
+    // Revue : ne pas resoumettre les réponses d’une formation / quiz déjà validé(e).
+    if (isSelectedFormationFullyDone || isCurrentQuizPassed) return;
 
     const modules = extractModules(selectedJourney);
     const mod = modules[slide.moduleIndex];
@@ -2233,6 +2319,8 @@ export function Training() {
     currentFormationViewerSlide,
     formationViewerQuizState,
     isCurrentQuizFullyAnswered,
+    isSelectedFormationFullyDone,
+    isCurrentQuizPassed,
     fetchTrainingProgressRows,
     fetchSlideProgressSummary,
     fetchStructuredProgress,
@@ -2574,14 +2662,12 @@ export function Training() {
             const openFormation = () => {
               if (!id) return;
               const slideCount = viewerSlideCountFromJourney(j);
-              // Completed formation → open on the last section.
+              // Completed formation → open on the first page (review / browse).
               // In progress → resume where the REP left off.
               if (isCompleted) {
-                // Formation terminée → slide Bravo (dernière), pas le dernier quiz.
-                const bravoSlide = Math.max(0, slideCount - 1);
-                setFormationViewerSlideIndex(bravoSlide);
+                setFormationViewerSlideIndex(0);
                 setSelectedJourneyId(id);
-                setActiveSlide(bravoSlide);
+                setActiveSlide(0);
                 return;
               }
               const fromSummary =
@@ -3318,8 +3404,16 @@ export function Training() {
                             !qState.timedOut &&
                             qState.selected !== null &&
                             qState.selected !== correctIdx;
+                          const reviewMode = isSelectedFormationFullyDone || isCurrentQuizPassed;
                           return (
                             <div className="rounded-3xl border border-harx-500/30 bg-[#0b1025]/90 p-5 shadow-[0_20px_70px_-25px_rgba(236,72,153,0.4)] sm:p-7">
+                              {reviewMode ? (
+                                <p className="mb-3 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                                  {isSelectedFormationFullyDone
+                                    ? 'Formation terminée — revue du quiz (votre réponse + bonne réponse).'
+                                    : 'Quiz réussi — revue de vos réponses.'}
+                                </p>
+                              ) : null}
                               <p className="mb-2 inline-flex rounded-full border border-harx-400/40 bg-harx-500/20 px-2.5 py-1 text-xs font-semibold text-harx-100">
                                 {currentQuestion?.quizTitle || `Quiz module ${slide.moduleIndex + 1}`}
                               </p>
@@ -3338,14 +3432,16 @@ export function Training() {
                                       : `${countdown}s`}
                                 </span>
                                 <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => restartQuizSlide(slide)}
-                                    disabled={quizAttemptsBlocked}
-                                    className="rounded-lg border border-amber-400/40 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100 transition hover:border-amber-300/70"
-                                  >
-                                    Refaire quiz
-                                  </button>
+                                  {!isSelectedFormationFullyDone ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => restartQuizSlide(slide)}
+                                      disabled={quizAttemptsBlocked}
+                                      className="rounded-lg border border-amber-400/40 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100 transition hover:border-amber-300/70"
+                                    >
+                                      Refaire quiz
+                                    </button>
+                                  ) : null}
                                   <button
                                     type="button"
                                     disabled={page <= 0}
@@ -3363,7 +3459,8 @@ export function Training() {
                                     type="button"
                                     disabled={
                                       page >= totalQuestions - 1 ||
-                                      !formationViewerQuizState[`${slide.key}-q${page}`]?.locked
+                                      (!reviewMode &&
+                                        !formationViewerQuizState[`${slide.key}-q${page}`]?.locked)
                                     }
                                     onClick={() =>
                                       setFormationViewerQuizPage((prev) => ({
@@ -3462,7 +3559,7 @@ export function Training() {
                                 })}
                               </div>
                               {qState.revealed ? (
-                                <div className="mt-4 rounded-xl border border-harx-500/20 bg-[#12172f] px-3 py-3">
+                                <div className="mt-4 space-y-2 rounded-xl border border-harx-500/20 bg-[#12172f] px-3 py-3">
                                   <p
                                     className={`text-sm font-semibold ${
                                       qState.timedOut
@@ -3475,13 +3572,25 @@ export function Training() {
                                     }`}
                                   >
                                     {qState.timedOut
-                                      ? 'Temps écoulé (40 s). Réponse enregistrée comme incorrecte.'
+                                      ? 'Temps écoulé (40 s) — ou réponse non enregistrée.'
                                       : isCorrect
                                         ? 'Bonne réponse !'
                                         : isWrong
                                           ? 'Ce n’était pas la bonne réponse.'
-                                          : ''}
+                                          : 'Revue de la question'}
                                   </p>
+                                  <div className="space-y-1.5 text-sm">
+                                    <p className="text-slate-200">
+                                      <span className="font-semibold text-rose-200">Votre réponse : </span>
+                                      {qState.selected !== null && opts[qState.selected] != null
+                                        ? String(opts[qState.selected])
+                                        : '—'}
+                                    </p>
+                                    <p className="text-slate-200">
+                                      <span className="font-semibold text-emerald-200">Bonne réponse : </span>
+                                      {opts[correctIdx] != null ? String(opts[correctIdx]) : '—'}
+                                    </p>
+                                  </div>
                                   {String(q?.explanation || '').trim() ? (
                                     <p className="mt-2 text-sm leading-relaxed text-slate-300">
                                       {String(q.explanation)}
@@ -3519,18 +3628,6 @@ export function Training() {
                     <button
                       type="button"
                       onClick={() => {
-                        // Depuis Bravo (formation terminée) : ne pas remonter sur un quiz.
-                        if (
-                          currentFormationViewerSlide?.kind === 'completion' &&
-                          isSelectedFormationFullyDone
-                        ) {
-                          for (let i = formationViewerSlideIndex - 1; i >= 0; i--) {
-                            if (formationViewerSlides[i]?.kind !== 'quiz_group') {
-                              setFormationViewerSlideIndex(i);
-                              return;
-                            }
-                          }
-                        }
                         setFormationViewerSlideIndex((i) => Math.max(0, i - 1));
                       }}
                       disabled={formationViewerSlideIndex <= 0}
@@ -3588,15 +3685,7 @@ export function Training() {
                             formationViewerSlides.length - 1,
                             formationViewerSlideIndex + 1
                           );
-                          // Formation terminée : ne pas rouvrir un quiz — aller direct à Bravo.
-                          if (isSelectedFormationFullyDone) {
-                            while (
-                              nextIndex < formationViewerSlides.length &&
-                              formationViewerSlides[nextIndex]?.kind === 'quiz_group'
-                            ) {
-                              nextIndex += 1;
-                            }
-                          }
+                          // Formation terminée : navigation libre (revue quizzes + contenu).
                           setFormationViewerSlideIndex(nextIndex);
                           const nextSlide = formationViewerSlides[nextIndex];
                           if (
