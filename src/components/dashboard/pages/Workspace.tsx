@@ -1268,10 +1268,26 @@ export function WorkspaceContent() {
             ) : selectedLead ? (
               <CopilotApp />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in">
+              <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in text-center px-8">
                 <Phone className="w-16 h-16 mb-4 opacity-50" />
                 <p className="text-sm font-bold uppercase tracking-widest">{t('workspace.noLeadSelected')}</p>
-                <p className="text-xs mt-2">{t('workspace.selectLeadHint')}</p>
+                <p className="text-xs mt-2 max-w-md">{t('workspace.selectLeadHint')}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('voice');
+                    const params = new URLSearchParams(location.search);
+                    params.set('tab', 'voice');
+                    params.delete('leadId');
+                    navigate(
+                      { pathname: location.pathname, search: `?${params.toString()}` },
+                      { replace: true }
+                    );
+                  }}
+                  className="mt-6 px-6 py-2.5 bg-gradient-harx text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-harx-500/20 hover:-translate-y-0.5 transition-all"
+                >
+                  {t('workspace.backToLeads')}
+                </button>
               </div>
             )}
           </div>
