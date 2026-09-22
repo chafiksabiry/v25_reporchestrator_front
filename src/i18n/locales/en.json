@@ -290,7 +290,15 @@
     "calendarHint": "14-day overview",
     "legendReserved": "Reserved",
     "legendAvailable": "Available",
-    "tzHint": "Times shown in your timezone ({{tz}})"
+    "tzHint": "Times shown in your timezone ({{tz}})",
+    "overlapTitle": "Slot already reserved on another GIG",
+    "overlapMessage": "You already reserved this slot on “{{gig}}”. Cancel that reservation on the other GIG first, or switch it here automatically.",
+    "overlapUnknownGig": "another GIG",
+    "cancelOtherGig": "Cancel on other GIG",
+    "switchHere": "Switch here",
+    "switching": "Switching…",
+    "switchSuccess": "Reservation switched to this GIG.",
+    "cancelOtherSuccess": "Reservation cancelled on the other GIG. You can now reserve here."
   },
   "operations": {
     "title": "Operations Panel",
