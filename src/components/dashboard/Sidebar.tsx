@@ -173,12 +173,17 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const openCockpitWithGig = React.useCallback(
     (gigId?: string | null) => {
       const id = String(gigId || '').trim();
+      // Opening COCKPIT from the sidebar is not a lead selection — clear any
+      // stale prospect so the phone number is only shown after picking from Prospects.
+      sessionStorage.removeItem('activeLeadId');
       if (id) {
         sessionStorage.setItem('training_gig_filter', id);
         sessionStorage.setItem('activeGigId', id);
-        navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(id)}`);
+        navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(id)}`, {
+          state: { gigId: id, clearLead: true },
+        });
       } else {
-        navigate('/workspace?tab=copilot');
+        navigate('/workspace?tab=copilot', { state: { clearLead: true } });
       }
       setShowCockpitGigModal(false);
       setIsSidebarOpen(false);
