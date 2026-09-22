@@ -730,7 +730,13 @@
   },
   "trainingAllGigsGuard": {
     "modalTitle": "Project Selection Required",
-    "modalSubtitle": "To access the COCKPIT, you must select a specific gig from the dropdown on the Training page instead of \"All enrolled gigs\".",
+    "modalSubtitle": "Choose the project to open in the COCKPIT, or continue to the workspace and select it there.",
+    "selectLabel": "Project",
+    "selectPlaceholder": "Select a project…",
+    "loadingGigs": "Loading projects…",
+    "noGigs": "No enrolled projects yet. Apply via the marketplace first.",
+    "openCockpitButton": "Open COCKPIT",
+    "chooseInWorkspace": "Choose in workspace",
     "understandButton": "Understood"
   },
   "cvGuide": {

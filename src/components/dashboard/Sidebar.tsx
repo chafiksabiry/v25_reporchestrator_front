@@ -8,6 +8,8 @@ import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
 import { getRepShellChrome } from '../../utils/harxBrand';
 import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenterStaff';
+import { getAgentId, getAuthToken } from '../../utils/authUtils';
+import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
 
 // Declare qiankun global variables
 declare global {
@@ -150,13 +152,59 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
-  const [showWarningModal, setShowWarningModal] = React.useState(false);
+  const [showCockpitGigModal, setShowCockpitGigModal] = React.useState(false);
+  const [cockpitGigOptions, setCockpitGigOptions] = React.useState<{ gigId: string; title: string }[]>([]);
+  const [cockpitGigLoading, setCockpitGigLoading] = React.useState(false);
+  const [selectedCockpitGigId, setSelectedCockpitGigId] = React.useState('');
   const [openTrainingModuleIndexes, setOpenTrainingModuleIndexes] = React.useState<number[]>([]);
   const {
     trainingModules,
     activeTrainingModuleIndex,
     activeTrainingSlideIndex
   } = useRepTrainingNav();
+
+  const resolveSpecificGigId = React.useCallback((): string | null => {
+    const trainingFilter = String(sessionStorage.getItem('training_gig_filter') || '').trim();
+    if (trainingFilter && trainingFilter !== '__all__') return trainingFilter;
+    return null;
+  }, []);
+
+  const openCockpitWithGig = React.useCallback(
+    (gigId?: string | null) => {
+      const id = String(gigId || '').trim();
+      if (id) {
+        sessionStorage.setItem('training_gig_filter', id);
+        sessionStorage.setItem('activeGigId', id);
+        navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(id)}`);
+      } else {
+        navigate('/workspace?tab=copilot');
+      }
+      setShowCockpitGigModal(false);
+      setIsSidebarOpen(false);
+    },
+    [navigate, setIsSidebarOpen]
+  );
+
+  const openCockpitGigPicker = React.useCallback(async () => {
+    setShowCockpitGigModal(true);
+    setCockpitGigLoading(true);
+    setSelectedCockpitGigId('');
+    setCockpitGigOptions([]);
+    try {
+      const agentId = getAgentId();
+      const token = getAuthToken();
+      if (!agentId || !token) return;
+      const gigs = await fetchEnrolledGigsForAgent(agentId, token);
+      setCockpitGigOptions(gigs);
+      if (gigs.length === 1) {
+        setSelectedCockpitGigId(gigs[0].gigId);
+      }
+    } catch {
+      setCockpitGigOptions([]);
+    } finally {
+      setCockpitGigLoading(false);
+    }
+  }, []);
 
   // Ensure workspace is open if we navigate there externally
   useEffect(() => {
@@ -482,15 +530,25 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                             to={sub.path}
                             onClick={(e) => {
                               e.preventDefault();
-                              if (
-                                sub.path.includes('tab=copilot') &&
-                                location.pathname.includes('/training') &&
-                                (sessionStorage.getItem('training_gig_filter') === '__all__' || !sessionStorage.getItem('training_gig_filter'))
-                              ) {
-                                setShowWarningModal(true);
+                              if (sub.path.includes('tab=copilot')) {
+                                const specificGigId = resolveSpecificGigId();
+                                if (specificGigId) {
+                                  openCockpitWithGig(specificGigId);
+                                  return;
+                                }
+                                const trainingFilter = sessionStorage.getItem('training_gig_filter');
+                                const onTrainingWithoutGig =
+                                  location.pathname.includes('/training') &&
+                                  (trainingFilter === '__all__' || !trainingFilter);
+                                if (onTrainingWithoutGig) {
+                                  void openCockpitGigPicker();
+                                  return;
+                                }
+                                openCockpitWithGig(null);
                                 return;
                               }
                               navigate(sub.path);
+                              setIsSidebarOpen(false);
                             }}
                             className={`flex w-full items-center rounded-xl transition-all duration-300 group relative space-x-3 py-2.5 px-4 ${isSubActive
                                 ? 'bg-white/20 text-white border-l-2 border-white shadow-sm shadow-black/10'
@@ -722,26 +780,23 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       </nav>
       </div>
 
-      {/* Warning Modal */}
-      {showWarningModal && createPortal(
+      {/* Cockpit project picker */}
+      {showCockpitGigModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
           <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl shadow-black/80 overflow-hidden animate-in zoom-in-95 duration-300 text-white">
-            {/* Close Button */}
             <button
-              onClick={() => setShowWarningModal(false)}
+              onClick={() => setShowCockpitGigModal(false)}
               className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-all duration-200 z-50"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {/* Glowing background light */}
             <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/10 blur-[60px] rounded-full pointer-events-none"></div>
             <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-orange-500/10 blur-[60px] rounded-full pointer-events-none"></div>
 
-            {/* Header with Warning icon */}
             <div className="flex flex-col items-center text-center mb-6 relative">
-              <div className="p-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-2xl mb-4 shadow-inner shadow-amber-500/5 animate-bounce">
+              <div className="p-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-2xl mb-4 shadow-inner shadow-amber-500/5">
                 <AlertTriangle className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-black tracking-wide uppercase">
@@ -749,20 +804,57 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               </h3>
             </div>
 
-            {/* Detailed Instructions */}
-            <div className="space-y-4 text-center mb-8 relative px-4">
-              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+            <div className="space-y-4 mb-6 relative px-1">
+              <p className="text-sm text-slate-300 leading-relaxed font-medium text-center">
                 {t('trainingAllGigsGuard.modalSubtitle')}
               </p>
+
+              {cockpitGigLoading ? (
+                <p className="text-center text-xs text-slate-400 font-medium py-3">
+                  {t('trainingAllGigsGuard.loadingGigs')}
+                </p>
+              ) : cockpitGigOptions.length === 0 ? (
+                <p className="text-center text-xs text-amber-300/90 font-medium py-3">
+                  {t('trainingAllGigsGuard.noGigs')}
+                </p>
+              ) : (
+                <label className="block space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                    {t('trainingAllGigsGuard.selectLabel')}
+                  </span>
+                  <select
+                    value={selectedCockpitGigId}
+                    onChange={(e) => setSelectedCockpitGigId(e.target.value)}
+                    className="w-full rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-amber-400/50 focus:ring-2 focus:ring-amber-500/20"
+                  >
+                    <option value="" disabled>
+                      {t('trainingAllGigsGuard.selectPlaceholder')}
+                    </option>
+                    {cockpitGigOptions.map((g) => (
+                      <option key={g.gigId} value={g.gigId}>
+                        {g.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5 relative">
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/5 relative">
               <button
-                onClick={() => setShowWarningModal(false)}
-                className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold uppercase tracking-widest text-[11px] rounded-2xl shadow-lg shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                type="button"
+                disabled={!selectedCockpitGigId || cockpitGigLoading}
+                onClick={() => openCockpitWithGig(selectedCockpitGigId)}
+                className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-amber-500 disabled:hover:to-amber-600 text-white font-extrabold uppercase tracking-widest text-[11px] rounded-2xl shadow-lg shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
               >
-                {t('trainingAllGigsGuard.understandButton')}
+                {t('trainingAllGigsGuard.openCockpitButton')}
+              </button>
+              <button
+                type="button"
+                onClick={() => openCockpitWithGig(null)}
+                className="w-full py-2.5 text-slate-300 hover:text-white text-[11px] font-bold uppercase tracking-widest rounded-2xl hover:bg-white/5 transition-all"
+              >
+                {t('trainingAllGigsGuard.chooseInWorkspace')}
               </button>
             </div>
           </div>
