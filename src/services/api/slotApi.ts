@@ -27,6 +27,10 @@ export interface Reservation {
     duration: number;
     status: 'reserved' | 'cancelled';
     notes?: string;
+    cancelledAt?: string;
+    canceledAt?: string;
+    updatedAt?: string;
+    createdAt?: string;
 }
 
 export const slotApi = {

@@ -3,7 +3,16 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HorizontalCalendar } from '../scheduler/HorizontalCalendar';
 import { TimeSlot, Gig, WeeklyStats, Rep, UserRole, Company } from '../../../types/scheduler';
-import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles } from 'lucide-react';
+import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles, UserCheck, Ban } from 'lucide-react';
+import {
+    engagementTone,
+    ENGAGEMENT_TONE_CLASS,
+    isDateInPeriod,
+    periodStart,
+    type StatsPeriod,
+    zonedWallTimeToUtc,
+    resolveIanaZone,
+} from '../../../utils/planningMetrics';
 import { CompanyView } from '../scheduler/CompanyView';
 import { WalletFilterSelect } from '../ui/WalletFilterSelect';
 import { WorkloadPredictionComponent as WorkloadPrediction } from '../scheduler/WorkloadPrediction';
@@ -198,7 +207,12 @@ interface EnrolledGig {
                 day: string;
                 hours: { start: string; end: string; };
             }[];
-            time_zone?: string | { name: string };
+            time_zone?: string | { name?: string; zoneName?: string };
+            minimumHours?: {
+                daily?: number;
+                weekly?: number;
+                monthly?: number;
+            };
         };
         commission?: {
             commission_per_call?: number;
@@ -239,6 +253,8 @@ export function SessionPlanning() {
     const [quickEnd, setQuickEnd] = useState<string>('');
     const [globalNotes, setGlobalNotes] = useState<string>('');
     const [loadingGigs, setLoadingGigs] = useState<boolean>(true);
+    const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('week');
+    const [allReservations, setAllReservations] = useState<any[]>([]);
     const [showAttendancePanel] = useState<boolean>(false);
     const [showAIPanel] = useState<boolean>(true);
     const routeGigId = useMemo(() => {
@@ -256,6 +272,8 @@ export function SessionPlanning() {
                     selectedGigId ? slotApi.getSlots(selectedGigId) : slotApi.getSlots(),
                     selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId)
                 ]);
+
+                setAllReservations(Array.isArray(reservations) ? reservations : []);
 
                 const mappedTimeSlots = Array.isArray(timeSlots) ? timeSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
                 const mappedAvailableSlots = Array.isArray(availableSlots) ? availableSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
@@ -420,13 +438,19 @@ export function SessionPlanning() {
     useEffect(() => {
         if (gigs.length <= 0) return;
         if (routeGigId && gigs.some((g) => g.id === routeGigId)) {
-            setSelectedGigId(routeGigId);
+            setSelectedGigId((prev) => (prev === routeGigId ? prev : routeGigId));
             return;
         }
-        if (!selectedGigId) {
-            setSelectedGigId(gigs[0].id);
-        }
-    }, [gigs, routeGigId, selectedGigId]);
+        setSelectedGigId((prev) => {
+            if (prev && gigs.some((g) => g.id === prev)) return prev;
+            return gigs[0].id;
+        });
+    }, [gigs, routeGigId]);
+
+    const selectedGig = useMemo(
+        () => gigs.find((g) => g.id === selectedGigId) || null,
+        [gigs, selectedGigId]
+    );
 
     const weeklyStats = useMemo<WeeklyStats>(() => {
         const stats: WeeklyStats = {
@@ -438,7 +462,7 @@ export function SessionPlanning() {
         };
 
         const filteredSlots = userRole === 'rep'
-            ? slots.filter(slot => slot.repId === selectedRepId)
+            ? slots.filter(slot => slot.repId === selectedRepId || slot.isMember)
             : slots;
 
         filteredSlots.forEach((slot) => {
@@ -458,6 +482,111 @@ export function SessionPlanning() {
         stats.pendingHours = draftSlots.reduce((sum, s) => sum + (s.duration || 1), 0);
         return stats;
     }, [slots, userRole, selectedRepId, draftSlots]);
+
+    const engagementMetrics = useMemo(() => {
+        const mh = selectedGig?.availability?.minimumHours;
+        const requiredDaily = Number(mh?.daily) || 0;
+        const requiredWeekly = Number(mh?.weekly) || 0;
+        const requiredMonthly = Number(mh?.monthly) || (requiredWeekly > 0 ? requiredWeekly * 4 : 0);
+
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const weekStart = periodStart('week');
+        const monthStart = periodStart('month');
+
+        const reservedMine = slots.filter(
+            (s) =>
+                s.status === 'reserved' &&
+                (s.repId === selectedRepId || s.isMember) &&
+                (!selectedGigId || s.gigId === selectedGigId)
+        );
+
+        const hoursInRange = (from: Date, toStrInclusive?: string) =>
+            reservedMine.reduce((sum, s) => {
+                if (!s.date) return sum;
+                const d = new Date(`${s.date}T12:00:00`);
+                if (d < from) return sum;
+                if (toStrInclusive && s.date > toStrInclusive) return sum;
+                return sum + (s.duration || 1);
+            }, 0);
+
+        const plannedDaily = hoursInRange(new Date(`${todayStr}T00:00:00`), todayStr);
+        const plannedWeekly = hoursInRange(weekStart);
+        const plannedMonthly = hoursInRange(monthStart);
+
+        const dailyTone = engagementTone(plannedDaily, requiredDaily, {
+            dailyZeroWithActivity: plannedDaily === 0 && reservedMine.some((s) => s.date === todayStr),
+        });
+        // User: when daily is 0, if activity it's always green
+        const dailyFinalTone =
+            plannedDaily === 0 && reservedMine.some((s) => s.date === todayStr && s.status === 'reserved')
+                ? 'green'
+                : plannedDaily === 0 && requiredDaily === 0
+                  ? 'green'
+                  : dailyTone;
+
+        return {
+            daily: { planned: plannedDaily, required: requiredDaily, tone: dailyFinalTone },
+            weekly: {
+                planned: plannedWeekly,
+                required: requiredWeekly,
+                tone: engagementTone(plannedWeekly, requiredWeekly),
+            },
+            monthly: {
+                planned: plannedMonthly,
+                required: requiredMonthly,
+                tone: engagementTone(plannedMonthly, requiredMonthly),
+            },
+        };
+    }, [slots, selectedGig, selectedGigId, selectedRepId]);
+
+    const attendanceScore = useMemo(() => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const pastReserved = slots.filter(
+            (s) =>
+                s.status === 'reserved' &&
+                s.date &&
+                s.date < todayStr &&
+                (s.repId === selectedRepId || s.isMember) &&
+                (!selectedGigId || s.gigId === selectedGigId)
+        );
+        if (pastReserved.length === 0) return null;
+        const attended = pastReserved.filter((s) => s.attended !== false).length;
+        return Math.round((attended / pastReserved.length) * 100);
+    }, [slots, selectedRepId, selectedGigId]);
+
+    const lastMinuteCancelRate = useMemo(() => {
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const relevant = (allReservations || []).filter((r: any) => {
+            const dateStr = String(r.reservationDate || r.date || '').slice(0, 10);
+            if (!dateStr) return false;
+            if (selectedGigId && String(r.gigId?._id || r.gigId) !== selectedGigId) return false;
+            return isDateInPeriod(dateStr, statsPeriod);
+        });
+        const totalEver = relevant.length;
+        if (totalEver === 0) return null;
+
+        const lastMinute = relevant.filter((r: any) => {
+            if (String(r.status || '').toLowerCase() !== 'cancelled') return false;
+            const dateStr = String(r.reservationDate || r.date || '').slice(0, 10);
+            const start = String(r.startTime || '00:00');
+            const cancelledRaw = r.cancelledAt || r.updatedAt || r.canceledAt;
+            if (!cancelledRaw) return false;
+            const cancelledAt = new Date(cancelledRaw);
+            if (Number.isNaN(cancelledAt.getTime())) return false;
+            let slotStart: Date | null = null;
+            if (gigTz) {
+                slotStart = zonedWallTimeToUtc(dateStr, start, gigTz);
+            }
+            if (!slotStart) {
+                slotStart = new Date(`${dateStr}T${start.slice(0, 5)}:00`);
+            }
+            if (!slotStart || Number.isNaN(slotStart.getTime())) return false;
+            const diffMs = slotStart.getTime() - cancelledAt.getTime();
+            return diffMs >= 0 && diffMs <= 2 * 60 * 60 * 1000;
+        }).length;
+
+        return Math.round((lastMinute / totalEver) * 100);
+    }, [allReservations, selectedGigId, selectedGig, statsPeriod]);
 
     const isPastDate = format(selectedDate, 'yyyy-MM-dd') < format(new Date(), 'yyyy-MM-dd');
 
@@ -635,9 +764,13 @@ export function SessionPlanning() {
                                 <CalendarRange className="h-6 w-6 text-harx-300" />
                             </div>
                             <div>
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-harx-300">Planning des sessions</span>
-                                <h1 className="text-2xl font-black text-white tracking-tight leading-none mt-0.5">{t('sessionPlanning.title')}</h1>
-                                <p className="text-[11px] font-medium text-white/50 mt-1">Gérez et réservez vos créneaux d'appels en toute simplicité.</p>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-harx-300">{t('sessionPlanning.eyebrow')}</span>
+                                <h1 className="text-2xl font-black text-white tracking-tight leading-none mt-0.5">
+                                    {selectedGig
+                                        ? t('sessionPlanning.titleOf', { gig: selectedGig.name })
+                                        : t('sessionPlanning.title')}
+                                </h1>
+                                <p className="text-[11px] font-medium text-white/50 mt-1">{t('sessionPlanning.subtitle')}</p>
                             </div>
                             {loadingGigs && (
                                 <div className="ml-2 flex items-center gap-1.5">
@@ -645,32 +778,94 @@ export function SessionPlanning() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-harx-500/20">
-                                    <Clock className="h-4.5 w-4.5 text-harx-300" />
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {([
+                                { key: 'daily' as const, label: t('sessionPlanning.engagementDaily'), m: engagementMetrics.daily },
+                                { key: 'weekly' as const, label: t('sessionPlanning.engagementWeekly'), m: engagementMetrics.weekly },
+                                { key: 'monthly' as const, label: t('sessionPlanning.engagementMonthly'), m: engagementMetrics.monthly },
+                            ]).map(({ key, label, m }) => {
+                                const tone = ENGAGEMENT_TONE_CLASS[m.tone];
+                                return (
+                                    <div
+                                        key={key}
+                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 ${tone.bg} ${tone.ring}`}
+                                    >
+                                        <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <Clock className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{label}</p>
+                                            <p className={`text-sm font-black tracking-tight ${tone.text}`}>
+                                                {t('sessionPlanning.ofRequired', {
+                                                    planned: m.planned,
+                                                    required: m.required || '—',
+                                                })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Engagement hebdo</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.totalHours}<span className="text-sm text-white/40 ml-1">h</span></p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20">
-                                    <CheckCircle2 className="h-4.5 w-4.5 text-emerald-300" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Réservés</p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.reserved')}</p>
                                     <p className="text-xl font-black text-white tracking-tight">{weeklyStats.reservedSlots}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20">
-                                    <Briefcase className="h-4.5 w-4.5 text-indigo-300" />
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/20">
+                                    <Briefcase className="h-4 w-4 text-indigo-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Projets actifs</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{Object.keys(weeklyStats.gigBreakdown).length}</p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.activeGigs')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{gigs.length}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/20">
+                                    <UserCheck className="h-4 w-4 text-sky-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {attendanceScore == null ? '—' : `${attendanceScore}%`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 min-w-[140px]">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/20">
+                                        <Ban className="h-4 w-4 text-rose-300" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lastMinuteCancel')}</p>
+                                        <p className="text-xl font-black text-white tracking-tight">
+                                            {lastMinuteCancelRate == null ? '—' : `${lastMinuteCancelRate}%`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {([
+                                        ['week', t('sessionPlanning.periodWeek')],
+                                        ['month', t('sessionPlanning.periodMonth')],
+                                        ['quarter', t('sessionPlanning.periodQuarter')],
+                                        ['year', t('sessionPlanning.periodYear')],
+                                    ] as const).map(([key, label]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setStatsPeriod(key)}
+                                            className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition ${
+                                                statsPeriod === key
+                                                    ? 'bg-white text-slate-900'
+                                                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -737,17 +932,17 @@ export function SessionPlanning() {
                         </div>
                     ) : userRole === 'rep' ? (
                         <div className="space-y-3">
-                            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-                                <div className="flex items-center gap-1.5 mb-3 text-slate-400">
-                                    <Briefcase className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{t('sessionPlanning.selectedProject')}</span>
+                            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                                <div className="flex items-center gap-1.5 mb-3 text-slate-700">
+                                    <Briefcase className="w-3.5 h-3.5 text-harx-600" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">{t('sessionPlanning.selectedGig')}</span>
                                 </div>
                                 <WalletFilterSelect
                                     label={t('sessionPlanning.enrolledGig')}
                                     value={selectedGigId || ''}
                                     onChange={(v) => setSelectedGigId(v === '' ? null : v)}
                                     options={[
-                                        { value: '', label: t('sessionPlanning.chooseProject'), tone: 'neutral' as const },
+                                        { value: '', label: t('sessionPlanning.chooseGig'), tone: 'neutral' as const },
                                         ...gigs.map((gig: Gig) => ({ value: gig.id, label: gig.name, tone: 'brand' as const })),
                                     ]}
                                     className="w-full md:max-w-[460px]"
@@ -765,6 +960,7 @@ export function SessionPlanning() {
                                 <AvailableSlotsGrid
                                     selectedDate={selectedDate}
                                     gigId={selectedGigId}
+                                    gigTimeZone={selectedGig?.availability?.time_zone}
                                     onReservationMade={refreshData}
                                 />
                             ) : (
@@ -772,7 +968,7 @@ export function SessionPlanning() {
                                     <div className="h-14 w-14 rounded-2xl bg-harx-50 flex items-center justify-center mb-4">
                                         <Sparkles className="w-7 h-7 text-harx-400" />
                                     </div>
-                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">{t('sessionPlanning.selectProjectHint')}</p>
+                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">{t('sessionPlanning.selectGigHint')}</p>
                                     <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
                                         Choisissez un gig ci-dessus pour afficher les créneaux disponibles à la réservation.
                                     </p>

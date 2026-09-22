@@ -32,8 +32,8 @@
     "defaultUser": "Utilisateur",
     "myWallet": "Mon portefeuille",
     "planning": "Planification",
-    "sessions": "Sessions",
-    "sessionPlanning": "Planification des sessions",
+    "sessions": "Planification",
+    "sessionPlanning": "Planification",
     "callCenterAgent": "Agent call center"
   },
   "dashboard": {
@@ -266,11 +266,31 @@
     }
   },
   "sessionPlanning": {
-    "title": "Planification de Session",
-    "selectedProject": "Projet sélectionné",
-    "enrolledGig": "Mission inscrite",
-    "chooseProject": "Choisir un projet…",
-    "selectProjectHint": "Sélectionnez un projet"
+    "title": "Planification",
+    "titleOf": "Planification de {{gig}}",
+    "eyebrow": "Planification",
+    "subtitle": "Gérez et réservez vos créneaux d'appels en toute simplicité.",
+    "selectedGig": "Gig sélectionné",
+    "enrolledGig": "Gig inscrit",
+    "chooseGig": "Choisir un gig…",
+    "selectGigHint": "Sélectionnez un gig",
+    "engagementDaily": "Engagement jour",
+    "engagementWeekly": "Engagement hebdo",
+    "engagementMonthly": "Engagement mensuel",
+    "reserved": "Réservés",
+    "activeGigs": "Gigs actifs",
+    "attendanceScoring": "Attendance scoring",
+    "lastMinuteCancel": "Last minute cancel",
+    "periodWeek": "Semaine",
+    "periodMonth": "Mois",
+    "periodQuarter": "Trimestre",
+    "periodYear": "Année",
+    "ofRequired": "{{planned}} / {{required}} h",
+    "calendar": "Calendrier",
+    "calendarHint": "Aperçu sur 14 jours",
+    "legendReserved": "Réservés",
+    "legendAvailable": "Disponibles",
+    "tzHint": "Horaires affichés dans votre fuseau ({{tz}})"
   },
   "operations": {
     "title": "Panneau des Opérations",
