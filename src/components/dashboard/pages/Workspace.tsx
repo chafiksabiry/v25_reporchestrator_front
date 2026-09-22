@@ -270,6 +270,23 @@ export function WorkspaceContent() {
     }
   }, [gigIdFromNavigation, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
 
+  // Sidebar → COCKPIT must not reuse a previously claimed lead / phone number.
+  useEffect(() => {
+    if (!location.state?.clearLead) return;
+    setSelectedLead(null);
+    setCockpitClaimedLeadId(null);
+    setCockpitAccessDenied(null);
+    sessionStorage.removeItem('activeLeadId');
+    const { clearLead: _clearLead, ...restState } = location.state as {
+      clearLead?: boolean;
+      gigId?: string;
+    };
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: Object.keys(restState).length ? restState : null }
+    );
+  }, [location.state, location.pathname, location.search, navigate]);
+
   useEffect(() => {
     setLeadStatusFilter('all');
     setCurrentPage(1);
@@ -1248,7 +1265,7 @@ export function WorkspaceContent() {
                   {t('workspace.backToLeads')}
                 </button>
               </div>
-            ) : (selectedLead || urlLeadId) ? (
+            ) : selectedLead ? (
               <CopilotApp />
             ) : (
               <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in">

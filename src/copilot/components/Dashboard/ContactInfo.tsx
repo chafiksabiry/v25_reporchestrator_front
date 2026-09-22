@@ -898,9 +898,9 @@ export function ContactInfo() {
           ) : (
             <button
               onClick={handleStartCall}
-              disabled={isCallLoading || callStatus === 'initiating'}
+              disabled={isCallLoading || callStatus === 'initiating' || !apiLead || !contact.phone}
               className={`w-48 flex items-center justify-center space-x-2 px-3 py-2 rounded-xl font-bold text-base transition-all duration-300 shadow-md hover:-translate-y-0.5
-                  ${isCallLoading || callStatus === 'initiating' ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'bg-gradient-harx text-white shadow-harx-500/20 active:scale-95'}`}
+                  ${isCallLoading || callStatus === 'initiating' || !apiLead || !contact.phone ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'bg-gradient-harx text-white shadow-harx-500/20 active:scale-95'}`}
             >
               <Phone className="w-4 h-4 mr-2" />
               {isCallLoading || callStatus === 'initiating' ? '...' : 'Call'}
@@ -913,12 +913,14 @@ export function ContactInfo() {
             </p>
           )}
 
-          <div className="flex items-center space-x-2 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100" title="Secure Line">
-            <div className="p-1 bg-cyan-100 rounded-lg">
-              <Phone className="w-3 h-3 text-cyan-600" />
+          {apiLead && contact.phone ? (
+            <div className="flex items-center space-x-2 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100" title="Secure Line">
+              <div className="p-1 bg-cyan-100 rounded-lg">
+                <Phone className="w-3 h-3 text-cyan-600" />
+              </div>
+              <span className="text-gray-600">{maskPhone(contact.phone)}</span>
             </div>
-            <span className="text-gray-600">{maskPhone(contact.phone)}</span>
-          </div>
+          ) : null}
 
         </div >
         {/* Actions à droite */}
