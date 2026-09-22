@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { fetchSkillsByType, Skill } from '../../../../services/api/skills';
 import { repApiClient } from '../../../../utils/client';
 import { useTranslation } from 'react-i18next';
+
+type SkillType = 'technical' | 'professional' | 'soft';
 
 interface SkillsTabProps {
   profile: any;
@@ -10,8 +12,10 @@ interface SkillsTabProps {
   findSkillData: (skillName: string) => any;
   takeContactCenterSkillAssessment: (skillName: string, categoryName?: string) => void;
   onEditItemClick: () => void;
-  onDeleteSkill: (type: 'technical' | 'professional' | 'soft', index: number) => void;
-  onAddSkill: (type: 'technical' | 'professional' | 'soft', skillId: string) => void;
+  onDeleteSkill: (type: SkillType, index: number) => void;
+  onAddSkill: (type: SkillType, skillId: string) => void;
+  onConfirmProposedSkill?: (type: SkillType, skillId: string) => void;
+  onDismissProposedSkill?: (type: SkillType, skillId: string) => void;
   onAddSpecializationItem?: (section: 'industries' | 'activities', value: string) => void;
   onDeleteSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', index: number) => void;
 }
@@ -39,21 +43,23 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   onEditItemClick,
   onDeleteSkill,
   onAddSkill,
+  onConfirmProposedSkill,
+  onDismissProposedSkill,
   onAddSpecializationItem,
   onDeleteSpecializationItem
 }) => {
   const { t } = useTranslation();
-  const [availableSkills, setAvailableSkills] = useState<Record<'technical' | 'professional' | 'soft', Skill[]>>({
+  const [availableSkills, setAvailableSkills] = useState<Record<SkillType, Skill[]>>({
     technical: [],
     professional: [],
     soft: []
   });
-  const [searchTermByType, setSearchTermByType] = useState<Record<'technical' | 'professional' | 'soft', string>>({
+  const [searchTermByType, setSearchTermByType] = useState<Record<SkillType, string>>({
     technical: '',
     professional: '',
     soft: ''
   });
-  const [dropdownOpenByType, setDropdownOpenByType] = useState<Record<'technical' | 'professional' | 'soft', boolean>>({
+  const [dropdownOpenByType, setDropdownOpenByType] = useState<Record<SkillType, boolean>>({
     technical: false,
     professional: false,
     soft: false
@@ -67,13 +73,13 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   const technicalDropdownRef = useRef<HTMLDivElement | null>(null);
   const professionalDropdownRef = useRef<HTMLDivElement | null>(null);
   const softDropdownRef = useRef<HTMLDivElement | null>(null);
-  const skillInputRefs = useRef<Record<'technical' | 'professional' | 'soft', HTMLInputElement | null>>({
+  const skillInputRefs = useRef<Record<SkillType, HTMLInputElement | null>>({
     technical: null,
     professional: null,
     soft: null,
   });
 
-  const dismissSkillSearch = (type: 'technical' | 'professional' | 'soft') => {
+  const dismissSkillSearch = (type: SkillType) => {
     setSearchTermByType((prev) => ({ ...prev, [type]: '' }));
     setDropdownOpenByType((prev) => ({ ...prev, [type]: false }));
     skillInputRefs.current[type]?.blur();
@@ -159,14 +165,46 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     return null;
   };
 
-  const getCurrentSkillIds = (type: 'technical' | 'professional' | 'soft') =>
+  const getCurrentSkillIds = (type: SkillType) =>
     new Set(
       (profile?.skills?.[type] || [])
         .map((item: any) => normalizeId(item?.skill) || normalizeId(item?._id))
         .filter((id: string | null): id is string => !!id)
     );
 
-  const getFilteredSkills = (type: 'technical' | 'professional' | 'soft') => {
+  const resolveSkillName = (type: SkillType, entry: any): string => {
+    if (entry?.skill && typeof entry.skill === 'object') {
+      const embedded = entry.skill.name || entry.skill.label || entry.skill.title;
+      if (embedded) return String(embedded);
+    }
+    const id = normalizeId(entry?.skill) || normalizeId(entry?._id);
+    if (id) {
+      const fromCatalog = availableSkills[type].find((s) => s._id === id);
+      if (fromCatalog?.name) return fromCatalog.name;
+    }
+    if (typeof entry?.details === 'string' && entry.details.trim() && entry.details !== 'Detected from experience video') {
+      return entry.details.trim();
+    }
+    return t('profile.common.unknown');
+  };
+
+  const getProposedEntries = (type: SkillType) => {
+    const confirmedIds = getCurrentSkillIds(type);
+    return (profile?.proposedSkills?.[type] || [])
+      .map((entry: any) => {
+        const id = normalizeId(entry?.skill) || normalizeId(entry?._id);
+        if (!id || confirmedIds.has(id)) return null;
+        return { id, name: resolveSkillName(type, entry), level: entry?.level };
+      })
+      .filter(Boolean) as Array<{ id: string; name: string; level?: number }>;
+  };
+
+  const totalProposedCount =
+    getProposedEntries('technical').length +
+    getProposedEntries('professional').length +
+    getProposedEntries('soft').length;
+
+  const getFilteredSkills = (type: SkillType) => {
     const selectedIds = getCurrentSkillIds(type);
     const search = (searchTermByType[type] || '').trim().toLowerCase();
     return availableSkills[type].filter((skill) => {
@@ -179,7 +217,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     });
   };
 
-  const renderAddDropdown = (type: 'technical' | 'professional' | 'soft') => {
+  const renderAddDropdown = (type: SkillType) => {
     const options = getFilteredSkills(type);
     return (
       <div className="mt-3 w-full">
@@ -235,7 +273,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   };
 
   const renderSkillChip = (
-    type: 'technical' | 'professional' | 'soft',
+    type: SkillType,
     skill: any,
     idx: number,
     chipClassName: string
@@ -257,8 +295,54 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     </div>
   );
 
+  const renderProposedChips = (type: SkillType) => {
+    const proposed = getProposedEntries(type);
+    if (proposed.length === 0) return null;
+    return (
+      <div className="mt-4 pt-4 border-t border-dashed border-amber-200/80">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800/80 mb-2">
+          {t('profile.skills.proposals')}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {proposed.map((skill) => (
+            <div
+              key={`proposed-${type}-${skill.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border border-amber-200 bg-amber-50 text-amber-900"
+            >
+              <span>{skill.name}</span>
+              <button
+                type="button"
+                onClick={() => onConfirmProposedSkill?.(type, skill.id)}
+                className="inline-flex items-center justify-center rounded-md p-0.5 hover:bg-emerald-100 text-emerald-700 transition-colors"
+                title={t('profile.skills.confirmProposal')}
+                aria-label={t('profile.skills.confirmProposalNamed', { name: skill.name })}
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDismissProposedSkill?.(type, skill.id)}
+                className="inline-flex items-center justify-center rounded-md p-0.5 hover:bg-rose-100 text-rose-600 transition-colors"
+                title={t('profile.skills.dismissProposal')}
+                aria-label={t('profile.skills.dismissProposalNamed', { name: skill.name })}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {totalProposedCount > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-semibold text-amber-950 leading-relaxed">
+          {t('profile.skills.proposalsHint', { count: totalProposedCount })}
+        </div>
+      )}
+
       {/* Skill Categories - Vertical Layout */}
       <div className="space-y-5">
         {/* Technical Skills */}
@@ -274,6 +358,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
           <div ref={technicalDropdownRef}>
             {renderAddDropdown('technical')}
           </div>
+          {renderProposedChips('technical')}
         </div>
 
         {/* Professional Skills */}
@@ -289,6 +374,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
           <div ref={professionalDropdownRef}>
             {renderAddDropdown('professional')}
           </div>
+          {renderProposedChips('professional')}
         </div>
 
         {/* Soft Skills */}
@@ -304,6 +390,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
           <div ref={softDropdownRef}>
             {renderAddDropdown('soft')}
           </div>
+          {renderProposedChips('soft')}
         </div>
       </div>
     </div>
