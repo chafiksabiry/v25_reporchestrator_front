@@ -8,6 +8,7 @@ import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
 import { fetchAllLanguages, Language as LanguageOption } from '../../services/api/languages';
+import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../utils/taxonomyI18n';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -16,6 +17,7 @@ import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
 import { LanguageVideoModal } from './profile/LanguageVideoModal';
+import { enrichLanguageFromExperience } from './profile/languageVideoUtils';
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -131,7 +133,7 @@ export const ProfileView: React.FC<{
   const [allTimezones, setAllTimezones] = useState<Timezone[]>([]);
   const [countries, setCountries] = useState<Timezone[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<LanguageOption[]>([]);
-  const [skillNameById, setSkillNameById] = useState<Record<string, string>>({});
+  const [skillEntityById, setSkillEntityById] = useState<Record<string, TaxonomyEntity>>({});
 
   const [countryMismatch, setCountryMismatch] = useState<{
     hasMismatch: boolean;
@@ -255,11 +257,11 @@ export const ProfileView: React.FC<{
         const skills = await fetchAllSkills();
         const mapFromCategory = (category: SkillsByCategory) =>
           Object.values(category || {}).flat().reduce((acc, skill: Skill) => {
-            acc[skill._id] = skill.name;
+            acc[skill._id] = { name: skill.name, name_i18n: skill.name_i18n || null };
             return acc;
-          }, {} as Record<string, string>);
+          }, {} as Record<string, TaxonomyEntity>);
 
-        setSkillNameById({
+        setSkillEntityById({
           ...mapFromCategory(skills.technical),
           ...mapFromCategory(skills.professional),
           ...mapFromCategory(skills.soft),
@@ -299,23 +301,28 @@ export const ProfileView: React.FC<{
       const toFetch: Array<{ id: string; type: SkillType }> = [];
       (Object.keys(byType) as SkillType[]).forEach((type) => {
         byType[type].forEach((id) => {
-          if (!skillNameById[id]) toFetch.push({ id, type });
+          if (!skillEntityById[id]) toFetch.push({ id, type });
         });
       });
 
       if (toFetch.length === 0) return;
 
       try {
-        const tryResolveSkillAcrossTypes = async (id: string, preferredType: SkillType): Promise<string | null> => {
+        const tryResolveSkillAcrossTypes = async (
+          id: string,
+          preferredType: SkillType
+        ): Promise<TaxonomyEntity | null> => {
           const orderedTypes: SkillType[] = [
             preferredType,
-            ...(['technical', 'professional', 'soft'] as SkillType[]).filter(t => t !== preferredType)
+            ...(['technical', 'professional', 'soft'] as SkillType[]).filter((t) => t !== preferredType),
           ];
 
           for (const type of orderedTypes) {
             try {
               const skill = await fetchSkillById(id, type);
-              if (skill?.name) return skill.name;
+              if (skill?.name) {
+                return { name: skill.name, name_i18n: skill.name_i18n || null };
+              }
             } catch {
               // continue trying other types
             }
@@ -325,23 +332,23 @@ export const ProfileView: React.FC<{
 
         const fetched = await Promise.all(
           toFetch.map(async ({ id, type }) => {
-            const resolvedName = await tryResolveSkillAcrossTypes(id, type);
-            return { id, name: resolvedName };
+            const entity = await tryResolveSkillAcrossTypes(id, type);
+            return { id, entity };
           })
         );
 
         const additions = fetched.reduce((acc, curr) => {
-          if (curr.name) acc[curr.id] = curr.name;
+          if (curr.entity) acc[curr.id] = curr.entity;
           return acc;
-        }, {} as Record<string, string>);
+        }, {} as Record<string, TaxonomyEntity>);
 
-        const unresolved = fetched.filter((f) => !f.name).map((f) => f.id);
+        const unresolved = fetched.filter((f) => !f.entity).map((f) => f.id);
         if (unresolved.length > 0) {
           console.warn('[ProfileView] Unresolved skill IDs after cross-type lookup:', unresolved);
         }
 
         if (Object.keys(additions).length > 0) {
-          setSkillNameById((prev) => ({ ...prev, ...additions }));
+          setSkillEntityById((prev) => ({ ...prev, ...additions }));
         }
       } catch (error) {
         console.error('Error hydrating agent skills by id:', error);
@@ -349,7 +356,7 @@ export const ProfileView: React.FC<{
     };
 
     hydrateAgentSkillNamesById();
-  }, [profile?.skills, skillNameById]);
+  }, [profile?.skills, skillEntityById]);
 
   // Load specific country and timezone data based on profile
   useEffect(() => {
@@ -485,8 +492,7 @@ export const ProfileView: React.FC<{
 
   const formatSkillsForDisplay = (skillsData: any) => {
     if (!Array.isArray(skillsData)) return [];
-    const readNameFromObject = (obj: any): string | null =>
-      obj?.name || obj?.label || obj?.title || null;
+    const uiLang = i18n.language;
 
     const normalizeId = (raw: any): string | null => {
       if (!raw) return null;
@@ -497,39 +503,30 @@ export const ProfileView: React.FC<{
       return null;
     };
 
-    return skillsData.map(item => {
+    return skillsData.map((item) => {
       if (typeof item === 'string') {
-        const resolvedFromMap = skillNameById[item];
-        return { name: resolvedFromMap || item };
+        return { name: localizeTaxonomyEntity(skillEntityById[item], uiLang) || item };
       }
       if (item?.skill && typeof item.skill === 'object') {
-        const embeddedName = readNameFromObject(item.skill);
-        if (embeddedName) return { name: embeddedName };
+        const localized = localizeTaxonomyEntity(item.skill, uiLang);
+        if (localized) return { name: localized };
       }
 
-      const directName = readNameFromObject(item);
-      if (directName) return { name: directName };
-
       const skillId = normalizeId(item?._id) || normalizeId(item?.id) || normalizeId(item?.skill);
-      const resolvedById = skillId ? skillNameById[skillId] : null;
-      const detailsFallback = typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
-      return { name: resolvedById || detailsFallback || (typeof item?.skill === 'string' ? item.skill : null) || t('profile.common.unknown') };
+      const fromMap = skillId ? localizeTaxonomyEntity(skillEntityById[skillId], uiLang) : '';
+      if (fromMap) return { name: fromMap };
+
+      const detailsFallback =
+        typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
+      return {
+        name:
+          detailsFallback ||
+          (typeof item?.skill === 'string' ? item.skill : null) ||
+          item?.name ||
+          t('profile.common.unknown'),
+      };
     });
   };
-
-  useEffect(() => {
-    if (!profile?.skills) return;
-
-    const normalizeId = (raw: any): string | null => {
-      if (!raw) return null;
-      if (typeof raw === 'string') return raw;
-      if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid;
-      if (typeof raw === 'object' && typeof raw._id === 'string') return raw._id;
-      if (typeof raw === 'object' && typeof raw.id === 'string') return raw.id;
-      return null;
-    };
-
-  }, [profile?.skills, skillNameById]);
 
   const takeLanguageAssessment = (
     language: string,
@@ -1149,10 +1146,11 @@ export const ProfileView: React.FC<{
             onTabChange={setActiveTab}
             warningTabs={[
               ...((profile?.personalInfo?.languages || []).some((l: any) => {
-                const ar = l?.assessmentResults;
+                const enriched = enrichLanguageFromExperience(l, profile);
+                const ar = enriched?.assessmentResults;
                 if (!ar || ar.source === 'cv') return true;
-                const verified = String(ar.verifiedProficiency || l.proficiency || '').toUpperCase();
-                return String(l.proficiency || '').toUpperCase() !== verified;
+                const verified = String(ar.verifiedProficiency || enriched.proficiency || '').toUpperCase();
+                return String(enriched.proficiency || '').toUpperCase() !== verified;
               })
                 ? ['languages']
                 : []),

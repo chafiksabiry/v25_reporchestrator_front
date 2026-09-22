@@ -5,6 +5,7 @@ import { ProfileView } from '../ProfileView';
 import { ProfileEditView } from '../ProfileEditView';
 import { getProfileData, updateProfileData, updateSkills, updateBasicInfo, updateExperience, fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { setProfileData } from '../../../utils/authUtils';
+import { buildSyncedLanguagesFromExperience } from '../profile/languageVideoUtils';
 
 // Import Timezone type from repWizard service
 import { Timezone } from '../../../services/api/repWizard';
@@ -196,7 +197,9 @@ export function Profile() {
         const profileData = await fetchProfileFromAPI();
         console.log('✅ Profile data received successfully');
         console.log('💽 Setting profile data in component state');
-        setProfile(profileData);
+        const synced = await syncExperienceLanguagesIfNeeded(profileData);
+        setProfile(synced);
+        if (synced) setProfileData(synced);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ Error loading profile:', err);
@@ -219,6 +222,43 @@ export function Profile() {
     window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
   };
 
+  const syncExperienceLanguagesIfNeeded = async (profileData: ProfileData | null) => {
+    if (!profileData?._id) return profileData;
+    const syncedLanguages = buildSyncedLanguagesFromExperience(profileData);
+    if (!syncedLanguages) return profileData;
+
+    const payload = {
+      personalInfo: {
+        ...(profileData.personalInfo || {}),
+        languages: syncedLanguages.map((lang: any) => ({
+          language:
+            typeof lang.language === 'object' && lang.language?._id
+              ? lang.language._id
+              : lang.language,
+          proficiency: lang.proficiency,
+          assessmentResults: lang.assessmentResults,
+          ...(lang.iso639_1 ? { iso639_1: lang.iso639_1 } : {}),
+        })),
+      },
+    };
+
+    try {
+      await updateProfileData(profileData._id, payload);
+      const refreshed = await getProfileData();
+      return refreshed || {
+        ...profileData,
+        personalInfo: { ...profileData.personalInfo, languages: syncedLanguages },
+      };
+    } catch (error) {
+      console.error('Error syncing experience languages onto profile:', error);
+      // Still show enriched data locally even if persist fails.
+      return {
+        ...profileData,
+        personalInfo: { ...profileData.personalInfo, languages: syncedLanguages },
+      };
+    }
+  };
+
   // Handle profile update
   const handleProfileUpdate = async (updatedProfile: ProfileData) => {
     try {
@@ -233,7 +273,8 @@ export function Profile() {
   const handleVideoAnalysisComplete = async () => {
     try {
       const fresh = await fetchProfileFromAPI();
-      if (fresh) updateProfileStateAndStorage(fresh);
+      const synced = await syncExperienceLanguagesIfNeeded(fresh);
+      if (synced) updateProfileStateAndStorage(synced);
     } catch (error) {
       console.error('Error refreshing profile after video analysis:', error);
     }
