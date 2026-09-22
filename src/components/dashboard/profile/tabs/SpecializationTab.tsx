@@ -2,6 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, AlertTriangle, Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { repApiClient } from '../../../../utils/client';
+import { localizeTaxonomyEntity } from '../../../../utils/taxonomyI18n';
+
+type TaxonomyOption = {
+  _id: string;
+  name: string;
+  name_i18n?: { en?: string; fr?: string } | null;
+};
 
 interface SpecializationTabProps {
   profile: any;
@@ -13,15 +20,19 @@ interface SpecializationTabProps {
 }
 
 export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, onDeleteItemClick, onAddItemClick, onGoToExperience }) => {
-  const { t } = useTranslation();
-  const [allIndustries, setAllIndustries] = useState<Array<{ _id: string; name: string }>>([]);
-  const [allActivities, setAllActivities] = useState<Array<{ _id: string; name: string }>>([]);
+  const { t, i18n } = useTranslation();
+  const [allIndustries, setAllIndustries] = useState<TaxonomyOption[]>([]);
+  const [allActivities, setAllActivities] = useState<TaxonomyOption[]>([]);
   const [industrySearch, setIndustrySearch] = useState('');
   const [activitySearch, setActivitySearch] = useState('');
   const [industryOpen, setIndustryOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const industryRef = useRef<HTMLDivElement | null>(null);
   const activityRef = useRef<HTMLDivElement | null>(null);
+  const uiLang = i18n.language;
+
+  const labelOf = (item: TaxonomyOption | any) =>
+    localizeTaxonomyEntity(item, uiLang) || String(item?.name || item?._id || '');
 
   useEffect(() => {
     const loadData = async () => {
@@ -62,7 +73,9 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
     return allIndustries.filter((ind) => {
       if (selectedIndustryIds.has(String(ind._id))) return false;
       if (!search) return true;
-      return (ind.name || '').toLowerCase().includes(search);
+      const en = (ind.name_i18n?.en || ind.name || '').toLowerCase();
+      const fr = (ind.name_i18n?.fr || '').toLowerCase();
+      return en.includes(search) || fr.includes(search);
     });
   }, [allIndustries, selectedIndustryIds, industrySearch]);
 
@@ -71,7 +84,9 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
     return allActivities.filter((act) => {
       if (selectedActivityIds.has(String(act._id))) return false;
       if (!search) return true;
-      return (act.name || '').toLowerCase().includes(search);
+      const en = (act.name_i18n?.en || act.name || '').toLowerCase();
+      const fr = (act.name_i18n?.fr || '').toLowerCase();
+      return en.includes(search) || fr.includes(search);
     });
   }, [allActivities, selectedActivityIds, activitySearch]);
 
@@ -81,17 +96,19 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
   // After adding an item the local profile only holds the raw id (the backend
   // populates the name on the next fetch). Resolve the display name from the
   // already-loaded option lists so it shows correctly without a refresh.
-  const industryNameById = useMemo(
-    () => new Map(allIndustries.map((i) => [String(i._id), i.name])),
+  const industryById = useMemo(
+    () => new Map(allIndustries.map((i) => [String(i._id), i])),
     [allIndustries]
   );
-  const activityNameById = useMemo(
-    () => new Map(allActivities.map((a) => [String(a._id), a.name])),
+  const activityById = useMemo(
+    () => new Map(allActivities.map((a) => [String(a._id), a])),
     [allActivities]
   );
-  const resolveName = (item: any, map: Map<string, string>) => {
-    if (item && typeof item === 'object') return item.name || map.get(String(item._id)) || item._id;
-    return map.get(String(item)) || item;
+  const resolveName = (item: any, map: Map<string, TaxonomyOption>) => {
+    if (item && typeof item === 'object') {
+      return labelOf(item) || labelOf(map.get(String(item._id))) || String(item._id || '');
+    }
+    return labelOf(map.get(String(item))) || String(item || '');
   };
 
   const renderVideoWarning = (kind: 'industries' | 'activities') => {
@@ -159,7 +176,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
           {industriesCount > 0 ? (
             profile.professionalSummary.industries.map((ind: any, idx: number) =>
               renderEditableBadge(
-                resolveName(ind, industryNameById),
+                resolveName(ind, industryById),
                 'bg-harx-50/80 text-harx-600 border-harx-100 shadow-harx-500/5',
                 `industry-${idx}`,
                 'industries',
@@ -196,7 +213,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
                     }}
                     className="w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors"
                   >
-                    <div className="text-sm font-bold text-harx-900">{industry.name}</div>
+                    <div className="text-sm font-bold text-harx-900">{labelOf(industry)}</div>
                   </button>
                 )) : (
                   <div className="px-3 py-3 text-xs text-slate-500">{t('profile.specialization.noMoreIndustries')}</div>
@@ -222,7 +239,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
           {activitiesCount > 0 ? (
             profile.professionalSummary.activities.map((act: any, idx: number) =>
               renderEditableBadge(
-                resolveName(act, activityNameById),
+                resolveName(act, activityById),
                 'bg-harx-alt-50/80 text-harx-alt-600 border-harx-alt-100 shadow-harx-alt-500/5',
                 `activity-${idx}`,
                 'activities',
@@ -259,7 +276,7 @@ export const SpecializationTab: React.FC<SpecializationTabProps> = ({ profile, o
                     }}
                     className="w-full text-left px-3 py-2.5 border-b border-harx-alt-50 last:border-b-0 hover:bg-harx-alt-50/60 transition-colors"
                   >
-                    <div className="text-sm font-bold text-harx-alt-900">{activity.name}</div>
+                    <div className="text-sm font-bold text-harx-alt-900">{labelOf(activity)}</div>
                   </button>
                 )) : (
                   <div className="px-3 py-3 text-xs text-slate-500">{t('profile.specialization.noMoreActivities')}</div>
