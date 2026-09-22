@@ -32,8 +32,8 @@
     "defaultUser": "User",
     "myWallet": "My wallet",
     "planning": "Planning",
-    "sessions": "Sessions",
-    "sessionPlanning": "Session planning",
+    "sessions": "Planning",
+    "sessionPlanning": "Planning",
     "callCenterAgent": "Call center agent"
   },
   "dashboard": {
@@ -266,11 +266,31 @@
     }
   },
   "sessionPlanning": {
-    "title": "Session Planning",
-    "selectedProject": "Selected project",
+    "title": "Planning",
+    "titleOf": "Planning of {{gig}}",
+    "eyebrow": "Planning",
+    "subtitle": "Manage and book your call slots with ease.",
+    "selectedGig": "Selected gig",
     "enrolledGig": "Enrolled gig",
-    "chooseProject": "Choose a project…",
-    "selectProjectHint": "Select a project"
+    "chooseGig": "Choose a gig…",
+    "selectGigHint": "Select a gig",
+    "engagementDaily": "Daily engagement",
+    "engagementWeekly": "Weekly engagement",
+    "engagementMonthly": "Monthly engagement",
+    "reserved": "Reserved",
+    "activeGigs": "Active gigs",
+    "attendanceScoring": "Attendance scoring",
+    "lastMinuteCancel": "Last minute cancel",
+    "periodWeek": "Week",
+    "periodMonth": "Month",
+    "periodQuarter": "Quarter",
+    "periodYear": "Year",
+    "ofRequired": "{{planned}} / {{required}} h",
+    "calendar": "Calendar",
+    "calendarHint": "14-day overview",
+    "legendReserved": "Reserved",
+    "legendAvailable": "Available",
+    "tzHint": "Times shown in your timezone ({{tz}})"
   },
   "operations": {
     "title": "Operations Panel",
