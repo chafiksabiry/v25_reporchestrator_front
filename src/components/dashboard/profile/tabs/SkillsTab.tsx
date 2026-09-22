@@ -3,6 +3,8 @@ import { Check, X } from 'lucide-react';
 import { fetchSkillsByType, Skill } from '../../../../services/api/skills';
 import { repApiClient } from '../../../../utils/client';
 import { useTranslation } from 'react-i18next';
+import { localizeTaxonomyEntity } from '../../../../utils/taxonomyI18n';
+import { localizeText } from '../../../../utils/i18nText';
 
 type SkillType = 'technical' | 'professional' | 'soft';
 
@@ -48,7 +50,13 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   onAddSpecializationItem,
   onDeleteSpecializationItem
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const uiLang = i18n.language;
+  const skillLabel = (skill: { name?: string; name_i18n?: { en?: string; fr?: string } | null } | null | undefined) =>
+    localizeTaxonomyEntity(skill as any, uiLang) || String(skill?.name || '');
+  const skillDescription = (skill: Skill) =>
+    localizeText(skill.description_i18n, uiLang) || skill.description || '';
+
   const [availableSkills, setAvailableSkills] = useState<Record<SkillType, Skill[]>>({
     technical: [],
     professional: [],
@@ -174,13 +182,13 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
 
   const resolveSkillName = (type: SkillType, entry: any): string => {
     if (entry?.skill && typeof entry.skill === 'object') {
-      const embedded = entry.skill.name || entry.skill.label || entry.skill.title;
-      if (embedded) return String(embedded);
+      const localized = skillLabel(entry.skill);
+      if (localized) return localized;
     }
     const id = normalizeId(entry?.skill) || normalizeId(entry?._id);
     if (id) {
       const fromCatalog = availableSkills[type].find((s) => s._id === id);
-      if (fromCatalog?.name) return fromCatalog.name;
+      if (fromCatalog) return skillLabel(fromCatalog);
     }
     if (typeof entry?.details === 'string' && entry.details.trim() && entry.details !== 'Detected from experience video') {
       return entry.details.trim();
@@ -210,10 +218,11 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     return availableSkills[type].filter((skill) => {
       if (selectedIds.has(skill._id)) return false;
       if (!search) return true;
-      return (
-        skill.name.toLowerCase().includes(search) ||
-        (skill.description || '').toLowerCase().includes(search)
-      );
+      const label = skillLabel(skill).toLowerCase();
+      const desc = skillDescription(skill).toLowerCase();
+      const en = (skill.name_i18n?.en || skill.name || '').toLowerCase();
+      const fr = (skill.name_i18n?.fr || '').toLowerCase();
+      return label.includes(search) || desc.includes(search) || en.includes(search) || fr.includes(search);
     });
   };
 
@@ -258,8 +267,8 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
                   }}
                   className="block w-full text-left px-3 py-2.5 border-b border-harx-50 last:border-b-0 hover:bg-harx-50/60 transition-colors cursor-pointer"
                 >
-                  <div className="text-sm font-bold text-harx-900 pointer-events-none">{skill.name}</div>
-                  <div className="text-xs text-slate-500 truncate pointer-events-none">{skill.description}</div>
+                  <div className="text-sm font-bold text-harx-900 pointer-events-none">{skillLabel(skill)}</div>
+                  <div className="text-xs text-slate-500 truncate pointer-events-none">{skillDescription(skill)}</div>
                 </button>
               ))
             ) : (

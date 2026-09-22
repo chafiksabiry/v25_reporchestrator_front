@@ -26,17 +26,19 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { localizeTaxonomyEntity } from '../../../utils/taxonomyI18n';
 import { useLiveFaceMatch } from './useLiveFaceMatch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type RefLabel = string | { _id?: string; name?: string };
+type RefLabel = string | { _id?: string; name?: string; name_i18n?: { en?: string; fr?: string } | null };
 
 // AI text fields are stored bilingually; older data may still be a plain string.
 type LocalizedText = string | { en?: string; fr?: string } | null;
 
 interface SkillScore {
   name?: string;
+  name_i18n?: { en?: string; fr?: string } | null;
   skill?: RefLabel;
   score: number;
   evidence?: LocalizedText;
@@ -52,6 +54,7 @@ interface LanguageScore {
 
 interface NamedScore {
   name?: string;
+  name_i18n?: { en?: string; fr?: string } | null;
   industry?: RefLabel;
   activity?: RefLabel;
   score: number;
@@ -184,19 +187,41 @@ const localize = (value: LocalizedText | undefined, lang: string): string => {
   return value[code as 'en' | 'fr'] || value.en || value.fr || '';
 };
 
-const refLabel = (value?: RefLabel | null, fallback = 'Unknown'): string => {
+const refLabel = (value?: RefLabel | null, lang = 'en', fallback = 'Unknown'): string => {
   if (!value) return fallback;
   if (typeof value === 'string') {
     if (/^[a-f0-9]{24}$/i.test(value)) return fallback;
     return value;
   }
-  return value.name || fallback;
+  return localizeTaxonomyEntity(value, lang) || value.name || fallback;
 };
 
-const skillLabel = (skill: SkillScore): string => skill.name || refLabel(skill.skill);
-const industryLabel = (item: NamedScore): string => item.name || refLabel(item.industry);
-const activityLabel = (item: NamedScore): string => item.name || refLabel(item.activity);
-const languageLabel = (lang: LanguageScore): string => lang.name || refLabel(lang.language);
+const skillLabel = (skill: SkillScore, lang = 'en'): string =>
+  localizeTaxonomyEntity(
+    (skill.skill && typeof skill.skill === 'object' ? skill.skill : null) || {
+      name: skill.name,
+      name_i18n: skill.name_i18n,
+    },
+    lang
+  ) || skill.name || refLabel(skill.skill, lang);
+const industryLabel = (item: NamedScore, lang = 'en'): string =>
+  localizeTaxonomyEntity(
+    (item.industry && typeof item.industry === 'object' ? item.industry : null) || {
+      name: item.name,
+      name_i18n: item.name_i18n,
+    },
+    lang
+  ) || item.name || refLabel(item.industry, lang);
+const activityLabel = (item: NamedScore, lang = 'en'): string =>
+  localizeTaxonomyEntity(
+    (item.activity && typeof item.activity === 'object' ? item.activity : null) || {
+      name: item.name,
+      name_i18n: item.name_i18n,
+    },
+    lang
+  ) || item.name || refLabel(item.activity, lang);
+const languageLabel = (langEntry: LanguageScore, lang = 'en'): string =>
+  langEntry.name || refLabel(langEntry.language, lang);
 
 const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   if (!saved?.videoAnalysis) return null;
@@ -211,8 +236,8 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   };
 };
 
-const langAssessmentLabel = (entry: LanguageAssessmentEntry): string =>
-  entry.languageName || refLabel(entry.language);
+const langAssessmentLabel = (entry: LanguageAssessmentEntry, lang = 'en'): string =>
+  entry.languageName || refLabel(entry.language, lang);
 
 const fraudRiskStyles: Record<string, { badge: string }> = {
   low: { badge: 'bg-emerald-100 text-emerald-700' },
@@ -1267,7 +1292,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   >
                     <div className="space-y-4">
                       {result.languageAssessment.languages.map((lang) => {
-                        const name = langAssessmentLabel(lang);
+                        const name = langAssessmentLabel(lang, uiLang);
                         const strengths = localize(lang.strengths, uiLang);
                         const improvements = localize(lang.areasForImprovement, uiLang);
                         const confKey =
@@ -1424,7 +1449,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 {result.analysis.industries?.length > 0 && (
                   <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
                     {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
-                      <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
+                      <ScoreBar key={industryLabel(ind, uiLang)} score={ind.score} label={industryLabel(ind, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -1434,10 +1459,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     <div className="flex flex-wrap gap-2">
                       {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
                         <span
-                          key={activityLabel(act)}
+                          key={activityLabel(act, uiLang)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900"
                         >
-                          {activityLabel(act)}
+                          {activityLabel(act, uiLang)}
                           <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
                         </span>
                       ))}
@@ -1453,11 +1478,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.spokenLanguages.length}
                   >
                     {result.analysis.spokenLanguages.filter((l) => l.score > 0).sort((a, b) => b.score - a.score).map((lang) => (
-                      <div key={languageLabel(lang)} className="flex items-center gap-3">
+                      <div key={languageLabel(lang, uiLang)} className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-slate-700">{languageLabel(lang)}</span>
+                              <span className="text-xs font-black text-slate-700">{languageLabel(lang, uiLang)}</span>
                               <span className={`px-2 py-0.5 text-[9px] font-black rounded-full ${levelBadge[lang.level] || 'bg-slate-100 text-slate-500'}`}>
                                 {lang.level}
                               </span>
@@ -1490,7 +1515,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     defaultOpen={false}
                   >
                     {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill, uiLang)} score={skill.score} label={skillLabel(skill, uiLang)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -1503,7 +1528,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     defaultOpen={false}
                   >
                     {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill, uiLang)} score={skill.score} label={skillLabel(skill, uiLang)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
@@ -1516,7 +1541,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     defaultOpen={false}
                   >
                     {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                      <ScoreBar key={skillLabel(skill, uiLang)} score={skill.score} label={skillLabel(skill, uiLang)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
