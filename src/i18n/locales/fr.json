@@ -220,6 +220,21 @@
     "executiveSummary": "Résumé Exécutif",
     "detailedAnalysis": "Analyse Détaillée",
     "closeDetails": "Fermer les détails",
+    "calibration": {
+      "title": "Calibrage du scoring",
+      "subtitle": "Confirmez si le score IA vous semble juste, ou signalez l’écart avec une explication.",
+      "thumbsUp": "D’accord",
+      "thumbsDown": "Pas d’accord",
+      "explanationLabel": "Explication de l’écart",
+      "explanationPlaceholder": "Ex. le résumé invente une conversation alors que j’ai seulement dit Allo…",
+      "explanationRequired": "Ajoutez une explication quand vous n’êtes pas d’accord.",
+      "submit": "Enregistrer le calibrage",
+      "saving": "Enregistrement…",
+      "saved": "Calibrage enregistré",
+      "saveError": "Impossible d’enregistrer le calibrage",
+      "recorded": "Calibré",
+      "tooShortTitle": "Pas d’analyse IA"
+    },
     "metrics": {
       "fluency": "Élocution Agent",
       "sentiment": "Sentiment Client",

@@ -24,6 +24,8 @@ import {
   Loader2,
   BellRing,
   RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
@@ -34,7 +36,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -97,8 +99,15 @@ export interface CallRecord {
     refusal_detected?: boolean;
   };
   // ── Unified call-analysis layer (shared with calls backend + ops dashboard) ──
-  /** Lifecycle of the AI analyzer: pending → processing → scored | auto_refused | error. */
-  ai_call_status?: 'pending' | 'processing' | 'scored' | 'auto_refused' | 'error' | null;
+  /** Lifecycle of the AI analyzer: pending → processing → scored | auto_refused | too_short | error. */
+  ai_call_status?: 'pending' | 'processing' | 'scored' | 'auto_refused' | 'too_short' | 'error' | null;
+  /** Calibrage du score IA (thumbs + explication). */
+  scoreCalibration?: {
+    verdict?: 'up' | 'down' | null;
+    explanation?: string | null;
+    calibratedAt?: string | Date | null;
+    calibratedByAgentId?: string | null;
+  } | null;
   /** Rep a alerté la company qu'une analyse est bloquée. */
   analysisCompanyAlert?: {
     requestedAt?: string | Date | null;
@@ -242,6 +251,7 @@ const STALE_ANALYSIS_MS = 5 * 60 * 1000;
 
 /** Is the AI analyzer still running (or hasn't run yet) for this call? */
 function isAnalysisPending(record: CallRecord): boolean {
+  if (isCallTooShortForAnalysis(record)) return false;
   // Prefer the explicit lifecycle field when the backend has set it.
   if (record.ai_call_status) {
     return record.ai_call_status === 'pending' || record.ai_call_status === 'processing';
@@ -305,10 +315,23 @@ export function CallRecords({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
+  const [calibrationVerdict, setCalibrationVerdict] = useState<'up' | 'down' | null>(null);
+  const [calibrationExplanation, setCalibrationExplanation] = useState('');
+  const [calibrationSaving, setCalibrationSaving] = useState(false);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
   const [repFraudStats, setRepFraudStats] = useState<AgentFraudStatsApi | null>(null);
   const selectedCallRef = useRef<CallRecord | null>(null);
   selectedCallRef.current = selectedCall;
+
+  useEffect(() => {
+    if (!selectedCall) {
+      setCalibrationVerdict(null);
+      setCalibrationExplanation('');
+      return;
+    }
+    setCalibrationVerdict(selectedCall.scoreCalibration?.verdict || null);
+    setCalibrationExplanation(selectedCall.scoreCalibration?.explanation || '');
+  }, [selectedCall?._id, selectedCall?.scoreCalibration?.verdict, selectedCall?.scoreCalibration?.explanation]);
 
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
@@ -899,6 +922,37 @@ export function CallRecords({
   const selectedCallNotifying = selectedCallId ? notifyingCallId === selectedCallId : false;
   const selectedCallCanNotify = selectedCall ? canNotifyCompanyForAnalysis(selectedCall) : false;
   const selectedCallCompanyAlerted = selectedCall ? hasAnalysisCompanyAlert(selectedCall) : false;
+  const selectedCallTooShort = selectedCall ? isCallTooShortForAnalysis(selectedCall) : false;
+
+  const handleSaveCalibration = async () => {
+    if (!selectedCallId || !calibrationVerdict) return;
+    if (calibrationVerdict === 'down' && calibrationExplanation.trim().length < 3) {
+      toast.error(t('calls.calibration.explanationRequired'));
+      return;
+    }
+    setCalibrationSaving(true);
+    try {
+      const result = await api.calls.calibrateScore(selectedCallId, {
+        verdict: calibrationVerdict,
+        explanation: calibrationExplanation.trim(),
+      });
+      if (!result?.success) {
+        throw new Error(result?.message || 'Calibration failed');
+      }
+      const next = result.data?.scoreCalibration || {
+        verdict: calibrationVerdict,
+        explanation: calibrationExplanation.trim(),
+        calibratedAt: new Date().toISOString(),
+      };
+      patchCallInLists(selectedCallId, { scoreCalibration: next });
+      setSelectedCall((prev) => (prev ? { ...prev, scoreCalibration: next } : prev));
+      toast.success(t('calls.calibration.saved'));
+    } catch (err: any) {
+      toast.error(err?.message || t('calls.calibration.saveError'));
+    } finally {
+      setCalibrationSaving(false);
+    }
+  };
 
   const renderRepAnalysisWaitState = (emptyLabel: string) => (
     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
@@ -1419,7 +1473,19 @@ export function CallRecords({
                 </div>
               ) : (
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
-                  {(!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
+                  {selectedCallTooShort ? (
+                    <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                        <Clock className="w-7 h-7" />
+                      </div>
+                      <p className="text-sm font-black uppercase tracking-widest text-slate-700">
+                        {t('calls.calibration.tooShortTitle')}
+                      </p>
+                      <p className="text-sm font-medium text-slate-500 max-w-lg leading-relaxed">
+                        {getTooShortAnalysisNotice(i18n.language, Number(selectedCall.duration) || undefined)}
+                      </p>
+                    </div>
+                  ) : (!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
                     renderRepAnalysisWaitState('Analyse détaillée non encore générée')
                   ) : (
                     <>
@@ -1464,6 +1530,82 @@ export function CallRecords({
                           </div>
                         </div>
                       </div>
+
+                      {/* Calibrage du scoring */}
+                      {!isNonEvaluableCall(selectedCall) && (
+                        <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-violet-100 shadow-lg shadow-violet-500/5 p-5 sm:p-7 space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                              <h5 className="text-sm font-black uppercase tracking-widest text-violet-700">
+                                {t('calls.calibration.title')}
+                              </h5>
+                              <p className="text-xs font-medium text-slate-500 mt-1">
+                                {t('calls.calibration.subtitle')}
+                              </p>
+                            </div>
+                            {selectedCall.scoreCalibration?.calibratedAt ? (
+                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full self-start">
+                                {t('calls.calibration.recorded')}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setCalibrationVerdict('up')}
+                              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${
+                                calibrationVerdict === 'up'
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/25'
+                                  : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <ThumbsUp className="w-4 h-4" />
+                              {t('calls.calibration.thumbsUp')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCalibrationVerdict('down')}
+                              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${
+                                calibrationVerdict === 'down'
+                                  ? 'bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/25'
+                                  : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                              }`}
+                            >
+                              <ThumbsDown className="w-4 h-4" />
+                              {t('calls.calibration.thumbsDown')}
+                            </button>
+                          </div>
+
+                          {calibrationVerdict === 'down' || calibrationExplanation ? (
+                            <label className="block space-y-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                {t('calls.calibration.explanationLabel')}
+                              </span>
+                              <textarea
+                                value={calibrationExplanation}
+                                onChange={(e) => setCalibrationExplanation(e.target.value)}
+                                rows={3}
+                                placeholder={t('calls.calibration.explanationPlaceholder')}
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-200/60 resize-y min-h-[88px]"
+                              />
+                            </label>
+                          ) : null}
+
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              disabled={!calibrationVerdict || calibrationSaving}
+                              onClick={() => void handleSaveCalibration()}
+                              className="px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-black uppercase tracking-widest shadow-md shadow-violet-500/20 transition-all"
+                            >
+                              {calibrationSaving
+                                ? t('calls.calibration.saving')
+                                : t('calls.calibration.submit')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {!isNonEvaluableCall(selectedCall) && (
                     <>
