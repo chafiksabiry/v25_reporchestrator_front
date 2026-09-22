@@ -177,6 +177,8 @@ export function AvailableSlotsGrid({
 
         const conflict = findCrossGigConflict(slot, targetDateKey);
         if (conflict) {
+            // Ensure the row re-renders as conflict (BASCULER only), not Réserver.
+            await loadReservations();
             setMessage({
                 text: t('sessionPlanning.overlapMessage', { gig: resolveGigName(conflict.gigId) }),
                 type: 'error',
@@ -209,8 +211,8 @@ export function AvailableSlotsGrid({
             const apiMsg = String(error.response?.data?.message || error.message || '');
             const looksLikeOverlap = /overlap/i.test(apiMsg);
             if (looksLikeOverlap) {
-                // Refresh then resolve conflict for a clear FR/EN message with gig name
                 await loadReservations();
+                // Re-resolve after refresh so the slot row shows BASCULER (single action).
                 const refreshed = findCrossGigConflict(slot, targetDateKey);
                 const gigLabel = resolveGigName(refreshed?.gigId);
                 setMessage({
@@ -507,7 +509,7 @@ export function AvailableSlotsGrid({
                                             </div>
                                         </div>
 
-                                        {isAvailable && !isSlotPast && !isReserved && (
+                                        {isAvailable && !isSlotPast && !isReserved && !hasConflict && (
                                             <div className="flex items-center gap-3">
                                                 <input
                                                     type="text"
