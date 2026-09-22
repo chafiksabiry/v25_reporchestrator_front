@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles, Upload, ImagePlus } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan } from '../../utils/profileUtils';
 import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
@@ -190,8 +190,13 @@ export const ProfileView: React.FC<{
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   // Load countries and all timezones on component mount
   useEffect(() => {
@@ -768,6 +773,91 @@ export const ProfileView: React.FC<{
     }
   };
 
+  const stopCameraStream = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const closeCameraModal = useCallback(() => {
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+  }, [stopCameraStream]);
+
+  const openPhotoSourceModal = () => {
+    if (isUploadingPhoto) return;
+    setShowPhotoSourceModal(true);
+  };
+
+  const openDevicePicker = () => {
+    setShowPhotoSourceModal(false);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+    photoInputRef.current?.click();
+  };
+
+  const startPhotoCamera = async () => {
+    setShowPhotoSourceModal(false);
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t('profile.header.cameraUnavailable'));
+      setShowCameraModal(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setShowCameraModal(true);
+      // Attach after modal mounts
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          void cameraVideoRef.current.play().catch(() => undefined);
+        }
+      });
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError(t('profile.header.cameraDenied'));
+      setShowCameraModal(true);
+    }
+  };
+
+  const capturePhotoFromCamera = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setImgSrc(dataUrl);
+    setIsCropModalOpen(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, [stopCameraStream]);
+
+  // Re-attach stream when camera modal opens
+  useEffect(() => {
+    if (!showCameraModal || !cameraStreamRef.current || !cameraVideoRef.current) return;
+    cameraVideoRef.current.srcObject = cameraStreamRef.current;
+    void cameraVideoRef.current.play().catch(() => undefined);
+  }, [showCameraModal]);
+
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
     const crop = centerCrop(
@@ -1100,7 +1190,7 @@ export const ProfileView: React.FC<{
                 </div>
                 <button
                   type="button"
-                  onClick={() => !isUploadingPhoto && photoInputRef.current?.click()}
+                  onClick={openPhotoSourceModal}
                   disabled={isUploadingPhoto}
                   className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-harx text-white shadow-lg hover:opacity-90 disabled:opacity-60"
                   title={t('profile.header.changePhoto')}
@@ -1437,6 +1527,113 @@ export const ProfileView: React.FC<{
                 currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
                 onSubscribed={handlePlanSubscribed}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo source chooser */}
+      {showPhotoSourceModal && (
+        <div
+          className="fixed inset-0 z-[125] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowPhotoSourceModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                {t('profile.header.photoSourceTitle')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPhotoSourceModal(false)}
+                className="p-2 hover:bg-slate-50 rounded-xl"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              <button
+                type="button"
+                onClick={openDevicePicker}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+              >
+                <div className="p-2.5 rounded-xl bg-slate-100 text-slate-600">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-bold text-slate-800">
+                  {t('profile.header.chooseFromDevice')}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void startPhotoCamera()}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+              >
+                <div className="p-2.5 rounded-xl bg-harx-50 text-harx-600">
+                  <ImagePlus className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-bold text-slate-800">
+                  {t('profile.header.takePhoto')}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live camera capture */}
+      {showCameraModal && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-black text-slate-900">{t('profile.header.takePhoto')}</h3>
+              <button type="button" onClick={closeCameraModal} className="p-2 hover:bg-slate-50 rounded-xl">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-5 bg-slate-950 flex items-center justify-center min-h-[280px]">
+              {cameraError ? (
+                <p className="text-sm font-semibold text-rose-200 text-center px-4">{cameraError}</p>
+              ) : (
+                <video
+                  ref={cameraVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-h-[55vh] rounded-2xl object-cover mirror-x scale-x-[-1]"
+                  aria-label={t('profile.header.cameraPreview')}
+                />
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCameraModal}
+                className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50"
+              >
+                {t('profile.common.cancel')}
+              </button>
+              {!cameraError && (
+                <button
+                  type="button"
+                  onClick={capturePhotoFromCamera}
+                  className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-harx-500/20"
+                >
+                  {t('profile.header.capturePhoto')}
+                </button>
+              )}
+              {cameraError && (
+                <button
+                  type="button"
+                  onClick={openDevicePicker}
+                  className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90"
+                >
+                  {t('profile.header.chooseFromDevice')}
+                </button>
+              )}
             </div>
           </div>
         </div>
