@@ -109,8 +109,9 @@ export function WorkspaceContent() {
   const searchParams = new URLSearchParams(location.search);
   const urlTab = searchParams.get('tab');
   const urlLeadId = searchParams.get('leadId') || sessionStorage.getItem('activeLeadId') || '';
-  const urlGigId = searchParams.get('gigId') || sessionStorage.getItem('activeGigId') || '';
-  const gigId = location.state?.gigId || urlGigId;
+  // Only URL / navigation state — never sessionStorage here. Falling back to
+  // sessionStorage raced with setSelectedGigId and reverted gig switches.
+  const gigIdFromNavigation = location.state?.gigId || searchParams.get('gigId') || '';
 
   const [activeTab, setActiveTab] = useState(urlTab && ['voice', 'calls', 'copilot'].includes(urlTab) ? urlTab : 'voice');
   const [message, setMessage] = useState('');
@@ -183,6 +184,7 @@ export function WorkspaceContent() {
   const [claimingCockpit, setClaimingCockpit] = useState(false);
   const prevTabRef = useRef(activeTab);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leadsFetchSeqRef = useRef(0);
 
   const myAgentId = getAgentId();
 
@@ -255,24 +257,32 @@ export function WorkspaceContent() {
     fetchEnrolledGigs();
   }, []);
 
+  // Apply gig from navigation (?gigId= / location.state) once enrolled gigs are known.
+  // Do not read sessionStorage here — that caused selectedGigId to snap back.
   useEffect(() => {
     if (!enrolledGigsLoaded) return;
-    if (gigId && enrolledGigs.some((g) => g._id === gigId) && gigId !== selectedGigId) {
-      setSelectedGigId(gigId);
+    if (
+      gigIdFromNavigation &&
+      enrolledGigs.some((g) => g._id === gigIdFromNavigation) &&
+      gigIdFromNavigation !== selectedGigId
+    ) {
+      setSelectedGigId(gigIdFromNavigation);
     }
-  }, [gigId, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
+  }, [gigIdFromNavigation, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
+
+  useEffect(() => {
+    setLeadStatusFilter('all');
+    setCurrentPage(1);
+    setSearchQuery('');
+    setLeads([]);
+    setLeadsTotal(0);
+  }, [activeEnrolledGigId]);
 
   useEffect(() => {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage, searchQuery);
     }
   }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter]);
-
-  useEffect(() => {
-    setLeadStatusFilter('all');
-    setCurrentPage(1);
-    setSearchQuery('');
-  }, [activeEnrolledGigId]);
 
   useEffect(() => {
     return () => {
@@ -528,7 +538,7 @@ export function WorkspaceContent() {
         setEnrolledGigs(enrolled);
 
         const enrolledIds = new Set(enrolled.map((g) => g._id));
-        const persistedGigId = sessionStorage.getItem('activeGigId') || gigId || '';
+        const persistedGigId = sessionStorage.getItem('activeGigId') || gigIdFromNavigation || '';
 
         if (enrolled.length === 0) {
           setSelectedGigId('');
@@ -561,12 +571,16 @@ export function WorkspaceContent() {
 
   const fetchLeads = async (page: number = 1, query: string = searchQuery) => {
     const activeGigId = activeEnrolledGigId;
+    const fetchSeq = ++leadsFetchSeqRef.current;
 
     // Leads are scoped to an enrolled gig only. Never call /leads/user/:id (demo data).
     if (!activeGigId) {
-      setLeads([]);
-      setTotalPages(1);
-      setIsLoadingLeads(false);
+      if (fetchSeq === leadsFetchSeqRef.current) {
+        setLeads([]);
+        setLeadsTotal(0);
+        setTotalPages(1);
+        setIsLoadingLeads(false);
+      }
       return;
     }
 
@@ -590,6 +604,9 @@ export function WorkspaceContent() {
       console.log("📡 Fetch response status:", response.status, response.statusText);
 
       const responseData: APIResponse = await response.json();
+      // Ignore stale responses after a gig switch / newer request.
+      if (fetchSeq !== leadsFetchSeqRef.current) return;
+
       console.log("✅ Leads data received:", responseData);
 
       if (responseData.success && Array.isArray(responseData.data)) {
@@ -609,6 +626,7 @@ export function WorkspaceContent() {
         setLeadsTotal(0);
       }
     } catch (error: any) {
+      if (fetchSeq !== leadsFetchSeqRef.current) return;
       console.error('❌ Error fetching leads (detailed):', {
         message: error.message,
         name: error.name,
@@ -616,8 +634,11 @@ export function WorkspaceContent() {
         url
       });
       setLeads([]);
+      setLeadsTotal(0);
     } finally {
-      setIsLoadingLeads(false);
+      if (fetchSeq === leadsFetchSeqRef.current) {
+        setIsLoadingLeads(false);
+      }
     }
   };
 
@@ -1337,6 +1358,7 @@ export function WorkspaceContent() {
                   <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-100/90 rounded-xl shadow-2xl shadow-slate-200/80 py-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                     <button
                       onClick={() => {
+                        sessionStorage.removeItem('activeGigId');
                         setSelectedGigId('');
                         setCurrentPage(1);
                         setIsGigDropdownOpen(false);
@@ -1357,6 +1379,8 @@ export function WorkspaceContent() {
                       <button
                         key={g._id}
                         onClick={() => {
+                          // Persist immediately so no effect can snap back to the previous gig.
+                          sessionStorage.setItem('activeGigId', g._id);
                           setSelectedGigId(g._id);
                           setCurrentPage(1);
                           setIsGigDropdownOpen(false);
