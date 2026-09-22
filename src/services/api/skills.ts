@@ -3,7 +3,9 @@ import { repApiClient } from '../../utils/client';
 export interface Skill {
   _id: string;
   name: string;
+  name_i18n?: { en?: string; fr?: string } | null;
   description: string;
+  description_i18n?: { en?: string; fr?: string } | null;
   category: string;
   isActive: boolean;
   createdAt: string;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Star, Globe, Plus, X, Video, AlertTriangle, CheckCircle2, Trash2, PlayCircle, Briefcase } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { resolveLanguageMedia, type LanguageMediaContext } from '../languageVideoUtils';
+import { resolveLanguageMedia, enrichLanguageFromExperience, type LanguageMediaContext } from '../languageVideoUtils';
 import { LanguageAnalysisModal } from '../LanguageAnalysisModal';
 
 interface LanguagesTabProps {
@@ -92,7 +92,9 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
   // Verified = assessment exists, not CV-only, and current level matches verified level.
   const isVideoVerified = (lang: any) => isLanguageVerified(lang);
 
-  const languagesList = profile.personalInfo?.languages || [];
+  const languagesList = (profile.personalInfo?.languages || []).map((lang: any) =>
+    enrichLanguageFromExperience(lang, profile)
+  );
   const totalCount = languagesList.length;
   const verifiedCount = languagesList.filter(isVideoVerified).length;
   const unverifiedCount = totalCount - verifiedCount;
