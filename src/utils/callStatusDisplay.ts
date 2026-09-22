@@ -72,10 +72,12 @@ const PRIORITY_CALLOUTCOMES = new Set([
 export type CallLike = {
   validByAI?: boolean | null;
   valid?: boolean | null;
+  duration?: number | null;
   ai_call_status?: string | null;
   callOutcome?: string | null;
   ai_summary?: string | null;
   ai_summary_fr?: string | null;
+  ai_summary_en?: string | null;
   flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number; feedback?: string; feedback_fr?: string; feedback_en?: string }> | null;
   transaction?: {
@@ -123,6 +125,26 @@ export function isNonEvaluableCall(call: CallLike): boolean {
   return isCallVoicemail(call) || isCallFraudDetected(call);
 }
 
+/** Minimum billable duration (seconds) before AI analysis is allowed. */
+export const MIN_CALL_ANALYSIS_SECONDS = 60;
+
+/** True when the call is too short for a reliable commercial AI audit. */
+export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_call_status'>): boolean {
+  if (call.ai_call_status === 'too_short') return true;
+  const duration = Number((call as any).duration);
+  return Number.isFinite(duration) && duration > 0 && duration < MIN_CALL_ANALYSIS_SECONDS;
+}
+
+export function getTooShortAnalysisNotice(language: string = 'fr', durationSec?: number): string {
+  const d =
+    typeof durationSec === 'number' && Number.isFinite(durationSec) && durationSec > 0
+      ? ` (${Math.round(durationSec)}s)`
+      : '';
+  return language.toLowerCase().startsWith('en')
+    ? `Call too short${d} — AI analysis is only run for calls of at least ${MIN_CALL_ANALYSIS_SECONDS} seconds.`
+    : `Appel trop court${d} — l’analyse IA n’est lancée qu’à partir de ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
+}
+
 /** Display score: hidden (null) for voicemail/fraud in list badges; otherwise the persisted overall score. */
 export function getDisplayOverallScore(call: CallLike): number | null {
   if (isNonEvaluableCall(call)) return null;
@@ -157,6 +179,7 @@ export function getExecutiveSummaryText(call: CallLike, language: string = 'fr')
 }
 
 export function hasAiCallAnalysis(call: CallLike): boolean {
+  if (isCallTooShortForAnalysis(call)) return false;
   if (typeof call.ai_call_score?.overall?.score === 'number') return true;
   const overall = call.ai_call_score?.overall;
   if (overall?.feedback || overall?.feedback_fr || overall?.feedback_en) return true;
