@@ -96,7 +96,7 @@ export const ProfileView: React.FC<{
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const getInitialTab = () => {
     try {
@@ -707,12 +707,19 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const handleSaveAbout = async (value: string) => {
+  const handleSaveAbout = async (value: string, i18nPair?: { en: string; fr: string } | null) => {
+    const nextI18n = i18nPair
+      ? i18nPair
+      : {
+          ...(profile.professionalSummary?.profileDescription_i18n || {}),
+          [(i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en']: value,
+        };
     await handleInlineUpdate(
       {
         professionalSummary: {
           ...profile.professionalSummary,
           profileDescription: value,
+          profileDescription_i18n: nextI18n,
         }
       },
       (prev) => ({
@@ -720,6 +727,7 @@ export const ProfileView: React.FC<{
         professionalSummary: {
           ...(prev.professionalSummary || {}),
           profileDescription: value,
+          profileDescription_i18n: nextI18n,
         }
       })
     );

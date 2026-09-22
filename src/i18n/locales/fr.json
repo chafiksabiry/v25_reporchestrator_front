@@ -606,6 +606,9 @@
       "about": "Résumé du Profil",
       "editAbout": "Modifier le résumé du profil",
       "emptySummary": "Aucun résumé professionnel renseigné",
+      "regenerate": "Générer avec l’IA",
+      "generating": "Génération…",
+      "generateFailed": "Impossible de générer le résumé. Réessayez.",
       "notableCompanies": "Entreprises notables",
       "emptyCompanies": "Aucune entreprise notable renseignée",
       "companyPlaceholder": "Saisissez le nom de l’entreprise puis appuyez sur Entrée..."
