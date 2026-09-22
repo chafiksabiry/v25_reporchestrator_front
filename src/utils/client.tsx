@@ -326,6 +326,16 @@ export const callsApi = {
     });
     return response.data;
   },
+  calibrateScore: async (
+    id: string,
+    payload: { verdict: 'up' | 'down'; explanation?: string }
+  ) => {
+    const response = await callsApiClient.post(`/api/calls/${id}/calibrate-score`, {
+      ...payload,
+      agentId: getAgentId(),
+    });
+    return response.data;
+  },
 };
 
 export const vertexApi = {

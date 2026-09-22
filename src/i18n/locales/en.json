@@ -220,6 +220,21 @@
     "executiveSummary": "Executive Summary",
     "detailedAnalysis": "Detailed Analysis",
     "closeDetails": "Close Details",
+    "calibration": {
+      "title": "Score calibration",
+      "subtitle": "Confirm whether the AI score looks right, or flag the gap with an explanation.",
+      "thumbsUp": "Agree",
+      "thumbsDown": "Disagree",
+      "explanationLabel": "Gap explanation",
+      "explanationPlaceholder": "e.g. the summary invents a conversation while I only said Hello…",
+      "explanationRequired": "Please add an explanation when you disagree.",
+      "submit": "Save calibration",
+      "saving": "Saving…",
+      "saved": "Calibration saved",
+      "saveError": "Could not save calibration",
+      "recorded": "Calibrated",
+      "tooShortTitle": "No AI analysis"
+    },
     "metrics": {
       "fluency": "Agent Fluency",
       "sentiment": "Sentiment Analysis",
