@@ -78,37 +78,110 @@ export function isScriptRequirementModule(mod: JourneyModuleRow): boolean {
   );
 }
 
-const SCRIPT_READ_STORAGE_KEY = 'harx_script_read_ids';
+const SCRIPT_READ_STORAGE_KEY = 'harx_script_read_ids'; // legacy — no longer written
 
-function readScriptReadSet(): Set<string> {
-  try {
-    const raw = localStorage.getItem(SCRIPT_READ_STORAGE_KEY);
-    const arr = raw ? (JSON.parse(raw) as unknown) : [];
-    return new Set(Array.isArray(arr) ? arr.map(String) : []);
-  } catch {
-    return new Set();
-  }
+/** In-memory cache hydrated from GET /script-reads (DB-backed). */
+let scriptReadCache = new Set<string>();
+
+function cacheKeyJourney(journeyId: string): string {
+  return `j:${String(journeyId || '').trim()}`;
+}
+function cacheKeyGig(gigId: string): string {
+  return `g:${String(gigId || '').trim()}`;
 }
 
-/** Marque le script comme lu (lecteur cockpit) — persistance locale + sync API si possible. */
-export function markScriptReadLocal(journeyId: string, gigId?: string): void {
+export function hydrateScriptReadCache(
+  rows: Array<{ gigId?: string; journeyId?: string }>
+): void {
+  const next = new Set<string>();
+  for (const row of rows) {
+    const gid = String(row.gigId || '').trim();
+    const jid = String(row.journeyId || '').trim();
+    if (gid) next.add(cacheKeyGig(gid));
+    if (jid) next.add(cacheKeyJourney(jid));
+  }
+  scriptReadCache = next;
   try {
-    const set = readScriptReadSet();
-    const jid = String(journeyId || '').trim();
-    const gid = String(gigId || '').trim();
-    if (jid) set.add(`j:${jid}`);
-    if (gid) set.add(`g:${gid}`);
-    localStorage.setItem(SCRIPT_READ_STORAGE_KEY, JSON.stringify([...set]));
+    localStorage.removeItem(SCRIPT_READ_STORAGE_KEY);
   } catch {
     /* ignore */
   }
 }
 
-export function isScriptReadLocal(journeyId: string, gigId?: string): boolean {
-  const set = readScriptReadSet();
+export async function fetchScriptReadsFromApi(
+  repId: string
+): Promise<Array<{ gigId: string; journeyId?: string; readAt?: string }>> {
+  const rid = String(repId || '').trim();
+  const base = trainingApiBase();
+  if (!rid || !base) return [];
+  try {
+    const res = await fetch(
+      `${base}/training_journeys/rep/${encodeURIComponent(rid)}/script-reads`
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: unknown };
+    const rows = Array.isArray(json.data) ? json.data : [];
+    return rows
+      .map((r) => {
+        const row = r as { gigId?: string; journeyId?: string; readAt?: string };
+        return {
+          gigId: String(row.gigId || '').trim(),
+          journeyId: String(row.journeyId || '').trim() || undefined,
+          readAt: row.readAt,
+        };
+      })
+      .filter((r) => Boolean(r.gigId));
+  } catch {
+    return [];
+  }
+}
+
+/** Marque le script comme lu en base (et met à jour le cache mémoire). */
+export async function markScriptReadRemote(input: {
+  repId: string;
+  gigId: string;
+  journeyId?: string;
+}): Promise<boolean> {
+  const repId = String(input.repId || '').trim();
+  const gigId = String(input.gigId || '').trim();
+  const journeyId = String(input.journeyId || '').trim();
+  const base = trainingApiBase();
+  if (!repId || !gigId || !base) return false;
+
+  try {
+    const res = await fetch(`${base}/training_journeys/script/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        repId,
+        gigId,
+        ...(journeyId ? { journeyId } : {}),
+      }),
+    });
+    if (!res.ok) return false;
+    if (gigId) scriptReadCache.add(cacheKeyGig(gigId));
+    if (journeyId) scriptReadCache.add(cacheKeyJourney(journeyId));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** @deprecated Use markScriptReadRemote — kept as sync cache update only. */
+export function markScriptReadLocal(journeyId: string, gigId?: string): void {
   const jid = String(journeyId || '').trim();
   const gid = String(gigId || '').trim();
-  return (jid && set.has(`j:${jid}`)) || (gid && set.has(`g:${gid}`)) || false;
+  if (jid) scriptReadCache.add(cacheKeyJourney(jid));
+  if (gid) scriptReadCache.add(cacheKeyGig(gid));
+}
+
+export function isScriptReadLocal(journeyId: string, gigId?: string): boolean {
+  const jid = String(journeyId || '').trim();
+  const gid = String(gigId || '').trim();
+  return (
+    (Boolean(jid) && scriptReadCache.has(cacheKeyJourney(jid))) ||
+    (Boolean(gid) && scriptReadCache.has(cacheKeyGig(gid)))
+  );
 }
 
 export type ScriptModuleMeta = {
