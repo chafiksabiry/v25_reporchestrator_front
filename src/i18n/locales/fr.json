@@ -730,7 +730,13 @@
   },
   "trainingAllGigsGuard": {
     "modalTitle": "Sélection de projet requise",
-    "modalSubtitle": "Pour accéder au COCKPIT, vous devez sélectionner un projet spécifique dans la liste déroulante de la page de Formation au lieu de \"Tous les projets\".",
+    "modalSubtitle": "Choisissez le projet à ouvrir dans le COCKPIT, ou poursuivez vers l’espace de travail pour le sélectionner là-bas.",
+    "selectLabel": "Projet",
+    "selectPlaceholder": "Sélectionner un projet…",
+    "loadingGigs": "Chargement des projets…",
+    "noGigs": "Aucun projet inscrit pour le moment. Inscrivez-vous via la place de marché.",
+    "openCockpitButton": "Ouvrir le COCKPIT",
+    "chooseInWorkspace": "Choisir dans l’espace de travail",
     "understandButton": "Compris"
   },
   "cvGuide": {
