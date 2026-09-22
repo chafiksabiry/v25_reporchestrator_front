@@ -4,14 +4,16 @@ import { fr } from 'date-fns/locale';
 import { Clock, Users, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
 import { slotApi, Slot, Reservation } from '../../../services/api/slotApi';
 import { getAgentId } from '../../../utils/authUtils';
+import { formatSlotTimeRange } from '../../../utils/planningMetrics';
 
 interface AvailableSlotsGridProps {
     gigId: string | null | undefined;
     selectedDate: Date;
+    gigTimeZone?: unknown;
     onReservationMade?: () => void;
 }
 
-export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: AvailableSlotsGridProps) {
+export function AvailableSlotsGrid({ gigId, selectedDate, gigTimeZone, onReservationMade }: AvailableSlotsGridProps) {
     const [slots, setSlots] = useState<Slot[]>([]);
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -143,7 +145,7 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
     if (!gigId || gigId === '' || !selectedDate) {
         return (
             <div className="bg-white/90 rounded-2xl shadow-sm border border-harx-100 p-6 text-center text-gray-500 text-sm">
-                Sélectionnez un projet pour voir les créneaux disponibles.
+                Sélectionnez un gig pour voir les créneaux disponibles.
             </div>
         );
     }
@@ -226,6 +228,12 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                             const isReserved = !!reservation;
                             const isAvailable = slot.status === 'available' && slot.reservedCount < slot.capacity;
                             const remaining = slot.capacity - slot.reservedCount;
+                            const timeDisplay = formatSlotTimeRange(
+                                dateStr,
+                                slot.startTime,
+                                slot.endTime,
+                                gigTimeZone
+                            );
 
                             const isSlotPast = (() => {
                                 try {
@@ -260,8 +268,8 @@ export function AvailableSlotsGrid({ gigId, selectedDate, onReservationMade }: A
                                         <div className="flex items-center justify-between">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-4 mb-2">
-                                                    <span className="text-sm font-bold text-gray-900">
-                                                        {slot.startTime} - {slot.endTime}
+                                                    <span className="text-sm font-bold text-gray-900" title={timeDisplay.hint}>
+                                                        {timeDisplay.label}
                                                     </span>
                                                     <div className="flex items-center gap-2 text-xs">
                                                         <Clock className="w-4 h-4 text-gray-400" />

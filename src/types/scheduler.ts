@@ -39,7 +39,12 @@ export interface Gig {
             day: string;
             hours: { start: string; end: string; };
         }[];
-        time_zone?: string | { name: string };
+        time_zone?: string | { name?: string; zoneName?: string };
+        minimumHours?: {
+            daily?: number;
+            weekly?: number;
+            monthly?: number;
+        };
     };
 }
 
