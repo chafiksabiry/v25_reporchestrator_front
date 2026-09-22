@@ -283,6 +283,10 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   identityMatchYes: { en: 'Matches your profile photo', fr: 'Correspond à votre photo de profil' },
   identityMatchNo: { en: 'Does not match your profile photo', fr: 'Ne correspond pas à votre photo de profil' },
   identityMatchUnknown: { en: 'Could not be verified', fr: 'Non vérifiable' },
+  fraudPhotoVideoAdvice: {
+    en: 'Recommendation: make sure your profile photo and this experience video clearly show the same person, then record again if needed.',
+    fr: 'Recommandation : assurez-vous que votre photo de profil et cette vidéo d’expérience montrent clairement la même personne, puis réenregistrez si besoin.',
+  },
   yes: { en: 'Yes', fr: 'Oui' },
   no: { en: 'No', fr: 'Non' },
   langAssessment: { en: 'Language Assessment (CEFR)', fr: 'Évaluation linguistique (CECR)' },
@@ -1203,6 +1207,14 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             </li>
                           ))}
                         </ul>
+                      )}
+
+                      {(result.fraudCheck.fraudRisk === 'high' ||
+                        result.fraudCheck.fraudRisk === 'medium' ||
+                        result.fraudCheck.identityMatch === false) && (
+                        <p className="text-[11px] font-semibold text-red-700 leading-relaxed bg-red-100/70 border border-red-200 rounded-xl px-3 py-2.5">
+                          {t('fraudPhotoVideoAdvice')}
+                        </p>
                       )}
                     </div>
                   </div>
