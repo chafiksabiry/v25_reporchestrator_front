@@ -291,7 +291,7 @@
     "legendReserved": "Réservés",
     "legendAvailable": "Disponibles",
     "tzHint": "Horaires affichés dans votre fuseau ({{tz}})",
-    "overlapTitle": "Créneau déjà réservé sur un autre GIG",
+    "overlapTitle": "Créneau déjà réservé sur « {{gig}} »",
     "overlapMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Annulez d'abord cette réservation sur l'autre GIG, ou basculez automatiquement ici.",
     "overlapUnknownGig": "un autre GIG",
     "cancelOtherGig": "Annuler sur l'autre GIG",

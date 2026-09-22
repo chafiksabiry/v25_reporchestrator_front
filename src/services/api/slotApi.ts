@@ -19,7 +19,8 @@ export interface Reservation {
     _id?: string;
     agentId: string;
     slotId: string;
-    gigId: string;
+    /** API may return a plain id or a populated gig document. */
+    gigId: string | { _id?: string; $oid?: string; id?: string; title?: string; name?: string };
     date: string;
     reservationDate?: string;
     startTime: string;
