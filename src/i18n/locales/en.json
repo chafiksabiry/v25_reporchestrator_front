@@ -276,6 +276,22 @@
     "title": "Operations Panel",
     "emergencyShutdown": "Emergency Shutdown"
   },
+  "companyProfile": {
+    "back": "Back",
+    "backToMarketplace": "Back to marketplace",
+    "loading": "Loading profile…",
+    "notFoundTitle": "Company not found",
+    "notFoundDesc": "Open this page from a gig details page or the marketplace, or check that the URL is correct.",
+    "loadError": "Could not load this profile. Check the link, or open the company from a gig page or the marketplace.",
+    "contact": "Contact",
+    "noContact": "No contact information published.",
+    "viewOnMap": "View on map",
+    "onlinePresence": "Online presence",
+    "noSocial": "No social links provided.",
+    "overview": "Overview",
+    "noOverview": "No description available for this company.",
+    "mission": "Our mission"
+  },
   "gigDetails": {
     "backToMarketplace": "Back to Marketplace",
     "notFoundTitle": "Gig Not Found",
