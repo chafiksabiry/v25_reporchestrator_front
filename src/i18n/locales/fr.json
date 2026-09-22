@@ -292,13 +292,14 @@
     "legendAvailable": "Disponibles",
     "tzHint": "Horaires affichés dans votre fuseau ({{tz}})",
     "overlapTitle": "Créneau déjà réservé sur « {{gig}} »",
-    "overlapMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Annulez d'abord cette réservation sur l'autre GIG, ou basculez automatiquement ici.",
-    "overlapUnknownGig": "un autre GIG",
-    "cancelOtherGig": "Annuler sur l'autre GIG",
-    "switchHere": "Basculez ici",
+    "overlapMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Cliquez sur BASCULER pour annuler cette réservation et la prendre ici.",
+    "overlapFullMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Ouvrez ce GIG et appuyez sur Annuler pour libérer le créneau, puis revenez réserver ici.",
+    "overlapUnknownGig": "GIG inconnu",
+    "cancelOtherGig": "Annuler sur « {{gig}} »",
+    "switchHere": "Basculer",
     "switching": "Bascule…",
     "switchSuccess": "Réservation basculée sur ce GIG.",
-    "cancelOtherSuccess": "Réservation annulée sur l'autre GIG. Vous pouvez maintenant réserver ici."
+    "cancelOtherSuccess": "Réservation annulée sur « {{gig}} ». Vous pouvez maintenant réserver ici."
   },
   "operations": {
     "title": "Panneau des Opérations",
