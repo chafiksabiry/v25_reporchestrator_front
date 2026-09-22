@@ -636,7 +636,13 @@
       "search": "Search and add {{type}} skill...",
       "noneAvailable": "No more skills available for this section.",
       "delete": "Delete this skill",
-      "deleteNamed": "Delete {{name}}"
+      "deleteNamed": "Delete {{name}}",
+      "proposals": "Suggested from your videos",
+      "proposalsHint": "{{count}} skill suggestion(s) from your experience videos — confirm to add them to your profile, or remove them. Mission matching mainly uses your industries and activities.",
+      "confirmProposal": "Confirm this skill",
+      "confirmProposalNamed": "Confirm {{name}}",
+      "dismissProposal": "Remove this suggestion",
+      "dismissProposalNamed": "Remove suggestion {{name}}"
     },
     "languages": {
       "title": "Language Proficiency",

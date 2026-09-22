@@ -73,6 +73,8 @@ export const ProfileView: React.FC<{
   onEditClick: (tab?: string) => void,
   onDeleteSkill?: (type: 'technical' | 'professional' | 'soft', index: number) => void,
   onAddSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onConfirmProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onDismissProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
   onDeleteLanguage?: (index: number) => void,
   onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string; code?: string }) => void | Promise<void>,
   onUpdateLanguageProficiency?: (index: number, proficiency: string) => void | Promise<void>,
@@ -95,7 +97,7 @@ export const ProfileView: React.FC<{
   onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
-}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onConfirmProposedSkill, onDismissProposedSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const getInitialTab = () => {
@@ -977,6 +979,8 @@ export const ProfileView: React.FC<{
           onEditItemClick={() => onEditClick('skills')}
           onDeleteSkill={(type, index) => onDeleteSkill?.(type, index)}
           onAddSkill={(type, skillId) => onAddSkill?.(type, skillId)}
+          onConfirmProposedSkill={(type, skillId) => onConfirmProposedSkill?.(type, skillId)}
+          onDismissProposedSkill={(type, skillId) => onDismissProposedSkill?.(type, skillId)}
           onAddSpecializationItem={(section, value) => onAddSpecializationItem?.(section, value)}
           onDeleteSpecializationItem={(section, index) => onDeleteSpecializationItem?.(section, index)}
         />
