@@ -367,6 +367,16 @@
     "monthly": "Monthly:",
     "schedule": "Schedule:",
     "flexibility": "Flexibility:",
+    "flexibilityOptions": {
+      "Remote Work Available": "Remote work available",
+      "Flexible Hours": "Flexible hours",
+      "Weekend Rotation": "Weekend rotation",
+      "Night Shift Available": "Night shift available",
+      "Split Shifts": "Split shifts",
+      "Part-Time Options": "Part-time options",
+      "Compressed Work Week": "Compressed work week",
+      "Shift Swapping Allowed": "Shift swapping allowed"
+    },
     "documentation": "Documentation & Resources",
     "productDocs": "Product Documentation:",
     "processDocs": "Process Documentation:",
