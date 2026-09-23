@@ -22,6 +22,7 @@ import {
 } from '../../../services/api/leadCockpitApi';
 import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
 import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
+import { anonymizeEmail, anonymizePhone } from '../../../utils/callStatusDisplay';
 
 interface Lead {
   _id?: string;
@@ -949,11 +950,15 @@ export function WorkspaceContent() {
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Phone className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest">{lead.Telephony || (lead as any).Phone || t('workspace.noPhone')}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest">
+                                    {anonymizePhone(lead.Telephony || (lead as any).Phone) || t('workspace.noPhone')}
+                                  </p>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Mail className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">{lead.Email_1 || t('workspace.noEmail')}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">
+                                    {anonymizeEmail(lead.Email_1) || t('workspace.noEmail')}
+                                  </p>
                                 </div>
                               </div>
                             </div>
