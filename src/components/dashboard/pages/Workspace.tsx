@@ -103,8 +103,6 @@ interface APIResponse {
   data: Lead[];
 }
 
-type LeadStatusFilter = 'all' | 'called' | 'signed' | 'rdv';
-
 function isLeadRdvByMe(lead: Lead): boolean {
   if (lead.isRdvByMe === true) return true;
   return lead.lastCallOutcome === 'appointment';
@@ -230,7 +228,6 @@ export function WorkspaceContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('1');
-  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [dispositionFilter, setDispositionFilter] = useState<string>('all');
@@ -352,7 +349,6 @@ export function WorkspaceContent() {
   }, [location.state, location.pathname, location.search, navigate]);
 
   useEffect(() => {
-    setLeadStatusFilter('all');
     setDispositionFilter('all');
     setDateFrom('');
     setDateTo('');
@@ -367,7 +363,7 @@ export function WorkspaceContent() {
       fetchLeads(currentPage, searchQuery);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter, dispositionFilter, dateFrom, dateTo]);
+  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, dispositionFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     return () => {
@@ -641,19 +637,6 @@ export function WorkspaceContent() {
     }
   };
 
-  const applyLeadStatusFilter = (leadList: Lead[]) => {
-    if (leadStatusFilter === 'called') {
-      return leadList.filter((lead) => lead.isCalledByMe);
-    }
-    if (leadStatusFilter === 'signed') {
-      return leadList.filter((lead) => lead.isSignedByMe);
-    }
-    if (leadStatusFilter === 'rdv') {
-      return leadList.filter((lead) => isLeadRdvByMe(lead));
-    }
-    return leadList;
-  };
-
   const fetchLeads = async (page: number = 1, query: string = searchQuery) => {
     const activeGigId = activeEnrolledGigId;
     const fetchSeq = ++leadsFetchSeqRef.current;
@@ -674,15 +657,14 @@ export function WorkspaceContent() {
     const limit = 50;
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
-    const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
     const dispParam = dispositionFilter !== 'all' ? `&disposition=${encodeURIComponent(dispositionFilter)}` : '';
     const dateFromParam = dateFrom ? `&createdFrom=${encodeURIComponent(dateFrom)}` : '';
     const dateToParam = dateTo ? `&createdTo=${encodeURIComponent(dateTo)}` : '';
     const extraParams = `${dispParam}${dateFromParam}${dateToParam}`;
     const trimmedQuery = query.trim();
     const url = trimmedQuery
-      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${statusParam}${extraParams}`
-      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}${extraParams}`;
+      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${extraParams}`
+      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${extraParams}`;
 
     try {
       setIsLoadingLeads(true);
@@ -699,7 +681,7 @@ export function WorkspaceContent() {
       console.log("✅ Leads data received:", responseData);
 
       if (responseData.success && Array.isArray(responseData.data)) {
-        const leadResults = applyLeadStatusFilter(responseData.data);
+        const leadResults = responseData.data;
         setLeads(leadResults);
         setLeadsTotal(trimmedQuery ? leadResults.length : (responseData.total ?? leadResults.length));
         if (trimmedQuery) {
@@ -770,13 +752,6 @@ export function WorkspaceContent() {
       fetchLeads(1, query);
     }, 500);
   };
-
-  const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
-    { id: 'all', label: t('workspace.filterAll') },
-    { id: 'called', label: t('workspace.filterCalled') },
-    { id: 'rdv', label: t('workspace.filterRdv') },
-    { id: 'signed', label: t('workspace.filterSigned') },
-  ];
 
   const formatCreatedDate = (raw?: string | null): string => {
     if (!raw) return '';
@@ -966,34 +941,7 @@ export function WorkspaceContent() {
                   </div>
                   {activeEnrolledGigId && (
                     <div className="flex flex-col gap-2">
-                      {/* Row 1: Status quick filters */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">{t('workspace.filter')}</span>
-                        {leadStatusFilters.map((filter) => (
-                          <button
-                            key={filter.id}
-                            type="button"
-                            onClick={() => {
-                              setLeadStatusFilter(filter.id);
-                              setCurrentPage(1);
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                              leadStatusFilter === filter.id
-                                ? filter.id === 'signed'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
-                                  : filter.id === 'called'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                                    : filter.id === 'rdv'
-                                      ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
-                                      : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
-                                : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
-                            }`}
-                          >
-                            {filter.label}
-                          </button>
-                        ))}
-                      </div>
-                      {/* Row 2: Disposition filter + Date range */}
+                      {/* Disposition filter + Date range */}
                       <div className="flex flex-wrap items-center gap-2">
                         <Tag className="w-3.5 h-3.5 text-gray-300 shrink-0" />
                         <select
@@ -1058,9 +1006,9 @@ export function WorkspaceContent() {
                 ) : leads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
-                      {searchQuery.trim()
+                        {searchQuery.trim()
                         ? t('workspaceGuard.noSearchResults', 'No leads match your search.')
-                        : leadStatusFilter !== 'all'
+                        : (dispositionFilter !== 'all' || dateFrom || dateTo)
                         ? t('workspaceGuard.noLeadsForFilter', 'Aucun prospect pour ce filtre.')
                         : enrolledGigs.length === 0
                         ? t(
