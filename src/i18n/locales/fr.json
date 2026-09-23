@@ -322,6 +322,36 @@
       "title": "Sauvegarde de l'appel…",
       "subtitle": "Veuillez patienter quelques secondes — nous finalisons l'enregistrement et préparons l'analyse IA.",
       "hint": "Ne fermez pas cette page."
+    },
+    "fiche": "Fiche",
+    "viewProfile": "Voir la fiche prospect",
+    "viewCallHistory": "Historique des appels",
+    "dateFrom": "Du",
+    "dateTo": "Au",
+    "clearFilters": "Effacer filtres",
+    "dispFilterAll": "Tous statuts",
+    "dispFilterNone": "Sans statut",
+    "dispositionTitle": "Statut d'appel",
+    "changeDisposition": "Modifier",
+    "dispositionExclNote": "À partir de « Appelé – RDV pris », ce prospect vous sera affecté exclusivement.",
+    "profileAddedOn": "Ajouté le",
+    "profileContact": "Contact",
+    "profilePhone": "Téléphone",
+    "profileEmail": "Email",
+    "profileAddress": "Adresse",
+    "profileDob": "Date de naissance",
+    "profilePipeline": "Pipeline",
+    "profileDisposition": "Statut d'appel",
+    "disp": {
+      "to_call": "À appeler",
+      "called_unreachable": "Appelé – Injoignable",
+      "called_voicemail": "Appelé – Répondeur",
+      "called_wrong_number": "Appelé – Numéro non attribué",
+      "called_callback": "Appelé – Souhaite être rappelé",
+      "called_rdv": "Appelé – RDV pris pour rappel",
+      "argued_rdv": "Appel argumenté – RDV pris / délai de réflexion",
+      "argued_declined": "Appel argumenté – Transaction déclinée",
+      "argued_done": "Appel argumenté – Transaction aboutie"
     }
   },
   "sessionPlanning": {
@@ -1034,12 +1064,30 @@
       "saveChanges": "Enregistrer les modifications"
     },
     "proficiency": {
-      "A1": { "label": "A1 - Débutant", "description": "Peut comprendre et utiliser des expressions simples et se présenter." },
-      "A2": { "label": "A2 - Élémentaire", "description": "Peut communiquer dans des situations simples et habituelles." },
-      "B1": { "label": "B1 - Intermédiaire", "description": "Peut gérer la plupart des situations en voyage et décrire ses expériences." },
-      "B2": { "label": "B2 - Intermédiaire avancé", "description": "Peut échanger avec aisance avec des locuteurs natifs et produire un texte clair." },
-      "C1": { "label": "C1 - Avancé", "description": "Peut utiliser la langue avec souplesse et produire un texte clair et structuré." },
-      "C2": { "label": "C2 - Maîtrise", "description": "Peut presque tout comprendre et s’exprimer spontanément." }
+      "A1": {
+        "label": "A1 - Débutant",
+        "description": "Peut comprendre et utiliser des expressions simples et se présenter."
+      },
+      "A2": {
+        "label": "A2 - Élémentaire",
+        "description": "Peut communiquer dans des situations simples et habituelles."
+      },
+      "B1": {
+        "label": "B1 - Intermédiaire",
+        "description": "Peut gérer la plupart des situations en voyage et décrire ses expériences."
+      },
+      "B2": {
+        "label": "B2 - Intermédiaire avancé",
+        "description": "Peut échanger avec aisance avec des locuteurs natifs et produire un texte clair."
+      },
+      "C1": {
+        "label": "C1 - Avancé",
+        "description": "Peut utiliser la langue avec souplesse et produire un texte clair et structuré."
+      },
+      "C2": {
+        "label": "C2 - Maîtrise",
+        "description": "Peut presque tout comprendre et s’exprimer spontanément."
+      }
     },
     "availability": {
       "defaultHours": "Horaires de travail par défaut",
