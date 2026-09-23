@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
 import { ScriptRequirementNotificationsSync } from '../components/dashboard/ScriptRequirementNotificationsSync';
+import { GigActivityNotificationsSync } from '../components/dashboard/GigActivityNotificationsSync';
 import { Sidebar } from '../components/dashboard/Sidebar';
 import { TopBar } from '../components/dashboard/TopBar';
 import { Dashboard } from '../components/dashboard/pages/Dashboard';
@@ -96,6 +97,7 @@ function DashboardAppContent() {
     <RepTrainingNavProvider>
       <NotificationsProvider>
         <ScriptRequirementNotificationsSync />
+        <GigActivityNotificationsSync />
         <DashboardRoutingWrapper
           userProfile={userProfile}
           loading={loading}
