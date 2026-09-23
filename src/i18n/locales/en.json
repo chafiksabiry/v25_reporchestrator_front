@@ -68,6 +68,12 @@
       "gigFallback": "Gig",
       "filterByGig": "Filter by gig",
       "filterByPeriod": "Filter by period",
+      "goLive": {
+        "eyebrow": "Now's the time",
+        "title": "Go live",
+        "subtitle": "Your leads are waiting — every call can pay",
+        "cta": "Start earning"
+      },
       "defaultUser": "User",
       "periods": {
         "today": "Today",
@@ -174,19 +180,23 @@
       },
       "goals": {
         "title": "My Goals",
-        "subtitle": "Daily, weekly and monthly target tracking",
-        "dailyTitle": "Today's goal",
-        "dailyLabel": "Calls today",
-        "weeklyTitle": "Weekly goal",
-        "weeklyLabel": "Calls this week",
-        "sessionsTitle": "Weekly sessions",
-        "sessionsLabel": "Active reservations"
+        "subtitle": "Calls, sessions and bonus for the period",
+        "callsTitle": "Calls",
+        "callsLabel": "Calls in this period",
+        "sessionsTitle": "Sessions",
+        "sessionsLabel": "Active reservations",
+        "bonusTitle": "Bonus",
+        "periodDay": "Day",
+        "periodWeek": "Week",
+        "periodMonth": "Month",
+        "periodQuarter": "Quarter",
+        "periodYear": "Year"
       },
       "gigGoal": {
-        "title": "Monthly goal",
+        "title": "Bonus goal",
         "bonusUnlock": "Bonus to unlock",
-        "selectGig": "Select a Gig to see the goal",
-        "validatedCalls": "validated calls this month",
+        "selectGig": "Select a Gig to see the bonus",
+        "validatedCalls": "validated calls",
         "achieved": "Goal reached — bonus credited",
         "remaining": "Only {{count}} more validated calls to unlock your bonus."
       },

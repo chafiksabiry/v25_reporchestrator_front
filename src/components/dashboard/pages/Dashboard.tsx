@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck, Rocket } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
@@ -17,6 +17,7 @@ import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerB
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 import { isCallCenterStaff } from '../../../utils/callCenterStaff';
 import { CallCenterAgentHome } from './CallCenterAgentHome';
+import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
 
 interface DashboardProps {
   profile?: any;
@@ -143,6 +144,17 @@ const clickableCallRowClass =
   'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-[0.99]';
 
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+type GoalsPeriod = Exclude<PeriodKey, 'all'>;
+
+const GOALS_PERIODS: GoalsPeriod[] = ['today', 'week', 'month', 'quarter', 'year'];
+
+const GOAL_TARGETS: Record<GoalsPeriod, { calls: number; sessions: number; bonusScale: number }> = {
+  today: { calls: 5, sessions: 1, bonusScale: 1 / 30 },
+  week: { calls: 25, sessions: 5, bonusScale: 1 / 4 },
+  month: { calls: 100, sessions: 20, bonusScale: 1 },
+  quarter: { calls: 300, sessions: 60, bonusScale: 3 },
+  year: { calls: 1200, sessions: 240, bonusScale: 12 },
+};
 
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
@@ -216,6 +228,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [, setLoading] = useState(true);
   const [selectedGigId, setSelectedGigId] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
+  const [goalsPeriod, setGoalsPeriod] = useState<GoalsPeriod>('week');
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   const gigTriggerRef = useRef<HTMLButtonElement>(null);
   const [gigDropdownPos, setGigDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -757,107 +770,70 @@ export function Dashboard({ profile }: DashboardProps) {
       .slice(0, callFilter === 'pending_client' ? 20 : 8);
   }, [filteredCalls, callFilter, earningsPipeline.pendingClientValidationCallIds]);
 
-  // Multi-objectifs — daily / weekly / monthly call goals + reservation goal
-  const multiObjectifs = useMemo(() => {
-    const todayStart = getPeriodStart('today');
-    const weekStart = getPeriodStart('week');
-    const monthStart = getPeriodStart('month');
+  const goals = useMemo(() => {
+    const startTs = getPeriodStart(goalsPeriod);
+    const targets = GOAL_TARGETS[goalsPeriod];
 
-    const callsByPeriod = (startTs: number) =>
-      callsData.filter((c: any) => {
-        if (selectedGigId !== 'all') {
-          const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
-          if (cGigId !== selectedGigId) return false;
-        }
-        const ts = new Date(c.createdAt || c.startTime || c.date || 0).getTime();
-        return ts >= startTs;
-      }).length;
-
-    const reservationsByPeriod = (startTs: number) =>
-      reservationsData.filter((r: any) => {
-        if (selectedGigId !== 'all') {
-          const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-          if (rGigId !== selectedGigId) return false;
-        }
-        if (r.status === 'cancelled') return false;
-        const ts = new Date(r.reservationDate || r.date || 0).getTime();
-        return ts >= startTs;
-      }).length;
-
-    const dailyTarget = 5;
-    const weeklyTarget = 25;
-    const reservationsWeekTarget = 5;
-
-    const dailyCurrent = callsByPeriod(todayStart);
-    const weeklyCurrent = callsByPeriod(weekStart);
-    const monthCalls = callsByPeriod(monthStart);
-    const reservationsThisWeek = reservationsByPeriod(weekStart);
-
-    return {
-      daily: {
-        current: dailyCurrent,
-        target: dailyTarget,
-        progressPct: Math.min(100, Math.round((dailyCurrent / dailyTarget) * 100)),
-      },
-      weekly: {
-        current: weeklyCurrent,
-        target: weeklyTarget,
-        progressPct: Math.min(100, Math.round((weeklyCurrent / weeklyTarget) * 100)),
-      },
-      monthCalls,
-      reservationsWeekly: {
-        current: reservationsThisWeek,
-        target: reservationsWeekTarget,
-        progressPct: Math.min(100, Math.round((reservationsThisWeek / reservationsWeekTarget) * 100)),
-      },
-    };
-  }, [callsData, reservationsData, selectedGigId]);
-
-  // Objectif gig — uses the selected gig's bonus thresholds (volume + bonus amount).
-  // Counts only this month's calls of the matching gig.
-  const objectif = useMemo(() => {
-    if (selectedGigId === 'all') {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const monthCalls = callsData.filter((c) => {
-        const d = new Date(c.createdAt || c.startTime || 0).getTime();
-        return d >= monthStart.getTime();
-      }).length;
-      return {
-        label: t('dashboard.home.allGigs'),
-        current: monthCalls,
-        target: 0,
-        bonusAmount: 0,
-        progressPct: 0
-      };
-    }
-
-    const gig = gigsData.find((g) => (g._id || g.id) === selectedGigId);
-    const target = gig?.commission?.minimumVolume || gig?.commission?.bonusMinimumCalls || 25;
-    const bonusGross = gig?.commission?.bonusAmount || gig?.rewardBonus || 120;
-    const bonusRepShare = Math.round(bonusGross * 0.7 * 100) / 100;
-
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const current = callsData.filter((c) => {
-      const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
-      if (cGigId !== selectedGigId) return false;
-      const d = new Date(c.createdAt || c.startTime || 0).getTime();
-      return d >= monthStart.getTime();
+    const callsCurrent = callsData.filter((c: any) => {
+      if (selectedGigId !== 'all') {
+        const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
+        if (cGigId !== selectedGigId) return false;
+      }
+      const ts = new Date(c.createdAt || c.startTime || c.date || 0).getTime();
+      return ts >= startTs;
     }).length;
 
-    const progressPct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+    const sessionsCurrent = reservationsData.filter((r: any) => {
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
+        if (rGigId !== selectedGigId) return false;
+      }
+      if (r.status === 'cancelled') return false;
+      const ts = new Date(r.reservationDate || r.date || 0).getTime();
+      return ts >= startTs;
+    }).length;
+
+    const gig = selectedGigId === 'all'
+      ? null
+      : gigsData.find((g) => (g._id || g.id) === selectedGigId);
+    const monthlyBonusTarget = gig?.commission?.minimumVolume || gig?.commission?.bonusMinimumCalls || 0;
+    const bonusTarget = monthlyBonusTarget > 0
+      ? Math.max(1, Math.round(monthlyBonusTarget * targets.bonusScale))
+      : 0;
+    const bonusGross = gig?.commission?.bonusAmount || gig?.rewardBonus || 0;
+    const bonusAmount = Math.round(bonusGross * 0.7 * 100) / 100;
+
+    const pct = (current: number, target: number) =>
+      target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+
     return {
-      label: gig?.title || t('dashboard.home.gigFallback'),
-      current,
-      target,
-      bonusAmount: bonusRepShare,
-      progressPct
+      calls: {
+        current: callsCurrent,
+        target: targets.calls,
+        progressPct: pct(callsCurrent, targets.calls),
+      },
+      sessions: {
+        current: sessionsCurrent,
+        target: targets.sessions,
+        progressPct: pct(sessionsCurrent, targets.sessions),
+      },
+      bonus: {
+        label: gig?.title || t('dashboard.home.allGigs'),
+        current: callsCurrent,
+        target: bonusTarget,
+        bonusAmount,
+        progressPct: pct(callsCurrent, bonusTarget),
+      },
     };
-  }, [selectedGigId, gigsData, callsData, t]);
+  }, [callsData, reservationsData, selectedGigId, gigsData, goalsPeriod, t]);
+
+  const goalsPeriodLabels: Record<GoalsPeriod, string> = {
+    today: t('dashboard.home.goals.periodDay'),
+    week: t('dashboard.home.goals.periodWeek'),
+    month: t('dashboard.home.goals.periodMonth'),
+    quarter: t('dashboard.home.goals.periodQuarter'),
+    year: t('dashboard.home.goals.periodYear'),
+  };
 
   const displayName = profile?.personalInfo?.name ? profile.personalInfo.name.split(' ')[0] : t('dashboard.home.defaultUser');
 
@@ -897,6 +873,12 @@ export function Dashboard({ profile }: DashboardProps) {
   const closePeriodDropdown = () => {
     setIsPeriodDropdownOpen(false);
     setPeriodDropdownPos(null);
+  };
+
+  const goToProduction = () => {
+    const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+    if (gigId) persistActiveGigId(gigId);
+    navigate(withActiveGig('/workspace', gigId || undefined));
   };
 
   const openGigDropdown = () => {
@@ -974,7 +956,40 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-10 pb-10 animate-in fade-in duration-700">
+    <div className="space-y-6 pb-10 animate-in fade-in duration-700">
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={goToProduction}
+          className="group relative w-full overflow-hidden rounded-[28px] bg-gradient-harx px-5 py-5 sm:px-8 sm:py-6 text-white shadow-2xl shadow-harx-500/35 hover:shadow-harx-500/50 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-harx-400/40"
+        >
+          <div className="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/20 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-black/10 blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-4 min-w-0">
+              <div className="h-16 w-16 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/25 group-hover:scale-105 transition-transform shadow-inner">
+                <Rocket size={30} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/80">
+                  {t('dashboard.home.goLive.eyebrow')}
+                </p>
+                <p className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none mt-1">
+                  {t('dashboard.home.goLive.title')}
+                </p>
+                <p className="text-sm font-semibold text-white/90 mt-2">
+                  {t('dashboard.home.goLive.subtitle')}
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-2xl bg-white text-harx-600 px-6 py-3.5 text-xs font-black uppercase tracking-widest shadow-lg group-hover:bg-white/95 shrink-0">
+              {t('dashboard.home.goLive.cta')}
+              <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </div>
+        </button>
+      </div>
+
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-4 bg-white/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-xl shadow-slate-200/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1292,6 +1307,146 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
             {fmtMoney(earningsPipeline.totalGains)} €
           </p>
+        </div>
+      </div>
+
+      {/* Objectifs — un seul pavé, période type cancellation */}
+      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/10 blur-3xl -mr-24 -mt-24 pointer-events-none" />
+        <div className="flex items-start justify-between gap-4 flex-wrap relative z-10 mb-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <Target size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
+                {goals.bonus.label}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1 rounded-full bg-slate-900 p-1 shrink-0">
+            {GOALS_PERIODS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setGoalsPeriod(key)}
+                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition ${
+                  goalsPeriod === key
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-white/55 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {goalsPeriodLabels[key]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Phone size={14} className="text-cyan-600" />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
+              </div>
+              <span className="text-[10px] font-black text-slate-700">{goals.calls.progressPct}%</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-900 tracking-tighter">
+                {goals.calls.current}<span className="text-base text-slate-400">/{goals.calls.target}</span>
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.callsLabel')}</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-700 ease-out rounded-full ${
+                  goals.calls.progressPct >= 100
+                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                    : 'bg-gradient-to-r from-cyan-400 to-cyan-600'
+                }`}
+                style={{ width: `${goals.calls.progressPct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarCheck size={14} className="text-violet-600" />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
+              </div>
+              <span className="text-[10px] font-black text-slate-700">{goals.sessions.progressPct}%</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-900 tracking-tighter">
+                {goals.sessions.current}<span className="text-base text-slate-400">/{goals.sessions.target}</span>
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.sessionsLabel')}</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-700 ease-out rounded-full ${
+                  goals.sessions.progressPct >= 100
+                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                    : 'bg-gradient-to-r from-violet-400 to-violet-600'
+                }`}
+                style={{ width: `${goals.sessions.progressPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-white/60 border border-white/60 rounded-[24px] p-5 relative z-10">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Flame size={14} className="text-emerald-500" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                {t('dashboard.home.goals.bonusTitle')}
+              </span>
+            </div>
+            {goals.bonus.target > 0 ? (
+              <span className="text-lg font-black text-emerald-600 tracking-tighter flex items-center gap-1.5">
+                +{goals.bonus.bonusAmount.toFixed(2)} €
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-slate-400 italic">
+                {t('dashboard.home.gigGoal.selectGig')}
+              </span>
+            )}
+          </div>
+          {goals.bonus.target > 0 && (
+            <div className="mt-4 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">
+                  <span className="text-slate-900 text-base font-black">{goals.bonus.current}</span>
+                  {' '}/{' '}
+                  <span>{goals.bonus.target}</span>
+                  {' '}{t('dashboard.home.gigGoal.validatedCalls')}
+                </span>
+                <span className="font-black text-slate-900">{goals.bonus.progressPct}%</span>
+              </div>
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                    goals.bonus.progressPct >= 100
+                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                      : 'bg-gradient-to-r from-rose-400 to-rose-600'
+                  }`}
+                  style={{ width: `${goals.bonus.progressPct}%` }}
+                />
+              </div>
+              {goals.bonus.progressPct >= 100 ? (
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 size={12} /> {t('dashboard.home.gigGoal.achieved')}
+                </p>
+              ) : (
+                <p className="text-[10px] font-bold text-slate-500">
+                  {t('dashboard.home.gigGoal.remaining', { count: goals.bonus.target - goals.bonus.current })}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1709,173 +1864,6 @@ export function Dashboard({ profile }: DashboardProps) {
                 );
               })}
             </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Multi-objectifs */}
-      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-8 overflow-hidden relative">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <Target size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {t('dashboard.home.goals.subtitle')}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* Daily objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone size={14} className="text-cyan-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.dailyTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.daily.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.daily.current}<span className="text-base text-slate-400">/{multiObjectifs.daily.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.dailyLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.daily.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-cyan-400 to-cyan-600'
-                }`}
-                style={{ width: `${multiObjectifs.daily.progressPct}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Weekly objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={14} className="text-indigo-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.weeklyTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.weekly.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.weekly.current}<span className="text-base text-slate-400">/{multiObjectifs.weekly.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.weeklyLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.weekly.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-indigo-400 to-indigo-600'
-                }`}
-                style={{ width: `${multiObjectifs.weekly.progressPct}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Reservations objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarCheck size={14} className="text-violet-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.reservationsWeekly.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.reservationsWeekly.current}<span className="text-base text-slate-400">/{multiObjectifs.reservationsWeekly.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.sessionsLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.reservationsWeekly.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-violet-400 to-violet-600'
-                }`}
-                style={{ width: `${multiObjectifs.reservationsWeekly.progressPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Objectif gig */}
-      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-8 overflow-hidden relative">
-        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/10 blur-3xl -mr-24 -mt-24" />
-        <div className="flex items-start justify-between gap-6 flex-wrap relative z-10">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
-              <Target size={22} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">{t('dashboard.home.gigGoal.title')}</h3>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
-                {objectif.label}
-              </p>
-            </div>
-          </div>
-
-          {objectif.target > 0 ? (
-            <div className="text-right shrink-0">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                {t('dashboard.home.gigGoal.bonusUnlock')}
-              </span>
-              <span className="text-2xl font-black text-emerald-600 tracking-tighter block mt-1 flex items-center justify-end gap-1.5">
-                <Flame size={18} className="text-emerald-500" />
-                +{objectif.bonusAmount.toFixed(2)} €
-              </span>
-            </div>
-          ) : (
-            <span className="text-[10px] font-bold text-slate-400 italic">
-              {t('dashboard.home.gigGoal.selectGig')}
-            </span>
-          )}
-        </div>
-
-        {objectif.target > 0 && (
-          <div className="mt-6 space-y-3 relative z-10">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-600">
-                <span className="text-slate-900 text-base font-black">{objectif.current}</span>
-                {' '}/{' '}
-                <span>{objectif.target}</span>
-                {' '}{t('dashboard.home.gigGoal.validatedCalls')}
-              </span>
-              <span className="font-black text-slate-900">{objectif.progressPct}%</span>
-            </div>
-            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                  objectif.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-rose-400 to-rose-600'
-                }`}
-                style={{ width: `${objectif.progressPct}%` }}
-              />
-            </div>
-            {objectif.progressPct >= 100 ? (
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 size={12} /> {t('dashboard.home.gigGoal.achieved')}
-              </p>
-            ) : (
-              <p className="text-[10px] font-bold text-slate-500">
-                {t('dashboard.home.gigGoal.remaining', { count: objectif.target - objectif.current })}
-              </p>
-            )}
           </div>
         )}
       </div>

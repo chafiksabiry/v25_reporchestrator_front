@@ -68,6 +68,12 @@
       "gigFallback": "Gig",
       "filterByGig": "Filtrer par gig",
       "filterByPeriod": "Filtrer par période",
+      "goLive": {
+        "eyebrow": "C'est le moment",
+        "title": "Passer en production",
+        "subtitle": "Tes prospects t'attendent — chaque appel peut rapporter",
+        "cta": "Gagner de l'argent"
+      },
       "defaultUser": "Utilisateur",
       "periods": {
         "today": "Aujourd'hui",
@@ -174,19 +180,23 @@
       },
       "goals": {
         "title": "Mes Objectifs",
-        "subtitle": "Suivi des cibles quotidiennes, hebdomadaires et mensuelles",
-        "dailyTitle": "Objectif du jour",
-        "dailyLabel": "Appels aujourd'hui",
-        "weeklyTitle": "Objectif hebdo",
-        "weeklyLabel": "Appels cette semaine",
-        "sessionsTitle": "Sessions hebdo",
-        "sessionsLabel": "Réservations actives"
+        "subtitle": "Appels, sessions et bonus sur la période",
+        "callsTitle": "Appels",
+        "callsLabel": "Appels sur la période",
+        "sessionsTitle": "Sessions",
+        "sessionsLabel": "Réservations actives",
+        "bonusTitle": "Bonus",
+        "periodDay": "Jour",
+        "periodWeek": "Semaine",
+        "periodMonth": "Mois",
+        "periodQuarter": "Trimestre",
+        "periodYear": "Année"
       },
       "gigGoal": {
-        "title": "Objectif du mois",
+        "title": "Objectif bonus",
         "bonusUnlock": "Bonus à débloquer",
-        "selectGig": "Sélectionnez un Gig pour voir l'objectif",
-        "validatedCalls": "appels validés ce mois-ci",
+        "selectGig": "Sélectionnez un Gig pour voir le bonus",
+        "validatedCalls": "appels validés",
         "achieved": "Objectif atteint — bonus crédité",
         "remaining": "Plus que {{count}} appels validés pour décrocher votre bonus."
       },
