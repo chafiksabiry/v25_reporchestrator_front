@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Phone, Mail, User,
-  Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
+  Paperclip, Image, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
   BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye,
-  MapPin, CreditCard, Info, Tag, X, Loader2
+  MapPin, CreditCard, Info, Tag, X, Loader2,
+  PhoneMissed, Voicemail, PhoneOff, Repeat2, CalendarCheck, Handshake, Ban, PartyPopper, ListFilter
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -62,30 +63,41 @@ interface Lead {
 }
 
 // ── HARX Disposition Ladder ─────────────────────────────────────────────────
-const HARX_DISPOSITIONS: { value: string; labelKey: string; color: string }[] = [
-  { value: 'to_call',            labelKey: 'workspace.disp.to_call',            color: 'gray' },
-  { value: 'called_unreachable', labelKey: 'workspace.disp.called_unreachable', color: 'orange' },
-  { value: 'called_voicemail',   labelKey: 'workspace.disp.called_voicemail',   color: 'orange' },
-  { value: 'called_wrong_number',labelKey: 'workspace.disp.called_wrong_number',color: 'red' },
-  { value: 'called_callback',    labelKey: 'workspace.disp.called_callback',    color: 'amber' },
-  { value: 'called_rdv',         labelKey: 'workspace.disp.called_rdv',         color: 'violet' },
-  { value: 'argued_rdv',         labelKey: 'workspace.disp.argued_rdv',         color: 'indigo' },
-  { value: 'argued_declined',    labelKey: 'workspace.disp.argued_declined',    color: 'rose' },
-  { value: 'argued_done',        labelKey: 'workspace.disp.argued_done',        color: 'emerald' },
+type LucideIcon = React.ComponentType<{ className?: string }>;
+
+interface DispConfig {
+  value: string;
+  labelKey: string;
+  color: string;
+  /** dot color class for the indicator */
+  dot: string;
+  Icon: LucideIcon;
+}
+
+const HARX_DISPOSITIONS: DispConfig[] = [
+  { value: 'to_call',            labelKey: 'workspace.disp.to_call',            color: 'gray',    dot: 'bg-gray-400',    Icon: Phone },
+  { value: 'called_unreachable', labelKey: 'workspace.disp.called_unreachable', color: 'orange',  dot: 'bg-orange-500',  Icon: PhoneMissed },
+  { value: 'called_voicemail',   labelKey: 'workspace.disp.called_voicemail',   color: 'orange',  dot: 'bg-orange-400',  Icon: Voicemail },
+  { value: 'called_wrong_number',labelKey: 'workspace.disp.called_wrong_number',color: 'red',     dot: 'bg-red-500',     Icon: PhoneOff },
+  { value: 'called_callback',    labelKey: 'workspace.disp.called_callback',    color: 'amber',   dot: 'bg-amber-500',   Icon: Repeat2 },
+  { value: 'called_rdv',         labelKey: 'workspace.disp.called_rdv',         color: 'violet',  dot: 'bg-violet-500',  Icon: CalendarCheck },
+  { value: 'argued_rdv',         labelKey: 'workspace.disp.argued_rdv',         color: 'indigo',  dot: 'bg-indigo-500',  Icon: Handshake },
+  { value: 'argued_declined',    labelKey: 'workspace.disp.argued_declined',    color: 'rose',    dot: 'bg-rose-500',    Icon: Ban },
+  { value: 'argued_done',        labelKey: 'workspace.disp.argued_done',        color: 'emerald', dot: 'bg-emerald-500', Icon: PartyPopper },
 ];
 
 const DISP_COLOR_MAP: Record<string, string> = {
-  gray:    'bg-gray-50 text-gray-500 border-gray-100',
-  orange:  'bg-orange-50 text-orange-600 border-orange-100',
-  red:     'bg-red-50 text-red-600 border-red-100',
-  amber:   'bg-amber-50 text-amber-600 border-amber-100',
-  violet:  'bg-violet-50 text-violet-700 border-violet-100',
-  indigo:  'bg-indigo-50 text-indigo-700 border-indigo-100',
-  rose:    'bg-rose-50 text-rose-600 border-rose-100',
-  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  gray:    'bg-gray-50 text-gray-500 border-gray-200',
+  orange:  'bg-orange-50 text-orange-600 border-orange-200',
+  red:     'bg-red-50 text-red-600 border-red-200',
+  amber:   'bg-amber-50 text-amber-600 border-amber-200',
+  violet:  'bg-violet-50 text-violet-700 border-violet-200',
+  indigo:  'bg-indigo-50 text-indigo-700 border-indigo-200',
+  rose:    'bg-rose-50 text-rose-600 border-rose-200',
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-function getDispConfig(value: string | null | undefined) {
+function getDispConfig(value: string | null | undefined): DispConfig | null {
   return HARX_DISPOSITIONS.find((d) => d.value === value) || null;
 }
 
@@ -231,6 +243,7 @@ export function WorkspaceContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [dispositionFilter, setDispositionFilter] = useState<string>('all');
+  const [isDispositionDropdownOpen, setIsDispositionDropdownOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [prospectProfileLead, setProspectProfileLead] = useState<Lead | null>(null);
@@ -943,18 +956,99 @@ export function WorkspaceContent() {
                     <div className="flex flex-col gap-2">
                       {/* Disposition filter + Date range */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <Tag className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                        <select
-                          value={dispositionFilter}
-                          onChange={(e) => { setDispositionFilter(e.target.value); setCurrentPage(1); }}
-                          className="text-[10px] font-black uppercase tracking-widest border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
-                        >
-                          <option value="all">{t('workspace.dispFilterAll', 'Tous statuts')}</option>
-                          <option value="none">{t('workspace.dispFilterNone', 'Sans statut')}</option>
-                          {HARX_DISPOSITIONS.map((d) => (
-                            <option key={d.value} value={d.value}>{t(d.labelKey, d.value)}</option>
-                          ))}
-                        </select>
+                        <ListFilter className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                        {/* ── Custom disposition dropdown ── */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsDispositionDropdownOpen((o) => !o)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all bg-white hover:border-harx-200 hover:shadow-sm ${
+                              dispositionFilter !== 'all'
+                                ? (() => {
+                                    const cfg = getDispConfig(dispositionFilter);
+                                    return cfg ? DISP_COLOR_MAP[cfg.color] : 'border-gray-100 text-gray-600';
+                                  })()
+                                : 'border-gray-100 text-gray-500'
+                            }`}
+                          >
+                            {dispositionFilter === 'all' ? (
+                              <>
+                                <Tag className="w-3 h-3" />
+                                <span>{t('workspace.dispFilterAll', 'Tous statuts')}</span>
+                              </>
+                            ) : dispositionFilter === 'none' ? (
+                              <>
+                                <Tag className="w-3 h-3 opacity-40" />
+                                <span>{t('workspace.dispFilterNone', 'Sans statut')}</span>
+                              </>
+                            ) : (() => {
+                              const cfg = getDispConfig(dispositionFilter);
+                              if (!cfg) return <span>{dispositionFilter}</span>;
+                              return (
+                                <>
+                                  <cfg.Icon className="w-3 h-3 shrink-0" />
+                                  <span>{t(cfg.labelKey, cfg.value)}</span>
+                                </>
+                              );
+                            })()}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${isDispositionDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isDispositionDropdownOpen && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setIsDispositionDropdownOpen(false)} />
+                              <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-200/60 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+                                {/* All */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setDispositionFilter('all'); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
+                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50 ${dispositionFilter === 'all' ? 'text-harx-600 bg-harx-50/60' : 'text-gray-500'}`}
+                                >
+                                  <div className="w-5 h-5 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                                    <Tag className="w-3 h-3 text-gray-500" />
+                                  </div>
+                                  {t('workspace.dispFilterAll', 'Tous statuts')}
+                                  {dispositionFilter === 'all' && <CheckCircle2 className="w-3 h-3 ml-auto text-harx-500" />}
+                                </button>
+                                {/* No status */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setDispositionFilter('none'); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
+                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50 ${dispositionFilter === 'none' ? 'text-gray-700 bg-gray-50' : 'text-gray-400'}`}
+                                >
+                                  <div className="w-5 h-5 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                                  </div>
+                                  {t('workspace.dispFilterNone', 'Sans statut')}
+                                  {dispositionFilter === 'none' && <CheckCircle2 className="w-3 h-3 ml-auto text-gray-500" />}
+                                </button>
+
+                                <div className="h-px bg-gray-100 mx-4 my-1" />
+
+                                {HARX_DISPOSITIONS.map((d) => {
+                                  const cls = DISP_COLOR_MAP[d.color];
+                                  const isActive = dispositionFilter === d.value;
+                                  return (
+                                    <button
+                                      key={d.value}
+                                      type="button"
+                                      onClick={() => { setDispositionFilter(d.value); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
+                                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50/80 ${isActive ? 'bg-gray-50' : ''}`}
+                                    >
+                                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cls} border`}>
+                                        <d.Icon className="w-3 h-3" />
+                                      </div>
+                                      <span className={isActive ? 'text-gray-900' : 'text-gray-600'}>
+                                        {t(d.labelKey, d.value)}
+                                      </span>
+                                      {isActive && <CheckCircle2 className="w-3 h-3 ml-auto text-harx-500" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                         <Calendar className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
                         <input
                           type="date"
@@ -1049,8 +1143,8 @@ export function WorkspaceContent() {
                             const cls = DISP_COLOR_MAP[cfg.color] || DISP_COLOR_MAP['gray'];
                             return (
                               <div className="mb-2">
-                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
-                                  <Tag className="w-2.5 h-2.5" />
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
+                                  <cfg.Icon className="w-2.5 h-2.5 shrink-0" />
                                   {t(cfg.labelKey, cfg.value)}
                                 </span>
                               </div>
@@ -1827,7 +1921,7 @@ export function WorkspaceContent() {
                     const cls = cfg ? DISP_COLOR_MAP[cfg.color] : DISP_COLOR_MAP['gray'];
                     return (
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${cls}`}>
-                        <Tag className="w-3 h-3" />
+                        {cfg ? <cfg.Icon className="w-3 h-3 shrink-0" /> : <Tag className="w-3 h-3" />}
                         {cfg ? t(cfg.labelKey, cfg.value) : prospectProfileLead.repDisposition}
                       </span>
                     );
@@ -1912,13 +2006,16 @@ export function WorkspaceContent() {
                     type="button"
                     disabled={dispositionSaving}
                     onClick={() => void setLeadDisposition(dispositionModalLead._id || dispositionModalLead.id, d.value)}
-                    className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isActive ? cls + ' ring-2 ring-offset-1 ring-current/20' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50'}`}
+                    className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${isActive ? cls + ' shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50'}`}
                   >
-                    {dispositionSaving && isActive
-                      ? <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                      : <Tag className="w-3 h-3 shrink-0" />
-                    }
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-white/60' : cls + ' border'}`}>
+                      {dispositionSaving && isActive
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <d.Icon className="w-3 h-3" />
+                      }
+                    </div>
                     {t(d.labelKey, d.value)}
+                    {isActive && <CheckCircle2 className="w-3.5 h-3.5 ml-auto shrink-0" />}
                   </button>
                 );
               })}
