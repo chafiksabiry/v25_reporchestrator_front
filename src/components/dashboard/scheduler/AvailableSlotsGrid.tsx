@@ -14,6 +14,8 @@ interface AvailableSlotsGridProps {
     /** Map of gigId → display name (for cross-gig conflict messages). */
     gigNamesById?: Record<string, string>;
     onReservationMade?: () => void;
+    /** Switch the planning view to another enrolled GIG (cross-gig conflict). */
+    onSelectGig?: (gigId: string) => void;
 }
 
 /** Normalize API gigId (string or populated gig doc) to an id string. */
@@ -91,6 +93,7 @@ export function AvailableSlotsGrid({
     gigTimeZone,
     gigNamesById = {},
     onReservationMade,
+    onSelectGig,
 }: AvailableSlotsGridProps) {
     const { t, i18n } = useTranslation();
     const [slots, setSlots] = useState<Slot[]>([]);
@@ -285,6 +288,20 @@ export function AvailableSlotsGrid({
     /** Cancel the conflicting reservation on the other GIG, then reserve this slot. */
     const handleSwitch = async (slot: Slot, conflict: Reservation) => {
         if (!repId || !slot._id || !conflict._id) return;
+
+        const canTakeHere = slot.status === 'available' && slot.reservedCount < slot.capacity;
+        if (!canTakeHere) {
+            const otherId = normalizeGigId(conflict.gigId);
+            if (otherId && onSelectGig) {
+                onSelectGig(otherId);
+                return;
+            }
+            await handleCancel(
+                conflict,
+                t('sessionPlanning.cancelOtherSuccess', { gig: resolveGigName(conflict.gigId) })
+            );
+            return;
+        }
 
         setSwitchingSlotId(slot._id);
         setMessage(null);
@@ -511,7 +528,7 @@ export function AvailableSlotsGrid({
                                                             </span>
                                                         )}
                                                     </>
-                                                ) : hasConflict && isAvailable && !isSlotPast ? (
+                                                ) : hasConflict && !isSlotPast ? (
                                                     <button
                                                         onClick={() => handleSwitch(slot, conflict!)}
                                                         disabled={switchingSlotId === slot._id}

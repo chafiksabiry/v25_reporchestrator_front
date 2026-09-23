@@ -352,7 +352,7 @@
     "tzHint": "Horaires affichés dans votre fuseau ({{tz}})",
     "overlapTitle": "Créneau déjà réservé sur « {{gig}} »",
     "overlapMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Cliquez sur BASCULER pour annuler cette réservation et la prendre ici.",
-    "overlapFullMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Ouvrez ce GIG et appuyez sur Annuler pour libérer le créneau, puis revenez réserver ici.",
+    "overlapFullMessage": "Vous avez déjà réservé ce créneau sur « {{gig}} ». Cliquez sur BASCULER pour ouvrir ce GIG, annuler et libérer le créneau.",
     "overlapUnknownGig": "GIG inconnu",
     "cancelOtherGig": "Annuler sur « {{gig}} »",
     "switchHere": "Basculer",
