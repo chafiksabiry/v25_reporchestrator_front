@@ -584,19 +584,30 @@ const TopStatusBar: React.FC = () => {
               ) : (
                 <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {leadCalls.map((call) => (
-                    <li
-                      key={String(call._id || call.sid)}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-white border border-gray-100 px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-gray-800 uppercase tracking-wide truncate">
-                          {formatCallWhen(call.createdAt || call.startTime, i18n.language)}
-                        </p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                          {call.status || 'call'} · {formatDuration(call.duration)}
-                        </p>
-                      </div>
-                      <Phone className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                    <li key={String(call._id || call.sid)}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('harx:open-call-history', {
+                              detail: { sid: call.sid, callId: call._id },
+                            })
+                          );
+                        }}
+                        className="w-full flex items-center justify-between gap-3 rounded-xl bg-white border border-gray-100 px-3 py-2.5 hover:border-violet-200 hover:bg-violet-50/40 transition-all text-left"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black text-gray-800 uppercase tracking-wide truncate">
+                            {formatCallWhen(call.createdAt || call.startTime, i18n.language)}
+                          </p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                            {call.status || 'call'} · {formatDuration(call.duration)}
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-violet-600 shrink-0">
+                          {t('workspace.prospectProfile.openCall')}
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>

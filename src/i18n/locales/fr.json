@@ -251,7 +251,14 @@
       "saved": "Calibrage enregistré",
       "saveError": "Impossible d’enregistrer le calibrage",
       "recorded": "Calibré",
-      "tooShortTitle": "Pas d’analyse IA"
+      "tooShortTitle": "Pas d’analyse IA",
+      "scoreTooltipHint": "Survolez la note pour voir le raisonnement de l’IA"
+    },
+    "scoreTooltip": {
+      "overall": "Score global {{score}}% calculé uniquement sur les preuves enregistrées.",
+      "duration": "Durée de l’appel : {{seconds}}s.",
+      "rubrics": "Critères : {{list}}",
+      "noInvent": "L’IA ne doit pas inventer de faits absents de la transcription."
     },
     "metrics": {
       "fluency": "Élocution Agent",
@@ -291,7 +298,8 @@
     "noLeadSelected": "Aucun prospect sélectionné",
     "selectLeadHint": "Sélectionnez un prospect dans l'onglet Prospects pour démarrer un appel.",
     "prospectProfile": {
-      "title": "Prospect Profile",
+      "title": "PROSPECT PROFILE",
+      "openCall": "Consulter l’appel",
       "loading": "Chargement…",
       "noLead": "Aucun prospect",
       "unknown": "Prospect",

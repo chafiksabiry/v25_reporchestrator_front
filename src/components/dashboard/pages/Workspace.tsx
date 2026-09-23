@@ -156,9 +156,26 @@ export function WorkspaceContent() {
         { replace: true }
       );
     };
+    const openHistory = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      const sid: string | undefined = detail.sid;
+      const callId: string | undefined = detail.callId;
+      if (!sid && !callId) return;
+      setPendingOpenCallSid(sid || callId);
+      setActiveTab('calls');
+      const params = new URLSearchParams(location.search);
+      params.set('tab', 'calls');
+      navigate(
+        { pathname: location.pathname, search: `?${params.toString()}` },
+        { replace: true }
+      );
+    };
     window.addEventListener('harx:call-saved', handler as EventListener);
-    return () =>
+    window.addEventListener('harx:open-call-history', openHistory as EventListener);
+    return () => {
       window.removeEventListener('harx:call-saved', handler as EventListener);
+      window.removeEventListener('harx:open-call-history', openHistory as EventListener);
+    };
     // We intentionally read `location.pathname` / `.search` inside the
     // handler so we don't need them as deps (they'd cause re-registration
     // on every URL change, which is undesirable for a one-shot listener).
