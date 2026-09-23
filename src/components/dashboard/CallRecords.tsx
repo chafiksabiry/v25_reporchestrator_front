@@ -26,6 +26,8 @@ import {
   RotateCcw,
   ThumbsUp,
   ThumbsDown,
+  Lightbulb,
+  AlertTriangle,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
@@ -36,7 +38,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -199,7 +201,8 @@ interface Lead {
     rewardPerCall?: number;
     rewardPerSale?: number;
   };
-  status?: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost';
+  status?: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost' | string;
+  Stage?: string;
   value?: number;
   probability?: number;
   source?: string;
@@ -507,7 +510,7 @@ export function CallRecords({
           {showCall && (
             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-emerald-100 shadow-sm">
               <Phone className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-[10px] font-black uppercase text-slate-500">Appel</span>
+              <span className="text-[10px] font-black uppercase text-slate-500">$ Appel</span>
               <span className="text-sm font-black text-emerald-700">
                 +{resolveCallRepCommission(record).toFixed(2)}€
               </span>
@@ -1076,7 +1079,11 @@ export function CallRecords({
               record.lead?.First_Name
                 ? `${record.lead.First_Name} ${record.lead.Last_Name || ''}`.trim()
                 : record.lead?.name || record.to || record.from || 'Client inconnu';
-            const leadPhone = record.lead?.phone || record.lead?.Phone || record.to || record.from;
+            const leadPhone = anonymizePhone(record.lead?.phone || record.lead?.Phone || record.to || record.from);
+            const leadEmail = anonymizeEmail(record.lead?.email || record.lead?.Email_1);
+            const publicCallId = String(record.call_id || record.sid || callId || '').trim();
+            const fraud = isCallFraudDetected(record);
+            const coaching = resolveCallCoaching(record);
             const status = record.status?.toLowerCase() || '';
             const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
             const showValidationSection =
@@ -1116,12 +1123,28 @@ export function CallRecords({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-extrabold text-slate-900 text-sm truncate">{leadName}</h3>
-                        {leadPhone && (
-                          <span className="text-[11px] font-semibold text-slate-400">{leadPhone}</span>
-                        )}
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-lg border shrink-0 ${
+                            fraud
+                              ? 'bg-orange-50 text-orange-600 border-orange-200'
+                              : 'bg-slate-50 text-slate-400 border-slate-200'
+                          }`}
+                          title={fraud ? t('calls.fraudDetected', 'Fraude détectée') : t('calls.fraudClear', 'Aucune fraude')}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                        </span>
                         {isCallApprovedByAI(record) && (
                           <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" title="Appel validé par l'IA" />
                         )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-semibold text-slate-400">
+                        {publicCallId ? (
+                          <span className="font-mono text-[10px] text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
+                            ID {publicCallId.length > 18 ? `${publicCallId.slice(0, 8)}…${publicCallId.slice(-4)}` : publicCallId}
+                          </span>
+                        ) : null}
+                        {leadPhone ? <span>{leadPhone}</span> : null}
+                        {leadEmail ? <span>{leadEmail}</span> : null}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -1175,10 +1198,22 @@ export function CallRecords({
                         <Clock className="w-3 h-3 shrink-0" />
                         {new Date(record.startTime || record.createdAt).toLocaleString('fr-FR')}
                       </p>
+                      {coaching === 'excellent' && (
+                        <p className="mt-2 inline-flex items-start gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5">
+                          <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {t('calls.coaching.excellentShort', 'Briefing : appel à réécouter pour vous en inspirer.')}
+                        </p>
+                      )}
+                      {coaching === 'critical' && (
+                        <p className="mt-2 inline-flex items-start gap-1.5 text-[10px] font-bold text-orange-800 bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {t('calls.coaching.criticalShort', 'Briefing : réécoutez cet appel pour ne plus répéter les erreurs.')}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Score */}
+                  {/* Score — hidden for short / non-commercial statuses */}
                   {getDisplayOverallScore(record) != null && (
                     <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
@@ -1190,7 +1225,7 @@ export function CallRecords({
                   {showValidationSection && (
                     <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 shrink-0">
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">$ Appel</span>
                         {isCallApprovedByAI(record) ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <Check className="w-3 h-3" />
@@ -1241,7 +1276,7 @@ export function CallRecords({
                       <div className="w-px bg-slate-200 hidden sm:block self-stretch" />
 
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">$ Transaction</span>
                         {renderTransactionCommissionPill(record)}
                       </div>
                     </div>
@@ -1285,10 +1320,20 @@ export function CallRecords({
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5 italic">
                     {new Date(selectedCall.startTime || selectedCall.createdAt).toLocaleString()} • {selectedCall.duration ? `${Math.floor(selectedCall.duration / 60)}m ${selectedCall.duration % 60}s` : '0s'}
                   </p>
-                  <div className="flex items-center gap-1.5 mt-1 opacity-60">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-1.5 py-0.5 rounded-md">
-                      Call ID: {typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id}
+                      ID {String(selectedCall.call_id || selectedCall.sid || (typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id))}
                     </span>
+                    {anonymizePhone(selectedCall.lead?.phone || selectedCall.lead?.Phone || selectedCall.to || selectedCall.from) ? (
+                      <span className="text-[8px] font-bold text-slate-400">
+                        {anonymizePhone(selectedCall.lead?.phone || selectedCall.lead?.Phone || selectedCall.to || selectedCall.from)}
+                      </span>
+                    ) : null}
+                    {anonymizeEmail(selectedCall.lead?.email || selectedCall.lead?.Email_1) ? (
+                      <span className="text-[8px] font-bold text-slate-400">
+                        {anonymizeEmail(selectedCall.lead?.email || selectedCall.lead?.Email_1)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 {/* Close button on mobile */}
@@ -1322,6 +1367,19 @@ export function CallRecords({
               </div>
             </div>
 
+            {resolveCallCoaching(selectedCall) === 'excellent' && (
+              <div className="px-4 md:px-8 py-3 bg-emerald-50 border-b border-emerald-100 text-[12px] font-semibold text-emerald-800 flex items-start gap-2 shrink-0">
+                <Lightbulb className="w-4 h-4 shrink-0 mt-0.5" />
+                {t('calls.coaching.excellent', 'Excellent appel — réécoutez-le et inspirez-vous-en pour vous améliorer. Ce briefing peut être partagé (anonymisé) avec les autres REPS du GIG si l’entreprise le souhaite.')}
+              </div>
+            )}
+            {resolveCallCoaching(selectedCall) === 'critical' && (
+              <div className="px-4 md:px-8 py-3 bg-orange-50 border-b border-orange-100 text-[12px] font-semibold text-orange-800 flex items-start gap-2 shrink-0">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                {t('calls.coaching.critical', 'Appel à retravailler — réécoutez-le pour identifier les erreurs et ne plus les commettre. Briefing coaching, partageable anonymisé sur le GIG si l’entreprise le souhaite.')}
+              </div>
+            )}
+
             {/* Tabs & Status Header */}
             <div className="px-4 py-3 md:px-8 md:py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-none pb-1 lg:pb-0">
@@ -1345,7 +1403,7 @@ export function CallRecords({
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-1.5 text-slate-400" title="Appel">
                     <Phone className="w-4 h-4" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">$ Appel</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                     isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
@@ -1507,6 +1565,7 @@ export function CallRecords({
                                 </div>
                               </div>
 
+                              {!shouldHideCallScoring(selectedCall) && (
                               <div className="flex items-center gap-4 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm self-start sm:self-auto">
                                 <div className="text-right">
                                   <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Score Global</p>
@@ -1518,6 +1577,7 @@ export function CallRecords({
                                   <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${getExecutiveSummaryScore(selectedCall) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
                                 </div>
                               </div>
+                              )}
                             </div>
 
                             <div className="bg-gradient-to-br from-slate-50 to-white rounded-[20px] sm:rounded-[32px] p-5 sm:p-8 border border-slate-100 shadow-inner">
@@ -1532,7 +1592,7 @@ export function CallRecords({
                       </div>
 
                       {/* Calibrage du scoring */}
-                      {!isNonEvaluableCall(selectedCall) && (
+                      {!shouldHideCallScoring(selectedCall) && (
                         <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-violet-100 shadow-lg shadow-violet-500/5 p-5 sm:p-7 space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
@@ -1607,7 +1667,7 @@ export function CallRecords({
                         </div>
                       )}
 
-                      {!isNonEvaluableCall(selectedCall) && (
+                      {!shouldHideCallScoring(selectedCall) && (
                     <>
                       {/* Detailed Metrics Section */}
                       <div className="space-y-6">

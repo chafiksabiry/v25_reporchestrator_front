@@ -17,7 +17,8 @@ import {
   Award,
   X,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Lightbulb,
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav';
@@ -28,6 +29,7 @@ import {
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
 import { GigScriptReaderModal } from '../GigScriptReaderModal';
+import { AcademyUseCases } from '../AcademyUseCases';
 import {
   fetchScriptReadsFromApi,
   gigIdFromJourney,
@@ -785,7 +787,7 @@ export function Training() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [formationViewerSlideIndex, setFormationViewerSlideIndex] = useState(0);
   /** Onglet actif de la page : formations en cours / certifications obtenues. */
-  const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications'>('trainings');
+  const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications' | 'usecases'>('trainings');
   type QuizQuestionState = {
     selected: number | null;
     revealed: boolean;
@@ -940,6 +942,7 @@ export function Training() {
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
     if (tab === 'certifications') setTrainingTab('certifications');
+    if (tab === 'usecases' || tab === 'use-cases') setTrainingTab('usecases');
   }, [location.search]);
 
   /** Formations terminées (= certifiées) pour la section Certifications. */
@@ -2550,6 +2553,19 @@ export function Training() {
             <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setTrainingTab('usecases')}
+          className={`relative flex items-center gap-2 px-4 py-3 text-sm font-black tracking-tight transition-colors ${
+            trainingTab === 'usecases' ? 'text-harx-700' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Lightbulb className="w-4 h-4" />
+          {t('trainingPage.tabUseCases', 'Use cases')}
+          {trainingTab === 'usecases' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
+          )}
+        </button>
       </div>
 
       {trainingTab === 'trainings' && (
@@ -2795,6 +2811,8 @@ export function Training() {
 
       </>
       )}
+
+      {trainingTab === 'usecases' && <AcademyUseCases gigFilter={gigFilter} />}
 
       {trainingTab === 'certifications' && (
       <>

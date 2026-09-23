@@ -73,6 +73,7 @@ export type CallLike = {
   validByAI?: boolean | null;
   valid?: boolean | null;
   duration?: number | null;
+  status?: string | null;
   ai_call_status?: string | null;
   callOutcome?: string | null;
   ai_summary?: string | null;
@@ -80,6 +81,7 @@ export type CallLike = {
   ai_summary_en?: string | null;
   flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number; feedback?: string; feedback_fr?: string; feedback_en?: string }> | null;
+  lead?: { Stage?: string; status?: string; nextAction?: string } | null;
   transaction?: {
     validByCompany?: boolean | null;
     validByAI?: boolean | null;
@@ -145,16 +147,94 @@ export function getTooShortAnalysisNotice(language: string = 'fr', durationSec?:
     : `Appel trop court${d} — l’analyse IA n’est lancée qu’à partir de ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
 }
 
-/** Display score: hidden (null) for voicemail/fraud in list badges; otherwise the persisted overall score. */
+const UNSCORED_OUTCOMES = new Set([
+  'voicemail',
+  'no_answer',
+  'busy',
+  'wrong_number',
+  'callback_requested',
+  'appointment',
+  'too_short',
+]);
+
+const UNSCORED_STATUS_HINTS = [
+  'a appeler',
+  'à appeler',
+  'to call',
+  'injoignable',
+  'unreachable',
+  'répondeur',
+  'repondeur',
+  'voicemail',
+  'numéro non attribué',
+  'numero non attribue',
+  'wrong number',
+  'souhaite être rappelé',
+  'souhaite etre rappele',
+  'rdv pris pour rappel',
+];
+
+/** No scoring: < 1 min, or prospect statuses that are not a real commercial exchange. */
+export function shouldHideCallScoring(call: CallLike): boolean {
+  if (isCallTooShortForAnalysis(call)) return true;
+  if (isNonEvaluableCall(call)) return true;
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (UNSCORED_OUTCOMES.has(outcome)) return true;
+  const twilio = String(call.status || '').toLowerCase();
+  if (['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(twilio)) {
+    return true;
+  }
+  const leadBlob = `${call.lead?.Stage || ''} ${call.lead?.status || ''} ${call.lead?.nextAction || ''}`.toLowerCase();
+  return UNSCORED_STATUS_HINTS.some((hint) => leadBlob.includes(hint));
+}
+
+export function anonymizePhone(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const digits = s.replace(/\D/g, '');
+  if (digits.length < 4) return '••••';
+  const prefix = s.trim().startsWith('+') ? '+' : '';
+  return `${prefix}${digits.slice(0, 2)}••••${digits.slice(-2)}`;
+}
+
+export function anonymizeEmail(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (!s.includes('@')) return `${s.slice(0, 1)}••••`;
+  const [user, domain] = s.split('@');
+  const tld = domain.split('.').pop() || 'com';
+  return `${(user[0] || '•').toLowerCase()}••••@••••.${tld}`;
+}
+
+export function anonymizePersonName(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return 'Prospect';
+  return s
+    .split(/\s+/)
+    .map((part) => `${(part[0] || '').toUpperCase()}••••`)
+    .join(' ');
+}
+
+export type CoachingKind = 'excellent' | 'critical' | null;
+
+export function resolveCallCoaching(call: CallLike): CoachingKind {
+  const score = getDisplayOverallScore(call);
+  if (score == null) return null;
+  if (score >= 85) return 'excellent';
+  if (score <= 35) return 'critical';
+  return null;
+}
+
+/** Display score: hidden for short / non-commercial statuses and voicemail/fraud. */
 export function getDisplayOverallScore(call: CallLike): number | null {
-  if (isNonEvaluableCall(call)) return null;
+  if (shouldHideCallScoring(call)) return null;
   const raw = call.ai_call_score?.overall?.score;
   return typeof raw === 'number' ? raw : null;
 }
 
-/** Score shown on the executive summary card (0 % for voicemail/fraud). */
+/** Score shown on the executive summary card (hidden / 0 when scoring is disabled). */
 export function getExecutiveSummaryScore(call: CallLike): number {
-  if (isNonEvaluableCall(call)) return 0;
+  if (shouldHideCallScoring(call)) return 0;
   const raw = call.ai_call_score?.overall?.score;
   return typeof raw === 'number' ? raw : 0;
 }
