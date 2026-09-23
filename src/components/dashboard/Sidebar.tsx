@@ -10,6 +10,7 @@ import { getRepShellChrome } from '../../utils/harxBrand';
 import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenterStaff';
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
+import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
 
 // Declare qiankun global variables
 declare global {
@@ -170,6 +171,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     return null;
   }, []);
 
+  const toWithGig = React.useCallback((path: string) => {
+    const base = path.split('?')[0];
+    if (base === '/workspace' || base === '/training' || base === '/session-planning') {
+      return withActiveGig(path);
+    }
+    return path;
+  }, []);
+
   const openCockpitWithGig = React.useCallback(
     (gigId?: string | null) => {
       const id = String(gigId || '').trim();
@@ -177,8 +186,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       // stale prospect so the phone number is only shown after picking from Prospects.
       sessionStorage.removeItem('activeLeadId');
       if (id) {
-        sessionStorage.setItem('training_gig_filter', id);
-        sessionStorage.setItem('activeGigId', id);
+        persistActiveGigId(id);
         navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(id)}`, {
           state: { gigId: id, clearLead: true },
         });
@@ -402,7 +410,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   <button
                     onClick={() => {
                       setIsTrainingOpen(!isTrainingOpen);
-                      if (!location.pathname.includes('/training')) navigate('/training');
+                      if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                     }}
                     className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                         ? 'bg-white/5 text-white'
@@ -478,7 +486,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                         key={`${sub.path}-slide-${slideIdx}`}
                                         type="button"
                                         onClick={() => {
-                                          if (!location.pathname.includes('/training')) navigate('/training');
+                                          if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                                           if (slide.globalIndex >= 0) {
                                             window.dispatchEvent(
                                               new CustomEvent('rep-training-goto-slide', {
@@ -534,7 +542,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         return (
                           <NavLink
                             key={sub.path}
-                            to={sub.path}
+                            to={withActiveGig(sub.path)}
                             onClick={(e) => {
                               e.preventDefault();
                               if (sub.path.includes('tab=copilot')) {
@@ -554,7 +562,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                 openCockpitWithGig(null);
                                 return;
                               }
-                              navigate(sub.path);
+                              navigate(withActiveGig(sub.path));
                               setIsSidebarOpen(false);
                             }}
                             className={`flex w-full items-center rounded-xl transition-all duration-300 group relative space-x-3 py-2.5 px-4 ${isSubActive
@@ -574,7 +582,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 </>
               ) : (
                 <NavLink
-                  to={item.path}
+                  to={toWithGig(item.path)}
                   className={({ isActive }) =>
                     `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                     } ${isActive
@@ -650,7 +658,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     <button
                       onClick={() => {
                         setIsTrainingOpen(!isTrainingOpen);
-                        if (!location.pathname.includes('/training')) navigate('/training');
+                        if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                       }}
                       className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                           ? 'bg-white/5 text-white'
@@ -697,7 +705,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                           key={`${sub.path}-slide-${slideIdx}`}
                                           type="button"
                                           onClick={() => {
-                                            if (!location.pathname.includes('/training')) navigate('/training');
+                                            if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                                             if (slide.globalIndex >= 0) {
                                               window.dispatchEvent(new CustomEvent('rep-training-goto-slide', { detail: { index: slide.globalIndex, ...(slide.slideId ? { slideId: slide.slideId } : {}) } }));
                                             }
@@ -720,7 +728,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   </>
                 ) : (
                   <NavLink
-                    to={item.path}
+                    to={toWithGig(item.path)}
                     className={({ isActive }) =>
                       `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                       } ${isActive
@@ -758,7 +766,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             {group3.map((item) => (
               <NavLink
                 key={item.path}
-                to={item.path}
+                to={withActiveGig(item.path)}
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                   } ${isActive

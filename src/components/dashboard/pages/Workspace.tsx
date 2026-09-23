@@ -21,6 +21,7 @@ import {
   isLeadCockpitLockedByOther,
 } from '../../../services/api/leadCockpitApi';
 import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
+import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
 
 interface Lead {
   _id?: string;
@@ -193,14 +194,12 @@ export function WorkspaceContent() {
     [selectedGigId, enrolledGigs]
   );
 
-  // Only persist enrolled gigs to sessionStorage (never a stale marketplace id).
+  // Only persist enrolled gigs after the list is known — never wipe a valid
+  // starting gig while enrolledGigs is still loading.
   useEffect(() => {
-    if (activeEnrolledGigId) {
-      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
-    } else {
-      sessionStorage.removeItem('activeGigId');
-    }
-  }, [activeEnrolledGigId]);
+    if (!enrolledGigsLoaded) return;
+    persistActiveGigId(activeEnrolledGigId || null);
+  }, [activeEnrolledGigId, enrolledGigsLoaded]);
 
   // Sync and Clean URL parameters to protect sensitive IDs from leaking
   useEffect(() => {
@@ -210,7 +209,7 @@ export function WorkspaceContent() {
     if (params.has('gigId')) {
       const gId = params.get('gigId') || '';
       if (gId) {
-        sessionStorage.setItem('activeGigId', gId);
+        persistActiveGigId(gId);
         setSelectedGigId(gId);
       }
       params.delete('gigId');
@@ -559,7 +558,7 @@ export function WorkspaceContent() {
 
         if (enrolled.length === 0) {
           setSelectedGigId('');
-          sessionStorage.removeItem('activeGigId');
+          persistActiveGigId(null);
         } else if (persistedGigId && enrolledIds.has(persistedGigId)) {
           setSelectedGigId(persistedGigId);
         } else {
@@ -775,7 +774,7 @@ export function WorkspaceContent() {
                           </p>
                         </div>
                         <button
-                          onClick={() => navigate(`/training?gigId=${activeEnrolledGigId}`)}
+                          onClick={() => navigate(withActiveGig('/training', activeEnrolledGigId))}
                           className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-amber-600/10 shrink-0 flex items-center gap-1.5"
                         >
                           {t('workspaceGuard.trainingButton')} <ChevronRight className="w-3 h-3" />
@@ -796,7 +795,12 @@ export function WorkspaceContent() {
                           </p>
                         </div>
                         <button
-                          onClick={() => navigate('/session-planning')}
+                          onClick={() => {
+                            persistActiveGigId(activeEnrolledGigId);
+                            navigate(withActiveGig('/session-planning', activeEnrolledGigId), {
+                              state: activeEnrolledGigId ? { gigId: activeEnrolledGigId } : undefined
+                            });
+                          }}
                           className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-rose-600/10 shrink-0 flex items-center gap-1.5"
                         >
                           {t('workspaceGuard.sessionButton')} <ChevronRight className="w-3 h-3" />
@@ -1335,9 +1339,7 @@ export function WorkspaceContent() {
     setCockpitAccessDenied(null);
     setCockpitClaimedLeadId(leadIdString);
     sessionStorage.setItem('activeLeadId', leadIdString);
-    if (activeEnrolledGigId) {
-      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
-    }
+    persistActiveGigId(activeEnrolledGigId || null);
 
     const params = new URLSearchParams(location.search);
     params.delete('leadId');
@@ -1391,7 +1393,7 @@ export function WorkspaceContent() {
                   <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-100/90 rounded-xl shadow-2xl shadow-slate-200/80 py-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                     <button
                       onClick={() => {
-                        sessionStorage.removeItem('activeGigId');
+                        persistActiveGigId(null);
                         setSelectedGigId('');
                         setCurrentPage(1);
                         setIsGigDropdownOpen(false);
@@ -1413,7 +1415,7 @@ export function WorkspaceContent() {
                         key={g._id}
                         onClick={() => {
                           // Persist immediately so no effect can snap back to the previous gig.
-                          sessionStorage.setItem('activeGigId', g._id);
+                          persistActiveGigId(g._id);
                           setSelectedGigId(g._id);
                           setCurrentPage(1);
                           setIsGigDropdownOpen(false);
@@ -1589,9 +1591,13 @@ export function WorkspaceContent() {
                   if (!activeEnrolledGigId || !copilotGuard.isEnrolledInGig) {
                     navigate('/marketplace');
                   } else if (!copilotGuard.isTrainingComplete) {
-                    navigate(`/training?gigId=${activeEnrolledGigId}`);
+                    persistActiveGigId(activeEnrolledGigId);
+                    navigate(withActiveGig('/training', activeEnrolledGigId));
                   } else if (!copilotGuard.hasActiveReservationNow) {
-                    navigate(`/session-planning?gigId=${activeEnrolledGigId}`);
+                    persistActiveGigId(activeEnrolledGigId);
+                    navigate(withActiveGig('/session-planning', activeEnrolledGigId), {
+                      state: { gigId: activeEnrolledGigId }
+                    });
                   }
                 }}
                 className="w-full py-3 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 hover:from-rose-600 hover:to-pink-700 text-white font-extrabold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-rose-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"

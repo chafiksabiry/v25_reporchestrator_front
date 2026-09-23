@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav';
 import { useTranslation } from 'react-i18next';
 import { HorizontalCalendar } from '../scheduler/HorizontalCalendar';
 import { TimeSlot, Gig, WeeklyStats, Rep, UserRole, Company } from '../../../types/scheduler';
@@ -233,6 +234,7 @@ interface EnrolledGig {
 export function SessionPlanning() {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [slots, setSlots] = useState<TimeSlot[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -258,9 +260,25 @@ export function SessionPlanning() {
     const [showAttendancePanel] = useState<boolean>(false);
     const [showAIPanel] = useState<boolean>(true);
     const routeGigId = useMemo(() => {
-        const p = new URLSearchParams(location.search);
-        return String(p.get('gigId') || '').trim();
-    }, [location.search]);
+        const fromSearch = String(new URLSearchParams(location.search).get('gigId') || '').trim();
+        const fromState = String((location.state as { gigId?: string } | null)?.gigId || '').trim();
+        return fromSearch || fromState;
+    }, [location.search, location.state]);
+
+    const applySelectedGig = (gigId: string | null, replaceUrl = true) => {
+        const id = String(gigId || '').trim();
+        setSelectedGigId(id || null);
+        persistActiveGigId(id || null);
+        if (!replaceUrl) return;
+        const params = new URLSearchParams(location.search);
+        if (id) params.set('gigId', id);
+        else params.delete('gigId');
+        const search = params.toString();
+        navigate(
+            { pathname: location.pathname, search: search ? `?${search}` : '' },
+            { replace: true, state: id ? { gigId: id } : undefined }
+        );
+    };
 
     const refreshData = async () => {
         if (!selectedRepId) return;
@@ -437,14 +455,22 @@ export function SessionPlanning() {
 
     useEffect(() => {
         if (gigs.length <= 0) return;
-        if (routeGigId && gigs.some((g) => g.id === routeGigId)) {
-            setSelectedGigId((prev) => (prev === routeGigId ? prev : routeGigId));
-            return;
+        const stored = getActiveGigId();
+        const preferred =
+            [routeGigId, stored].find((id) => Boolean(id) && gigs.some((g) => g.id === id)) ||
+            (selectedGigId && gigs.some((g) => g.id === selectedGigId) ? selectedGigId : '') ||
+            gigs[0].id;
+        if (!preferred) return;
+        if (selectedGigId !== preferred) setSelectedGigId(preferred);
+        persistActiveGigId(preferred);
+        if (routeGigId !== preferred) {
+            const params = new URLSearchParams(location.search);
+            params.set('gigId', preferred);
+            navigate(
+                { pathname: location.pathname, search: `?${params.toString()}` },
+                { replace: true, state: { gigId: preferred } }
+            );
         }
-        setSelectedGigId((prev) => {
-            if (prev && gigs.some((g) => g.id === prev)) return prev;
-            return gigs[0].id;
-        });
     }, [gigs, routeGigId]);
 
     const selectedGig = useMemo(
@@ -884,7 +910,7 @@ export function SessionPlanning() {
                                     gigs.map(gig => (
                                         <button
                                             key={gig.id}
-                                            onClick={() => setSelectedGigId(gig.id)}
+                                            onClick={() => applySelectedGig(gig.id)}
                                             className={`px-8 py-4 rounded-2xl whitespace-nowrap transition-all duration-300 text-[10px] font-black uppercase tracking-widest ${selectedGigId === gig.id
                                                 ? 'bg-gradient-harx text-white shadow-lg shadow-harx-500/20'
                                                 : 'bg-white text-gray-500 hover:text-harx-600 hover:bg-harx-50 border border-gray-100 shadow-sm'
@@ -940,7 +966,7 @@ export function SessionPlanning() {
                                 <WalletFilterSelect
                                     label={t('sessionPlanning.enrolledGig')}
                                     value={selectedGigId || ''}
-                                    onChange={(v) => setSelectedGigId(v === '' ? null : v)}
+                                    onChange={(v) => applySelectedGig(v === '' ? null : v)}
                                     options={[
                                         { value: '', label: t('sessionPlanning.chooseGig'), tone: 'neutral' as const },
                                         ...gigs.map((gig: Gig) => ({ value: gig.id, label: gig.name, tone: 'brand' as const })),

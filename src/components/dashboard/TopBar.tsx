@@ -10,6 +10,7 @@ import { NotificationBell } from './NotificationBell';
 import config from '../../config';
 import { getRepShellChrome } from '../../utils/harxBrand';
 import { isCallCenterStaff } from '../../utils/callCenterStaff';
+import { withActiveGig } from '../../utils/activeGigNav';
 import {
   PROFILE_UPDATE_EVENT,
   USER_FULLNAME_UPDATE_EVENT,
@@ -269,7 +270,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
             {/* Session Planning */}
             <button
-              onClick={() => navigate('/session-planning')}
+              onClick={() => navigate(withActiveGig('/session-planning'))}
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
               title={t('topbar.sessionPlanning')}
             >

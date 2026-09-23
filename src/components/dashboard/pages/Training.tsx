@@ -20,6 +20,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
+import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav';
 import { useRepTrainingNav } from '../../../contexts/RepTrainingNavContext';
 import {
   getModuleColorStyles,
@@ -1044,13 +1045,16 @@ export function Training() {
 
   useEffect(() => {
     if (routeGigApplied) return;
-    if (!routeGigId) {
+    const stored = getActiveGigId();
+    const preferred = routeGigId || stored;
+    if (!preferred) {
       setRouteGigApplied(true);
       return;
     }
     if (enrolledGigs.length <= 0) return;
-    if (enrolledGigs.some((g) => g.gigId === routeGigId)) {
-      setGigFilter(routeGigId);
+    if (enrolledGigs.some((g) => g.gigId === preferred)) {
+      setGigFilter(preferred);
+      persistActiveGigId(preferred);
     }
     setRouteGigApplied(true);
   }, [routeGigId, enrolledGigs, routeGigApplied]);
