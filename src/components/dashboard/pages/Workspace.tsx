@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Phone, Mail, User,
   Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
-  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye
+  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye,
+  MapPin, CreditCard, Info, Tag, X, Loader2
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -29,10 +30,18 @@ interface Lead {
   id: string;
   Deal_Name: string;
   Telephony: string;
+  Phone?: string;
   Email_1: string;
   Stage: string;
-  Created_Time: string;
-  Owner: {
+  Pipeline?: string;
+  Created_Time?: string;
+  First_Name?: string;
+  Last_Name?: string;
+  Address?: string;
+  Postal_Code?: string;
+  City?: string;
+  Date_of_Birth?: string;
+  Owner?: {
     name: string;
     id: string;
     email: string;
@@ -44,8 +53,40 @@ interface Lead {
   signedAt?: string | null;
   isSignedByMe?: boolean;
   isCalledByMe?: boolean;
+  isAssignedToMe?: boolean;
   isRdvByMe?: boolean;
   lastCallOutcome?: string | null;
+  repDisposition?: string | null;
+  repDispositionAt?: string | null;
+  assignedRepId?: string | null;
+}
+
+// ── HARX Disposition Ladder ─────────────────────────────────────────────────
+const HARX_DISPOSITIONS: { value: string; labelKey: string; color: string }[] = [
+  { value: 'to_call',            labelKey: 'workspace.disp.to_call',            color: 'gray' },
+  { value: 'called_unreachable', labelKey: 'workspace.disp.called_unreachable', color: 'orange' },
+  { value: 'called_voicemail',   labelKey: 'workspace.disp.called_voicemail',   color: 'orange' },
+  { value: 'called_wrong_number',labelKey: 'workspace.disp.called_wrong_number',color: 'red' },
+  { value: 'called_callback',    labelKey: 'workspace.disp.called_callback',    color: 'amber' },
+  { value: 'called_rdv',         labelKey: 'workspace.disp.called_rdv',         color: 'violet' },
+  { value: 'argued_rdv',         labelKey: 'workspace.disp.argued_rdv',         color: 'indigo' },
+  { value: 'argued_declined',    labelKey: 'workspace.disp.argued_declined',    color: 'rose' },
+  { value: 'argued_done',        labelKey: 'workspace.disp.argued_done',        color: 'emerald' },
+];
+
+const DISP_COLOR_MAP: Record<string, string> = {
+  gray:    'bg-gray-50 text-gray-500 border-gray-100',
+  orange:  'bg-orange-50 text-orange-600 border-orange-100',
+  red:     'bg-red-50 text-red-600 border-red-100',
+  amber:   'bg-amber-50 text-amber-600 border-amber-100',
+  violet:  'bg-violet-50 text-violet-700 border-violet-100',
+  indigo:  'bg-indigo-50 text-indigo-700 border-indigo-100',
+  rose:    'bg-rose-50 text-rose-600 border-rose-100',
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+};
+
+function getDispConfig(value: string | null | undefined) {
+  return HARX_DISPOSITIONS.find((d) => d.value === value) || null;
 }
 
 interface EnrolledGig {
@@ -192,6 +233,12 @@ export function WorkspaceContent() {
   const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
+  const [dispositionFilter, setDispositionFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [prospectProfileLead, setProspectProfileLead] = useState<Lead | null>(null);
+  const [dispositionModalLead, setDispositionModalLead] = useState<Lead | null>(null);
+  const [dispositionSaving, setDispositionSaving] = useState(false);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
   // Do not hydrate from sessionStorage on first paint — a stale activeGigId from
@@ -306,6 +353,9 @@ export function WorkspaceContent() {
 
   useEffect(() => {
     setLeadStatusFilter('all');
+    setDispositionFilter('all');
+    setDateFrom('');
+    setDateTo('');
     setCurrentPage(1);
     setSearchQuery('');
     setLeads([]);
@@ -316,7 +366,8 @@ export function WorkspaceContent() {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage, searchQuery);
     }
-  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter, dispositionFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     return () => {
@@ -624,10 +675,14 @@ export function WorkspaceContent() {
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
     const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
+    const dispParam = dispositionFilter !== 'all' ? `&disposition=${encodeURIComponent(dispositionFilter)}` : '';
+    const dateFromParam = dateFrom ? `&createdFrom=${encodeURIComponent(dateFrom)}` : '';
+    const dateToParam = dateTo ? `&createdTo=${encodeURIComponent(dateTo)}` : '';
+    const extraParams = `${dispParam}${dateFromParam}${dateToParam}`;
     const trimmedQuery = query.trim();
     const url = trimmedQuery
-      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${statusParam}`
-      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
+      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${statusParam}${extraParams}`
+      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}${extraParams}`;
 
     try {
       setIsLoadingLeads(true);
@@ -676,6 +731,33 @@ export function WorkspaceContent() {
     }
   };
 
+  const setLeadDisposition = useCallback(async (leadId: string, disposition: string) => {
+    const agentId = getAgentId();
+    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-development.up.railway.app/api').replace(/\/$/, '');
+    setDispositionSaving(true);
+    try {
+      const resp = await fetch(`${baseUrl}/leads/${leadId}/disposition`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, disposition }),
+      });
+      const data = await resp.json();
+      if (data.success && data.data) {
+        // Update the lead in the local list
+        const updated = data.data as Lead;
+        setLeads((prev) => prev.map((l) => (l._id || l.id) === leadId ? { ...l, ...updated } : l));
+        if (prospectProfileLead && (prospectProfileLead._id || prospectProfileLead.id) === leadId) {
+          setProspectProfileLead((prev) => prev ? { ...prev, ...updated } : prev);
+        }
+        setDispositionModalLead(null);
+      }
+    } catch (err) {
+      console.error('Error saving disposition:', err);
+    } finally {
+      setDispositionSaving(false);
+    }
+  }, [prospectProfileLead]);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
 
@@ -695,6 +777,13 @@ export function WorkspaceContent() {
     { id: 'rdv', label: t('workspace.filterRdv') },
     { id: 'signed', label: t('workspace.filterSigned') },
   ];
+
+  const formatCreatedDate = (raw?: string | null): string => {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   const workspaceTools = [
     { id: 'voice', label: t('workspace.tabLeads'), icon: User },
@@ -876,31 +965,75 @@ export function WorkspaceContent() {
                     )}
                   </div>
                   {activeEnrolledGigId && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">{t('workspace.filter')}</span>
-                      {leadStatusFilters.map((filter) => (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          onClick={() => {
-                            setLeadStatusFilter(filter.id);
-                            setCurrentPage(1);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                            leadStatusFilter === filter.id
-                              ? filter.id === 'signed'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
-                                : filter.id === 'called'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                                  : filter.id === 'rdv'
-                                    ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
-                                    : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
-                              : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
-                          }`}
+                    <div className="flex flex-col gap-2">
+                      {/* Row 1: Status quick filters */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">{t('workspace.filter')}</span>
+                        {leadStatusFilters.map((filter) => (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            onClick={() => {
+                              setLeadStatusFilter(filter.id);
+                              setCurrentPage(1);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                              leadStatusFilter === filter.id
+                                ? filter.id === 'signed'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
+                                  : filter.id === 'called'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                                    : filter.id === 'rdv'
+                                      ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
+                                      : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
+                                : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
+                            }`}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Row 2: Disposition filter + Date range */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Tag className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                        <select
+                          value={dispositionFilter}
+                          onChange={(e) => { setDispositionFilter(e.target.value); setCurrentPage(1); }}
+                          className="text-[10px] font-black uppercase tracking-widest border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
                         >
-                          {filter.label}
-                        </button>
-                      ))}
+                          <option value="all">{t('workspace.dispFilterAll', 'Tous statuts')}</option>
+                          <option value="none">{t('workspace.dispFilterNone', 'Sans statut')}</option>
+                          {HARX_DISPOSITIONS.map((d) => (
+                            <option key={d.value} value={d.value}>{t(d.labelKey, d.value)}</option>
+                          ))}
+                        </select>
+                        <Calendar className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                        <input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                          className="text-[10px] font-black border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
+                          title={t('workspace.dateFrom', 'Du')}
+                        />
+                        <span className="text-[9px] text-gray-400 font-black">→</span>
+                        <input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+                          className="text-[10px] font-black border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
+                          title={t('workspace.dateTo', 'Au')}
+                        />
+                        {(dateFrom || dateTo || dispositionFilter !== 'all') && (
+                          <button
+                            type="button"
+                            onClick={() => { setDateFrom(''); setDateTo(''); setDispositionFilter('all'); setCurrentPage(1); }}
+                            className="px-2 py-1.5 rounded-xl border border-gray-100 text-gray-400 hover:text-rose-500 hover:border-rose-200 transition-all"
+                            title={t('workspace.clearFilters', 'Effacer filtres')}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -961,14 +1094,28 @@ export function WorkspaceContent() {
                           role={isSignedByMe ? 'button' : undefined}
                           tabIndex={isSignedByMe ? 0 : undefined}
                         >
+                          {/* Disposition badge */}
+                          {lead.repDisposition && (() => {
+                            const cfg = getDispConfig(lead.repDisposition);
+                            if (!cfg) return null;
+                            const cls = DISP_COLOR_MAP[cfg.color] || DISP_COLOR_MAP['gray'];
+                            return (
+                              <div className="mb-2">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
+                                  <Tag className="w-2.5 h-2.5" />
+                                  {t(cfg.labelKey, cfg.value)}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div className="flex justify-between items-center">
                             <div className="space-y-1">
                               <h4 className="font-black text-gray-900 uppercase text-sm tracking-tight group-hover:text-harx-600 transition-colors">{lead.Deal_Name}</h4>
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 flex-wrap">
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Phone className="w-3 h-3" />
                                   <p className="text-[10px] font-black uppercase tracking-widest">
-                                    {anonymizePhone(lead.Telephony || (lead as any).Phone) || t('workspace.noPhone')}
+                                    {anonymizePhone(lead.Telephony || lead.Phone) || t('workspace.noPhone')}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-gray-400">
@@ -977,9 +1124,15 @@ export function WorkspaceContent() {
                                     {anonymizeEmail(lead.Email_1) || t('workspace.noEmail')}
                                   </p>
                                 </div>
+                                {lead.Created_Time && (
+                                  <div className="flex items-center gap-1 text-gray-300">
+                                    <Calendar className="w-2.5 h-2.5" />
+                                    <span className="text-[9px] font-medium">{formatCreatedDate(lead.Created_Time)}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
                               {isSignedByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
                                   <CheckCircle2 className="w-3 h-3" />
@@ -1012,6 +1165,16 @@ export function WorkspaceContent() {
                                   {lead.Stage}
                                 </span>
                               )}
+                              {/* Fiche (profile) button */}
+                              <button
+                                type="button"
+                                className="px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 border border-gray-100 bg-white text-gray-500 hover:border-harx-200 hover:text-harx-600"
+                                onClick={(e) => { e.stopPropagation(); setProspectProfileLead(lead); }}
+                                title={t('workspace.viewProfile', 'Fiche prospect')}
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                                <span>{t('workspace.fiche', 'Fiche')}</span>
+                              </button>
                               <button
                                 type="button"
                                 className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${
@@ -1635,6 +1798,190 @@ export function WorkspaceContent() {
           overlayOpenLeadId={signedLeadOverlayId}
           onOverlayClose={() => setSignedLeadOverlayId(null)}
         />
+      )}
+
+      {/* ── Prospect Profile Modal ─────────────────────────────────── */}
+      {prospectProfileLead && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setProspectProfileLead(null)}
+        >
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-harx px-6 py-5 flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white tracking-tight">{prospectProfileLead.Deal_Name}</h2>
+                  {prospectProfileLead.Created_Time && (
+                    <p className="text-[10px] text-white/70 font-medium mt-0.5 flex items-center gap-1">
+                      <Calendar className="w-2.5 h-2.5" />
+                      {t('workspace.profileAddedOn', 'Ajouté le')} {formatCreatedDate(prospectProfileLead.Created_Time)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setProspectProfileLead(null)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Contact info */}
+              <div className="space-y-2.5">
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileContact', 'Contact')}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-gray-50 rounded-2xl p-3">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePhone', 'Téléphone')}</p>
+                    <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Telephony || prospectProfileLead.Phone || '—'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-3">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profileEmail', 'Email')}</p>
+                    <p className="text-sm font-bold text-gray-800 break-all">{prospectProfileLead.Email_1 || '—'}</p>
+                  </div>
+                  {(prospectProfileLead.Address || prospectProfileLead.City) && (
+                    <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {t('workspace.profileAddress', 'Adresse')}</p>
+                      <p className="text-sm font-bold text-gray-800">
+                        {[prospectProfileLead.Address, prospectProfileLead.Postal_Code, prospectProfileLead.City].filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  {prospectProfileLead.Date_of_Birth && (
+                    <div className="bg-gray-50 rounded-2xl p-3">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><CreditCard className="w-2.5 h-2.5" /> {t('workspace.profileDob', 'Date de naissance')}</p>
+                      <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Date_of_Birth}</p>
+                    </div>
+                  )}
+                  {prospectProfileLead.Pipeline && (
+                    <div className="bg-gray-50 rounded-2xl p-3">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePipeline', 'Pipeline')}</p>
+                      <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Pipeline}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Current disposition */}
+              <div className="space-y-2">
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileDisposition', 'Statut d\'appel')}</h3>
+                <div className="flex items-center gap-2">
+                  {prospectProfileLead.repDisposition ? (() => {
+                    const cfg = getDispConfig(prospectProfileLead.repDisposition);
+                    const cls = cfg ? DISP_COLOR_MAP[cfg.color] : DISP_COLOR_MAP['gray'];
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${cls}`}>
+                        <Tag className="w-3 h-3" />
+                        {cfg ? t(cfg.labelKey, cfg.value) : prospectProfileLead.repDisposition}
+                      </span>
+                    );
+                  })() : (
+                    <span className="text-[10px] text-gray-400 font-medium">{t('workspace.dispFilterNone', 'Sans statut')}</span>
+                  )}
+                  {prospectProfileLead.repDispositionAt && (
+                    <span className="text-[9px] text-gray-400">{formatCreatedDate(prospectProfileLead.repDispositionAt)}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDispositionModalLead(prospectProfileLead)}
+                    className="ml-auto px-3 py-1.5 rounded-xl border border-harx-200 text-harx-600 text-[9px] font-black uppercase tracking-widest hover:bg-harx-50 transition-all flex items-center gap-1"
+                  >
+                    <Tag className="w-2.5 h-2.5" />
+                    {t('workspace.changeDisposition', 'Modifier')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Call history link */}
+              <div className="pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  className="w-full px-4 py-2.5 bg-gray-50 hover:bg-harx-50 border border-gray-100 hover:border-harx-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-harx-700 transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    const id = prospectProfileLead._id || prospectProfileLead.id;
+                    setSignedLeadOverlayId(id);
+                    setProspectProfileLead(null);
+                  }}
+                >
+                  <PhoneOutgoing className="w-3.5 h-3.5" />
+                  {t('workspace.viewCallHistory', 'Historique des appels')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disposition Setter Modal ───────────────────────────────── */}
+      {dispositionModalLead && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => !dispositionSaving && setDispositionModalLead(null)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-black uppercase tracking-tight text-gray-900 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-harx-500" />
+                {t('workspace.dispositionTitle', 'Statut d\'appel')}
+              </h3>
+              <button
+                onClick={() => !dispositionSaving && setDispositionModalLead(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-2">
+              <p className="text-[10px] text-gray-500 font-medium mb-3">
+                {dispositionModalLead.Deal_Name}
+              </p>
+              {/* Clear option */}
+              <button
+                type="button"
+                disabled={dispositionSaving}
+                onClick={() => void setLeadDisposition(dispositionModalLead._id || dispositionModalLead.id, '')}
+                className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${!dispositionModalLead.repDisposition ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50'}`}
+              >
+                {t('workspace.dispFilterNone', 'Sans statut')}
+              </button>
+              {HARX_DISPOSITIONS.map((d) => {
+                const cls = DISP_COLOR_MAP[d.color] || DISP_COLOR_MAP['gray'];
+                const isActive = dispositionModalLead.repDisposition === d.value;
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    disabled={dispositionSaving}
+                    onClick={() => void setLeadDisposition(dispositionModalLead._id || dispositionModalLead.id, d.value)}
+                    className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${isActive ? cls + ' ring-2 ring-offset-1 ring-current/20' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    {dispositionSaving && isActive
+                      ? <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                      : <Tag className="w-3 h-3 shrink-0" />
+                    }
+                    {t(d.labelKey, d.value)}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-6 py-3 bg-gray-50 text-center">
+              <p className="text-[9px] text-gray-400 font-medium">
+                {t('workspace.dispositionExclNote', 'À partir de "Appelé – RDV pris", ce prospect vous sera affecté exclusivement.')}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

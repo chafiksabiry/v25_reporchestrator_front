@@ -322,6 +322,36 @@
       "title": "Saving the call…",
       "subtitle": "Hang on a few seconds — we're finalising the recording and preparing the AI analysis.",
       "hint": "Please don't close this page."
+    },
+    "fiche": "Profile",
+    "viewProfile": "View prospect profile",
+    "viewCallHistory": "Call history",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "clearFilters": "Clear filters",
+    "dispFilterAll": "All statuses",
+    "dispFilterNone": "No status",
+    "dispositionTitle": "Call status",
+    "changeDisposition": "Edit",
+    "dispositionExclNote": "From Appointment booked onward, this prospect will be exclusively assigned to you.",
+    "profileAddedOn": "Added on",
+    "profileContact": "Contact",
+    "profilePhone": "Phone",
+    "profileEmail": "Email",
+    "profileAddress": "Address",
+    "profileDob": "Date of birth",
+    "profilePipeline": "Pipeline",
+    "profileDisposition": "Call status",
+    "disp": {
+      "to_call": "To call",
+      "called_unreachable": "Called - Unreachable",
+      "called_voicemail": "Called - Voicemail",
+      "called_wrong_number": "Called - Wrong number",
+      "called_callback": "Called - Requested callback",
+      "called_rdv": "Called - Appointment booked",
+      "argued_rdv": "Argued - Appointment / Thinking time",
+      "argued_declined": "Argued - Transaction declined",
+      "argued_done": "Argued - Transaction completed"
     }
   },
   "sessionPlanning": {
@@ -1034,12 +1064,30 @@
       "saveChanges": "Save changes"
     },
     "proficiency": {
-      "A1": { "label": "A1 - Beginner", "description": "Can understand and use basic phrases and introduce themselves." },
-      "A2": { "label": "A2 - Elementary", "description": "Can communicate in simple, routine situations." },
-      "B1": { "label": "B1 - Intermediate", "description": "Can handle most travel situations and describe experiences." },
-      "B2": { "label": "B2 - Upper intermediate", "description": "Can interact fluently with native speakers and produce clear text." },
-      "C1": { "label": "C1 - Advanced", "description": "Can use the language flexibly and produce clear, well-structured text." },
-      "C2": { "label": "C2 - Mastery", "description": "Can understand virtually everything and express themselves spontaneously." }
+      "A1": {
+        "label": "A1 - Beginner",
+        "description": "Can understand and use basic phrases and introduce themselves."
+      },
+      "A2": {
+        "label": "A2 - Elementary",
+        "description": "Can communicate in simple, routine situations."
+      },
+      "B1": {
+        "label": "B1 - Intermediate",
+        "description": "Can handle most travel situations and describe experiences."
+      },
+      "B2": {
+        "label": "B2 - Upper intermediate",
+        "description": "Can interact fluently with native speakers and produce clear text."
+      },
+      "C1": {
+        "label": "C1 - Advanced",
+        "description": "Can use the language flexibly and produce clear, well-structured text."
+      },
+      "C2": {
+        "label": "C2 - Mastery",
+        "description": "Can understand virtually everything and express themselves spontaneously."
+      }
     },
     "availability": {
       "defaultHours": "Default working hours",
