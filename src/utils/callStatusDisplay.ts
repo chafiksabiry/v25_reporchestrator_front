@@ -137,6 +137,52 @@ export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_
   return Number.isFinite(duration) && duration > 0 && duration < MIN_CALL_ANALYSIS_SECONDS;
 }
 
+const SCORE_RUBRIC_KEYS = [
+  'Agent fluency',
+  'Sentiment analysis',
+  'Fraud detection',
+  'Script coherence',
+  'Argumentation',
+  'Script adherence',
+];
+
+/** Hover bubble: why the AI assigned this score (evidence only, no invention). */
+export function getScoreDecisionTooltip(call: CallLike, language: string = 'fr'): string {
+  const isEn = String(language || '').toLowerCase().startsWith('en');
+  const lines: string[] = [];
+  const score = call.ai_call_score?.overall?.score;
+  if (typeof score === 'number') {
+    lines.push(
+      isEn
+        ? `Overall score ${score}% based only on recorded evidence.`
+        : `Score global ${score}% calculé uniquement sur les preuves enregistrées.`
+    );
+  }
+  const duration = Number((call as any).duration);
+  if (Number.isFinite(duration) && duration > 0) {
+    lines.push(
+      isEn ? `Call duration: ${Math.round(duration)}s.` : `Durée de l’appel : ${Math.round(duration)}s.`
+    );
+  }
+  const bits = SCORE_RUBRIC_KEYS.map((key) => {
+    const metric = call.ai_call_score?.[key];
+    return typeof metric?.score === 'number' ? `${key}: ${metric.score}%` : null;
+  }).filter(Boolean);
+  if (bits.length) {
+    lines.push(isEn ? `Rubrics: ${bits.join(' · ')}` : `Critères : ${bits.join(' · ')}`);
+  }
+  const feedback = isEn
+    ? call.ai_call_score?.overall?.feedback_en || call.ai_call_score?.overall?.feedback || ''
+    : call.ai_call_score?.overall?.feedback_fr || call.ai_call_score?.overall?.feedback || '';
+  if (String(feedback).trim()) lines.push(String(feedback).trim().slice(0, 280));
+  lines.push(
+    isEn
+      ? 'The AI must not invent facts that are absent from the transcript.'
+      : 'L’IA ne doit pas inventer de faits absents de la transcription.'
+  );
+  return lines.join('\n');
+}
+
 export function getTooShortAnalysisNotice(language: string = 'fr', durationSec?: number): string {
   const d =
     typeof durationSec === 'number' && Number.isFinite(durationSec) && durationSec > 0

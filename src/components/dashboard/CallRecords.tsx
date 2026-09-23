@@ -38,7 +38,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -1566,7 +1566,7 @@ export function CallRecords({
                               </div>
 
                               {!shouldHideCallScoring(selectedCall) && (
-                              <div className="flex items-center gap-4 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm self-start sm:self-auto">
+                              <div className="relative group/score flex items-center gap-4 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm self-start sm:self-auto cursor-help">
                                 <div className="text-right">
                                   <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Score Global</p>
                                   <div className="text-2xl sm:text-4xl font-black text-slate-900 leading-none">
@@ -1575,6 +1575,9 @@ export function CallRecords({
                                 </div>
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
                                   <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${getExecutiveSummaryScore(selectedCall) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                                </div>
+                                <div className="pointer-events-none absolute right-0 top-full z-30 mt-2 hidden w-72 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-left text-[11px] font-medium leading-relaxed text-white shadow-xl group-hover/score:block whitespace-pre-line">
+                                  {getScoreDecisionTooltip(selectedCall, i18n.language)}
                                 </div>
                               </div>
                               )}

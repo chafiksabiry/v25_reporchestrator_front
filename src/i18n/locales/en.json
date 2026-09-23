@@ -251,7 +251,14 @@
       "saved": "Calibration saved",
       "saveError": "Could not save calibration",
       "recorded": "Calibrated",
-      "tooShortTitle": "No AI analysis"
+      "tooShortTitle": "No AI analysis",
+      "scoreTooltipHint": "Hover the score to see the AI rationale"
+    },
+    "scoreTooltip": {
+      "overall": "Overall score {{score}}% based only on recorded evidence.",
+      "duration": "Call duration: {{seconds}}s.",
+      "rubrics": "Rubrics: {{list}}",
+      "noInvent": "The AI must not invent facts that are absent from the transcript."
     },
     "metrics": {
       "fluency": "Agent Fluency",
@@ -291,7 +298,8 @@
     "noLeadSelected": "No lead selected",
     "selectLeadHint": "Please select a lead from the Leads tab to start a call.",
     "prospectProfile": {
-      "title": "Prospect Profile",
+      "title": "PROSPECT PROFILE",
+      "openCall": "Review call",
       "loading": "Loading…",
       "noLead": "No prospect",
       "unknown": "Prospect",
