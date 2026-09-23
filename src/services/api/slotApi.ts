@@ -11,6 +11,8 @@ export interface Slot {
     duration: number; // hours
     capacity: number;
     reservedCount: number;
+    /** Recurring weekly slots: reserved seats per yyyy-MM-dd. */
+    occupancyByDate?: Record<string, number>;
     status: 'available' | 'full' | 'cancelled';
     notes?: string;
 }

@@ -87,6 +87,19 @@ function reservationDateKey(r: Reservation): string {
     return '';
 }
 
+function slotOccupancy(slot: Slot, dateKey: string): number {
+    const byDate = slot.occupancyByDate;
+    if (byDate && Object.prototype.hasOwnProperty.call(byDate, dateKey)) {
+        return Number(byDate[dateKey]) || 0;
+    }
+    const rawDate = String(slot.date || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
+        return Number(slot.reservedCount) || 0;
+    }
+    // Recurring template: other weeks must not keep this day "Complet".
+    return Number(byDate?.[dateKey]) || 0;
+}
+
 export function AvailableSlotsGrid({
     gigId,
     selectedDate,
@@ -162,11 +175,18 @@ export function AvailableSlotsGrid({
 
     const findOwnReservation = (slot: Slot, dateKey: string): Reservation | undefined => {
         const currentGig = normalizeGigId(gigId);
+        const slotId = normalizeGigId(slot._id);
+        const slotStart = normalizeHHmm(slot.startTime);
+        const slotEnd = normalizeHHmm(slot.endTime);
         return reservations.find((r) => {
             if (!isActiveReservation(r)) return false;
             if (normalizeGigId(r.gigId) !== currentGig) return false;
-            if (r.slotId !== slot._id) return false;
-            return reservationDateKey(r) === dateKey;
+            if (reservationDateKey(r) !== dateKey) return false;
+            const resSlotId = normalizeGigId(r.slotId);
+            if (resSlotId && slotId && resSlotId === slotId) return true;
+            const rStart = normalizeHHmm(r.startTime);
+            const rEnd = normalizeHHmm(r.endTime);
+            return !!slotStart && !!rStart && rStart === slotStart && rEnd === slotEnd;
         });
     };
 
@@ -289,7 +309,8 @@ export function AvailableSlotsGrid({
     const handleSwitch = async (slot: Slot, conflict: Reservation) => {
         if (!repId || !slot._id || !conflict._id) return;
 
-        const canTakeHere = slot.status === 'available' && slot.reservedCount < slot.capacity;
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const canTakeHere = slotOccupancy(slot, dateKey) < (slot.capacity || 0) && slot.status !== 'cancelled';
         if (!canTakeHere) {
             const otherId = normalizeGigId(conflict.gigId);
             if (otherId && onSelectGig) {
@@ -418,8 +439,9 @@ export function AvailableSlotsGrid({
                             const conflict = !reservation ? findCrossGigConflict(slot, dateStr) : undefined;
                             const isReserved = !!reservation;
                             const hasConflict = !!conflict;
-                            const isAvailable = slot.status === 'available' && slot.reservedCount < slot.capacity;
-                            const remaining = slot.capacity - slot.reservedCount;
+                            const occupied = slotOccupancy(slot, dateStr);
+                            const remaining = Math.max(0, (slot.capacity || 0) - occupied);
+                            const isAvailable = remaining > 0 && slot.status !== 'cancelled';
                             const timeDisplay = formatSlotTimeRange(
                                 dateStr,
                                 slot.startTime,
