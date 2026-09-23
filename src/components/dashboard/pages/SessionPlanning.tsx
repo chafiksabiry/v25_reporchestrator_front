@@ -989,6 +989,7 @@ export function SessionPlanning() {
                                     gigTimeZone={selectedGig?.availability?.time_zone}
                                     gigNamesById={Object.fromEntries(gigs.map((g) => [g.id, g.name]))}
                                     onReservationMade={refreshData}
+                                    onSelectGig={(id) => applySelectedGig(id)}
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">

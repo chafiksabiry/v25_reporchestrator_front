@@ -352,7 +352,7 @@
     "tzHint": "Times shown in your timezone ({{tz}})",
     "overlapTitle": "Slot already reserved on “{{gig}}”",
     "overlapMessage": "You already reserved this slot on “{{gig}}”. Click SWITCH to cancel that reservation and take it here.",
-    "overlapFullMessage": "You already reserved this slot on “{{gig}}”. Open that GIG and press Cancel to free the slot, then come back to reserve here.",
+    "overlapFullMessage": "You already reserved this slot on “{{gig}}”. Click SWITCH to open that GIG, cancel, and free the slot.",
     "overlapUnknownGig": "Unknown GIG",
     "cancelOtherGig": "Cancel on “{{gig}}”",
     "switchHere": "Switch",
