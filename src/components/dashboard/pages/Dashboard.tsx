@@ -141,6 +141,17 @@ function resolveTransactionCallId(tx: RepTransactionRow): string | null {
   return tx.callId || tx.call?._id || tx.call?.sid || null;
 }
 
+/** Masque un numéro de téléphone : garde le préfixe pays + les 2 derniers chiffres.
+ *  Ex: +33623984708 → +336 •• •• 08   |   0623984708 → 06 •• •• 08 */
+function maskPhone(raw: string | undefined | null): string {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 6) return raw;
+  const suffix = digits.slice(-2);
+  const prefix = raw.startsWith('+') ? raw.slice(0, raw.indexOf(digits[0]) + 3) : digits.slice(0, 2);
+  return `${prefix} •• •• ${suffix}`;
+}
+
 const clickableRowClass =
   'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-emerald-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.99]';
 
@@ -1964,7 +1975,7 @@ export function Dashboard({ profile }: DashboardProps) {
                             <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
                               <span>{contact}</span>
                               {hasLeadName && phoneNum && (
-                                <span className="text-[11px] font-normal text-slate-400">({phoneNum})</span>
+                                <span className="text-[11px] font-normal text-slate-400">({maskPhone(phoneNum)})</span>
                               )}
                             </p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
