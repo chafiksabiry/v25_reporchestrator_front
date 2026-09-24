@@ -1310,31 +1310,35 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Objectifs — un seul pavé, période type cancellation */}
-      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-6 overflow-hidden relative">
-        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/10 blur-3xl -mr-24 -mt-24 pointer-events-none" />
-        <div className="flex items-start justify-between gap-4 flex-wrap relative z-10 mb-5">
+      {/* Objectifs — pavé unique avec sélecteur de période intégré (style Last Minute Cancel) */}
+      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 flex-wrap relative z-10 mb-6">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-2xl bg-harx-500/20 text-harx-400 flex items-center justify-center shrink-0">
               <Target size={18} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
+              <h2 className="text-base font-black text-white tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5 truncate">
                 {goals.bonus.label}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1 rounded-full bg-slate-900 p-1 shrink-0">
-            {GOALS_PERIODS.map((key) => (
+          {/* Sélecteur période — style widget Last Minute Cancel */}
+          <div className="flex flex-wrap gap-1 shrink-0">
+            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setGoalsPeriod(key)}
-                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition ${
+                className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider transition ${
                   goalsPeriod === key
                     ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-white/55 hover:bg-white/10 hover:text-white'
+                    : 'bg-white/10 text-white/55 hover:bg-white/20 hover:text-white'
                 }`}
               >
                 {goalsPeriodLabels[key]}
@@ -1343,109 +1347,109 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
+        {/* Metrics — 3 lignes dans un seul pavé */}
+        <div className="relative z-10 space-y-5">
+          {/* Appels */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Phone size={14} className="text-cyan-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
+                <Phone size={13} className="text-cyan-400" />
+                <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
               </div>
-              <span className="text-[10px] font-black text-slate-700">{goals.calls.progressPct}%</span>
+              <div className="flex items-center gap-3">
+                <span className="text-white font-black tracking-tighter">
+                  {goals.calls.current}<span className="text-white/40 font-bold text-sm">/{goals.calls.target}</span>
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.calls.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
+                  {goals.calls.progressPct}%
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {goals.calls.current}<span className="text-base text-slate-400">/{goals.calls.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.callsLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-700 ease-out rounded-full ${
                   goals.calls.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-cyan-400 to-cyan-600'
+                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                    : 'bg-gradient-to-r from-cyan-400 to-cyan-500'
                 }`}
                 style={{ width: `${goals.calls.progressPct}%` }}
               />
             </div>
           </div>
 
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
+          <div className="h-px bg-white/10" />
+
+          {/* Sessions */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CalendarCheck size={14} className="text-violet-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
+                <CalendarCheck size={13} className="text-violet-400" />
+                <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
               </div>
-              <span className="text-[10px] font-black text-slate-700">{goals.sessions.progressPct}%</span>
+              <div className="flex items-center gap-3">
+                <span className="text-white font-black tracking-tighter">
+                  {goals.sessions.current}<span className="text-white/40 font-bold text-sm">/{goals.sessions.target}</span>
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.sessions.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
+                  {goals.sessions.progressPct >= 100
+                    ? <span className="inline-flex items-center gap-1"><CheckCircle2 size={10} />{goals.sessions.progressPct}%</span>
+                    : `${goals.sessions.progressPct}%`}
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {goals.sessions.current}<span className="text-base text-slate-400">/{goals.sessions.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.sessionsLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-700 ease-out rounded-full ${
                   goals.sessions.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-violet-400 to-violet-600'
+                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                    : 'bg-gradient-to-r from-violet-400 to-violet-500'
                 }`}
                 style={{ width: `${goals.sessions.progressPct}%` }}
               />
             </div>
           </div>
-        </div>
 
-        <div className="mt-4 bg-white/60 border border-white/60 rounded-[24px] p-5 relative z-10">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Flame size={14} className="text-emerald-500" />
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                {t('dashboard.home.goals.bonusTitle')}
-              </span>
-            </div>
-            {goals.bonus.target > 0 ? (
-              <span className="text-lg font-black text-emerald-600 tracking-tighter flex items-center gap-1.5">
-                +{goals.bonus.bonusAmount.toFixed(2)} €
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold text-slate-400 italic">
-                {t('dashboard.home.gigGoal.selectGig')}
-              </span>
-            )}
-          </div>
+          {/* Bonus GIG — seulement si un GIG est sélectionné */}
           {goals.bonus.target > 0 && (
-            <div className="mt-4 space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-600">
-                  <span className="text-slate-900 text-base font-black">{goals.bonus.current}</span>
-                  {' '}/{' '}
-                  <span>{goals.bonus.target}</span>
-                  {' '}{t('dashboard.home.gigGoal.validatedCalls')}
-                </span>
-                <span className="font-black text-slate-900">{goals.bonus.progressPct}%</span>
-              </div>
-              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                    goals.bonus.progressPct >= 100
-                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                      : 'bg-gradient-to-r from-rose-400 to-rose-600'
-                  }`}
-                  style={{ width: `${goals.bonus.progressPct}%` }}
-                />
-              </div>
-              {goals.bonus.progressPct >= 100 ? (
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <CheckCircle2 size={12} /> {t('dashboard.home.gigGoal.achieved')}
+            <>
+              <div className="h-px bg-white/10" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Flame size={13} className="text-amber-400" />
+                    <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-black tracking-tighter">
+                      {goals.bonus.current}<span className="text-white/40 font-bold text-sm">/{goals.bonus.target}</span>
+                    </span>
+                    <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {goals.bonus.progressPct >= 100 ? '✓' : `${goals.bonus.progressPct}%`}
+                    </span>
+                  </div>
+                </div>
+                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                      goals.bonus.progressPct >= 100
+                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                        : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                    }`}
+                    style={{ width: `${goals.bonus.progressPct}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-black text-emerald-400 tracking-tight">
+                  {t('dashboard.home.gigGoal.bonusReward', { amount: goals.bonus.bonusAmount.toFixed(2) })}
                 </p>
-              ) : (
-                <p className="text-[10px] font-bold text-slate-500">
-                  {t('dashboard.home.gigGoal.remaining', { count: goals.bonus.target - goals.bonus.current })}
-                </p>
-              )}
-            </div>
+              </div>
+            </>
+          )}
+
+          {/* Message si pas de GIG sélectionné pour le bonus */}
+          {goals.bonus.target === 0 && selectedGigId === 'all' && (
+            <p className="text-[10px] font-bold text-white/30 italic pt-1">
+              {t('dashboard.home.gigGoal.selectGig')}
+            </p>
           )}
         </div>
       </div>
