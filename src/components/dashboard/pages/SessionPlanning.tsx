@@ -965,6 +965,7 @@ export function SessionPlanning() {
                                 </div>
                                 <WalletFilterSelect
                                     label={t('sessionPlanning.enrolledGig')}
+                                    hideLabel
                                     value={selectedGigId || ''}
                                     onChange={(v) => applySelectedGig(v === '' ? null : v)}
                                     options={[
