@@ -198,7 +198,8 @@
         "selectGig": "Select a Gig to see the bonus",
         "validatedCalls": "validated calls",
         "achieved": "Goal reached — bonus credited",
-        "remaining": "Only {{count}} more validated calls to unlock your bonus."
+        "remaining": "Only {{count}} more validated calls to unlock your bonus.",
+        "bonusReward": "+{{amount}} € bonus to unlock"
       },
       "transactionModal": {
         "title": "Transaction details",
