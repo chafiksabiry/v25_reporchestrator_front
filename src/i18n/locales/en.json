@@ -388,7 +388,9 @@
     "switchHere": "Switch",
     "switching": "Switching…",
     "switchSuccess": "Reservation switched to this GIG.",
-    "cancelOtherSuccess": "Reservation cancelled on “{{gig}}”. You can now reserve here."
+    "cancelOtherSuccess": "Reservation cancelled on “{{gig}}”. You can now reserve here.",
+    "tzRep": "You",
+    "tzGig": "Destination"
   },
   "operations": {
     "title": "Operations Panel",
