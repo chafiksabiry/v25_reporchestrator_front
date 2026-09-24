@@ -1321,7 +1321,7 @@ export function CallRecords({
                     {new Date(selectedCall.startTime || selectedCall.createdAt).toLocaleString()} • {selectedCall.duration ? `${Math.floor(selectedCall.duration / 60)}m ${selectedCall.duration % 60}s` : '0s'}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-1.5 py-0.5 rounded-md">
+                    <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
                       ID {String(selectedCall.call_id || selectedCall.sid || (typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id))}
                     </span>
                     {anonymizePhone(selectedCall.lead?.phone || selectedCall.lead?.Phone || selectedCall.to || selectedCall.from) ? (
