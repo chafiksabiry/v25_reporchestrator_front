@@ -198,7 +198,8 @@
         "selectGig": "Sélectionnez un Gig pour voir le bonus",
         "validatedCalls": "appels validés",
         "achieved": "Objectif atteint — bonus crédité",
-        "remaining": "Plus que {{count}} appels validés pour décrocher votre bonus."
+        "remaining": "Plus que {{count}} appels validés pour décrocher votre bonus.",
+        "bonusReward": "+{{amount}} € bonus à décrocher"
       },
       "transactionModal": {
         "title": "Détail transaction",
