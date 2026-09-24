@@ -842,10 +842,32 @@ export function Dashboard({ profile }: DashboardProps) {
   // Company targets from GIG contract
   const companyTargets = useMemo(() => {
     const gig = selectedGigId === 'all' ? null : gigsData.find((g) => g._id === selectedGigId);
-    if (!gig) return { hoursTarget: 0, transactionTarget: 0 };
+    const empty = { hoursTarget: 0, transactionTarget: 0, commissionPerCall: 0, transactionCommission: 0, volumeUnit: 'Transactions', volumePeriod: 'Monthly' };
+    if (!gig) return empty;
+    const g = gig as any;
+
+    // Heures cibles : dans availability.minimumHours (mensuel en priorité)
+    const hoursTarget = Number(
+      g.availability?.minimumHours?.monthly ||
+      (g.availability?.minimumHours?.weekly ? g.availability.minimumHours.weekly * 4 : 0) ||
+      (g.availability?.minimumHours?.daily ? g.availability.minimumHours.daily * 20 : 0) ||
+      0
+    );
+
+    // Volume min : commission.minimumVolume.amount (c'est un string dans le schéma)
+    const transactionTarget = Number(g.commission?.minimumVolume?.amount || 0);
+
+    // Commissions
+    const commissionPerCall = Number(g.commission?.commission_per_call || 0);
+    const transactionCommission = Number(g.commission?.transactionCommission || 0);
+
     return {
-      hoursTarget: Number((gig as any).commission?.minimumHours || (gig as any).commission?.hoursPerMonth || 0),
-      transactionTarget: Number((gig as any).commission?.minimumVolume || (gig as any).commission?.targetTransactions || 0),
+      hoursTarget,
+      transactionTarget,
+      commissionPerCall,
+      transactionCommission,
+      volumeUnit: String(g.commission?.minimumVolume?.unit || 'Transactions'),
+      volumePeriod: String(g.commission?.minimumVolume?.period || 'Monthly'),
     };
   }, [selectedGigId, gigsData]);
 
@@ -915,6 +937,15 @@ export function Dashboard({ profile }: DashboardProps) {
     setIsPeriodDropdownOpen(false);
     setPeriodDropdownPos(null);
   };
+
+  // Sync simulateur avec les données réelles GIG quand on change de GIG
+  useEffect(() => {
+    if (companyTargets.transactionCommission > 0) {
+      setCalcCommission(companyTargets.transactionCommission);
+    } else if (companyTargets.commissionPerCall > 0) {
+      setCalcCommission(companyTargets.commissionPerCall);
+    }
+  }, [companyTargets.transactionCommission, companyTargets.commissionPerCall]);
 
   const goToProduction = () => {
     const gigId = selectedGigId !== 'all' ? selectedGigId : '';
@@ -1426,7 +1457,9 @@ export function Dashboard({ profile }: DashboardProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Zap size={13} className="text-amber-400" />
-                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Transactions cibles</span>
+                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">
+                        {companyTargets.volumeUnit} · {companyTargets.volumePeriod}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-white font-black tracking-tighter">
