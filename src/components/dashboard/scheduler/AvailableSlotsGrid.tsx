@@ -493,9 +493,29 @@ export function AvailableSlotsGrid({
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-4 mb-2 flex-wrap">
-                                                    <span className="text-sm font-bold text-gray-900" title={timeDisplay.hint}>
-                                                        {timeDisplay.label}
-                                                    </span>
+                                                    {/* Dual-timezone display */}
+                                                    {timeDisplay.dualZone ? (
+                                                        <div className="flex flex-col gap-0.5" title={timeDisplay.hint}>
+                                                            {/* REP local time — where they are */}
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-sm font-bold text-gray-900">{timeDisplay.repLabel}</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-wider text-harx-500 bg-harx-50 px-1.5 py-0.5 rounded-md border border-harx-100">
+                                                                    {t('sessionPlanning.tzRep', 'Vous')} · {timeDisplay.repCity}
+                                                                </span>
+                                                            </div>
+                                                            {/* GIG destination time — where prospects are */}
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-sm font-medium text-slate-500">{timeDisplay.gigLabel}</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">
+                                                                    {t('sessionPlanning.tzGig', 'Destination')} · {timeDisplay.gigCity}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm font-bold text-gray-900" title={timeDisplay.hint}>
+                                                            {timeDisplay.label}
+                                                        </span>
+                                                    )}
                                                     <div className="flex items-center gap-2 text-xs">
                                                         <Clock className="w-4 h-4 text-gray-400" />
                                                         <span className="text-gray-600">{slot.duration}h</span>
