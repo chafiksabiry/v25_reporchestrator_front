@@ -28,6 +28,7 @@ type GigFilterOption = {
   title: string;
   commission?: any;
   rewardBonus?: number;
+  availability?: any; // minimumHours.daily/weekly/monthly
 };
 
 function isPlaceholderGigTitle(title: string | undefined | null, id: string): boolean {
@@ -73,6 +74,7 @@ function normalizeGigEntry(raw: any): GigFilterOption | null {
         ),
         commission: nested.commission || raw.commission,
         rewardBonus: nested.rewardBonus || raw.rewardBonus,
+        availability: nested.availability || raw.availability,
       };
     }
     const id = String(nested);
@@ -89,6 +91,7 @@ function normalizeGigEntry(raw: any): GigFilterOption | null {
     title: firstRealGigTitle(id, raw.title, raw.name, raw.gigTitle, raw.gigName),
     commission: raw.commission,
     rewardBonus: raw.rewardBonus,
+    availability: raw.availability,
   };
 }
 
@@ -106,6 +109,7 @@ function mergeGigOptions(lists: any[][], locale = 'fr'): GigFilterOption[] {
         title: firstRealGigTitle(gig._id, existing?.title, gig.title),
         commission: gig.commission ?? existing?.commission,
         rewardBonus: gig.rewardBonus ?? existing?.rewardBonus,
+        availability: gig.availability ?? existing?.availability,
       });
     }
   }
@@ -358,13 +362,16 @@ export function Dashboard({ profile }: DashboardProps) {
 
         const mergedGigs = mergeGigOptions([enrolledMerged, titleHints], i18n.language);
 
-        // Resolve leftover "Gig abc123" labels from the gigs API.
+        // Resolve leftover "Gig abc123" labels + enrich commission/availability from the gigs API.
         const gigsApi = getGigsApiBase();
-        const unresolved = mergedGigs.filter((g) => isPlaceholderGigTitle(g.title, g._id));
-        if (unresolved.length > 0 && gigsApi) {
-          const titleById = new Map<string, string>();
+        // Fetch details for any GIG that still has a placeholder title OR is missing commission/availability
+        const needsDetails = mergedGigs.filter(
+          (g) => isPlaceholderGigTitle(g.title, g._id) || !g.commission || !g.availability
+        );
+        if (needsDetails.length > 0 && gigsApi) {
+          const detailsById = new Map<string, { title?: string; commission?: any; availability?: any }>();
           await Promise.all(
-            unresolved.map(async (g) => {
+            needsDetails.map(async (g) => {
               try {
                 const res = await fetch(`${gigsApi}/gigs/${encodeURIComponent(g._id)}/details`);
                 if (!res.ok) return;
@@ -377,18 +384,23 @@ export function Dashboard({ profile }: DashboardProps) {
                   data?.title,
                   data?.name
                 );
-                if (!isPlaceholderGigTitle(title, g._id)) {
-                  titleById.set(g._id, title);
-                }
+                detailsById.set(g._id, {
+                  title: !isPlaceholderGigTitle(title, g._id) ? title : undefined,
+                  commission: payload?.commission || data?.commission,
+                  availability: payload?.availability || data?.availability,
+                });
               } catch {
                 /* ignore per-gig failures */
               }
             })
           );
-          if (titleById.size > 0) {
+          if (detailsById.size > 0) {
             for (const g of mergedGigs) {
-              const title = titleById.get(g._id);
-              if (title) g.title = title;
+              const details = detailsById.get(g._id);
+              if (!details) continue;
+              if (details.title) g.title = details.title;
+              if (details.commission && !g.commission) g.commission = details.commission;
+              if (details.availability && !g.availability) g.availability = details.availability;
             }
           }
         }
