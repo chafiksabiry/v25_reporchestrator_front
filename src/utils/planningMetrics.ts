@@ -88,16 +88,31 @@ export function formatTimeInZone(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+/** Extract a short city/region label from an IANA timezone string.
+ *  "Europe/Paris" → "Paris", "Africa/Casablanca" → "Casablanca", "America/New_York" → "New York" */
+export function ianaToCity(tz: string): string {
+  const parts = tz.split('/');
+  return (parts[parts.length - 1] || tz).replace(/_/g, ' ');
+}
+
 /**
- * Display slot range. If gig TZ is known, convert wall times to the browser
- * (REP) timezone so DST shifts stay correct.
+ * Display slot range in DUAL timezone mode.
+ *
+ * Returns:
+ *  - `repLabel`  : slot time converted to the REP's browser timezone  (where they are)
+ *  - `gigLabel`  : slot time in the GIG destination timezone (where prospects are)
+ *  - `repCity`   : short city name for REP tz  (e.g. "Casablanca")
+ *  - `gigCity`   : short city name for GIG tz  (e.g. "Paris")
+ *  - `label`     : fallback — repLabel when different TZs, raw otherwise
+ *  - `hint`      : tooltip-friendly full info string
+ *  - `dualZone`  : true when the two timezones differ (show both rows in UI)
  */
 export function formatSlotTimeRange(
   dateStr: string,
   startTime: string,
   endTime: string,
   gigTimeZone?: unknown
-): { label: string; hint?: string } {
+): { label: string; hint?: string; repLabel?: string; gigLabel?: string; repCity?: string; gigCity?: string; dualZone?: boolean } {
   const raw = `${String(startTime || '').slice(0, 5)} – ${String(endTime || '').slice(0, 5)}`;
   const sourceTz = resolveIanaZone(gigTimeZone);
   const displayTz =
@@ -107,16 +122,25 @@ export function formatSlotTimeRange(
   if (!sourceTz || !displayTz || !dateStr) {
     return { label: raw };
   }
+  const gigCity = ianaToCity(sourceTz);
+  const repCity = ianaToCity(displayTz);
   if (sourceTz === displayTz) {
-    return { label: raw, hint: sourceTz };
+    // Same timezone — no dual display needed
+    return { label: raw, hint: sourceTz, repLabel: raw, gigLabel: raw, repCity, gigCity, dualZone: false };
   }
   const startUtc = zonedWallTimeToUtc(dateStr, startTime, sourceTz);
   const endUtc = zonedWallTimeToUtc(dateStr, endTime, sourceTz);
   if (!startUtc || !endUtc) return { label: raw, hint: sourceTz };
-  const local = `${formatTimeInZone(startUtc, displayTz)} – ${formatTimeInZone(endUtc, displayTz)}`;
+  const repLabel = `${formatTimeInZone(startUtc, displayTz)} – ${formatTimeInZone(endUtc, displayTz)}`;
+  const gigLabel = raw; // GIG wall-clock time (as stored)
   return {
-    label: local,
-    hint: `${raw} (${sourceTz})`,
+    label: repLabel,
+    hint: `${repLabel} (${repCity}) · ${gigLabel} (${gigCity})`,
+    repLabel,
+    gigLabel,
+    repCity,
+    gigCity,
+    dualZone: true,
   };
 }
 
