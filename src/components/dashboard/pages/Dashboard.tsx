@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck, Rocket } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck, Rocket, Calculator, Pencil, Check, Users, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
@@ -252,6 +252,18 @@ export function Dashboard({ profile }: DashboardProps) {
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
   const [overlayCallId, setOverlayCallId] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<RepTransactionRow | null>(null);
+
+  // Calculator / Simulateur
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcCalls, setCalcCalls] = useState(12);
+  const [calcConvRate, setCalcConvRate] = useState(10); // %
+  const [calcCommission, setCalcCommission] = useState(25); // € per sale
+  // REP personal earnings goal
+  const [repEarningsGoal, setRepEarningsGoal] = useState(() => Number(localStorage.getItem('harx_earnings_goal') || '0'));
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('0');
+  // Reservations cancellation stats period
+  const [cancelStatsPeriod, setCancelStatsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
 
   useEffect(() => {
     const agentId = profile?._id || localStorage.getItem('agentId') || localStorage.getItem('userId');
@@ -827,6 +839,35 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [callsData, reservationsData, selectedGigId, gigsData, goalsPeriod, t]);
 
+  // Company targets from GIG contract
+  const companyTargets = useMemo(() => {
+    const gig = selectedGigId === 'all' ? null : gigsData.find((g) => g._id === selectedGigId);
+    if (!gig) return { hoursTarget: 0, transactionTarget: 0 };
+    return {
+      hoursTarget: Number((gig as any).commission?.minimumHours || (gig as any).commission?.hoursPerMonth || 0),
+      transactionTarget: Number((gig as any).commission?.minimumVolume || (gig as any).commission?.targetTransactions || 0),
+    };
+  }, [selectedGigId, gigsData]);
+
+  // Calculator result
+  const calcResult = useMemo(() => {
+    const transactions = Math.round(calcCalls * (calcConvRate / 100));
+    const earnings = transactions * calcCommission;
+    return { transactions, earnings };
+  }, [calcCalls, calcConvRate, calcCommission]);
+
+  // Cancel rate from reservations
+  const cancelRate = useMemo(() => {
+    if (reservationStats.total === 0) return null;
+    return Math.round((reservationStats.cancelled / reservationStats.total) * 100);
+  }, [reservationStats]);
+
+  // Earnings goal progress
+  const earningsGoalProgress = useMemo(() => {
+    if (repEarningsGoal <= 0) return 0;
+    return Math.min(100, Math.round((earningsPipeline.earnedInPeriod / repEarningsGoal) * 100));
+  }, [earningsPipeline.earnedInPeriod, repEarningsGoal]);
+
   const goalsPeriodLabels: Record<GoalsPeriod, string> = {
     today: t('dashboard.home.goals.periodDay'),
     week: t('dashboard.home.goals.periodWeek'),
@@ -1310,7 +1351,7 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Objectifs — pavé unique avec sélecteur de période intégré (style Last Minute Cancel) */}
+      {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
       <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
         <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
@@ -1328,7 +1369,7 @@ export function Dashboard({ profile }: DashboardProps) {
               </p>
             </div>
           </div>
-          {/* Sélecteur période — style widget Last Minute Cancel */}
+          {/* Sélecteur période */}
           <div className="flex flex-wrap gap-1 shrink-0">
             {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
               <button
@@ -1347,10 +1388,75 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        {/* Metrics — 3 lignes dans un seul pavé */}
-        <div className="relative z-10 space-y-5">
+        <div className="relative z-10 space-y-4">
+
+          {/* ── Section : Objectifs Company (depuis contrat GIG) ── */}
+          {(companyTargets.hoursTarget > 0 || companyTargets.transactionTarget > 0) && (
+            <>
+              <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Objectifs company · GIG</p>
+              {companyTargets.hoursTarget > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock size={13} className="text-blue-400" />
+                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Heures travaillées</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white font-black tracking-tighter">
+                        {reservationStats.workedHours}h<span className="text-white/40 font-bold text-sm">/{companyTargets.hoursTarget}h</span>
+                      </span>
+                      <span className={`text-[10px] font-black min-w-[32px] text-right ${
+                        companyTargets.hoursTarget > 0 && reservationStats.workedHours >= companyTargets.hoursTarget ? 'text-emerald-400' : 'text-white/60'
+                      }`}>
+                        {companyTargets.hoursTarget > 0 ? `${Math.min(100, Math.round((reservationStats.workedHours / companyTargets.hoursTarget) * 100))}%` : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-700 ${
+                      companyTargets.hoursTarget > 0 && reservationStats.workedHours >= companyTargets.hoursTarget
+                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                        : 'bg-gradient-to-r from-blue-400 to-blue-500'
+                    }`} style={{ width: `${companyTargets.hoursTarget > 0 ? Math.min(100, Math.round((reservationStats.workedHours / companyTargets.hoursTarget) * 100)) : 0}%` }} />
+                  </div>
+                </div>
+              )}
+              {companyTargets.transactionTarget > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap size={13} className="text-amber-400" />
+                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Transactions cibles</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white font-black tracking-tighter">
+                        {earningsPipeline.validatedSalesCount}<span className="text-white/40 font-bold text-sm">/{companyTargets.transactionTarget}</span>
+                      </span>
+                      <span className={`text-[10px] font-black min-w-[32px] text-right ${
+                        earningsPipeline.validatedSalesCount >= companyTargets.transactionTarget ? 'text-emerald-400' : 'text-amber-400/80'
+                      }`}>
+                        {`${Math.min(100, Math.round((earningsPipeline.validatedSalesCount / companyTargets.transactionTarget) * 100))}%`}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-700 ${
+                      earningsPipeline.validatedSalesCount >= companyTargets.transactionTarget
+                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                        : 'bg-gradient-to-r from-amber-400 to-orange-400'
+                    }`} style={{ width: `${Math.min(100, Math.round((earningsPipeline.validatedSalesCount / companyTargets.transactionTarget) * 100))}%` }} />
+                  </div>
+                </div>
+              )}
+              <div className="h-px bg-white/10" />
+            </>
+          )}
+
+          {/* ── Section : Objectifs REP (appels + sessions) ── */}
+          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Mes objectifs activité</p>
+
           {/* Appels */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone size={13} className="text-cyan-400" />
@@ -1365,22 +1471,15 @@ export function Dashboard({ profile }: DashboardProps) {
                 </span>
               </div>
             </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  goals.calls.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-cyan-400 to-cyan-500'
-                }`}
-                style={{ width: `${goals.calls.progressPct}%` }}
-              />
+            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full transition-all duration-700 ease-out rounded-full ${
+                goals.calls.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-cyan-400 to-cyan-500'
+              }`} style={{ width: `${goals.calls.progressPct}%` }} />
             </div>
           </div>
 
-          <div className="h-px bg-white/10" />
-
           {/* Sessions */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarCheck size={13} className="text-violet-400" />
@@ -1391,66 +1490,182 @@ export function Dashboard({ profile }: DashboardProps) {
                   {goals.sessions.current}<span className="text-white/40 font-bold text-sm">/{goals.sessions.target}</span>
                 </span>
                 <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.sessions.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                  {goals.sessions.progressPct >= 100
-                    ? <span className="inline-flex items-center gap-1"><CheckCircle2 size={10} />{goals.sessions.progressPct}%</span>
-                    : `${goals.sessions.progressPct}%`}
+                  {goals.sessions.progressPct >= 100 ? <span className="inline-flex items-center gap-0.5"><CheckCircle2 size={9} />{goals.sessions.progressPct}%</span> : `${goals.sessions.progressPct}%`}
                 </span>
               </div>
             </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  goals.sessions.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-violet-400 to-violet-500'
-                }`}
-                style={{ width: `${goals.sessions.progressPct}%` }}
-              />
+            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full transition-all duration-700 ease-out rounded-full ${
+                goals.sessions.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'
+              }`} style={{ width: `${goals.sessions.progressPct}%` }} />
             </div>
           </div>
 
-          {/* Bonus GIG — seulement si un GIG est sélectionné */}
+          {/* Bonus GIG si disponible */}
           {goals.bonus.target > 0 && (
-            <>
-              <div className="h-px bg-white/10" />
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Flame size={13} className="text-amber-400" />
-                    <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white font-black tracking-tighter">
-                      {goals.bonus.current}<span className="text-white/40 font-bold text-sm">/{goals.bonus.target}</span>
-                    </span>
-                    <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {goals.bonus.progressPct >= 100 ? '✓' : `${goals.bonus.progressPct}%`}
-                    </span>
-                  </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame size={13} className="text-amber-400" />
+                  <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
                 </div>
-                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                      goals.bonus.progressPct >= 100
-                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                        : 'bg-gradient-to-r from-amber-400 to-orange-500'
-                    }`}
-                    style={{ width: `${goals.bonus.progressPct}%` }}
-                  />
+                <div className="flex items-center gap-3">
+                  <span className="text-white font-black tracking-tighter">
+                    {goals.bonus.current}<span className="text-white/40 font-bold text-sm">/{goals.bonus.target}</span>
+                  </span>
+                  <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {goals.bonus.progressPct >= 100 ? '✓' : `${goals.bonus.progressPct}%`}
+                  </span>
                 </div>
-                <p className="text-[10px] font-black text-emerald-400 tracking-tight">
-                  {t('dashboard.home.gigGoal.bonusReward', { amount: goals.bonus.bonusAmount.toFixed(2) })}
-                </p>
               </div>
-            </>
+              <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                  goals.bonus.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                }`} style={{ width: `${goals.bonus.progressPct}%` }} />
+              </div>
+              <p className="text-[10px] font-black text-emerald-400 tracking-tight">
+                {t('dashboard.home.gigGoal.bonusReward', { amount: goals.bonus.bonusAmount.toFixed(2) })}
+              </p>
+            </div>
           )}
 
-          {/* Message si pas de GIG sélectionné pour le bonus */}
-          {goals.bonus.target === 0 && selectedGigId === 'all' && (
-            <p className="text-[10px] font-bold text-white/30 italic pt-1">
-              {t('dashboard.home.gigGoal.selectGig')}
-            </p>
+          {/* ── Objectif gains personnalisé du REP ── */}
+          <div className="h-px bg-white/10" />
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Trophy size={13} className="text-harx-400" />
+                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Mon objectif gains</span>
+              </div>
+              {!editingGoal ? (
+                <button
+                  type="button"
+                  onClick={() => { setGoalInput(String(repEarningsGoal)); setEditingGoal(true); }}
+                  className="p-1 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition"
+                >
+                  <Pencil size={11} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = Math.max(0, Number(goalInput) || 0);
+                    setRepEarningsGoal(v);
+                    localStorage.setItem('harx_earnings_goal', String(v));
+                    setEditingGoal(false);
+                  }}
+                  className="p-1 rounded-lg bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/50 transition"
+                >
+                  <Check size={11} />
+                </button>
+              )}
+            </div>
+            {editingGoal ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { const v = Math.max(0, Number(goalInput) || 0); setRepEarningsGoal(v); localStorage.setItem('harx_earnings_goal', String(v)); setEditingGoal(false); } }}
+                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-400"
+                  placeholder="Ex: 1000"
+                  autoFocus
+                />
+                <span className="text-white/50 text-sm font-bold">€</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xl font-black text-white tracking-tighter">
+                    {fmtMoney(earningsPipeline.earnedInPeriod)} €
+                  </span>
+                  {repEarningsGoal > 0 && (
+                    <span className="text-[11px] font-bold text-white/40">/ {fmtMoney(repEarningsGoal)} € objectif</span>
+                  )}
+                </div>
+                {repEarningsGoal > 0 ? (
+                  <>
+                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-400 to-harx-500'
+                        }`}
+                        style={{ width: `${earningsGoalProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] font-bold text-white/40">
+                      {earningsGoalProgress}% · {earningsGoalProgress >= 100 ? '🎉 Objectif atteint !' : `Il reste ${fmtMoney(Math.max(0, repEarningsGoal - earningsPipeline.earnedInPeriod))} € à gagner`}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] font-bold text-white/30 italic">Cliquer sur ✏️ pour définir un objectif de gains</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Simulateur de gains ── */}
+          <div className="h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={() => setShowCalculator((p) => !p)}
+            className="w-full flex items-center justify-between gap-2 text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <Calculator size={13} className="text-cyan-400" />
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-widest group-hover:text-white/80 transition">Simulateur de gains</span>
+            </div>
+            <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showCalculator && (
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+              <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">Calculez vos gains estimés par session</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels / session</label>
+                  <input
+                    type="number"
+                    min={1} max={200}
+                    value={calcCalls}
+                    onChange={(e) => setCalcCalls(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Conversion %</label>
+                  <input
+                    type="number"
+                    min={1} max={100}
+                    value={calcConvRate}
+                    onChange={(e) => setCalcConvRate(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Commission € / vente</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={calcCommission}
+                    onChange={(e) => setCalcCommission(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+              </div>
+              {/* Résultat */}
+              <div className="rounded-xl bg-harx-500/15 border border-harx-500/30 px-4 py-3 flex items-center justify-between">
+                <p className="text-[10px] text-white/60 font-bold">
+                  {calcCalls} appels × {calcConvRate}% = <strong className="text-white">{calcResult.transactions} vente{calcResult.transactions !== 1 ? 's' : ''}</strong>
+                </p>
+                <p className="text-xl font-black text-harx-400 tracking-tight">
+                  +{calcResult.earnings.toFixed(2)} €
+                </p>
+              </div>
+              <p className="text-[9px] text-white/25 font-bold">Estimation indicative — basée sur vos paramètres GIG.</p>
+            </div>
           )}
+
         </div>
       </div>
 
@@ -1746,130 +1961,285 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Reservations / Travail planifié */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Classement des gains du GIG */}
+      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl -mr-20 -mt-20 pointer-events-none" />
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-5 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center">
-              <CalendarCheck size={18} />
+            <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <Medal size={18} />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.reservations.title')}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {t('dashboard.home.reservations.subtitle')}
+              <h2 className="text-base font-black text-white tracking-tight uppercase">Classement des gains</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">
+                {selectedGigId === 'all' ? 'Sélectionnez un GIG pour voir le classement' : selectedGigLabel}
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="flex items-center gap-2">
+            <Users size={14} className="text-white/30" />
+            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">REPs inscrits</span>
+          </div>
+        </div>
+        {selectedGigId === 'all' ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-white/5 text-white/20 flex items-center justify-center mb-3">
+              <Medal size={24} />
+            </div>
+            <p className="text-xs font-bold text-white/30 uppercase tracking-wider">Sélectionnez un GIG</p>
+            <p className="text-[11px] text-white/20 mt-1">Le classement des REPs s'affiche par GIG</p>
+          </div>
+        ) : (
+          <div className="relative z-10">
+            {/* Podium — top 3 */}
+            <div className="flex items-end justify-center gap-3 mb-6">
+              {[2, 1, 3].map((pos) => {
+                const isFirst = pos === 1;
+                const podiumColors: Record<number, string> = {
+                  1: 'from-amber-400/30 to-amber-500/10 border-amber-500/30',
+                  2: 'from-slate-400/20 to-slate-500/10 border-slate-500/20',
+                  3: 'from-amber-700/20 to-amber-800/10 border-amber-700/20',
+                };
+                const rankColors: Record<number, string> = { 1: 'text-amber-400', 2: 'text-slate-300', 3: 'text-amber-700' };
+                const medalEmojis: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+                if (pos === 1) {
+                  return (
+                    <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-5 py-4 ${isFirst ? 'pb-6' : 'pb-4'}`}>
+                      <span className="text-2xl">{medalEmojis[pos]}</span>
+                      <div className="h-10 w-10 rounded-2xl bg-harx-500/30 flex items-center justify-center">
+                        <Users size={16} className="text-harx-400" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black ${rankColors[pos]}`}>#{pos}</p>
+                        <p className="text-[10px] font-bold text-white/60 truncate max-w-[80px]">{displayName}</p>
+                        <p className="text-sm font-black text-white">{fmtMoney(earningsPipeline.earnedInPeriod)} €</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-4 py-3`}>
+                    <span className="text-lg opacity-30">{medalEmojis[pos]}</span>
+                    <div className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Users size={13} className="text-white/20" />
+                    </div>
+                    <p className={`text-[10px] font-black ${rankColors[pos]} opacity-30`}>#{pos}</p>
+                    <p className="text-[10px] text-white/20">—</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-center text-[10px] font-bold text-white/20 italic">Classement complet disponible prochainement · Données multi-REP en cours d'intégration</p>
+          </div>
+        )}
+      </div>
+
+      {/* Réservations — bandeau style Planning */}
+      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-violet-500/15 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-5 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-violet-500/20 text-violet-400 flex items-center justify-center shrink-0">
+              <CalendarCheck size={18} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white tracking-tight uppercase">{t('dashboard.home.reservations.title')}</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{t('dashboard.home.reservations.subtitle')}</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">
             {t('dashboard.home.reservations.count', { count: reservationStats.total })}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.total')}</span>
-              <CalendarDays size={16} className="text-slate-500" />
-            </div>
-            <span className="text-2xl font-black text-slate-900 tracking-tighter">{reservationStats.total}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.sessions')}</p>
+        {/* Métriques en ligne — style Planning */}
+        <div className="flex flex-wrap gap-3 relative z-10">
+          {/* Total */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-white/10 border border-white/10 px-4 py-3 min-w-[100px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.total')}</span>
+            <span className="text-2xl font-black text-white tracking-tighter">{reservationStats.total}</span>
+            <span className="text-[10px] font-bold text-white/40">{t('dashboard.home.reservations.sessions')}</span>
           </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.upcoming')}</span>
-              <CalendarClock size={16} className="text-blue-500" />
-            </div>
-            <span className="text-2xl font-black text-blue-600 tracking-tighter">{reservationStats.upcoming}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.scheduled')}</p>
+          {/* À venir */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-4 py-3 min-w-[100px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.upcoming')}</span>
+            <span className="text-2xl font-black text-blue-400 tracking-tighter">{reservationStats.upcoming}</span>
+            <span className="text-[10px] font-bold text-white/40">{t('dashboard.home.reservations.scheduled')}</span>
           </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.completed')}</span>
-              <CheckCircle2 size={16} className="text-emerald-500" />
-            </div>
-            <span className="text-2xl font-black text-emerald-600 tracking-tighter">{reservationStats.completed}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.honored')}</p>
+          {/* Effectuées */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 min-w-[100px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.completed')}</span>
+            <span className="text-2xl font-black text-emerald-400 tracking-tighter">{reservationStats.completed}</span>
+            <span className="text-[10px] font-bold text-white/40">{t('dashboard.home.reservations.honored')}</span>
           </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.missed')}</span>
-              <CalendarX size={16} className="text-rose-500" />
-            </div>
-            <span className="text-2xl font-black text-rose-600 tracking-tighter">{reservationStats.noShow + reservationStats.cancelled}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">
+          {/* Manquées */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 px-4 py-3 min-w-[120px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.missed')}</span>
+            <span className="text-2xl font-black text-rose-400 tracking-tighter">{reservationStats.noShow + reservationStats.cancelled}</span>
+            <span className="text-[10px] font-bold text-white/40">
               {t('dashboard.home.reservations.missedDetail', { cancelled: reservationStats.cancelled, noShow: reservationStats.noShow })}
-            </p>
+            </span>
           </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.hoursWorked')}</span>
-              <Timer size={16} className="text-amber-500" />
-            </div>
-            <span className="text-2xl font-black text-amber-600 tracking-tighter">{reservationStats.workedHours}h</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.hoursScheduled', { hours: reservationStats.scheduledHours })}</p>
+          {/* Heures */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 min-w-[120px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.hoursWorked')}</span>
+            <span className="text-2xl font-black text-amber-400 tracking-tighter">{reservationStats.workedHours}h</span>
+            <span className="text-[10px] font-bold text-white/40">{t('dashboard.home.reservations.hoursScheduled', { hours: reservationStats.scheduledHours })}</span>
           </div>
-
-          <div className="bg-slate-950 text-white border border-slate-800 rounded-[24px] p-5 shadow-xl shadow-slate-900/30 relative overflow-hidden">
-            <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/30 blur-2xl" />
-            <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.reservations.attendance')}</span>
-              <Award size={16} className="text-harx-400" />
+          {/* Assiduité */}
+          <div className="flex flex-col gap-0.5 rounded-2xl bg-harx-500/15 border border-harx-500/25 px-4 py-3 min-w-[100px]">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t('dashboard.home.reservations.attendance')}</span>
+            <span className="text-2xl font-black text-white tracking-tighter">{reservationStats.attendanceRate}%</span>
+            <span className="text-[10px] font-bold text-white/40">{t('dashboard.home.reservations.attendanceRate')}</span>
+          </div>
+          {/* Last Minute Cancel avec sélecteur de période */}
+          <div className="flex flex-col gap-1.5 rounded-2xl bg-white/8 border border-white/10 px-4 py-3 min-w-[160px]">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                <Ban size={13} className="text-rose-400" />
+              </div>
+              <div>
+                <p className="text-[9px] text-white/40 font-black uppercase tracking-widest">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+                <p className="text-xl font-black text-white tracking-tight">
+                  {cancelRate == null ? '—' : `${cancelRate}%`}
+                </p>
+              </div>
             </div>
-            <span className="text-2xl font-black tracking-tighter relative z-10">{reservationStats.attendanceRate}%</span>
-            <p className="text-[10px] font-bold text-white/60 mt-1 relative z-10">{t('dashboard.home.reservations.attendanceRate')}</p>
+            <div className="flex flex-wrap gap-1">
+              {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCancelStatsPeriod(key)}
+                  className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition ${
+                    cancelStatsPeriod === key ? 'bg-white text-slate-900' : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Upcoming reservations list */}
+        {/* Prochaines réservations (condensé) */}
         {upcomingReservations.length > 0 && (
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-6 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.reservations.upcomingSessions')}</h3>
-              <Clock size={14} className="text-slate-400" />
-            </div>
-            <ul className="space-y-2.5">
+          <div className="mt-4 relative z-10">
+            <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-2">{t('dashboard.home.reservations.upcomingSessions')}</p>
+            <div className="flex flex-wrap gap-2">
               {upcomingReservations.map((r: any) => {
                 const dateStr = r.reservationDate || r.date;
                 const d = new Date(dateStr);
                 const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || t('dashboard.home.gigFallback')) : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || t('dashboard.home.gigFallback'));
                 return (
-                  <li key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-                        if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`);
-                      }}
-                      className="group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/60 border border-white/60 hover:border-violet-200 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/20 active:scale-[0.99]"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                          <CalendarClock size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate">{gigTitle}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                          {r.duration}h
-                        </span>
-                        <ChevronRight size={14} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
-                      </div>
-                    </button>
-                  </li>
+                  <button
+                    key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}
+                    type="button"
+                    onClick={() => { const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId; if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`); }}
+                    className="flex items-center gap-2 bg-white/8 border border-white/15 rounded-2xl px-3 py-2 hover:bg-white/15 transition text-left group"
+                  >
+                    <CalendarClock size={13} className="text-violet-400 shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-black text-white truncate max-w-[140px]">{gigTitle}</p>
+                      <p className="text-[9px] text-white/40 font-bold">
+                        {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
+                      </p>
+                    </div>
+                    <span className="text-[9px] font-black text-white/40 bg-white/10 px-1.5 py-0.5 rounded-lg">{r.duration}h</span>
+                  </button>
                 );
               })}
-            </ul>
+            </div>
           </div>
         )}
+      </div>
+
+      {/* À faire du jour + Rappels — pavés compacts avec CTA apparent */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* To-Do du jour */}
+        <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden">
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
+                <ListChecks size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">À faire aujourd'hui</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Formations · Scripts · Documents KB</p>
+              </div>
+            </div>
+            <ul className="space-y-2 mb-4">
+              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-violet-50 border border-violet-100">
+                <GraduationCap size={14} className="text-violet-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">Formations assignées</p>
+                  <p className="text-[10px] text-slate-400">Accéder à HARX Academy</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-blue-50 border border-blue-100">
+                <BookOpen size={14} className="text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">Scripts de vente</p>
+                  <p className="text-[10px] text-slate-400">Lire avant vos sessions</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                <FileText size={14} className="text-emerald-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">Documents assignés (KB)</p>
+                  <p className="text-[10px] text-slate-400">Par votre Company</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+          {/* CTA apparent */}
+          <button
+            type="button"
+            onClick={() => navigate('/academy')}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-violet-600 text-white hover:bg-violet-700 transition-all group"
+          >
+            <div className="flex items-center gap-2">
+              <GraduationCap size={16} />
+              <span className="text-xs font-black uppercase tracking-widest">Accéder à l'Academy</span>
+            </div>
+            <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
+
+        {/* Rappels à effectuer */}
+        <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden">
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <PhoneCall size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">Rappels à effectuer</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Prospects · Callbacks planifiés</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
+                <PhoneCall size={20} />
+              </div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vos rappels apparaîtront ici</p>
+              <p className="text-[11px] text-slate-400 mt-1">Gérez vos prospects depuis l'espace dédié</p>
+            </div>
+          </div>
+          {/* CTA apparent */}
+          <button
+            type="button"
+            onClick={() => navigate('/workspace')}
+            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-amber-500 text-white hover:bg-amber-600 transition-all group"
+          >
+            <div className="flex items-center gap-2">
+              <PhoneCall size={16} />
+              <span className="text-xs font-black uppercase tracking-widest">Voir mes prospects</span>
+            </div>
+            <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
       </div>
 
       {overlayCallId && (
