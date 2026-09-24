@@ -128,10 +128,21 @@ export function AvailableSlotsGrid({
 
     useEffect(() => {
         if (!gigId || gigId === '') return;
+        // Both loads must complete before slots become interactive.
+        // Running them in parallel but gating reservationsReady on BOTH prevents
+        // the race where slots briefly show "RÉSERVER" before cross-GIG conflicts
+        // are known, causing conflict banners to appear only on user action.
         setReservationsReady(false);
-        loadSlots();
-        loadReservations();
+        void loadAll();
     }, [gigId, selectedDate]);
+
+    const loadAll = async () => {
+        try {
+            await Promise.all([loadSlots(), loadReservations()]);
+        } finally {
+            setReservationsReady(true);
+        }
+    };
 
     const loadSlots = async () => {
         if (!gigId || gigId === '' || !selectedDate) return;
@@ -144,7 +155,7 @@ export function AvailableSlotsGrid({
         } catch (error: any) {
             console.error('Error loading slots:', error);
             setMessage({
-                text: error.response?.data?.message || error.message || 'Failed to load available slots',
+                text: error.response?.data?.message || error.message || 'Échec du chargement des créneaux.',
                 type: 'error'
             });
         } finally {
@@ -156,16 +167,15 @@ export function AvailableSlotsGrid({
     const loadReservations = async () => {
         if (!repId || repId === '') {
             setReservations([]);
-            setReservationsReady(true);
-            return;
+            return; // reservationsReady is controlled by loadAll()
         }
         try {
             const fetchedReservations = await slotApi.getReservations(repId);
             setReservations(Array.isArray(fetchedReservations) ? fetchedReservations : []);
         } catch (error: any) {
             console.error('Error loading reservations:', error);
-        } finally {
-            setReservationsReady(true);
+            // Don't set reservationsReady here — loadAll() will do it.
+            // Leaving reservations as-is means conflict detection uses stale-but-safe data.
         }
     };
 
@@ -228,8 +238,9 @@ export function AvailableSlotsGrid({
 
         const conflict = findCrossGigConflict(slot, targetDateKey);
         if (conflict) {
-            // Ensure the row re-renders as conflict (BASCULER only), not Réserver.
-            await loadReservations();
+            // Re-fetch fresh reservations so ALL cross-GIG conflicts are visible
+            // immediately, not only after the next user action.
+            await loadAll();
             setMessage({
                 text: t('sessionPlanning.overlapMessage', { gig: resolveGigName(conflict.gigId) }),
                 type: 'error',
@@ -251,8 +262,7 @@ export function AvailableSlotsGrid({
                 return next;
             });
 
-            await loadSlots();
-            await loadReservations();
+            await loadAll();
             onReservationMade?.();
             setTimeout(() => {
                 setMessage(null);
@@ -262,7 +272,7 @@ export function AvailableSlotsGrid({
             const apiMsg = String(error.response?.data?.message || error.message || '');
             const looksLikeOverlap = /overlap/i.test(apiMsg);
             if (looksLikeOverlap) {
-                await loadReservations();
+                await loadAll();
                 // Re-resolve after refresh so the slot row shows BASCULER (single action).
                 const refreshed = findCrossGigConflict(slot, targetDateKey);
                 const gigLabel = resolveGigName(refreshed?.gigId);
@@ -291,8 +301,7 @@ export function AvailableSlotsGrid({
                 text: successText || 'Réservation annulée avec succès.',
                 type: 'success',
             });
-            await loadSlots();
-            await loadReservations();
+            await loadAll();
             onReservationMade?.();
             setTimeout(() => {
                 setMessage(null);
@@ -338,15 +347,14 @@ export function AvailableSlotsGrid({
             });
 
             setMessage({ text: t('sessionPlanning.switchSuccess'), type: 'success' });
-            await loadSlots();
-            await loadReservations();
+            await loadAll();
             onReservationMade?.();
             setTimeout(() => {
                 setMessage(null);
             }, 3000);
         } catch (error: any) {
             console.error('Error switching reservation:', error);
-            await loadReservations();
+            await loadAll();
             setMessage({
                 text: error.response?.data?.message || error.message || 'Échec de la bascule de réservation.',
                 type: 'error',
