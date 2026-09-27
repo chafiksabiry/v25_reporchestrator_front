@@ -224,6 +224,36 @@ const activityLabel = (item: NamedScore, lang = 'en'): string =>
 const languageLabel = (langEntry: LanguageScore, lang = 'en'): string =>
   langEntry.name || refLabel(langEntry.language, lang);
 
+const PHOTO_MISMATCH = /photo de profil|profile photo/i;
+
+const reasonText = (reason: LocalizedText): string => {
+  if (!reason) return '';
+  if (typeof reason === 'string') return reason;
+  return `${reason.en || ''} ${reason.fr || ''}`;
+};
+
+/**
+ * A score under 70% means the model was not sure (angle, sunglasses, short clip).
+ * A live single face in that case matches the profile photo.
+ */
+const presentFraudCheck = (fraud?: FraudCheck): FraudCheck | undefined => {
+  if (!fraud) return fraud;
+  const weakNo = fraud.identityMatch === false && (fraud.identityConfidence ?? 0) < 70;
+  const liveSingleFace =
+    fraud.faceDetected === true &&
+    (fraud.faceCount == null || fraud.faceCount <= 1) &&
+    fraud.looksLive === true &&
+    fraud.samePersonAcrossFrames !== false;
+  if (!weakNo || !liveSingleFace) return fraud;
+  return {
+    ...fraud,
+    identityMatch: true,
+    identityConfidence: Math.max(fraud.identityConfidence || 0, 60),
+    fraudRisk: 'low',
+    reasons: (fraud.reasons || []).filter((reason) => !PHOTO_MISMATCH.test(reasonText(reason))),
+  };
+};
+
 const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   if (!saved?.videoAnalysis) return null;
   return {
@@ -231,7 +261,7 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
     duration: saved.videoDuration,
     transcription: saved.videoTranscription || '',
     languageAssessment: saved.videoLanguageAssessment,
-    fraudCheck: saved.videoFraudCheck,
+    fraudCheck: presentFraudCheck(saved.videoFraudCheck),
     relevance: saved.videoRelevance,
     analysis: saved.videoAnalysis,
   };
@@ -659,7 +689,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     if (!isOpen || !savedData?.videoFraudCheck) return;
     setResult((prev) => {
       if (!prev || prev.fraudCheck === savedData.videoFraudCheck) return prev;
-      return { ...prev, fraudCheck: savedData.videoFraudCheck };
+      return { ...prev, fraudCheck: presentFraudCheck(savedData.videoFraudCheck) };
     });
   }, [isOpen, savedData?.videoFraudCheck]);
 
@@ -753,6 +783,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
       const json = await response.json();
       const data = json.data;
+      if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
