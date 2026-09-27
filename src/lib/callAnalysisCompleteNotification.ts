@@ -13,6 +13,31 @@ export function dispatchCallAnalysisCompleteEvent(data: CallAnalysisCompleteDeta
   window.dispatchEvent(new CustomEvent(CALL_ANALYSIS_COMPLETE_EVENT, { detail: data }));
 }
 
+/** App-relative path. The router basename is already `/reps`. */
+export function callAnalysisHistoryPath(callId: string): string {
+  return `/workspace?tab=calls&callId=${encodeURIComponent(callId)}`;
+}
+
+/**
+ * Where a notification click should go.
+ * Analysis notifications deep-link the call even when the stored path is the
+ * old `/reps/workspace?tab=calls` (that prefix doubles the basename and the
+ * catch-all sends the rep back to the dashboard).
+ */
+export function resolveRepNotificationPath(n: {
+  notificationKey?: string;
+  actionPath?: string;
+}): string | null {
+  const fromKey = /^call-analysis-complete-(.+)$/.exec(String(n.notificationKey || ''));
+  if (fromKey?.[1]) return callAnalysisHistoryPath(fromKey[1]);
+
+  const raw = String(n.actionPath || '').trim();
+  if (!raw) return null;
+  if (raw === '/reps' || raw === '/reps/') return '/dashboard';
+  if (raw.startsWith('/reps/')) return raw.slice('/reps'.length);
+  return raw;
+}
+
 export function showCallAnalysisCompleteToast(data: EscrowMessage) {
   const callId = data.callId ? String(data.callId) : '';
   if (!callId) return;

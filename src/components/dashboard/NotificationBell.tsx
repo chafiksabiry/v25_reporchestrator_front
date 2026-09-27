@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNotifications, type RepNotification } from '../../contexts/NotificationsContext';
+import { resolveRepNotificationPath } from '../../lib/callAnalysisCompleteNotification';
 import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
 
 function timeAgo(ts: number, isFr: boolean): string {
@@ -83,8 +84,9 @@ export function NotificationBell() {
 
   const handleOpenNotification = (n: RepNotification) => {
     if (!n.read) markAsRead(n.id);
-    if (n.actionPath) {
-      navigate(n.actionPath);
+    const path = resolveRepNotificationPath(n);
+    if (path) {
+      navigate(path);
       setOpen(false);
     }
   };
