@@ -139,13 +139,55 @@ const buildAssessmentFromExperience = (
  * If a language is still CV-estimated but an experience video already assessed it,
  * attach experience verification so the Languages tab can show it as verified.
  */
+const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+const asText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const localized = value as { en?: string; fr?: string };
+    return localized.fr || localized.en || '';
+  }
+  return '';
+};
+
+const asScore = (value: unknown): number => {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+};
+
+/** Shape accepted by the agent language schema. `experience` is stored as `video`. */
+export const toPersistedProfileLanguage = (lang: any) => {
+  const rawLevel = String(lang?.proficiency || lang?.assessmentResults?.verifiedProficiency || 'B1').toUpperCase();
+  const proficiency = CEFR_LEVELS.includes(rawLevel) ? rawLevel : 'B1';
+  const ar = lang?.assessmentResults || {};
+  const rawSource = String(ar.source || '');
+  const source = rawSource === 'cv' || rawSource === 'assessment' ? rawSource : 'video';
+  const language =
+    typeof lang?.language === 'object' && lang.language?._id ? lang.language._id : lang?.language;
+
+  return {
+    language,
+    proficiency,
+    assessmentResults: {
+      completeness: { score: asScore(ar.completeness?.score), feedback: asText(ar.completeness?.feedback) },
+      fluency: { score: asScore(ar.fluency?.score), feedback: asText(ar.fluency?.feedback) },
+      proficiency: { score: asScore(ar.proficiency?.score), feedback: asText(ar.proficiency?.feedback) },
+      overall: {
+        score: asScore(ar.overall?.score),
+        strengths: asText(ar.overall?.strengths),
+        areasForImprovement: asText(ar.overall?.areasForImprovement),
+      },
+      source,
+      completedAt: ar.completedAt || new Date().toISOString(),
+    },
+  };
+};
+
 export const enrichLanguageFromExperience = (lang: any, profile: any): any => {
   if (!lang) return lang;
   const ar = lang.assessmentResults;
-  if (ar?.source === 'language') return lang;
-  if (ar && ar.source !== 'cv' && (ar.verifiedProficiency || ar.experienceVideoUrl || ar.videoUrl)) {
-    return lang;
-  }
+  if (ar?.source && ar.source !== 'cv') return lang;
 
   const langId = getLangId(lang);
   const langName = getLangName(lang);
