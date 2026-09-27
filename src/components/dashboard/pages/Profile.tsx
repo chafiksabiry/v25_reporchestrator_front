@@ -5,7 +5,7 @@ import { ProfileView } from '../ProfileView';
 import { ProfileEditView } from '../ProfileEditView';
 import { getProfileData, updateProfileData, updateSkills, updateBasicInfo, updateExperience, fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { setProfileData } from '../../../utils/authUtils';
-import { buildSyncedLanguagesFromExperience } from '../profile/languageVideoUtils';
+import { buildSyncedLanguagesFromExperience, toPersistedProfileLanguage } from '../profile/languageVideoUtils';
 
 // Import Timezone type from repWizard service
 import { Timezone } from '../../../services/api/repWizard';
@@ -228,18 +228,7 @@ export function Profile() {
     if (!syncedLanguages) return profileData;
 
     const payload = {
-      personalInfo: {
-        ...(profileData.personalInfo || {}),
-        languages: syncedLanguages.map((lang: any) => ({
-          language:
-            typeof lang.language === 'object' && lang.language?._id
-              ? lang.language._id
-              : lang.language,
-          proficiency: lang.proficiency,
-          assessmentResults: lang.assessmentResults,
-          ...(lang.iso639_1 ? { iso639_1: lang.iso639_1 } : {}),
-        })),
-      },
+      'personalInfo.languages': syncedLanguages.map((lang: any) => toPersistedProfileLanguage(lang)),
     };
 
     try {

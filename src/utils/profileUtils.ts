@@ -1,6 +1,7 @@
 import { profileApi } from './client.tsx';
 import Cookies from 'js-cookie';
 import { getProfileData as getCachedProfileData, setProfileData, redirectToLoginIfUnauthorized } from './authUtils';
+import { dashRepApiUrl } from './repApiUrl';
 
 /** Fired when `users.fullName` changes — TopBar listens for instant UI update. */
 export const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
@@ -586,4 +587,27 @@ export const checkCountryMismatch = async (
     console.error('Error checking country mismatch:', error);
     return null;
   }
-}; 
+};
+
+/**
+ * Re-compare every experience video to the current profile photo.
+ * Includes the first experience. A failed recheck must not undo the photo save.
+ */
+export async function recheckExperienceIdentity(profileId: string): Promise<boolean> {
+  const token = localStorage.getItem('token');
+  if (!token || !profileId) return false;
+  try {
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/identity/recheck`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.warn('Identity recheck failed', response.status);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('Identity recheck failed', error);
+    return false;
+  }
+} 

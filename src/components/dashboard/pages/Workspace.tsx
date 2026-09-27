@@ -166,12 +166,12 @@ export function WorkspaceContent() {
   // sessionStorage raced with setSelectedGigId and reverted gig switches.
   const gigIdFromNavigation = location.state?.gigId || searchParams.get('gigId') || '';
 
+  const urlCallId = searchParams.get('callId') || '';
   const [activeTab, setActiveTab] = useState(urlTab && ['voice', 'calls', 'copilot'].includes(urlTab) ? urlTab : 'voice');
   const [message, setMessage] = useState('');
-  // Twilio CallSid of the call that was just hung-up and persisted. When
-  // set, the Call History tab is auto-opened and `CallRecords` deep-links
-  // the matching call into its details modal.
-  const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(null);
+  // Twilio CallSid or Mongo call id to deep-link into the history modal
+  // (hang-up, or a notification click on a finished analysis).
+  const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(urlCallId || null);
   const [signedLeadOverlayId, setSignedLeadOverlayId] = useState<string | null>(null);
 
   // Sync activeTab with URL
@@ -180,6 +180,25 @@ export function WorkspaceContent() {
       setActiveTab(urlTab);
     }
   }, [urlTab]);
+
+  // Notification deep-link: /workspace?tab=calls&callId=...
+  useEffect(() => {
+    if (!urlCallId) return;
+    setPendingOpenCallSid(urlCallId);
+    setActiveTab('calls');
+  }, [urlCallId]);
+
+  const handleAutoOpenHandled = useCallback(() => {
+    setPendingOpenCallSid(null);
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('callId')) return;
+    params.delete('callId');
+    const qs = params.toString();
+    navigate(
+      { pathname: '/workspace', search: qs ? `?${qs}` : '' },
+      { replace: true }
+    );
+  }, [navigate]);
 
   // ── Auto-open the Call History modal after a hangup ──────────────
   //  `ContactInfo` dispatches `harx:call-saved` once the just-finished
@@ -1391,7 +1410,7 @@ export function WorkspaceContent() {
             <CallRecords
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
-              onAutoOpenHandled={() => setPendingOpenCallSid(null)}
+              onAutoOpenHandled={handleAutoOpenHandled}
             />
           </div>
         );

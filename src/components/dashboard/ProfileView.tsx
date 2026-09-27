@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles, Upload, ImagePlus } from 'lucide-react';
-import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan } from '../../utils/profileUtils';
+import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity } from '../../utils/profileUtils';
 import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -858,6 +858,40 @@ export const ProfileView: React.FC<{
     };
   }, [stopCameraStream]);
 
+  const identityRecheckFor = useRef<string | null>(null);
+  useEffect(() => {
+    const photoUrl = profile?.personalInfo?.photo?.url as string | undefined;
+    const profileId = profile?._id as string | undefined;
+    if (!photoUrl || !profileId) return;
+    const experiences = Array.isArray(profile?.experience) ? profile.experience : [];
+    const stale = experiences.some((exp: {
+      videoUrl?: string;
+      videoFraudCheck?: { referencePhotoUrl?: string; identityMatch?: boolean | null; identityConfidence?: number };
+    }) => {
+      if (!exp?.videoUrl) return false;
+      const fraud = exp.videoFraudCheck;
+      if (fraud?.referencePhotoUrl !== photoUrl) return true;
+      return fraud?.identityMatch === false && (fraud.identityConfidence ?? 0) < 70;
+    });
+    if (!stale) return;
+    const key = `${profileId}:${photoUrl}`;
+    if (identityRecheckFor.current === key) return;
+    identityRecheckFor.current = key;
+    void (async () => {
+      const ok = await recheckExperienceIdentity(profileId);
+      if (!ok) {
+        identityRecheckFor.current = null;
+        return;
+      }
+      try {
+        const refreshed = await fetchProfileFromAPI();
+        onProfileUpdate?.(refreshed);
+      } catch (err) {
+        console.warn('Profile refresh after identity recheck failed', err);
+      }
+    })();
+  }, [profile?.personalInfo?.photo?.url, profile?._id, profile?.experience, onProfileUpdate]);
+
   // Re-attach stream when camera modal opens
   useEffect(() => {
     if (!showCameraModal || !cameraStreamRef.current || !cameraVideoRef.current) return;
@@ -950,6 +984,7 @@ export const ProfileView: React.FC<{
         throw new Error(`Photo upload failed with status ${response.status}`);
       }
 
+      await recheckExperienceIdentity(profile._id);
       const refreshed = await fetchProfileFromAPI();
       onProfileUpdate?.(refreshed);
       window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
