@@ -107,6 +107,7 @@ interface FraudCheck {
   identityMatch?: boolean | null;
   identityConfidence?: number;
   identityChecked?: boolean;
+  referencePhotoUrl?: string | null;
   fraudRisk: 'low' | 'medium' | 'high' | 'unknown';
   reasons: LocalizedText[];
   checkedFrames?: number;
@@ -652,6 +653,15 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       if (!isOpen) stopCamera();
     };
   }, [isOpen, savedData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Photo change recheck updates fraud in place without resetting the open video.
+  useEffect(() => {
+    if (!isOpen || !savedData?.videoFraudCheck) return;
+    setResult((prev) => {
+      if (!prev || prev.fraudCheck === savedData.videoFraudCheck) return prev;
+      return { ...prev, fraudCheck: savedData.videoFraudCheck };
+    });
+  }, [isOpen, savedData?.videoFraudCheck]);
 
   // Lock background scroll while the modal is open (it's portaled to body).
   useEffect(() => {
