@@ -593,6 +593,29 @@ export const checkCountryMismatch = async (
  * Re-compare every experience video to the current profile photo.
  * Includes the first experience. A failed recheck must not undo the photo save.
  */
+/**
+ * Hear the accent on experience videos that were scored from a transcript only.
+ * Does not change the CEFR score.
+ */
+export async function recheckExperienceAccents(profileId: string): Promise<boolean> {
+  const token = localStorage.getItem('token');
+  if (!token || !profileId) return false;
+  try {
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/language/accent/recheck`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.warn('Accent recheck failed', response.status);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('Accent recheck failed', error);
+    return false;
+  }
+}
+
 export async function recheckExperienceIdentity(profileId: string): Promise<boolean> {
   const token = localStorage.getItem('token');
   if (!token || !profileId) return false;

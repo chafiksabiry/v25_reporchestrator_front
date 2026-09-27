@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles, Upload, ImagePlus } from 'lucide-react';
-import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity } from '../../utils/profileUtils';
+import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -859,6 +859,36 @@ export const ProfileView: React.FC<{
   }, [stopCameraStream]);
 
   const identityRecheckFor = useRef<string | null>(null);
+  const accentRecheckFor = useRef<string | null>(null);
+  useEffect(() => {
+    const profileId = profile?._id as string | undefined;
+    if (!profileId) return;
+    const experiences = Array.isArray(profile?.experience) ? profile.experience : [];
+    const needsAccent = experiences.some((exp: {
+      videoUrl?: string;
+      videoLanguageAssessment?: { languages?: Array<{ accent?: { source?: string } }>; accent?: { source?: string } };
+    }) => {
+      if (!exp?.videoUrl) return false;
+      const languages = exp.videoLanguageAssessment?.languages;
+      if (Array.isArray(languages) && languages.length > 0) {
+        return languages.some((entry) => entry?.accent?.source !== 'audio');
+      }
+      return Boolean(exp.videoLanguageAssessment) && exp.videoLanguageAssessment?.accent?.source !== 'audio';
+    });
+    if (!needsAccent) return;
+    if (accentRecheckFor.current === profileId) return;
+    accentRecheckFor.current = profileId;
+    void (async () => {
+      const ok = await recheckExperienceAccents(profileId);
+      if (!ok) return;
+      try {
+        const refreshed = await fetchProfileFromAPI();
+        onProfileUpdate?.(refreshed);
+      } catch (err) {
+        console.warn('Profile refresh after accent recheck failed', err);
+      }
+    })();
+  }, [profile, onProfileUpdate]);
   useEffect(() => {
     const photoUrl = profile?.personalInfo?.photo?.url as string | undefined;
     const profileId = profile?._id as string | undefined;
