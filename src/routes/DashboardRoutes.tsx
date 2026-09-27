@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
@@ -32,7 +32,12 @@ import api from '../utils/client';
 import { getRepShellChrome } from '../utils/harxBrand';
 import { isCallCenterStaff } from '../utils/callCenterStaff';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
-import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
+import {
+  CALL_ANALYSIS_COMPLETE_EVENT,
+  callAnalysisHistoryPath,
+  handleCallAnalysisCompleteMessage,
+  type CallAnalysisCompleteDetail,
+} from '../lib/callAnalysisCompleteNotification';
 import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
@@ -111,6 +116,19 @@ function DashboardAppContent() {
 
 function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onAnalysisOpen = (e: Event) => {
+      const detail = (e as CustomEvent<CallAnalysisCompleteDetail>).detail;
+      if (!detail?.openModal) return;
+      const callId = detail.callId ? String(detail.callId) : '';
+      if (!callId) return;
+      navigate(callAnalysisHistoryPath(callId));
+    };
+    window.addEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
+    return () => window.removeEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
+  }, [navigate]);
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
   const chrome = getRepShellChrome(isCallCenterStaff());
 

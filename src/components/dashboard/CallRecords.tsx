@@ -44,6 +44,7 @@ import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLe
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 import {
   CALL_ANALYSIS_COMPLETE_EVENT,
+  callAnalysisHistoryPath,
   type CallAnalysisCompleteDetail,
 } from '../../lib/callAnalysisCompleteNotification';
 
@@ -339,6 +340,9 @@ export function CallRecords({
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
 
+  const recordMatchesDeepLink = (record: CallRecord, openId: string) =>
+    record.sid === openId || resolveCallId(record) === openId;
+
   const normalizeMongoId = (value: unknown): string | null => {
     if (value == null) return null;
     if (typeof value === 'string') {
@@ -624,7 +628,7 @@ export function CallRecords({
         message: isError
           ? `L'analyse de l'appel avec ${leadName} a échoué.`
           : `L'analyse de l'appel avec ${leadName} est prête.`,
-        actionPath: '/reps/workspace?tab=calls',
+        actionPath: callAnalysisHistoryPath(callId),
         playSound: !modalWasOpen,
       });
 
@@ -638,17 +642,20 @@ export function CallRecords({
   }, [onAnalysisSettled, upsertNotification]);
 
   const autoOpenHandledRef = React.useRef<string | null>(null);
+  const callRecordsRef = useRef(callRecords);
+  callRecordsRef.current = callRecords;
   useEffect(() => {
-    if (!autoOpenSid) return;
+    if (!autoOpenSid) {
+      autoOpenHandledRef.current = null;
+      return;
+    }
     if (autoOpenHandledRef.current === autoOpenSid) return;
 
     fetchCallRecords(true);
     let attempts = 0;
     const tryOpen = () => {
       attempts += 1;
-      const match = callRecords.find(
-        (r) => r.sid === autoOpenSid || r._id === autoOpenSid
-      );
+      const match = callRecordsRef.current.find((r) => recordMatchesDeepLink(r, autoOpenSid));
       if (match) {
         autoOpenHandledRef.current = autoOpenSid;
         setSelectedCall(match);
@@ -673,9 +680,7 @@ export function CallRecords({
   useEffect(() => {
     if (!autoOpenSid) return;
     if (autoOpenHandledRef.current === autoOpenSid) return;
-    const match = callRecords.find(
-      (r) => r.sid === autoOpenSid || r._id === autoOpenSid
-    );
+    const match = callRecords.find((r) => recordMatchesDeepLink(r, autoOpenSid));
     if (match) {
       autoOpenHandledRef.current = autoOpenSid;
       setSelectedCall(match);
@@ -795,7 +800,7 @@ export function CallRecords({
         kind: 'general',
         title: 'Alerte analyse envoyée',
         message: `Votre entreprise a été notifiée pour l'appel avec ${leadName}.`,
-        actionPath: '/reps/workspace?tab=calls',
+        actionPath: callAnalysisHistoryPath(callId),
         playSound: false,
       });
     } catch (err: any) {
