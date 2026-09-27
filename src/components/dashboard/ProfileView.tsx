@@ -864,9 +864,14 @@ export const ProfileView: React.FC<{
     const profileId = profile?._id as string | undefined;
     if (!photoUrl || !profileId) return;
     const experiences = Array.isArray(profile?.experience) ? profile.experience : [];
-    const stale = experiences.some((exp: { videoUrl?: string; videoFraudCheck?: { referencePhotoUrl?: string } }) => {
+    const stale = experiences.some((exp: {
+      videoUrl?: string;
+      videoFraudCheck?: { referencePhotoUrl?: string; identityMatch?: boolean | null; identityConfidence?: number };
+    }) => {
       if (!exp?.videoUrl) return false;
-      return exp.videoFraudCheck?.referencePhotoUrl !== photoUrl;
+      const fraud = exp.videoFraudCheck;
+      if (fraud?.referencePhotoUrl !== photoUrl) return true;
+      return fraud?.identityMatch === false && (fraud.identityConfidence ?? 0) < 70;
     });
     if (!stale) return;
     const key = `${profileId}:${photoUrl}`;
