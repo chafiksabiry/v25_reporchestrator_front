@@ -76,6 +76,7 @@ interface AccentInfo {
   variety?: LocalizedText | string;
   confidence?: 'low' | 'medium' | 'high' | string;
   feedback?: LocalizedText | string;
+  source?: 'audio' | 'transcript' | string;
 }
 
 interface LanguageAssessmentEntry {
@@ -692,6 +693,15 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       return { ...prev, fraudCheck: presentFraudCheck(savedData.videoFraudCheck) };
     });
   }, [isOpen, savedData?.videoFraudCheck]);
+
+  // Accent measured from the audio replaces the transcript-only guess in place.
+  useEffect(() => {
+    if (!isOpen || !savedData?.videoLanguageAssessment) return;
+    setResult((prev) => {
+      if (!prev || prev.languageAssessment === savedData.videoLanguageAssessment) return prev;
+      return { ...prev, languageAssessment: savedData.videoLanguageAssessment };
+    });
+  }, [isOpen, savedData?.videoLanguageAssessment]);
 
   // Lock background scroll while the modal is open (it's portaled to body).
   useEffect(() => {
