@@ -236,8 +236,6 @@ interface CallRecordsProps {
    *  to deep-link the rep into the AI-insights modal right after they
    *  hang up. */
   autoOpenSid?: string;
-  /** Clears a prospect filter opened from the leads list. */
-  onClearLeadFilter?: () => void;
   /** Dashboard overlay: open this call's modal without rendering the list. */
   overlayOpenCallId?: string | null;
   /** Dashboard overlay: open the lead's best call modal without rendering the list. */
@@ -354,7 +352,6 @@ export function CallRecords({
   callValidationFilter = 'all',
   transactionValidationFilter = 'all',
   autoOpenSid,
-  onClearLeadFilter,
   overlayOpenCallId,
   overlayOpenLeadId,
   onOverlayClose,
@@ -1099,21 +1096,6 @@ export function CallRecords({
           <span>{t('calls.refresh')}</span>
         </button>
       </div>
-
-      {leadId && onClearLeadFilter && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-harx-50 border border-harx-100">
-          <p className="text-[10px] font-black uppercase tracking-widest text-harx-700">
-            {t('calls.leadFilter', 'Appels de ce prospect')}
-          </p>
-          <button
-            type="button"
-            onClick={onClearLeadFilter}
-            className="px-3 py-1.5 rounded-lg bg-white border border-harx-200 text-[10px] font-black uppercase tracking-widest text-harx-700 hover:bg-harx-100"
-          >
-            {t('calls.showAll', 'Tous les appels')}
-          </button>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <ListFilter className="w-3.5 h-3.5 text-slate-300 shrink-0" />
