@@ -38,7 +38,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring, twilioCallStatusBadge } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -140,6 +140,7 @@ export interface CallRecord {
     | null;
   callOutcomeSource?: 'ai' | 'rep' | 'system' | null;
   /** Denormalised flags. `flags.fraud` is the canonical fraud signal now. */
+  answeredBy?: string | null;
   flags?: {
     fraud?: boolean;
     selfCall?: boolean;
@@ -284,7 +285,7 @@ function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
 
 /** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags'>,
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy'>,
   ledgerTxStatus?: string | null
 ): { label: string; tone: string } | null {
   if (isCallVoicemail(record)) {
@@ -292,6 +293,9 @@ function dispositionBadge(
   }
   if (isCallFraudDetected(record)) {
     return callOutcomeBadge('fraud');
+  }
+  if (isCallTooShortForAnalysis(record)) {
+    return { label: 'Trop court', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
   }
   if (isCallRejectedByAI(record)) return null;
   const status = resolveCallDispositionStatus(record, ledgerTxStatus);
@@ -1095,6 +1099,10 @@ export function CallRecords({
               status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
             const ledgerStatus = getLedgerTxStatus(record);
             const outcomeBadge = dispositionBadge(record, ledgerStatus);
+            const voicemail = isCallVoicemail(record);
+            const telephonyBadge = voicemail
+              ? { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Répondeur. Twilio reste sur completed dès qu’un audio est transféré.' }
+              : twilioCallStatusBadge(record.status);
 
             return (
               <div
@@ -1177,13 +1185,10 @@ export function CallRecords({
                           </span>
                         )}
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
-                            status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                              : 'bg-rose-50 text-rose-700 border-rose-100'
-                          }`}
+                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${telephonyBadge.tone}`}
+                          title={telephonyBadge.title}
                         >
-                          {record.status}
+                          {telephonyBadge.label}
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
