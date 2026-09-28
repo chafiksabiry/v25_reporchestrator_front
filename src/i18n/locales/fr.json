@@ -223,6 +223,8 @@
     "title": "Mes Appels",
     "subtitle": "Consultez vos performances et les détails de vos interactions",
     "recordsTitle": "Enregistrements d'appels",
+    "leadFilter": "Appels de ce prospect",
+    "showAll": "Tous les appels",
     "fraudDetected": "Fraude détectée",
     "fraudClear": "Aucune fraude",
     "coaching": {
@@ -325,6 +327,7 @@
       "hint": "Ne fermez pas cette page."
     },
     "fiche": "Fiche",
+    "viewCall": "Voir l'appel",
     "viewProfile": "Voir la fiche prospect",
     "viewCallHistory": "Historique des appels",
     "dateFrom": "Du",
