@@ -1902,11 +1902,11 @@ export function WorkspaceContent() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePhone', 'Téléphone')}</p>
-                    <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Telephony || prospectProfileLead.Phone || '—'}</p>
+                    <p className="text-sm font-bold text-gray-800">{anonymizePhone(prospectProfileLead.Telephony || prospectProfileLead.Phone) || '—'}</p>
                   </div>
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profileEmail', 'Email')}</p>
-                    <p className="text-sm font-bold text-gray-800 break-all">{prospectProfileLead.Email_1 || '—'}</p>
+                    <p className="text-sm font-bold text-gray-800 break-all">{anonymizeEmail(prospectProfileLead.Email_1) || '—'}</p>
                   </div>
                   {(prospectProfileLead.Address || prospectProfileLead.City) && (
                     <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
