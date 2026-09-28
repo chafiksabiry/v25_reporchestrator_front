@@ -40,6 +40,46 @@ export function resolveIanaZone(tz: unknown): string | null {
   return null;
 }
 
+/**
+ * Morocco returned to permanent GMT (UTC+0) on 20 Sep 2026 at 02:00 GMT+1,
+ * which is 01:00 UTC (décret n° 2.26.530). Windows and browser timezone data
+ * still report Africa/Casablanca as UTC+1, so Paris looks only 1 hour ahead
+ * during European summer time. The real gap until France leaves summer time
+ * is 2 hours.
+ */
+const MOROCCO_IANA = new Set(['Africa/Casablanca', 'Africa/El_Aaiun']);
+const MOROCCO_PERMANENT_GMT_UTC = Date.UTC(2026, 8, 20, 1, 0, 0);
+
+function icuOffsetMinutes(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0);
+  let hour = get('hour');
+  if (hour === 24) hour = 0;
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
+  return Math.round((wall - instant.getTime()) / 60000);
+}
+
+function zoneOffsetMinutes(instant: Date, timeZone: string): number {
+  const icu = icuOffsetMinutes(instant, timeZone);
+  if (
+    MOROCCO_IANA.has(timeZone) &&
+    instant.getTime() >= MOROCCO_PERMANENT_GMT_UTC &&
+    icu === 60
+  ) {
+    return 0;
+  }
+  return icu;
+}
+
 /** Interpret wall-clock date+HH:mm in `sourceTz` as a UTC Date (DST-aware). */
 export function zonedWallTimeToUtc(
   dateStr: string,
@@ -55,31 +95,34 @@ export function zonedWallTimeToUtc(
   const hh = Number(tm[1]);
   const mi = Number(tm[2]);
   let guess = Date.UTC(y, mo - 1, d, hh, mi, 0);
+  const wanted = Date.UTC(y, mo - 1, d, hh, mi, 0);
   for (let i = 0; i < 4; i++) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: sourceTz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(new Date(guess));
-    const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0);
-    const asY = get('year');
-    const asM = get('month');
-    const asD = get('day');
-    let asH = get('hour');
-    if (asH === 24) asH = 0;
-    const asMin = get('minute');
-    const wanted = Date.UTC(y, mo - 1, d, hh, mi);
-    const actual = Date.UTC(asY, asM - 1, asD, asH, asMin);
-    guess += wanted - actual;
+    const off = zoneOffsetMinutes(new Date(guess), sourceTz);
+    const wallInstant = new Date(guess + off * 60000);
+    const actual = Date.UTC(
+      wallInstant.getUTCFullYear(),
+      wallInstant.getUTCMonth(),
+      wallInstant.getUTCDate(),
+      wallInstant.getUTCHours(),
+      wallInstant.getUTCMinutes(),
+      wallInstant.getUTCSeconds()
+    );
+    const delta = wanted - actual;
+    if (delta === 0) break;
+    guess += delta;
   }
   return new Date(guess);
 }
 
 export function formatTimeInZone(date: Date, timeZone: string): string {
+  const real = zoneOffsetMinutes(date, timeZone);
+  const icu = icuOffsetMinutes(date, timeZone);
+  if (real !== icu) {
+    const shifted = new Date(date.getTime() + real * 60000);
+    const hh = String(shifted.getUTCHours()).padStart(2, '0');
+    const mm = String(shifted.getUTCMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
   return new Intl.DateTimeFormat('fr-FR', {
     timeZone,
     hour: '2-digit',
