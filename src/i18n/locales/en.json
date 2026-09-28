@@ -223,6 +223,8 @@
     "title": "My Calls",
     "subtitle": "Review your performance and interaction details",
     "recordsTitle": "Call Records",
+    "leadFilter": "Calls for this prospect",
+    "showAll": "All calls",
     "fraudDetected": "Fraud detected",
     "fraudClear": "No fraud",
     "coaching": {
@@ -325,6 +327,7 @@
       "hint": "Please don't close this page."
     },
     "fiche": "Profile",
+    "viewCall": "View call",
     "viewProfile": "View prospect profile",
     "viewCallHistory": "Call history",
     "dateFrom": "From",
