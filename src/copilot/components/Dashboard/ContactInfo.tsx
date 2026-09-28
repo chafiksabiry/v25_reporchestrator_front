@@ -9,7 +9,7 @@ import { useCallStorage } from '../../hooks/useCallStorage';
 import { useTranscription } from '../../contexts/TranscriptionContext';
 import { useLead } from '../../hooks/useLead';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
-import { anonymizeEmail } from '../../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone } from '../../../utils/callStatusDisplay';
 import {
   TelnyxCallPersist,
   type GigPhoneLine,
@@ -122,7 +122,7 @@ export function ContactInfo() {
     id: apiLead._id,
     name: apiLead.name || (apiLead.First_Name || apiLead.Last_Name ? `${apiLead.First_Name || ''} ${apiLead.Last_Name || ''}`.trim() : 'Unknown Lead'),
     email: apiLead.email || apiLead.Email_1 || 'No email',
-    phone: apiLead.phone || apiLead.Phone || '',
+    phone: apiLead.phone || apiLead.Phone || apiLead.Telephony || '',
     company: apiLead.company || apiLead.companyId || 'Unknown Company',
     title: apiLead.title || apiLead.Activity_Tag || 'Prospect',
     avatar: apiLead.avatar || '',
@@ -195,16 +195,6 @@ export function ContactInfo() {
       }
     ] as { date: Date; type: 'call' | 'email' | 'meeting' | 'demo'; outcome: string; notes: string; }[]
   };
-
-  const maskPhone = (phone: string) => {
-    if (!phone) return '';
-    const cleanPhone = phone.replace(/\s+/g, '');
-    if (cleanPhone.startsWith('+')) {
-      return `${cleanPhone.substring(0, 5)}...`;
-    }
-    return `+${cleanPhone.substring(0, 4)}...`;
-  };
-
 
   // Debug: Log contact data whenever it changes
   /*  console.log("Contact data:", contact);
@@ -832,7 +822,7 @@ export function ContactInfo() {
                     <div className="p-1 bg-blue-50 rounded-lg">
                       <Mail className="w-3.5 h-3.5 text-blue-500" />
                     </div>
-                    <span className="text-gray-500">{anonymizeEmail(contact.email) || '—'}</span>
+                    <span className="text-gray-500 normal-case tracking-normal">{anonymizeEmail(contact.email) || '—'}</span>
                   </div>
 
                   {/* Gig Section */}
@@ -919,7 +909,7 @@ export function ContactInfo() {
               <div className="p-1 bg-cyan-100 rounded-lg">
                 <Phone className="w-3 h-3 text-cyan-600" />
               </div>
-              <span className="text-gray-600">{maskPhone(contact.phone)}</span>
+              <span className="text-gray-600 normal-case tracking-normal">{anonymizePhone(contact.phone) || '—'}</span>
             </div>
           ) : null}
 

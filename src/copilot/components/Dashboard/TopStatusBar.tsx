@@ -87,11 +87,11 @@ const TopStatusBar: React.FC = () => {
 
   const prospectEmail = anonymizeEmail(lead?.email || lead?.Email_1 || '');
   const prospectPhone = anonymizePhone(lead?.phone || lead?.Phone || lead?.Telephony || '');
-  const prospectCompany =
+  const rawCompany =
     (typeof lead?.company === 'string' ? lead.company : '') ||
-    lead?.companyId ||
     lead?.Company ||
     '';
+  const prospectCompany = /^[a-f0-9]{24}$/i.test(String(rawCompany).trim()) ? '' : rawCompany;
   const prospectStage = lead?.Stage || lead?.status || lead?.Pipeline || '';
   const prospectNotes = lead?.notes || lead?.Description || lead?.Activity_Tag || '';
   const prospectGigTitle =
