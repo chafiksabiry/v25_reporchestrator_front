@@ -252,6 +252,20 @@ export function anonymizeEmail(raw?: string | null): string {
   return `${(user[0] || '•').toLowerCase()}••••@••••.${tld}`;
 }
 
+/** Street and postal code stay hidden. The city can still be shown by the caller. */
+export function anonymizeStreet(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  return s ? '••••' : '';
+}
+
+/** Birth date keeps only the year. */
+export function anonymizeBirthDate(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const year = s.match(/(19|20)\d{2}/);
+  return year ? `••/••/${year[0]}` : '••/••/••••';
+}
+
 export function anonymizePersonName(raw?: string | null): string {
   const s = String(raw || '').trim();
   if (!s) return 'Prospect';
