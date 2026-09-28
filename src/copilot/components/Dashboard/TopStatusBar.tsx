@@ -21,6 +21,7 @@ import { useAudioVisualizer } from '../../hooks/useAudioVisualizer';
 import { useLead } from '../../hooks/useLead';
 import api from '../../../utils/client';
 import { getAgentId } from '../../../utils/authUtils';
+import { anonymizeEmail, anonymizePhone } from '../../../utils/callStatusDisplay';
 
 type LeadCallRow = {
   _id?: string;
@@ -84,8 +85,8 @@ const TopStatusBar: React.FC = () => {
     );
   }, [lead, t]);
 
-  const prospectEmail = lead?.email || lead?.Email_1 || '';
-  const prospectPhone = lead?.phone || lead?.Phone || '';
+  const prospectEmail = anonymizeEmail(lead?.email || lead?.Email_1 || '');
+  const prospectPhone = anonymizePhone(lead?.phone || lead?.Phone || lead?.Telephony || '');
   const prospectCompany =
     (typeof lead?.company === 'string' ? lead.company : '') ||
     lead?.companyId ||

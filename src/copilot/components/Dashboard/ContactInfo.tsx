@@ -9,6 +9,7 @@ import { useCallStorage } from '../../hooks/useCallStorage';
 import { useTranscription } from '../../contexts/TranscriptionContext';
 import { useLead } from '../../hooks/useLead';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
+import { anonymizeEmail } from '../../../utils/callStatusDisplay';
 import {
   TelnyxCallPersist,
   type GigPhoneLine,
@@ -831,7 +832,7 @@ export function ContactInfo() {
                     <div className="p-1 bg-blue-50 rounded-lg">
                       <Mail className="w-3.5 h-3.5 text-blue-500" />
                     </div>
-                    <span className="text-gray-500">{contact.email}</span>
+                    <span className="text-gray-500">{anonymizeEmail(contact.email) || '—'}</span>
                   </div>
 
                   {/* Gig Section */}
