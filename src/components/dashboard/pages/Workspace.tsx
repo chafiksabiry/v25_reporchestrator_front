@@ -998,11 +998,6 @@ export function WorkspaceContent() {
                                 <Tag className="w-3 h-3" />
                                 <span>{t('workspace.dispFilterAll', 'Tous statuts')}</span>
                               </>
-                            ) : dispositionFilter === 'none' ? (
-                              <>
-                                <Tag className="w-3 h-3 opacity-40" />
-                                <span>{t('workspace.dispFilterNone', 'Sans statut')}</span>
-                              </>
                             ) : (() => {
                               const cfg = getDispConfig(dispositionFilter);
                               if (!cfg) return <span>{dispositionFilter}</span>;
@@ -1031,18 +1026,6 @@ export function WorkspaceContent() {
                                   </div>
                                   {t('workspace.dispFilterAll', 'Tous statuts')}
                                   {dispositionFilter === 'all' && <CheckCircle2 className="w-3 h-3 ml-auto text-harx-500" />}
-                                </button>
-                                {/* No status */}
-                                <button
-                                  type="button"
-                                  onClick={() => { setDispositionFilter('none'); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
-                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50 ${dispositionFilter === 'none' ? 'text-gray-700 bg-gray-50' : 'text-gray-400'}`}
-                                >
-                                  <div className="w-5 h-5 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                                  </div>
-                                  {t('workspace.dispFilterNone', 'Sans statut')}
-                                  {dispositionFilter === 'none' && <CheckCircle2 className="w-3 h-3 ml-auto text-gray-500" />}
                                 </button>
 
                                 <div className="h-px bg-gray-100 mx-4 my-1" />
@@ -1942,18 +1925,17 @@ export function WorkspaceContent() {
               <div className="space-y-2">
                 <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileDisposition', 'Statut d\'appel')}</h3>
                 <div className="flex items-center gap-2">
-                  {prospectProfileLead.repDisposition ? (() => {
-                    const cfg = getDispConfig(prospectProfileLead.repDisposition);
+                  {(() => {
+                    const disposition = prospectProfileLead.repDisposition || 'to_call';
+                    const cfg = getDispConfig(disposition);
                     const cls = cfg ? DISP_COLOR_MAP[cfg.color] : DISP_COLOR_MAP['gray'];
                     return (
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${cls}`}>
                         {cfg ? <cfg.Icon className="w-3 h-3 shrink-0" /> : <Tag className="w-3 h-3" />}
-                        {cfg ? t(cfg.labelKey, cfg.value) : prospectProfileLead.repDisposition}
+                        {cfg ? t(cfg.labelKey, cfg.value) : disposition}
                       </span>
                     );
-                  })() : (
-                    <span className="text-[10px] text-gray-400 font-medium">{t('workspace.dispFilterNone', 'Sans statut')}</span>
-                  )}
+                  })()}
                   {prospectProfileLead.repDispositionAt && (
                     <span className="text-[9px] text-gray-400">{formatCreatedDate(prospectProfileLead.repDispositionAt)}</span>
                   )}
@@ -2014,18 +1996,10 @@ export function WorkspaceContent() {
               <p className="text-[10px] text-gray-500 font-medium mb-3">
                 {dispositionModalLead.Deal_Name}
               </p>
-              {/* Clear option */}
-              <button
-                type="button"
-                disabled={dispositionSaving}
-                onClick={() => void setLeadDisposition(dispositionModalLead._id || dispositionModalLead.id, '')}
-                className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${!dispositionModalLead.repDisposition ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50'}`}
-              >
-                {t('workspace.dispFilterNone', 'Sans statut')}
-              </button>
               {HARX_DISPOSITIONS.map((d) => {
                 const cls = DISP_COLOR_MAP[d.color] || DISP_COLOR_MAP['gray'];
-                const isActive = dispositionModalLead.repDisposition === d.value;
+                const isActive = dispositionModalLead.repDisposition === d.value
+                  || (!dispositionModalLead.repDisposition && d.value === 'to_call');
                 return (
                   <button
                     key={d.value}
