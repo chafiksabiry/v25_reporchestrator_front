@@ -24,7 +24,7 @@ import {
 } from '../../../services/api/leadCockpitApi';
 import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
 import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
-import { anonymizeEmail, anonymizePhone } from '../../../utils/callStatusDisplay';
+import { anonymizeBirthDate, anonymizeEmail, anonymizePhone, anonymizeStreet } from '../../../utils/callStatusDisplay';
 
 interface Lead {
   _id?: string;
@@ -32,7 +32,10 @@ interface Lead {
   Deal_Name: string;
   Telephony: string;
   Phone?: string;
+  Mobile?: string;
   Email_1: string;
+  Email?: string;
+  email?: string;
   Stage: string;
   Pipeline?: string;
   Created_Time?: string;
@@ -1902,24 +1905,28 @@ export function WorkspaceContent() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePhone', 'Téléphone')}</p>
-                    <p className="text-sm font-bold text-gray-800">{anonymizePhone(prospectProfileLead.Telephony || prospectProfileLead.Phone) || '—'}</p>
+                    <p className="text-sm font-bold text-gray-800">{anonymizePhone(prospectProfileLead.Telephony || prospectProfileLead.Phone || prospectProfileLead.Mobile) || '—'}</p>
                   </div>
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profileEmail', 'Email')}</p>
-                    <p className="text-sm font-bold text-gray-800 break-all">{anonymizeEmail(prospectProfileLead.Email_1) || '—'}</p>
+                    <p className="text-sm font-bold text-gray-800 break-all">{anonymizeEmail(prospectProfileLead.Email_1 || prospectProfileLead.Email || prospectProfileLead.email) || '—'}</p>
                   </div>
-                  {(prospectProfileLead.Address || prospectProfileLead.City) && (
+                  {(prospectProfileLead.Address || prospectProfileLead.Postal_Code || prospectProfileLead.City) && (
                     <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
                       <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {t('workspace.profileAddress', 'Adresse')}</p>
                       <p className="text-sm font-bold text-gray-800">
-                        {[prospectProfileLead.Address, prospectProfileLead.Postal_Code, prospectProfileLead.City].filter(Boolean).join(', ')}
+                        {[
+                          anonymizeStreet(prospectProfileLead.Address),
+                          prospectProfileLead.Postal_Code ? '••••' : '',
+                          prospectProfileLead.City,
+                        ].filter(Boolean).join(', ')}
                       </p>
                     </div>
                   )}
                   {prospectProfileLead.Date_of_Birth && (
                     <div className="bg-gray-50 rounded-2xl p-3">
                       <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><CreditCard className="w-2.5 h-2.5" /> {t('workspace.profileDob', 'Date de naissance')}</p>
-                      <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Date_of_Birth}</p>
+                      <p className="text-sm font-bold text-gray-800">{anonymizeBirthDate(prospectProfileLead.Date_of_Birth)}</p>
                     </div>
                   )}
                   {prospectProfileLead.Pipeline && (
