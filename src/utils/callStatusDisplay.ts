@@ -81,7 +81,7 @@ export type CallLike = {
   ai_summary_en?: string | null;
   flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number; feedback?: string; feedback_fr?: string; feedback_en?: string }> | null;
-  lead?: { Stage?: string; status?: string; nextAction?: string } | null;
+  lead?: { Stage?: string; status?: string; nextAction?: string; repDisposition?: string | null } | null;
   /** Twilio AMD: human | machine_start | machine_end_beep | fax | unknown */
   answeredBy?: string | null;
   transaction?: {
@@ -166,6 +166,50 @@ export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_
   if (call.ai_call_status === 'too_short') return true;
   const duration = Number((call as any).duration);
   return Number.isFinite(duration) && duration > 0 && duration < MIN_CALL_ANALYSIS_SECONDS;
+}
+
+/** HARX ladder value for a stored call, used by the history status filter. */
+export function historyDisposition(call: CallLike): string | null {
+  if (isCallVoicemail(call)) return 'called_voicemail';
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  const status = String(call.status || '').toLowerCase();
+  if (outcome === 'wrong_number' || status === 'failed') return 'called_wrong_number';
+  if (
+    outcome === 'no_answer' ||
+    outcome === 'busy' ||
+    ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled'].includes(status)
+  ) {
+    return 'called_unreachable';
+  }
+  if (outcome === 'callback_requested') return 'called_callback';
+  if (outcome === 'appointment') return 'called_rdv';
+  if (outcome === 'transaction') return 'argued_done';
+  if (['refusal', 'not_interested', 'already_equipped'].includes(outcome)) return 'argued_declined';
+  const stored = String(call.lead?.repDisposition || '').trim();
+  if (stored) return stored;
+  return null;
+}
+
+/** History status dropdown. Twilio chip first, then the same prospect ladder. */
+export function callMatchesHistoryStatus(call: CallLike, filter: string): boolean {
+  if (!filter || filter === 'all') return true;
+  if (filter === 'voicemail') return isCallVoicemail(call);
+  if (filter === 'too_short') return !isCallVoicemail(call) && isCallTooShortForAnalysis(call);
+  if (filter === 'completed') {
+    return String(call.status || '').toLowerCase() === 'completed' && !isCallVoicemail(call);
+  }
+  if (filter === 'no-answer') {
+    const s = String(call.status || '').toLowerCase();
+    return s === 'no-answer' || s === 'noanswer';
+  }
+  if (filter === 'canceled') {
+    const s = String(call.status || '').toLowerCase();
+    return s === 'canceled' || s === 'cancelled';
+  }
+  if (['busy', 'failed', 'queued', 'initiated', 'ringing', 'in-progress'].includes(filter)) {
+    return String(call.status || '').toLowerCase() === filter;
+  }
+  return historyDisposition(call) === filter;
 }
 
 const SCORE_RUBRIC_KEYS = [
