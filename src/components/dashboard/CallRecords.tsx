@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 import {
   Phone,
   Calendar,
+  ChevronDown,
+  ListFilter,
+  CheckCircle2,
   ShieldAlert,
   ShieldCheck,
   RefreshCw,
@@ -38,7 +41,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring, twilioCallStatusBadge } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring, twilioCallStatusBadge } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -205,6 +208,7 @@ interface Lead {
   };
   status?: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost' | string;
   Stage?: string;
+  repDisposition?: string | null;
   value?: number;
   probability?: number;
   source?: string;
@@ -274,6 +278,45 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
+const HISTORY_STATUS_FILTERS: Array<{ id: string; label: string; group?: 'line' }> = [
+  { id: 'all', label: 'Tous statuts' },
+  { id: 'completed', label: 'Terminé' },
+  { id: 'voicemail', label: 'Répondeur' },
+  { id: 'too_short', label: 'Trop court' },
+  { id: 'busy', label: 'Occupé' },
+  { id: 'no-answer', label: 'Pas de réponse' },
+  { id: 'canceled', label: 'Annulé' },
+  { id: 'failed', label: 'Échec' },
+  { id: 'in-progress', label: 'En cours' },
+  { id: 'line', label: '', group: 'line' },
+  { id: 'to_call', label: 'À appeler' },
+  { id: 'called_unreachable', label: 'Appelé – Injoignable' },
+  { id: 'called_voicemail', label: 'Appelé – Répondeur' },
+  { id: 'called_wrong_number', label: 'Appelé – Numéro non attribué' },
+  { id: 'called_callback', label: 'Appelé – Souhaite être rappelé' },
+  { id: 'called_rdv', label: 'Appelé – RDV pris pour rappel' },
+  { id: 'argued_rdv', label: 'Appel argumenté – RDV pris' },
+  { id: 'argued_declined', label: 'Appel argumenté – Transaction déclinée' },
+  { id: 'argued_done', label: 'Appel argumenté – Transaction aboutie' },
+];
+
+function callFallsInDateRange(record: { startTime?: string | Date; createdAt?: string | Date }, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  const raw = record.startTime || record.createdAt;
+  if (!raw) return false;
+  const when = new Date(raw).getTime();
+  if (!Number.isFinite(when)) return false;
+  if (from) {
+    const start = new Date(`${from}T00:00:00`).getTime();
+    if (when < start) return false;
+  }
+  if (to) {
+    const end = new Date(`${to}T23:59:59.999`).getTime();
+    if (when > end) return false;
+  }
+  return true;
+}
+
 function hasAnalysisCompanyAlert(record: Pick<CallRecord, 'analysisCompanyAlert'>): boolean {
   return Boolean(record.analysisCompanyAlert?.requestedAt);
 }
@@ -321,6 +364,10 @@ export function CallRecords({
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   const [activeTab, setActiveTab] = useState<'transcript' | 'insights'>('transcript');
   const [loading, setLoading] = useState(true);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyStatusOpen, setHistoryStatusOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
   const [calibrationVerdict, setCalibrationVerdict] = useState<'up' | 'down' | null>(null);
@@ -897,6 +944,9 @@ export function CallRecords({
       }
     }
 
+    if (!callMatchesHistoryStatus(record, historyStatusFilter)) return false;
+    if (!callFallsInDateRange(record, historyDateFrom, historyDateTo)) return false;
+
     return true;
   });
 
@@ -1045,6 +1095,83 @@ export function CallRecords({
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>{t('calls.refresh')}</span>
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <ListFilter className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setHistoryStatusOpen((open) => !open)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest bg-white transition-all hover:border-harx-200 ${
+              historyStatusFilter !== 'all' ? 'border-harx-200 text-harx-700' : 'border-slate-200 text-slate-500'
+            }`}
+          >
+            <span>
+              {HISTORY_STATUS_FILTERS.find((item) => item.id === historyStatusFilter)?.label || 'Tous statuts'}
+            </span>
+            <ChevronDown className={`w-3 h-3 transition-transform ${historyStatusOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {historyStatusOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setHistoryStatusOpen(false)} />
+              <div className="absolute top-full left-0 mt-1.5 w-80 max-h-80 overflow-y-auto bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-50">
+                {HISTORY_STATUS_FILTERS.map((item) => {
+                  if (item.group === 'line') {
+                    return <div key={item.id} className="h-px bg-slate-100 mx-4 my-1" />;
+                  }
+                  const active = historyStatusFilter === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setHistoryStatusFilter(item.id);
+                        setHistoryStatusOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-left hover:bg-slate-50 ${
+                        active ? 'text-harx-700 bg-harx-50/60' : 'text-slate-600'
+                      }`}
+                    >
+                      <span className="flex-1">{item.label}</span>
+                      {active && <CheckCircle2 className="w-3 h-3 text-harx-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        <Calendar className="w-3.5 h-3.5 text-slate-300 shrink-0 ml-1" />
+        <input
+          type="date"
+          value={historyDateFrom}
+          onChange={(e) => setHistoryDateFrom(e.target.value)}
+          className="text-[10px] font-black border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20"
+          title={t('workspace.dateFrom', 'Du')}
+        />
+        <span className="text-[9px] font-black text-slate-400">→</span>
+        <input
+          type="date"
+          value={historyDateTo}
+          onChange={(e) => setHistoryDateTo(e.target.value)}
+          className="text-[10px] font-black border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20"
+          title={t('workspace.dateTo', 'Au')}
+        />
+        {(historyStatusFilter !== 'all' || historyDateFrom || historyDateTo) && (
+          <button
+            type="button"
+            onClick={() => {
+              setHistoryStatusFilter('all');
+              setHistoryDateFrom('');
+              setHistoryDateTo('');
+            }}
+            className="px-2 py-1.5 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200"
+            title={t('workspace.clearFilters', 'Effacer filtres')}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
 
       {renderFraudBlacklistBanner()}
