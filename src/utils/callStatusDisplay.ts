@@ -14,7 +14,7 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
     refusal: { label: 'Refus', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
     not_interested: { label: 'Pas intéressé', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
     already_equipped: { label: 'Déjà équipé', tone: 'bg-blue-50 text-blue-700 border-blue-200' },
-    voicemail: { label: 'Messagerie', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
+    voicemail: { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' },
     no_answer: { label: 'Non décroché', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
     busy: { label: 'Occupé', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
     wrong_number: { label: 'Faux numéro', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
@@ -82,6 +82,8 @@ export type CallLike = {
   flags?: { fraud?: boolean; selfCall?: boolean; transactionDetected?: boolean };
   ai_call_score?: Record<string, { passed?: boolean; score?: number; feedback?: string; feedback_fr?: string; feedback_en?: string }> | null;
   lead?: { Stage?: string; status?: string; nextAction?: string } | null;
+  /** Twilio AMD: human | machine_start | machine_end_beep | fax | unknown */
+  answeredBy?: string | null;
   transaction?: {
     validByCompany?: boolean | null;
     validByAI?: boolean | null;
@@ -93,8 +95,37 @@ export type CallLike = {
 const VOICEMAIL_REGEX =
   /messagerie|messagerie\s+(vocale|automatique)|r[ée]pondeur|laissez\s+(votre|un)\s+message|bo[îi]te\s+vocale|voicemail|answering\s+machine|leave\s+(a|your)\s+message|after\s+(the\s+)?(tone|beep)|appel\s+non\s+productif|non\s+productif|aucun(?:e)?\s+(?:interaction|[ée]change)|aucun\s+(?:él|el)[ée]ment\s+exploitable|n['']?est\s+pas\s+disponible|votre\s+correspondant|tombe?\s+(?:imm[ée]diatement\s+)?sur\s+la?\s?messagerie|redirig[ée]\s+vers\s+la?\s?messagerie/i;
 
+function isMachineAnswer(call: CallLike): boolean {
+  const answeredBy = String(call.answeredBy || '').toLowerCase();
+  return answeredBy.startsWith('machine') || answeredBy === 'fax';
+}
+
+/** Twilio Call status. `completed` means audio was transferred: a person, an IVR, or a voicemail. */
+export function twilioCallStatusBadge(status?: string | null): StatusBadge {
+  const key = String(status || '').toLowerCase();
+  const table: Record<string, StatusBadge> = {
+    queued: { label: 'En file', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Twilio a reçu la demande d’appel.' },
+    initiated: { label: 'Composé', tone: 'bg-sky-50 text-sky-700 border-sky-100', title: 'Twilio a composé le numéro.' },
+    ringing: { label: 'Sonnerie', tone: 'bg-sky-50 text-sky-700 border-sky-100', title: 'Le numéro destinataire sonne.' },
+    'in-progress': { label: 'En cours', tone: 'bg-emerald-50 text-emerald-700 border-emerald-100', title: 'L’appel est connecté.' },
+    completed: {
+      label: 'Terminé',
+      tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      title: 'Connexion établie puis raccrochée. Une personne, un serveur vocal ou un répondeur.',
+    },
+    busy: { label: 'Occupé', tone: 'bg-amber-50 text-amber-800 border-amber-200', title: 'Le numéro a répondu occupé.' },
+    'no-answer': { label: 'Pas de réponse', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Personne n’a décroché avant le délai.' },
+    noanswer: { label: 'Pas de réponse', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Personne n’a décroché avant le délai.' },
+    canceled: { label: 'Annulé', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Appel annulé avant décroché.' },
+    cancelled: { label: 'Annulé', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Appel annulé avant décroché.' },
+    failed: { label: 'Échec', tone: 'bg-rose-50 text-rose-700 border-rose-100', title: 'Le transporteur n’a pas pu connecter l’appel.' },
+  };
+  return table[key] || { label: status || '—', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+}
+
 export function isCallVoicemail(call: CallLike): boolean {
   if (call.callOutcome === 'voicemail') return true;
+  if (isMachineAnswer(call)) return true;
   const feedback = String(
     call.ai_summary_fr ||
       call.ai_summary ||
@@ -494,7 +525,15 @@ export function resolveCallDispositionStatus(
 ): StatusBadge {
   if (isCallVoicemail(call)) {
     const badge = callOutcomeBadge('voicemail');
-    if (badge) return { ...badge, title: 'Messagerie — aucun échange avec le prospect' };
+    if (badge) return { ...badge, title: 'Répondeur — aucun échange avec le prospect' };
+  }
+
+  if (isCallTooShortForAnalysis(call)) {
+    return {
+      label: 'Trop court',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Moins d’une minute — pas d’analyse commerciale',
+    };
   }
 
   if (isCallFraudDetected(call)) {
@@ -550,8 +589,16 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
   if (isCallVoicemail(call)) {
     const badge = callOutcomeBadge('voicemail');
     return badge
-      ? { ...badge, title: 'Messagerie — aucune commission due' }
-      : { label: 'Messagerie', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Messagerie — aucune commission due' };
+      ? { ...badge, title: 'Répondeur — aucune commission due' }
+      : { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Répondeur — aucune commission due' };
+  }
+
+  if (isCallTooShortForAnalysis(call)) {
+    return {
+      label: 'Trop court',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Moins d’une minute — aucune commission due',
+    };
   }
 
   if (isCallFraudDetected(call)) {
