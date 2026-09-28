@@ -123,6 +123,11 @@ function isLeadRdvByMe(lead: Lead): boolean {
   return lead.lastCallOutcome === 'appointment';
 }
 
+function leadHasRecordedCall(lead: Lead): boolean {
+  if (lead.isCalledByMe || lead.isSignedByMe || isLeadRdvByMe(lead) || lead.lastCallOutcome) return true;
+  return Boolean(lead.repDisposition && lead.repDisposition !== 'to_call');
+}
+
 type CopilotGuardState = {
   loading: boolean;
   isEnrolledInGig: boolean;
@@ -1179,7 +1184,7 @@ export function WorkspaceContent() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center flex-wrap justify-end gap-2">
                               {isSignedByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
                                   <CheckCircle2 className="w-3 h-3" />
@@ -1211,6 +1216,17 @@ export function WorkspaceContent() {
                                   }`}>
                                   {lead.Stage}
                                 </span>
+                              )}
+                              {leadHasRecordedCall(lead) && (
+                                <button
+                                  type="button"
+                                  className="px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 border border-harx-200 bg-harx-50 text-harx-700 hover:bg-harx-100"
+                                  onClick={(e) => { e.stopPropagation(); openLeadInHistory(lead); }}
+                                  title={t('workspace.viewCall', 'Voir l\'appel')}
+                                >
+                                  <PhoneOutgoing className="w-3.5 h-3.5" />
+                                  <span>{t('workspace.viewCall', 'Voir l\'appel')}</span>
+                                </button>
                               )}
                               {/* Fiche (profile) button */}
                               <button
@@ -1395,6 +1411,7 @@ export function WorkspaceContent() {
           <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
               leadId={searchParams.get('leadId') || undefined}
+              onClearLeadFilter={searchParams.get('leadId') ? clearHistoryLeadFilter : undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
               onAutoOpenHandled={handleAutoOpenHandled}
             />
@@ -1531,6 +1548,29 @@ export function WorkspaceContent() {
       default:
         return null;
     }
+  };
+
+  const openLeadInHistory = (lead: Lead) => {
+    const leadIdString = String(lead._id || lead.id || '');
+    if (!leadIdString) return;
+    setProspectProfileLead(null);
+    setActiveTab('calls');
+    const params = new URLSearchParams(location.search);
+    params.set('tab', 'calls');
+    params.set('leadId', leadIdString);
+    navigate(
+      { pathname: location.pathname, search: `?${params.toString()}` },
+      { replace: true }
+    );
+  };
+
+  const clearHistoryLeadFilter = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete('leadId');
+    navigate(
+      { pathname: location.pathname, search: `?${params.toString()}` },
+      { replace: true }
+    );
   };
 
   const handleViewSignedLeadDetails = (lead: Lead) => {
@@ -1684,6 +1724,7 @@ export function WorkspaceContent() {
               setActiveTab(tool.id);
               const params = new URLSearchParams(location.search);
               params.set('tab', tool.id);
+              params.delete('leadId');
               navigate({
                 pathname: location.pathname,
                 search: `?${params.toString()}`
@@ -1955,11 +1996,7 @@ export function WorkspaceContent() {
                 <button
                   type="button"
                   className="w-full px-4 py-2.5 bg-gray-50 hover:bg-harx-50 border border-gray-100 hover:border-harx-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-harx-700 transition-all flex items-center justify-center gap-2"
-                  onClick={() => {
-                    const id = prospectProfileLead._id || prospectProfileLead.id;
-                    setSignedLeadOverlayId(id);
-                    setProspectProfileLead(null);
-                  }}
+                  onClick={() => openLeadInHistory(prospectProfileLead)}
                 >
                   <PhoneOutgoing className="w-3.5 h-3.5" />
                   {t('workspace.viewCallHistory', 'Historique des appels')}
