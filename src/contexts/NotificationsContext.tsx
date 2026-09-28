@@ -20,7 +20,18 @@ import {
   type ApiNotification,
 } from '../services/api/notificationsApi';
 
-export type RepNotificationKind = 'enrollment' | 'script_required' | 'certification_required' | 'general';
+export type RepNotificationKind =
+  | 'enrollment'
+  | 'script_required'
+  | 'certification_required'
+  | 'general'
+  | 'matching'
+  | 'teammate'
+  | 'training_added'
+  | 'action_assigned'
+  | 'kb_document'
+  | 'script_added'
+  | 'deactivated';
 
 export type RepNotification = {
   id: string;
