@@ -4,11 +4,12 @@ import i18n from '../../i18n';
 import { NOTIFICATIONS_REFRESH_EVENT } from '../../contexts/NotificationsContext';
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { upsertNotificationApi } from '../../services/api/notificationsApi';
+import type { RepNotificationKind } from '../../contexts/NotificationsContext';
 import { fetchEnrolledGigsForAgent, trainingApiBase } from '../../utils/trainingScriptRequirement';
 import { getGigsApiBase } from '../../utils/gigsApiBase';
 import { repApiUrl } from '../../utils/repApiUrl';
 
-const SEEN_PREFIX = 'harx_gig_activity_seen_';
+const SEEN_PREFIX = 'harx_gig_activity_seen_v2_';
 const POLL_MS = 3 * 60 * 1000;
 
 type SeenState = {
@@ -62,6 +63,28 @@ function nid(raw: unknown): string {
   return String(raw).trim();
 }
 
+function asList(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  const row = payload as Record<string, unknown>;
+  for (const key of ['data', 'documents', 'matches', 'preferedmatches', 'agents', 'gigs', 'scripts']) {
+    if (Array.isArray(row[key])) return row[key] as unknown[];
+  }
+  return [];
+}
+
+function scorePercent(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return NaN;
+  return n <= 1 ? Math.round(n * 100) : Math.round(n);
+}
+
+function isJoined(status: unknown): boolean {
+  const s = String(status || '').toLowerCase();
+  if (!s) return true;
+  return ['enrolled', 'accepted', 'active', 'approved'].includes(s);
+}
+
 function isInactive(status: unknown, isActive?: unknown): boolean {
   if (isActive === false) return true;
   const s = String(status || '').toLowerCase();
@@ -93,6 +116,7 @@ export function GigActivityNotificationsSync() {
       const nextKeys = new Set(seen.keys);
       const pending: Array<{
         key: string;
+        kind: RepNotificationKind;
         title: string;
         message: string;
         gigId?: string;
@@ -119,23 +143,36 @@ export function GigActivityNotificationsSync() {
         const enrolled = await fetchEnrolledGigsForAgent(repId, token).catch(() => []);
         const enrolledIds = new Set(enrolled.map((g) => g.gigId));
 
-        // 1) Matching auto ≥ 50 %
+        // 1) Matching auto ≥ 50 % — POST /matches/agent/:id (le GET /matches n'existe pas)
         try {
-          const res = await axios.get(`${matchingApi()}/matches`, {
-            headers,
-            params: { agentId: repId },
-          });
-          const rows = Array.isArray(res.data) ? res.data : [];
-          for (const row of rows) {
-            const scoreRaw = Number(row?.score);
-            const scorePct = scoreRaw <= 1 ? Math.round(scoreRaw * 100) : Math.round(scoreRaw);
+          const res = await axios.post(
+            `${matchingApi()}/matches/agent/${encodeURIComponent(repId)}`,
+            {
+              weights: {
+                experience: 0.15,
+                skills: 0.2,
+                industry: 0.15,
+                language: 0.1,
+                availability: 0.1,
+                timezone: 0.05,
+                performance: 0.2,
+                region: 0.05,
+              },
+            },
+            { headers }
+          );
+          const rows = asList(res.data);
+          for (const raw of rows) {
+            const row = raw as Record<string, any>;
+            const scorePct = scorePercent(row?.totalMatchingScore ?? row?.overallScore ?? row?.score ?? row?.matchScore);
             if (!Number.isFinite(scorePct) || scorePct < 50) continue;
-            const gigId = nid(row?.gigId?._id || row?.gigId);
-            if (!gigId) continue;
-            const title = String(row?.gigId?.title || row?.gigTitle || 'Gig');
+            const gigId = nid(row?.gigId?._id || row?.gigId || row?.gig?._id);
+            if (!gigId || enrolledIds.has(gigId)) continue;
+            const title = String(row?.gig?.title || row?.gigId?.title || row?.gigTitle || row?.title || 'Gig');
             const key = `match:${gigId}`;
             remember(key, {
               key,
+              kind: 'matching',
               status: 'matching',
               gigId,
               actionPath: `/marketplace?gigId=${encodeURIComponent(gigId)}`,
@@ -161,16 +198,23 @@ export function GigActivityNotificationsSync() {
           enrolled.map(async ({ gigId, title }) => {
             try {
               const res = await axios.get(`${matchingApi()}/gig-agents/gig/${encodeURIComponent(gigId)}`, { headers });
-              const rows = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
-              for (const row of rows) {
-                const status = String(row?.status || '').toLowerCase();
-                if (status && status !== 'enrolled') continue;
+              const rows = asList(res.data);
+              for (const raw of rows) {
+                const row = raw as Record<string, any>;
+                if (!isJoined(row?.status)) continue;
                 const otherId = nid(row?.agentId?._id || row?.agentId);
                 if (!otherId || otherId === repId) continue;
-                const name = String(row?.agentId?.firstName || row?.agentId?.name || row?.agentName || 'REP');
+                const name = String(
+                  row?.agentId?.personalInfo?.name ||
+                    row?.agentId?.firstName ||
+                    row?.agentId?.name ||
+                    row?.agentName ||
+                    'REP'
+                );
                 const key = `teammate:${gigId}:${otherId}`;
                 remember(key, {
                   key,
+                  kind: 'teammate',
                   status: 'teammate',
                   gigId,
                   actionPath: `/workspace?gigId=${encodeURIComponent(gigId)}`,
@@ -208,9 +252,13 @@ export function GigActivityNotificationsSync() {
                   const jid = nid(j?._id || j?.id);
                   if (!jid) continue;
                   const jTitle = String(j?.title || j?.name || 'Formation');
+                  const isConsigne = /consigne|instruction/i.test(
+                    `${j?.type || ''} ${j?.category || ''} ${jTitle}`
+                  );
                   const key = `training:${jid}`;
                   remember(key, {
                     key,
+                    kind: 'training_added',
                     status: 'training_added',
                     gigId,
                     journeyId: jid,
@@ -218,12 +266,16 @@ export function GigActivityNotificationsSync() {
                     ...copy(
                       isFr,
                       {
-                        title: 'Nouvelle formation / consigne',
-                        message: `« ${jTitle} » a été ajoutée sur ${title}.`,
+                        title: isConsigne ? 'Nouvelle consigne' : 'Nouvelle formation',
+                        message: isConsigne
+                          ? `La consigne « ${jTitle} » a été ajoutée sur ${title}.`
+                          : `La formation « ${jTitle} » a été ajoutée sur ${title}.`,
                       },
                       {
-                        title: 'New training / instruction',
-                        message: `"${jTitle}" was added on ${title}.`,
+                        title: isConsigne ? 'New instruction' : 'New training',
+                        message: isConsigne
+                          ? `Instruction "${jTitle}" was added on ${title}.`
+                          : `Training "${jTitle}" was added on ${title}.`,
                       }
                     ),
                   });
@@ -231,6 +283,7 @@ export function GigActivityNotificationsSync() {
                     const dkey = `deact:training:${jid}`;
                     remember(dkey, {
                       key: dkey,
+                      kind: 'deactivated',
                       status: 'deactivated',
                       gigId,
                       journeyId: jid,
@@ -266,10 +319,12 @@ export function GigActivityNotificationsSync() {
             for (const j of arr) {
               const jid = nid(j?._id || j?.id);
               if (!jid) continue;
+              if (nextKeys.has(`training:${jid}`)) continue;
               const jTitle = String(j?.title || j?.name || 'Action');
               const key = `action:journey:${jid}`;
               remember(key, {
                 key,
+                kind: 'action_assigned',
                 status: 'action_assigned',
                 journeyId: jid,
                 actionPath: '/training',
@@ -296,16 +351,23 @@ export function GigActivityNotificationsSync() {
             const profile = await profileRes.json();
             const phases = profile?.onboardingProgress?.phases || {};
             for (const [phaseKey, phase] of Object.entries(phases)) {
-              const actions = Array.isArray((phase as { requiredActions?: unknown[] })?.requiredActions)
-                ? (phase as { requiredActions: unknown[] }).requiredActions
-                : [];
-              actions.forEach((a, idx) => {
-                const row = (a && typeof a === 'object' ? a : {}) as Record<string, unknown>;
-                const aid = String(row.id || row.key || row.type || `${phaseKey}-${idx}`);
-                const label = String(row.label || row.title || row.type || aid);
+              const rawActions = (phase as { requiredActions?: unknown })?.requiredActions;
+              const actions: Array<{ id: string; label: string }> = Array.isArray(rawActions)
+                ? rawActions.map((a, idx) => {
+                    const row = (a && typeof a === 'object' ? a : {}) as Record<string, unknown>;
+                    const id = String(row.id || row.key || row.type || `${phaseKey}-${idx}`);
+                    return { id, label: String(row.label || row.title || row.type || id) };
+                  })
+                : rawActions && typeof rawActions === 'object'
+                  ? Object.keys(rawActions as Record<string, unknown>).map((id) => ({ id, label: id }))
+                  : [];
+              actions.forEach((action) => {
+                const aid = action.id;
+                const label = action.label;
                 const key = `action:onboarding:${aid}`;
                 remember(key, {
                   key,
+                  kind: 'action_assigned',
                   status: 'action_assigned',
                   actionPath: '/orchestrator',
                   ...copy(
@@ -332,8 +394,8 @@ export function GigActivityNotificationsSync() {
         await Promise.all(
           enrolled.map(async ({ gigId, title }) => {
             try {
-              const docsRes = await axios.get(`${kbApi()}/documents/gig/${encodeURIComponent(gigId)}`);
-              const docs = Array.isArray(docsRes.data?.documents) ? docsRes.data.documents : [];
+              const docsRes = await axios.get(`${kbApi()}/documents`, { params: { gigId } });
+              const docs = asList(docsRes.data) as Record<string, any>[];
               for (const doc of docs) {
                 const did = nid(doc?._id || doc?.id);
                 if (!did) continue;
@@ -341,6 +403,7 @@ export function GigActivityNotificationsSync() {
                 const key = `kb:${did}`;
                 remember(key, {
                   key,
+                  kind: 'kb_document',
                   status: 'kb_document',
                   gigId,
                   actionPath: `/workspace?gigId=${encodeURIComponent(gigId)}`,
@@ -362,8 +425,11 @@ export function GigActivityNotificationsSync() {
             }
 
             try {
-              const sRes = await axios.get(`${kbApi()}/scripts/gig/${encodeURIComponent(gigId)}`);
-              const scripts = Array.isArray(sRes.data?.data) ? sRes.data.data : [];
+              const [callScripts, ragScripts] = await Promise.all([
+                axios.get(`${kbApi()}/scripts/gig/${encodeURIComponent(gigId)}`).then((r) => asList(r.data)).catch(() => []),
+                axios.get(`${kbApi()}/rag/scripts`, { params: { gigId } }).then((r) => asList(r.data)).catch(() => []),
+              ]);
+              const scripts = [...callScripts, ...ragScripts] as Record<string, any>[];
               for (const script of scripts) {
                 const sid = nid(script?._id || script?.id);
                 if (!sid) continue;
@@ -371,6 +437,7 @@ export function GigActivityNotificationsSync() {
                 const key = `script:${sid}`;
                 remember(key, {
                   key,
+                  kind: 'script_added',
                   status: 'script_added',
                   gigId,
                   actionPath: `/training?gigId=${encodeURIComponent(gigId)}`,
@@ -390,6 +457,7 @@ export function GigActivityNotificationsSync() {
                   const dkey = `deact:script:${sid}`;
                   remember(dkey, {
                     key: dkey,
+                    kind: 'deactivated',
                     status: 'deactivated',
                     gigId,
                     actionPath: `/training?gigId=${encodeURIComponent(gigId)}`,
@@ -419,6 +487,7 @@ export function GigActivityNotificationsSync() {
                   const dkey = `deact:gig:${gigId}`;
                   remember(dkey, {
                     key: dkey,
+                    kind: 'deactivated',
                     status: 'deactivated',
                     gigId,
                     actionPath: `/marketplace?gigId=${encodeURIComponent(gigId)}`,
@@ -442,52 +511,13 @@ export function GigActivityNotificationsSync() {
           })
         );
 
-        // Matching aussi sur les nouveaux gigs marketplace (si score exposé)
-        if (gigsBase) {
-          try {
-            const listRes = await axios.get(`${gigsBase}/gigs`);
-            const list = Array.isArray(listRes.data?.data)
-              ? listRes.data.data
-              : Array.isArray(listRes.data)
-                ? listRes.data
-                : [];
-            for (const gig of list) {
-              const gigId = nid(gig?._id || gig?.id);
-              if (!gigId || enrolledIds.has(gigId)) continue;
-              const score = Number(gig?.matchScore ?? gig?.score);
-              if (!Number.isFinite(score) || score < 50) continue;
-              const title = String(gig?.title || 'Gig');
-              const key = `match:${gigId}`;
-              remember(key, {
-                key,
-                status: 'matching',
-                gigId,
-                actionPath: `/marketplace?gigId=${encodeURIComponent(gigId)}`,
-                ...copy(
-                  isFr,
-                  {
-                    title: 'Nouveau projet correspondant',
-                    message: `« ${title} » matche à ${Math.round(score)} % avec votre profil.`,
-                  },
-                  {
-                    title: 'New matching project',
-                    message: `"${title}" matches your profile at ${Math.round(score)}%.`,
-                  }
-                ),
-              });
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
         saveSeen(repId, Array.from(nextKeys));
 
         if (seen.initialized && pending.length > 0) {
           for (const n of pending) {
             await upsertNotificationApi({
               notificationKey: n.key,
-              kind: 'general',
+              kind: n.kind,
               status: n.status,
               title: n.title,
               message: n.message,
