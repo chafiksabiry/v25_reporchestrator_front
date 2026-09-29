@@ -2,18 +2,16 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck, Rocket, Calculator, Pencil, Check, Users, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Users, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
-import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
 import { repApiUrl } from '../../../utils/repApiUrl';
-import { CallRecords } from '../CallRecords';
 import {
   resolveClientValidationPendingAmount,
-  resolveTransactionRepCommission,
 } from '../../../utils/commissionUtils';
-import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
-import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
+import { getDisplayOverallScore, isCallFraudDetected } from '../../../utils/callStatusDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
 import { isCallCenterStaff } from '../../../utils/callCenterStaff';
 import { CallCenterAgentHome } from './CallCenterAgentHome';
@@ -137,39 +135,71 @@ function normalizeRecordId(value: unknown): string | null {
   return String(value);
 }
 
-function resolveTransactionCallId(tx: RepTransactionRow): string | null {
-  return tx.callId || tx.call?._id || tx.call?.sid || null;
-}
-
-/** Masque un numéro de téléphone : garde le préfixe pays + les 2 derniers chiffres.
- *  Ex: +33623984708 → +336 •• •• 08   |   0623984708 → 06 •• •• 08 */
-function maskPhone(raw: string | undefined | null): string {
-  if (!raw) return '';
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length < 6) return raw;
-  const suffix = digits.slice(-2);
-  const prefix = raw.startsWith('+') ? raw.slice(0, raw.indexOf(digits[0]) + 3) : digits.slice(0, 2);
-  return `${prefix} •• •• ${suffix}`;
-}
-
-const clickableRowClass =
-  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-emerald-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.99]';
-
-const clickableCallRowClass =
-  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-[0.99]';
-
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 type GoalsPeriod = Exclude<PeriodKey, 'all'>;
 
 const GOALS_PERIODS: GoalsPeriod[] = ['today', 'week', 'month', 'quarter', 'year'];
 
-const GOAL_TARGETS: Record<GoalsPeriod, { calls: number; sessions: number; bonusScale: number }> = {
-  today: { calls: 5, sessions: 1, bonusScale: 1 / 30 },
-  week: { calls: 25, sessions: 5, bonusScale: 1 / 4 },
-  month: { calls: 100, sessions: 20, bonusScale: 1 },
-  quarter: { calls: 300, sessions: 60, bonusScale: 3 },
-  year: { calls: 1200, sessions: 240, bonusScale: 12 },
+const PERIOD_OF_MONTH: Record<GoalsPeriod, number> = {
+  today: 1 / 20,
+  week: 1 / 4,
+  month: 1,
+  quarter: 3,
+  year: 12,
 };
+
+type EarningsGoals = Record<GoalsPeriod, number>;
+
+function loadEarningsGoals(): EarningsGoals {
+  const empty: EarningsGoals = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
+  try {
+    const parsed = JSON.parse(localStorage.getItem('harx_earnings_goals') || '{}') as Partial<EarningsGoals>;
+    const legacy = Number(localStorage.getItem('harx_earnings_goal') || '0');
+    return {
+      today: Number(parsed.today) || 0,
+      week: Number(parsed.week) || legacy || 0,
+      month: Number(parsed.month) || 0,
+      quarter: Number(parsed.quarter) || 0,
+      year: Number(parsed.year) || 0,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+function monthHours(availability: any): number {
+  const hours = availability?.minimumHours || {};
+  const monthly = Number(hours.monthly || 0);
+  const weekly = Number(hours.weekly || 0);
+  const daily = Number(hours.daily || 0);
+  if (monthly > 0) return monthly;
+  if (weekly > 0) return weekly * 4;
+  if (daily > 0) return daily * 20;
+  return 0;
+}
+
+function monthTransactions(commission: any): number {
+  return Number(commission?.minimumVolume?.amount || 0);
+}
+
+function agentTxAmount(commission: any): number {
+  const facing = getResolvedAgentFacing(commission);
+  const tx = facing?.transactionCommission;
+  if (typeof tx === 'number' && tx > 0) return tx;
+  if (tx && typeof tx === 'object') {
+    const type = String(tx.type || '').toLowerCase();
+    const amount = Number(String(tx.amount ?? '').replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    if (type === 'percentage' || type === 'percent' || type === '%') return 0;
+    return amount;
+  }
+  return 0;
+}
+
+function scaleTarget(monthly: number, period: GoalsPeriod): number {
+  if (monthly <= 0) return 0;
+  return Math.max(1, Math.round(monthly * PERIOD_OF_MONTH[period]));
+}
 
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
@@ -250,12 +280,6 @@ export function Dashboard({ profile }: DashboardProps) {
   const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
   const periodTriggerRef = useRef<HTMLButtonElement>(null);
   const [periodDropdownPos, setPeriodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  type TransactionFilter = 'all' | 'paid' | 'earned' | 'pending_retraction' | 'refused';
-  const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
-  type CallFilter = 'all' | 'valid' | 'invalid' | 'pending_client';
-  const [callFilter, setCallFilter] = useState<CallFilter>('all');
-  const callsSectionRef = useRef<HTMLDivElement>(null);
-  const transactionsSectionRef = useRef<HTMLDivElement>(null);
 
   // Earnings & objectifs (RepTransaction-backed)
   const [walletStats, setWalletStats] = useState<{
@@ -265,16 +289,13 @@ export function Dashboard({ profile }: DashboardProps) {
     lifetimeEarnings: number;
   }>({ availableBalance: 0, pendingCommissions: 0, pendingRetraction: 0, lifetimeEarnings: 0 });
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
-  const [overlayCallId, setOverlayCallId] = useState<string | null>(null);
-  const [selectedTransaction, setSelectedTransaction] = useState<RepTransactionRow | null>(null);
 
   // Calculator / Simulateur
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcCalls, setCalcCalls] = useState(12);
-  const [calcConvRate, setCalcConvRate] = useState(10); // %
-  const [calcCommission, setCalcCommission] = useState(25); // € per sale
-  // REP personal earnings goal
-  const [repEarningsGoal, setRepEarningsGoal] = useState(() => Number(localStorage.getItem('harx_earnings_goal') || '0'));
+  const [calcCallsPerTx, setCalcCallsPerTx] = useState(12);
+  const [calcCommission, setCalcCommission] = useState(25);
+  const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState('0');
   // Reservations cancellation stats period
@@ -454,11 +475,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
   const periodStartTs = useMemo(() => getPeriodStart(selectedPeriod), [selectedPeriod]);
 
-  const repSaleLedgerByCallId = useMemo(
-    () => indexSaleLedgerByCallId(repLedger),
-    [repLedger]
-  );
-
   // Dynamic filter logic — apply gig + period
   const filteredCalls = React.useMemo(() => {
     return callsData.filter(call => {
@@ -619,27 +635,6 @@ export function Dashboard({ profile }: DashboardProps) {
     dateLocale,
   ]);
 
-  const focusClientValidationPending = () => {
-    setCallFilter('pending_client');
-    window.setTimeout(() => {
-      callsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  const focusValidatedEarnings = () => {
-    setTransactionFilter('earned');
-    window.setTimeout(() => {
-      transactionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  const focusRetractionTransactions = () => {
-    setTransactionFilter('pending_retraction');
-    window.setTimeout(() => {
-      transactionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
   // Reservation statistics (work the rep has booked)
   const reservationStats = useMemo(() => {
     const nowTs = Date.now();
@@ -714,204 +709,132 @@ export function Dashboard({ profile }: DashboardProps) {
       .slice(0, 3);
   }, [filteredReservations]);
 
-  // Transactions filtered by gig + period
-  const filteredTransactions = useMemo(() => {
-    return dedupeSaleLedgerRows(repLedger).filter((row: any) => {
-      if (selectedGigId !== 'all') {
-        const rGigId = typeof row.gigId === 'object' ? (row.gigId?._id || row.gigId?.id) : row.gigId;
-        if (rGigId !== selectedGigId) return false;
-      }
-      if (periodStartTs > 0) {
-        const ts = new Date(row.createdAt).getTime();
-        if (!ts || ts < periodStartTs) return false;
-      }
-      return true;
-    });
-  }, [repLedger, selectedGigId, periodStartTs]);
-
-  // Transaction breakdown by status (counts + totals)
-  const transactionStats = useMemo(() => {
-    const acc = {
-      all: { count: 0, total: 0 },
-      paid: { count: 0, total: 0 },
-      earned: { count: 0, total: 0 },
-      pending_retraction: { count: 0, total: 0 },
-      refused: { count: 0, total: 0 },
-    };
-    filteredTransactions.forEach((row: RepTransactionRow) => {
-      const share = row.repShare || 0;
-      acc.all.count += 1;
-      acc.all.total += share;
-      if (row.status === 'paid') {
-        acc.paid.count += 1;
-        acc.paid.total += share;
-      } else if (row.status === 'earned') {
-        acc.earned.count += 1;
-        acc.earned.total += share;
-      } else if (row.status === 'pending_retraction') {
-        acc.pending_retraction.count += 1;
-        acc.pending_retraction.total += share;
-      } else if (row.status === 'refused') {
-        acc.refused.count += 1;
-        acc.refused.total += share;
-      }
-    });
-    return acc;
-  }, [filteredTransactions]);
-
-  // Transactions list (filtered + sorted desc)
-  const visibleTransactions = useMemo(() => {
-    const list = filteredTransactions.filter((row: RepTransactionRow) => {
-      if (transactionFilter === 'all') return true;
-      return row.status === transactionFilter;
-    });
-    return [...list]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
-  }, [filteredTransactions, transactionFilter]);
-
-  // Call validation breakdown + visible list
-  const callStats = useMemo(() => {
-    const acc = { all: 0, valid: 0, invalid: 0, pending_client: 0 };
-    filteredCalls.forEach((call: any) => {
-      acc.all += 1;
-      const isValid = call.valid === true || call.validByAI === true;
-      if (isValid) acc.valid += 1;
-      else acc.invalid += 1;
-      const callId = resolveCallRefId(call);
-      if (callId && earningsPipeline.pendingClientValidationCallIds.has(callId)) {
-        acc.pending_client += 1;
-      }
-    });
-    return acc;
-  }, [filteredCalls, earningsPipeline.pendingClientValidationCallIds]);
-
-  const visibleCalls = useMemo(() => {
-    const list = filteredCalls.filter((call: any) => {
-      if (callFilter === 'pending_client') {
-        const callId = resolveCallRefId(call);
-        return callId ? earningsPipeline.pendingClientValidationCallIds.has(callId) : false;
-      }
-      if (callFilter === 'all') return true;
-      const isValid = call.valid === true || call.validByAI === true;
-      return callFilter === 'valid' ? isValid : !isValid;
-    });
-    return [...list]
-      .sort((a: any, b: any) => {
-        const ta = new Date(a.createdAt || a.startTime || 0).getTime();
-        const tb = new Date(b.createdAt || b.startTime || 0).getTime();
-        return tb - ta;
-      })
-      .slice(0, callFilter === 'pending_client' ? 20 : 8);
-  }, [filteredCalls, callFilter, earningsPipeline.pendingClientValidationCallIds]);
-
   const goals = useMemo(() => {
     const startTs = getPeriodStart(goalsPeriod);
-    const targets = GOAL_TARGETS[goalsPeriod];
+    const scopedGigs = selectedGigId === 'all'
+      ? gigsData
+      : gigsData.filter((g) => g._id === selectedGigId);
+    const monthlyHours = scopedGigs.reduce((sum, gig) => sum + monthHours(gig.availability), 0);
+    const monthlyTx = scopedGigs.reduce((sum, gig) => sum + monthTransactions(gig.commission), 0);
+    const hoursTarget = scaleTarget(monthlyHours, goalsPeriod);
+    const transactionTarget = scaleTarget(monthlyTx, goalsPeriod);
+    const bonusAmount = scopedGigs.reduce((sum, gig) => {
+      const facing = getResolvedAgentFacing(gig.commission as any);
+      const amount = Number(facing?.bonusAmount || 0);
+      if (amount > 0) return sum + amount;
+      const gross = Number(gig.rewardBonus || 0);
+      return sum + (gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0);
+    }, 0);
 
-    const callsCurrent = callsData.filter((c: any) => {
-      if (selectedGigId !== 'all') {
-        const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
-        if (cGigId !== selectedGigId) return false;
-      }
-      const ts = new Date(c.createdAt || c.startTime || c.date || 0).getTime();
-      return ts >= startTs;
+    const matchesGig = (gigId: any) => {
+      if (selectedGigId === 'all') return true;
+      const id = typeof gigId === 'object' ? (gigId?._id || gigId?.id) : gigId;
+      return id === selectedGigId;
+    };
+
+    const validatedCalls = callsData.filter((call: any) => {
+      if (!matchesGig(call.gigId)) return false;
+      const ts = new Date(call.createdAt || call.startTime || call.date || 0).getTime();
+      if (!ts || ts < startTs) return false;
+      return call.valid === true || call.validByAI === true;
     }).length;
 
-    const sessionsCurrent = reservationsData.filter((r: any) => {
-      if (selectedGigId !== 'all') {
-        const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-        if (rGigId !== selectedGigId) return false;
-      }
-      if (r.status === 'cancelled') return false;
-      const ts = new Date(r.reservationDate || r.date || 0).getTime();
-      return ts >= startTs;
-    }).length;
+    let slotHours = 0;
+    reservationsData.forEach((reservation: any) => {
+      if (!matchesGig(reservation.gigId)) return;
+      if (reservation.status === 'cancelled' || reservation.attended === false) return;
+      const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
+      if (!ts || ts < startTs || ts > Date.now()) return;
+      slotHours += Number(reservation.duration || 0);
+    });
+    slotHours = Math.round(slotHours * 10) / 10;
 
-    const gig = selectedGigId === 'all'
-      ? null
-      : gigsData.find((g) => (g._id || g.id) === selectedGigId);
-    const monthlyBonusTarget = gig?.commission?.minimumVolume || gig?.commission?.bonusMinimumCalls || 0;
-    const bonusTarget = monthlyBonusTarget > 0
-      ? Math.max(1, Math.round(monthlyBonusTarget * targets.bonusScale))
-      : 0;
-    const bonusGross = gig?.commission?.bonusAmount || gig?.rewardBonus || 0;
-    const bonusAmount = Math.round(bonusGross * 0.7 * 100) / 100;
+    let validatedTransactions = 0;
+    let earned = 0;
+    repLedger.forEach((row) => {
+      if (!matchesGig(row.gigId)) return;
+      const ts = new Date(row.createdAt || 0).getTime();
+      if (!ts || ts < startTs) return;
+      const isSale = row.type === 'transaction' && (row.status === 'earned' || row.status === 'paid' || row.status === 'pending_retraction');
+      if (isSale) validatedTransactions += 1;
+      if (row.status === 'earned') earned += row.repShare || 0;
+    });
 
+    const callsPerTx = Math.max(1, calcCallsPerTx);
+    const callsTarget = transactionTarget > 0 ? transactionTarget * callsPerTx : 0;
     const pct = (current: number, target: number) =>
       target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+    const labelGig = selectedGigId === 'all'
+      ? t('dashboard.home.allGigs')
+      : (gigsData.find((g) => g._id === selectedGigId)?.title || t('dashboard.home.gigFallback'));
 
     return {
-      calls: {
-        current: callsCurrent,
-        target: targets.calls,
-        progressPct: pct(callsCurrent, targets.calls),
-      },
-      sessions: {
-        current: sessionsCurrent,
-        target: targets.sessions,
-        progressPct: pct(sessionsCurrent, targets.sessions),
-      },
+      label: labelGig,
+      hours: { current: slotHours, target: hoursTarget, progressPct: pct(slotHours, hoursTarget) },
+      transactions: { current: validatedTransactions, target: transactionTarget, progressPct: pct(validatedTransactions, transactionTarget) },
+      calls: { current: validatedCalls, target: callsTarget, progressPct: pct(validatedCalls, callsTarget) },
       bonus: {
-        label: gig?.title || t('dashboard.home.allGigs'),
-        current: callsCurrent,
-        target: bonusTarget,
-        bonusAmount,
-        progressPct: pct(callsCurrent, bonusTarget),
+        current: validatedTransactions,
+        target: transactionTarget,
+        bonusAmount: Math.round(bonusAmount * 100) / 100,
+        progressPct: pct(validatedTransactions, transactionTarget),
       },
+      earned,
     };
-  }, [callsData, reservationsData, selectedGigId, gigsData, goalsPeriod, t]);
+  }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, calcCallsPerTx, t]);
 
-  // Company targets from GIG contract
   const companyTargets = useMemo(() => {
-    const gig = selectedGigId === 'all' ? null : gigsData.find((g) => g._id === selectedGigId);
-    const empty = { hoursTarget: 0, transactionTarget: 0, commissionPerCall: 0, transactionCommission: 0, volumeUnit: 'Transactions', volumePeriod: 'Monthly' };
-    if (!gig) return empty;
-    const g = gig as any;
-
-    // Heures cibles : dans availability.minimumHours (mensuel en priorité)
-    const hoursTarget = Number(
-      g.availability?.minimumHours?.monthly ||
-      (g.availability?.minimumHours?.weekly ? g.availability.minimumHours.weekly * 4 : 0) ||
-      (g.availability?.minimumHours?.daily ? g.availability.minimumHours.daily * 20 : 0) ||
-      0
-    );
-
-    // Volume min : commission.minimumVolume.amount (c'est un string dans le schéma)
-    const transactionTarget = Number(g.commission?.minimumVolume?.amount || 0);
-
-    // Commissions
-    const commissionPerCall = Number(g.commission?.commission_per_call || 0);
-    const transactionCommission = Number(g.commission?.transactionCommission || 0);
-
-    return {
-      hoursTarget,
-      transactionTarget,
-      commissionPerCall,
-      transactionCommission,
-      volumeUnit: String(g.commission?.minimumVolume?.unit || 'Transactions'),
-      volumePeriod: String(g.commission?.minimumVolume?.period || 'Monthly'),
-    };
+    const scoped = selectedGigId === 'all' ? gigsData : gigsData.filter((g) => g._id === selectedGigId);
+    const transactionCommission = scoped.reduce((found, gig) => found || agentTxAmount(gig.commission), 0);
+    const commissionPerCall = scoped.reduce((found, gig) => {
+      if (found > 0) return found;
+      return Number(getResolvedAgentFacing(gig.commission as any)?.commission_per_call || 0);
+    }, 0);
+    return { transactionCommission, commissionPerCall };
   }, [selectedGigId, gigsData]);
 
-  // Calculator result
   const calcResult = useMemo(() => {
-    const transactions = Math.round(calcCalls * (calcConvRate / 100));
+    const callsPerTx = Math.max(1, calcCallsPerTx);
+    const transactions = Math.floor(Math.max(0, calcCalls) / callsPerTx);
     const earnings = transactions * calcCommission;
-    return { transactions, earnings };
-  }, [calcCalls, calcConvRate, calcCommission]);
+    const goal = earningsGoals[goalsPeriod] || 0;
+    const transactionsForGoal = calcCommission > 0 && goal > 0 ? Math.ceil(goal / calcCommission) : 0;
+    return {
+      transactions,
+      earnings,
+      callsPerTx,
+      transactionsForGoal,
+      callsForGoal: transactionsForGoal * callsPerTx,
+    };
+  }, [calcCalls, calcCallsPerTx, calcCommission, earningsGoals, goalsPeriod]);
 
-  // Cancel rate from reservations
+  const repEarningsGoal = earningsGoals[goalsPeriod] || 0;
+  const earningsGoalProgress = repEarningsGoal > 0
+    ? Math.min(100, Math.round((goals.earned / repEarningsGoal) * 100))
+    : 0;
+
+  const qualityAlerts = useMemo(() => {
+    let fraud = 0;
+    let scoreSum = 0;
+    let scored = 0;
+    filteredCalls.forEach((call) => {
+      if (isCallFraudDetected(call)) fraud += 1;
+      const score = getDisplayOverallScore(call);
+      if (score != null) {
+        scoreSum += score;
+        scored += 1;
+      }
+    });
+    return {
+      fraud,
+      quality: scored > 0 ? Math.round(scoreSum / scored) : null,
+    };
+  }, [filteredCalls]);
+
   const cancelRate = useMemo(() => {
     if (reservationStats.total === 0) return null;
     return Math.round((reservationStats.cancelled / reservationStats.total) * 100);
   }, [reservationStats]);
-
-  // Earnings goal progress
-  const earningsGoalProgress = useMemo(() => {
-    if (repEarningsGoal <= 0) return 0;
-    return Math.min(100, Math.round((earningsPipeline.earnedInPeriod / repEarningsGoal) * 100));
-  }, [earningsPipeline.earnedInPeriod, repEarningsGoal]);
 
   const goalsPeriodLabels: Record<GoalsPeriod, string> = {
     today: t('dashboard.home.goals.periodDay'),
@@ -970,6 +893,20 @@ export function Dashboard({ profile }: DashboardProps) {
     }
   }, [companyTargets.transactionCommission, companyTargets.commissionPerCall]);
 
+  useEffect(() => {
+    if (selectedPeriod !== 'all') setGoalsPeriod(selectedPeriod);
+  }, [selectedPeriod]);
+
+  const saveEarningsGoal = (raw: string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setEarningsGoals((current) => {
+      const next = { ...current, [goalsPeriod]: value };
+      localStorage.setItem('harx_earnings_goals', JSON.stringify(next));
+      return next;
+    });
+    setEditingGoal(false);
+  };
+
   const goToProduction = () => {
     const gigId = selectedGigId !== 'all' ? selectedGigId : '';
     if (gigId) persistActiveGigId(gigId);
@@ -998,20 +935,6 @@ export function Dashboard({ profile }: DashboardProps) {
   const togglePeriodDropdown = () => {
     if (isPeriodDropdownOpen) closePeriodDropdown();
     else openPeriodDropdown();
-  };
-
-  const openCallDetails = (call: any) => {
-    const callId = resolveCallRefId(call);
-    if (callId) setOverlayCallId(callId);
-  };
-
-  const openTransactionDetails = (tx: RepTransactionRow) => {
-    const callId = resolveTransactionCallId(tx);
-    if (callId) {
-      setOverlayCallId(callId);
-      return;
-    }
-    setSelectedTransaction(tx);
   };
 
   useLayoutEffect(() => {
@@ -1258,8 +1181,279 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
+<div className="grid grid-cols-1 xl:grid-cols-5 gap-4 items-start">
+        <div className="xl:col-span-3 min-w-0">
+      {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
+      <div className="bg-slate-950 rounded-[32px] border border-harx-500/30 ring-1 ring-harx-500/20 shadow-2xl shadow-harx-900/20 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 flex-wrap relative z-10 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-2xl bg-harx-500/20 text-harx-400 flex items-center justify-center shrink-0">
+              <Target size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-black text-white tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5 truncate">
+                {goals.label}
+              </p>
+            </div>
+          </div>
+          {/* Sélecteur période */}
+          <div className="flex flex-wrap gap-1 shrink-0">
+            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setGoalsPeriod(key);
+                  setSelectedPeriod(key);
+                  setEditingGoal(false);
+                }}
+                className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider transition ${
+                  goalsPeriod === key
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'bg-white/10 text-white/55 hover:bg-white/20 hover:text-white'
+                }`}
+              >
+                {goalsPeriodLabels[key]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative z-10 space-y-4">
+
+          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Company · prérequis</p>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <CalendarCheck size={13} className="text-violet-400 shrink-0" />
+                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
+                <span className="text-[10px] font-bold text-white/35 lowercase">{t('dashboard.home.goals.sessionsLabel')}</span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-white font-black tracking-tighter">
+                  {goals.hours.current}h<span className="text-white/40 font-bold text-sm">{goals.hours.target > 0 ? `/${goals.hours.target}h` : ''}</span>
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.hours.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
+                  {goals.hours.target > 0 ? `${goals.hours.progressPct}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.hours.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${goals.hours.progressPct}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Zap size={13} className="text-amber-400" />
+                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Transactions</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-white font-black tracking-tighter">
+                  {goals.transactions.current}<span className="text-white/40 font-bold text-sm">{goals.transactions.target > 0 ? `/${goals.transactions.target}` : ''}</span>
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.transactions.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                  {goals.transactions.target > 0 ? `${goals.transactions.progressPct}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.transactions.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`} style={{ width: `${goals.transactions.progressPct}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Phone size={13} className="text-cyan-400" />
+                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-white font-black tracking-tighter">
+                  {goals.calls.current}<span className="text-white/40 font-bold text-sm">{goals.calls.target > 0 ? `/${goals.calls.target}` : ''}</span>
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.calls.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
+                  {goals.calls.target > 0 ? `${goals.calls.progressPct}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.calls.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-cyan-400 to-cyan-500'}`} style={{ width: `${goals.calls.progressPct}%` }} />
+            </div>
+            <p className="text-[10px] font-bold text-white/35">
+              {calcResult.callsPerTx} appels validés = 1 transaction
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Flame size={13} className="text-orange-400" />
+                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-emerald-300 font-black tracking-tight">
+                  {goals.bonus.bonusAmount > 0 ? `+${goals.bonus.bonusAmount.toFixed(2)} €` : '—'}
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-orange-300'}`}>
+                  {goals.bonus.target > 0 ? `${goals.bonus.progressPct}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.bonus.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-400'}`} style={{ width: `${goals.bonus.progressPct}%` }} />
+            </div>
+            <p className="text-[10px] font-bold text-white/35">
+              {goals.bonus.target > 0
+                ? `${goals.bonus.current}/${goals.bonus.target} transactions validées pour déclencher le bonus`
+                : 'Le seuil de bonus vient du volume de transactions du GIG'}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-harx-400/40 bg-harx-500/15 p-4 space-y-3 shadow-[0_0_40px_-12px_rgba(236,72,153,0.65)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Trophy size={14} className="text-harx-300" />
+                <span className="text-[10px] font-black text-white uppercase tracking-widest">Mon objectif gains · {goalsPeriodLabels[goalsPeriod]}</span>
+              </div>
+              {!editingGoal ? (
+                <button
+                  type="button"
+                  onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal(true); }}
+                  className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
+                  aria-label="Modifier l'objectif de gains"
+                >
+                  <Pencil size={12} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => saveEarningsGoal(goalInput)}
+                  className="p-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 transition"
+                  aria-label="Enregistrer l'objectif de gains"
+                >
+                  <Check size={12} />
+                </button>
+              )}
+            </div>
+            {editingGoal ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
+                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-300"
+                  placeholder="Ex. 500"
+                  autoFocus
+                />
+                <span className="text-white/60 text-sm font-bold">€</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-3xl font-black text-white tracking-tighter">{fmtMoney(goals.earned)} €</span>
+                  <span className="text-sm font-bold text-white/50">
+                    {repEarningsGoal > 0 ? `/ ${fmtMoney(repEarningsGoal)} €` : 'Objectif à définir'}
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-300 to-harx-500'}`}
+                    style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
+                  />
+                </div>
+                <p className="text-[11px] font-bold text-white/70">
+                  {repEarningsGoal > 0
+                    ? (earningsGoalProgress >= 100
+                      ? 'Objectif atteint'
+                      : `${earningsGoalProgress}% · il reste ${fmtMoney(Math.max(0, repEarningsGoal - goals.earned))} €`)
+                    : 'Fixez votre gain cible pour le jour, la semaine ou le mois'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={() => setShowCalculator((open) => !open)}
+            className="w-full flex items-center justify-between gap-2 text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <Calculator size={13} className="text-cyan-400" />
+              <span className="text-[10px] font-black text-white/70 uppercase tracking-widest group-hover:text-white transition">Simulateur</span>
+            </div>
+            <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+          </button>
+          <p className="text-[12px] font-black text-white">
+            {calcResult.callsPerTx} appels = 1 transaction = {fmtMoney(calcCommission)} €
+          </p>
+
+          {showCalculator && (
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels prévus</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={calcCalls}
+                    onChange={(e) => setCalcCalls(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels / transaction</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={calcCallsPerTx}
+                    onChange={(e) => setCalcCallsPerTx(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Commission € / transaction</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={calcCommission}
+                    onChange={(e) => setCalcCommission(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+              </div>
+              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3 flex items-center justify-between gap-3">
+                <p className="text-[11px] text-white/80 font-bold">
+                  {calcCalls} appels = <strong className="text-white">{calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''}</strong>
+                </p>
+                <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(calcResult.earnings)} €</p>
+              </div>
+              {repEarningsGoal > 0 && calcCommission > 0 && (
+                <p className="text-[11px] font-bold text-white/70">
+                  Pour {fmtMoney(repEarningsGoal)} € : {calcResult.transactionsForGoal} transactions, soit {calcResult.callsForGoal} appels validés
+                </p>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+        </div>
+        <div className="xl:col-span-2 min-w-0">
       {/* Gains pipeline */}
-      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {/* 1. Solde au début de la période */}
         <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
@@ -1299,17 +1493,7 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 3. Gains validés */}
-        <button
-          type="button"
-          onClick={focusValidatedEarnings}
-          disabled={earningsPipeline.validatedInPeriod === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            transactionFilter === 'earned'
-              ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
-              : 'border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 hover:border-emerald-300 hover:shadow-md'
-          } ${earningsPipeline.validatedInPeriod === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaValidated')}
-        >
+        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
               {t('dashboard.home.pipeline.validatedEarnings')}
@@ -1326,20 +1510,10 @@ export function Dashboard({ profile }: DashboardProps) {
             {' · '}
             {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
           </p>
-        </button>
+        </div>
 
         {/* 4. Rétractation */}
-        <button
-          type="button"
-          onClick={focusRetractionTransactions}
-          disabled={earningsPipeline.retractionCount === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            transactionFilter === 'pending_retraction'
-              ? 'border-orange-400 bg-orange-50 ring-2 ring-orange-400/30'
-              : 'border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 hover:border-orange-300 hover:shadow-md'
-          } ${earningsPipeline.retractionCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaRetraction')}
-        >
+        <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
               {t('dashboard.home.pipeline.retraction')}
@@ -1356,20 +1530,10 @@ export function Dashboard({ profile }: DashboardProps) {
               ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
               : t('dashboard.home.pipeline.noSales')}
           </p>
-        </button>
+        </div>
 
         {/* 5. Validation client */}
-        <button
-          type="button"
-          onClick={focusClientValidationPending}
-          disabled={earningsPipeline.clientValidationCount === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            callFilter === 'pending_client'
-              ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-400/30'
-              : 'border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 hover:border-amber-300 hover:shadow-md'
-          } ${earningsPipeline.clientValidationCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaClientValidation')}
-        >
+        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
               {t('dashboard.home.pipeline.clientValidation')}
@@ -1386,7 +1550,7 @@ export function Dashboard({ profile }: DashboardProps) {
               ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
               : t('dashboard.home.pipeline.nothingPending')}
           </p>
-        </button>
+        </div>
 
         {/* 6. Total période */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[118px] flex flex-col relative overflow-hidden col-span-2 md:col-span-1">
@@ -1403,691 +1567,36 @@ export function Dashboard({ profile }: DashboardProps) {
             {fmtMoney(earningsPipeline.totalGains)} €
           </p>
         </div>
-      </div>
 
-      {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
-        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap relative z-10 mb-6">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-2xl bg-harx-500/20 text-harx-400 flex items-center justify-center shrink-0">
-              <Target size={18} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base font-black text-white tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5 truncate">
-                {goals.bonus.label}
-              </p>
+        <div className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${qualityAlerts.fraud > 0 ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
+              <ShieldAlert size={14} />
             </div>
           </div>
-          {/* Sélecteur période */}
-          <div className="flex flex-wrap gap-1 shrink-0">
-            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setGoalsPeriod(key)}
-                className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider transition ${
-                  goalsPeriod === key
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'bg-white/10 text-white/55 hover:bg-white/20 hover:text-white'
-                }`}
-              >
-                {goalsPeriodLabels[key]}
-              </button>
-            ))}
-          </div>
+          <p className={`text-xl font-black tracking-tight mt-2 ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+            {qualityAlerts.fraud}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-auto pt-2">
+            {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
+          </p>
         </div>
 
-        <div className="relative z-10 space-y-4">
-
-          {/* ── Section : Objectifs Company (depuis contrat GIG) ── */}
-          {(companyTargets.hoursTarget > 0 || companyTargets.transactionTarget > 0) && (
-            <>
-              <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Objectifs company · GIG</p>
-              {companyTargets.hoursTarget > 0 && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock size={13} className="text-blue-400" />
-                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Heures travaillées</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white font-black tracking-tighter">
-                        {reservationStats.workedHours}h<span className="text-white/40 font-bold text-sm">/{companyTargets.hoursTarget}h</span>
-                      </span>
-                      <span className={`text-[10px] font-black min-w-[32px] text-right ${
-                        companyTargets.hoursTarget > 0 && reservationStats.workedHours >= companyTargets.hoursTarget ? 'text-emerald-400' : 'text-white/60'
-                      }`}>
-                        {companyTargets.hoursTarget > 0 ? `${Math.min(100, Math.round((reservationStats.workedHours / companyTargets.hoursTarget) * 100))}%` : '—'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-700 ${
-                      companyTargets.hoursTarget > 0 && reservationStats.workedHours >= companyTargets.hoursTarget
-                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                        : 'bg-gradient-to-r from-blue-400 to-blue-500'
-                    }`} style={{ width: `${companyTargets.hoursTarget > 0 ? Math.min(100, Math.round((reservationStats.workedHours / companyTargets.hoursTarget) * 100)) : 0}%` }} />
-                  </div>
-                </div>
-              )}
-              {companyTargets.transactionTarget > 0 && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap size={13} className="text-amber-400" />
-                      <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">
-                        {companyTargets.volumeUnit} · {companyTargets.volumePeriod}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white font-black tracking-tighter">
-                        {earningsPipeline.validatedSalesCount}<span className="text-white/40 font-bold text-sm">/{companyTargets.transactionTarget}</span>
-                      </span>
-                      <span className={`text-[10px] font-black min-w-[32px] text-right ${
-                        earningsPipeline.validatedSalesCount >= companyTargets.transactionTarget ? 'text-emerald-400' : 'text-amber-400/80'
-                      }`}>
-                        {`${Math.min(100, Math.round((earningsPipeline.validatedSalesCount / companyTargets.transactionTarget) * 100))}%`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-700 ${
-                      earningsPipeline.validatedSalesCount >= companyTargets.transactionTarget
-                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                        : 'bg-gradient-to-r from-amber-400 to-orange-400'
-                    }`} style={{ width: `${Math.min(100, Math.round((earningsPipeline.validatedSalesCount / companyTargets.transactionTarget) * 100))}%` }} />
-                  </div>
-                </div>
-              )}
-              <div className="h-px bg-white/10" />
-            </>
-          )}
-
-          {/* ── Section : Objectifs REP (appels + sessions) ── */}
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Mes objectifs activité</p>
-
-          {/* Appels */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone size={13} className="text-cyan-400" />
-                <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-black tracking-tighter">
-                  {goals.calls.current}<span className="text-white/40 font-bold text-sm">/{goals.calls.target}</span>
-                </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.calls.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                  {goals.calls.progressPct}%
-                </span>
-              </div>
-            </div>
-            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full transition-all duration-700 ease-out rounded-full ${
-                goals.calls.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-cyan-400 to-cyan-500'
-              }`} style={{ width: `${goals.calls.progressPct}%` }} />
+        <div className="rounded-2xl border border-indigo-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
+            <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+              <Award size={14} />
             </div>
           </div>
-
-          {/* Sessions */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarCheck size={13} className="text-violet-400" />
-                <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-black tracking-tighter">
-                  {goals.sessions.current}<span className="text-white/40 font-bold text-sm">/{goals.sessions.target}</span>
-                </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.sessions.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                  {goals.sessions.progressPct >= 100 ? <span className="inline-flex items-center gap-0.5"><CheckCircle2 size={9} />{goals.sessions.progressPct}%</span> : `${goals.sessions.progressPct}%`}
-                </span>
-              </div>
-            </div>
-            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full transition-all duration-700 ease-out rounded-full ${
-                goals.sessions.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'
-              }`} style={{ width: `${goals.sessions.progressPct}%` }} />
-            </div>
-          </div>
-
-          {/* Bonus GIG si disponible */}
-          {goals.bonus.target > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Flame size={13} className="text-amber-400" />
-                  <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-white font-black tracking-tighter">
-                    {goals.bonus.current}<span className="text-white/40 font-bold text-sm">/{goals.bonus.target}</span>
-                  </span>
-                  <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {goals.bonus.progressPct >= 100 ? '✓' : `${goals.bonus.progressPct}%`}
-                  </span>
-                </div>
-              </div>
-              <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                  goals.bonus.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'
-                }`} style={{ width: `${goals.bonus.progressPct}%` }} />
-              </div>
-              <p className="text-[10px] font-black text-emerald-400 tracking-tight">
-                {t('dashboard.home.gigGoal.bonusReward', { amount: goals.bonus.bonusAmount.toFixed(2) })}
-              </p>
-            </div>
-          )}
-
-          {/* ── Objectif gains personnalisé du REP ── */}
-          <div className="h-px bg-white/10" />
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Trophy size={13} className="text-harx-400" />
-                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Mon objectif gains</span>
-              </div>
-              {!editingGoal ? (
-                <button
-                  type="button"
-                  onClick={() => { setGoalInput(String(repEarningsGoal)); setEditingGoal(true); }}
-                  className="p-1 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition"
-                >
-                  <Pencil size={11} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const v = Math.max(0, Number(goalInput) || 0);
-                    setRepEarningsGoal(v);
-                    localStorage.setItem('harx_earnings_goal', String(v));
-                    setEditingGoal(false);
-                  }}
-                  className="p-1 rounded-lg bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/50 transition"
-                >
-                  <Check size={11} />
-                </button>
-              )}
-            </div>
-            {editingGoal ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={goalInput}
-                  onChange={(e) => setGoalInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { const v = Math.max(0, Number(goalInput) || 0); setRepEarningsGoal(v); localStorage.setItem('harx_earnings_goal', String(v)); setEditingGoal(false); } }}
-                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-400"
-                  placeholder="Ex: 1000"
-                  autoFocus
-                />
-                <span className="text-white/50 text-sm font-bold">€</span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-xl font-black text-white tracking-tighter">
-                    {fmtMoney(earningsPipeline.earnedInPeriod)} €
-                  </span>
-                  {repEarningsGoal > 0 && (
-                    <span className="text-[11px] font-bold text-white/40">/ {fmtMoney(repEarningsGoal)} € objectif</span>
-                  )}
-                </div>
-                {repEarningsGoal > 0 ? (
-                  <>
-                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-400 to-harx-500'
-                        }`}
-                        style={{ width: `${earningsGoalProgress}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] font-bold text-white/40">
-                      {earningsGoalProgress}% · {earningsGoalProgress >= 100 ? '🎉 Objectif atteint !' : `Il reste ${fmtMoney(Math.max(0, repEarningsGoal - earningsPipeline.earnedInPeriod))} € à gagner`}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[10px] font-bold text-white/30 italic">Cliquer sur ✏️ pour définir un objectif de gains</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Simulateur de gains ── */}
-          <div className="h-px bg-white/10" />
-          <button
-            type="button"
-            onClick={() => setShowCalculator((p) => !p)}
-            className="w-full flex items-center justify-between gap-2 text-left group"
-          >
-            <div className="flex items-center gap-2">
-              <Calculator size={13} className="text-cyan-400" />
-              <span className="text-[10px] font-black text-white/50 uppercase tracking-widest group-hover:text-white/80 transition">Simulateur de gains</span>
-            </div>
-            <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showCalculator && (
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-              <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">Calculez vos gains estimés par session</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels / session</label>
-                  <input
-                    type="number"
-                    min={1} max={200}
-                    value={calcCalls}
-                    onChange={(e) => setCalcCalls(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Conversion %</label>
-                  <input
-                    type="number"
-                    min={1} max={100}
-                    value={calcConvRate}
-                    onChange={(e) => setCalcConvRate(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Commission € / vente</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={calcCommission}
-                    onChange={(e) => setCalcCommission(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-              </div>
-              {/* Résultat */}
-              <div className="rounded-xl bg-harx-500/15 border border-harx-500/30 px-4 py-3 flex items-center justify-between">
-                <p className="text-[10px] text-white/60 font-bold">
-                  {calcCalls} appels × {calcConvRate}% = <strong className="text-white">{calcResult.transactions} vente{calcResult.transactions !== 1 ? 's' : ''}</strong>
-                </p>
-                <p className="text-xl font-black text-harx-400 tracking-tight">
-                  +{calcResult.earnings.toFixed(2)} €
-                </p>
-              </div>
-              <p className="text-[9px] text-white/25 font-bold">Estimation indicative — basée sur vos paramètres GIG.</p>
-            </div>
-          )}
-
+          <p className="text-xl font-black text-indigo-700 tracking-tight mt-2">
+            {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-auto pt-2">Moyenne des appels scorés</p>
         </div>
       </div>
-
-      {/* Activité Récente — Transactions & Calls cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Transactions card */}
-        <div ref={transactionsSectionRef} className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col">
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                  <Receipt size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.transactions.title')}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    {t('dashboard.home.transactions.subtitle')}
-                  </p>
-                </div>
-              </div>
-              <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                {transactionStats.all.total.toFixed(2)} €
-              </span>
-            </div>
-
-            {/* Filter pills */}
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'all', label: t('dashboard.home.transactions.filterAll'), accent: 'slate', count: transactionStats.all.count },
-                { key: 'earned', label: t('dashboard.home.transactions.filterEarned'), accent: 'emerald', count: transactionStats.earned.count },
-                { key: 'pending_retraction', label: t('dashboard.home.transactions.filterRetraction'), accent: 'amber', count: transactionStats.pending_retraction.count },
-                { key: 'paid', label: t('dashboard.home.transactions.filterPaid'), accent: 'blue', count: transactionStats.paid.count },
-                { key: 'refused', label: t('dashboard.home.transactions.filterRefused'), accent: 'rose', count: transactionStats.refused.count },
-              ] as { key: TransactionFilter; label: string; accent: string; count: number }[]).map((tab) => {
-                const active = transactionFilter === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setTransactionFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                      active
-                        ? tab.accent === 'slate'
-                          ? 'bg-slate-900 text-white shadow-md'
-                          : tab.accent === 'emerald'
-                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                          : tab.accent === 'amber'
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                          : tab.accent === 'blue'
-                          ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
-                          : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'bg-white/60 text-slate-500 hover:bg-white hover:text-slate-800'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
-                      active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Transactions list */}
-          <div className="px-6 pb-6 flex-1">
-            {visibleTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                  <Inbox size={22} />
-                </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('dashboard.home.transactions.empty')}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{t('dashboard.home.transactions.emptyFilter')}</p>
-              </div>
-            ) : (
-              <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
-                {visibleTransactions.map((tx) => {
-                  const statusMeta =
-                    tx.status === 'earned'
-                      ? { label: t('dashboard.home.transactions.statusEarned'), cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
-                      : tx.status === 'paid'
-                      ? { label: t('dashboard.home.transactions.statusPaid'), cls: 'bg-blue-50 text-blue-700 border-blue-100' }
-                      : tx.status === 'pending_retraction'
-                      ? { label: t('dashboard.home.transactions.statusRetraction'), cls: 'bg-amber-50 text-amber-800 border-amber-200' }
-                      : { label: t('dashboard.home.transactions.statusRefused'), cls: 'bg-rose-50 text-rose-700 border-rose-100' };
-                  const typeLabel =
-                    tx.type === 'call_validated' ? t('dashboard.home.transactions.typeCallValidated')
-                    : tx.type === 'transaction' ? t('dashboard.home.transactions.typeSale')
-                    : t('dashboard.home.transactions.typeBonus');
-                  const gigTitle = tx.gig?.title || (gigsData.find((g: any) => (g._id || g.id) === tx.gigId)?.title) || t('dashboard.home.gigFallback');
-                  return (
-                    <li key={tx._id}>
-                      <button
-                        type="button"
-                        onClick={() => openTransactionDetails(tx)}
-                        className={clickableRowClass}
-                        aria-label={t('dashboard.home.transactions.ariaView', { type: typeLabel })}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                            <DollarSign size={16} />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-slate-900 truncate">{typeLabel} · {gigTitle}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              {new Date(tx.createdAt).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${statusMeta.cls}`}>
-                            {statusMeta.label}
-                          </span>
-                          <span className="text-sm font-black text-slate-900 tracking-tighter">
-                            +{(tx.repShare || 0).toFixed(2)} €
-                          </span>
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0" />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         </div>
-
-        {/* Calls card */}
-        <div
-          ref={callsSectionRef}
-          className={`bg-white/50 backdrop-blur-xl border rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col transition-all ${
-            callFilter === 'pending_client'
-              ? 'border-amber-300 ring-2 ring-amber-200/80'
-              : 'border-white/60'
-          }`}
-        >
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                  <Phone size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.callsSection.title')}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    {callFilter === 'pending_client'
-                      ? t('dashboard.home.callsSection.subtitlePending')
-                      : t('dashboard.home.callsSection.subtitle')}
-                  </p>
-                </div>
-              </div>
-              <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                {t('dashboard.home.callsSection.count', { count: callStats.all })}
-              </span>
-            </div>
-
-            {/* Filter pills */}
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'all', label: t('dashboard.home.callsSection.filterAll'), accent: 'slate', count: callStats.all },
-                { key: 'valid', label: t('dashboard.home.callsSection.filterValid'), accent: 'emerald', count: callStats.valid },
-                { key: 'invalid', label: t('dashboard.home.callsSection.filterInvalid'), accent: 'rose', count: callStats.invalid },
-                { key: 'pending_client', label: t('dashboard.home.callsSection.filterPending'), accent: 'amber', count: callStats.pending_client },
-              ] as { key: CallFilter; label: string; accent: string; count: number }[]).map((tab) => {
-                const active = callFilter === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setCallFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                      active
-                        ? tab.accent === 'slate'
-                          ? 'bg-slate-900 text-white shadow-md'
-                          : tab.accent === 'emerald'
-                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                          : tab.accent === 'amber'
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                          : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'bg-white/60 text-slate-500 hover:bg-white hover:text-slate-800'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
-                      active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Calls list */}
-          <div className="px-6 pb-6 flex-1">
-            {visibleCalls.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                  <Inbox size={22} />
-                </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {callFilter === 'pending_client'
-                    ? t('dashboard.home.callsSection.emptyPending')
-                    : t('dashboard.home.callsSection.empty')}
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {callFilter === 'pending_client'
-                    ? t('dashboard.home.callsSection.emptyPendingDetail')
-                    : t('dashboard.home.callsSection.emptyFilter')}
-                </p>
-              </div>
-            ) : (
-              <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
-                {visibleCalls.map((call: any) => {
-                  const isValid = call.valid === true || call.validByAI === true;
-                  const contact = (call.lead?.First_Name || call.lead?.Last_Name)
-                    ? `${call.lead.First_Name || ''} ${call.lead.Last_Name || ''}`.trim()
-                    : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || t('dashboard.home.callsSection.unknownContact'));
-                  const phoneNum = call.lead?.phone || call.lead?.Phone || call.to || call.from || call.phoneNumber;
-                  const hasLeadName = !!(call.lead?.First_Name || call.lead?.Last_Name || call.lead?.name);
-                  const durationSec = Number(call.duration || 0);
-                  const billedMin = billedMinutesFromSeconds(durationSec);
-                  const dateStr = call.startTime || call.createdAt;
-                  const cGigId = typeof call.gigId === 'object' ? (call.gigId?._id || call.gigId?.id) : call.gigId;
-                  const gigTitle = (typeof call.gigId === 'object' && call.gigId?.title) || (gigsData.find((g: any) => (g._id || g.id) === cGigId)?.title) || '';
-                  const callId = resolveCallRefId(call);
-                  const isPendingClient = callId
-                    ? earningsPipeline.pendingClientValidationCallIds.has(callId)
-                    : false;
-                  const ledgerTxStatus = callId ? repSaleLedgerByCallId.get(callId)?.status ?? null : null;
-                  const inRetraction = isTransactionInRetraction(call, ledgerTxStatus);
-                  const txCommission = resolveTransactionRepCommission(call);
-                  return (
-                    <li key={call._id || call.sid || `${contact}-${dateStr}`}>
-                      <button
-                        type="button"
-                        onClick={() => openCallDetails(call)}
-                        className={clickableCallRowClass}
-                        aria-label={t('dashboard.home.callsSection.ariaView', { contact })}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
-                            isValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                          }`}>
-                            {isValid ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
-                              <span>{contact}</span>
-                              {hasLeadName && phoneNum && (
-                                <span className="text-[11px] font-normal text-slate-400">({maskPhone(phoneNum)})</span>
-                              )}
-                            </p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                              {dateStr ? new Date(dateStr).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' }) : '—'}
-                              {billedMin > 0 && ` · ${billedMin} min`}
-                              {gigTitle && ` · ${gigTitle}`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {inRetraction && (
-                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-800 border-amber-200 inline-flex items-center gap-1">
-                              <RotateCcw size={10} />
-                              {t('dashboard.home.callsSection.retractionBadge', { amount: txCommission.toFixed(2) })}
-                            </span>
-                          )}
-                          {callFilter === 'pending_client' || isPendingClient ? (
-                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                              {t('dashboard.home.callsSection.pendingSale')}
-                            </span>
-                          ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
-                              isValid
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : 'bg-rose-50 text-rose-700 border-rose-100'
-                            }`}>
-                              {isValid ? t('dashboard.home.callsSection.validated') : t('dashboard.home.callsSection.notValidated')}
-                            </span>
-                          )}
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Classement des gains du GIG */}
-      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
-        <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl -mr-20 -mt-20 pointer-events-none" />
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-5 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-              <Medal size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-white tracking-tight uppercase">Classement des gains</h2>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">
-                {selectedGigId === 'all' ? 'Sélectionnez un GIG pour voir le classement' : selectedGigLabel}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users size={14} className="text-white/30" />
-            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">REPs inscrits</span>
-          </div>
-        </div>
-        {selectedGigId === 'all' ? (
-          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-white/5 text-white/20 flex items-center justify-center mb-3">
-              <Medal size={24} />
-            </div>
-            <p className="text-xs font-bold text-white/30 uppercase tracking-wider">Sélectionnez un GIG</p>
-            <p className="text-[11px] text-white/20 mt-1">Le classement des REPs s'affiche par GIG</p>
-          </div>
-        ) : (
-          <div className="relative z-10">
-            {/* Podium — top 3 */}
-            <div className="flex items-end justify-center gap-3 mb-6">
-              {[2, 1, 3].map((pos) => {
-                const isFirst = pos === 1;
-                const podiumColors: Record<number, string> = {
-                  1: 'from-amber-400/30 to-amber-500/10 border-amber-500/30',
-                  2: 'from-slate-400/20 to-slate-500/10 border-slate-500/20',
-                  3: 'from-amber-700/20 to-amber-800/10 border-amber-700/20',
-                };
-                const rankColors: Record<number, string> = { 1: 'text-amber-400', 2: 'text-slate-300', 3: 'text-amber-700' };
-                const medalEmojis: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
-                if (pos === 1) {
-                  return (
-                    <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-5 py-4 ${isFirst ? 'pb-6' : 'pb-4'}`}>
-                      <span className="text-2xl">{medalEmojis[pos]}</span>
-                      <div className="h-10 w-10 rounded-2xl bg-harx-500/30 flex items-center justify-center">
-                        <Users size={16} className="text-harx-400" />
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-xs font-black ${rankColors[pos]}`}>#{pos}</p>
-                        <p className="text-[10px] font-bold text-white/60 truncate max-w-[80px]">{displayName}</p>
-                        <p className="text-sm font-black text-white">{fmtMoney(earningsPipeline.earnedInPeriod)} €</p>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-4 py-3`}>
-                    <span className="text-lg opacity-30">{medalEmojis[pos]}</span>
-                    <div className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center">
-                      <Users size={13} className="text-white/20" />
-                    </div>
-                    <p className={`text-[10px] font-black ${rankColors[pos]} opacity-30`}>#{pos}</p>
-                    <p className="text-[10px] text-white/20">—</p>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-center text-[10px] font-bold text-white/20 italic">Classement complet disponible prochainement · Données multi-REP en cours d'intégration</p>
-          </div>
-        )}
       </div>
 
       {/* Réservations — bandeau style Planning */}
@@ -2211,6 +1720,93 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
 
+      <button
+        type="button"
+        onClick={() => navigate('/calls')}
+        className="w-full flex items-center justify-between gap-3 px-6 py-4 rounded-[28px] bg-slate-900 text-white shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all group"
+      >
+        <span className="flex items-center gap-3">
+          <span className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center">
+            <Phone size={18} />
+          </span>
+          <span className="text-sm font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
+        </span>
+        <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+      </button>
+
+      {/* Classement des gains du GIG */}
+      <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl -mr-20 -mt-20 pointer-events-none" />
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-5 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <Medal size={18} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white tracking-tight uppercase">Classement des gains</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">
+                {selectedGigId === 'all' ? 'Sélectionnez un GIG pour voir le classement' : selectedGigLabel}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users size={14} className="text-white/30" />
+            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">REPs inscrits</span>
+          </div>
+        </div>
+        {selectedGigId === 'all' ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-white/5 text-white/20 flex items-center justify-center mb-3">
+              <Medal size={24} />
+            </div>
+            <p className="text-xs font-bold text-white/30 uppercase tracking-wider">Sélectionnez un GIG</p>
+            <p className="text-[11px] text-white/20 mt-1">Le classement des REPs s'affiche par GIG</p>
+          </div>
+        ) : (
+          <div className="relative z-10">
+            {/* Podium — top 3 */}
+            <div className="flex items-end justify-center gap-3 mb-6">
+              {[2, 1, 3].map((pos) => {
+                const isFirst = pos === 1;
+                const podiumColors: Record<number, string> = {
+                  1: 'from-amber-400/30 to-amber-500/10 border-amber-500/30',
+                  2: 'from-slate-400/20 to-slate-500/10 border-slate-500/20',
+                  3: 'from-amber-700/20 to-amber-800/10 border-amber-700/20',
+                };
+                const rankColors: Record<number, string> = { 1: 'text-amber-400', 2: 'text-slate-300', 3: 'text-amber-700' };
+                const medalEmojis: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+                if (pos === 1) {
+                  return (
+                    <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-5 py-4 ${isFirst ? 'pb-6' : 'pb-4'}`}>
+                      <span className="text-2xl">{medalEmojis[pos]}</span>
+                      <div className="h-10 w-10 rounded-2xl bg-harx-500/30 flex items-center justify-center">
+                        <Users size={16} className="text-harx-400" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black ${rankColors[pos]}`}>#{pos}</p>
+                        <p className="text-[10px] font-bold text-white/60 truncate max-w-[80px]">{displayName}</p>
+                        <p className="text-sm font-black text-white">{fmtMoney(earningsPipeline.earnedInPeriod)} €</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-4 py-3`}>
+                    <span className="text-lg opacity-30">{medalEmojis[pos]}</span>
+                    <div className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Users size={13} className="text-white/20" />
+                    </div>
+                    <p className={`text-[10px] font-black ${rankColors[pos]} opacity-30`}>#{pos}</p>
+                    <p className="text-[10px] text-white/20">—</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-center text-[10px] font-bold text-white/20 italic">Classement complet disponible prochainement · Données multi-REP en cours d'intégration</p>
+          </div>
+        )}
+      </div>
+
       {/* À faire du jour + Rappels — pavés compacts avec CTA apparent */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* To-Do du jour */}
@@ -2237,7 +1833,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <BookOpen size={14} className="text-blue-600 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-700 truncate">Scripts de vente</p>
-                  <p className="text-[10px] text-slate-400">Lire avant vos sessions</p>
+                  <p className="text-[10px] text-slate-400">Lire avant vos créneaux</p>
                 </div>
               </li>
               <li className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
@@ -2297,99 +1893,6 @@ export function Dashboard({ profile }: DashboardProps) {
           </button>
         </div>
       </div>
-
-      {overlayCallId && (
-        <CallRecords
-          overlayOpenCallId={overlayCallId}
-          onOverlayClose={() => setOverlayCallId(null)}
-        />
-      )}
-
-      {selectedTransaction && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-[9998] bg-slate-950/60 backdrop-blur-sm"
-            onClick={() => setSelectedTransaction(null)}
-            aria-hidden
-          />
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-md bg-white rounded-[28px] border border-slate-200 shadow-2xl overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.transactionModal.title')}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
-                    {selectedTransaction.type === 'bonus'
-                      ? t('dashboard.home.transactionModal.typeBonus')
-                      : selectedTransaction.type === 'transaction'
-                        ? t('dashboard.home.transactionModal.typeSale')
-                        : t('dashboard.home.transactionModal.typeCommission')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTransaction(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                  aria-label={t('dashboard.home.transactionModal.close')}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="px-6 py-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.transactionModal.repAmount')}</span>
-                  <span className="text-xl font-black text-emerald-600">+{(selectedTransaction.repShare || 0).toFixed(2)} €</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.status')}</span>
-                  <span className="text-xs font-bold text-slate-700 capitalize">
-                    {selectedTransaction.status === 'pending_retraction'
-                      ? t('dashboard.home.transactionModal.statusRetraction')
-                      : selectedTransaction.status === 'earned'
-                        ? t('dashboard.home.transactionModal.statusEarned')
-                        : selectedTransaction.status === 'paid'
-                          ? t('dashboard.home.transactionModal.statusPaid')
-                          : selectedTransaction.status === 'refused'
-                            ? t('dashboard.home.transactionModal.statusRefused')
-                            : selectedTransaction.status}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.gig')}</span>
-                  <span className="text-xs font-semibold text-slate-700 text-right">
-                    {selectedTransaction.gig?.title || gigsData.find((g) => g._id === selectedTransaction.gigId)?.title || '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.date')}</span>
-                  <span className="text-xs font-semibold text-slate-700">
-                    {new Date(selectedTransaction.createdAt).toLocaleString(dateLocale)}
-                  </span>
-                </div>
-                {selectedTransaction.description && (
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                    {selectedTransaction.description}
-                  </p>
-                )}
-                {selectedTransaction.status === 'pending_retraction' && (
-                  <p className="text-xs font-medium text-amber-800 leading-relaxed bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                    {t('dashboard.home.transactionModal.retractionNote')}
-                  </p>
-                )}
-              </div>
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTransaction(null)}
-                  className="w-full py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
-                >
-                  {t('dashboard.home.transactionModal.close')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
 
     </div>
   );

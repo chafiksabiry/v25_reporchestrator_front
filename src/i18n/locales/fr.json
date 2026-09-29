@@ -119,6 +119,7 @@
         "ariaRetraction": "Voir les ventes en période de rétractation",
         "ariaClientValidation": "Voir les commissions en attente de validation entreprise"
       },
+      "historyButton": "Voir l'historique",
       "transactions": {
         "title": "Transactions",
         "subtitle": "Vos commissions & paiements",
@@ -161,11 +162,11 @@
       },
       "reservations": {
         "title": "Mes Réservations",
-        "subtitle": "Sessions planifiées & heures travaillées",
+        "subtitle": "Créneaux planifiés et heures travaillées",
         "count_one": "{{count}} réservation sur la période",
         "count_other": "{{count}} réservations sur la période",
         "total": "Total",
-        "sessions": "Sessions",
+        "sessions": "Créneaux",
         "upcoming": "À venir",
         "scheduled": "Planifiées",
         "completed": "Effectuées",
@@ -176,15 +177,15 @@
         "hoursScheduled": "/ {{hours}}h prévues",
         "attendance": "Assiduité",
         "attendanceRate": "Taux d'assiduité",
-        "upcomingSessions": "Prochaines sessions"
+        "upcomingSessions": "Prochains créneaux"
       },
       "goals": {
         "title": "Mes Objectifs",
-        "subtitle": "Appels, sessions et bonus sur la période",
-        "callsTitle": "Appels",
-        "callsLabel": "Appels sur la période",
-        "sessionsTitle": "Sessions",
-        "sessionsLabel": "Réservations actives",
+        "subtitle": "Heures, transactions et bonus sur la période",
+        "callsTitle": "Appels validés",
+        "callsLabel": "Appels validés sur la période",
+        "sessionsTitle": "Créneaux",
+        "sessionsLabel": "Heures",
         "bonusTitle": "Bonus",
         "periodDay": "Jour",
         "periodWeek": "Semaine",
