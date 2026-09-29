@@ -1178,39 +1178,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-700">
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={goToProduction}
-          className="group relative w-full overflow-hidden rounded-[28px] bg-gradient-harx px-5 py-5 sm:px-8 sm:py-6 text-white shadow-2xl shadow-harx-500/35 hover:shadow-harx-500/50 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-harx-400/40"
-        >
-          <div className="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/20 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-black/10 blur-2xl pointer-events-none" />
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-            <div className="flex flex-col sm:flex-row items-center gap-4 min-w-0">
-              <div className="h-16 w-16 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/25 group-hover:scale-105 transition-transform shadow-inner">
-                <Rocket size={30} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/80">
-                  {t('dashboard.home.goLive.eyebrow')}
-                </p>
-                <p className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-none mt-1">
-                  {t('dashboard.home.goLive.title')}
-                </p>
-                <p className="text-sm font-semibold text-white/90 mt-2">
-                  {t('dashboard.home.goLive.subtitle')}
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-2xl bg-white text-harx-600 px-6 py-3.5 text-xs font-black uppercase tracking-widest shadow-lg group-hover:bg-white/95 shrink-0">
-              {t('dashboard.home.goLive.cta')}
-              <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-            </span>
-          </div>
-        </button>
-      </div>
-
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-4 bg-white/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-xl shadow-slate-200/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1380,6 +1347,16 @@ export function Dashboard({ profile }: DashboardProps) {
                 )}
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={goToProduction}
+              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-harx px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/35 hover:shadow-harx-500/55 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-harx-400/40"
+            >
+              <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
+              {t('dashboard.home.goLive.title')}
+              <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+            </button>
           </div>
         </div>
       </div>
