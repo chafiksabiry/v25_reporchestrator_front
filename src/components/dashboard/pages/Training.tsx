@@ -7,7 +7,6 @@ import remarkGfm from 'remark-gfm';
 import {
   BookOpen,
   Briefcase,
-  Clock3,
   Loader2,
   AlertCircle,
   ChevronDown,
@@ -138,8 +137,6 @@ type ViewerSlide =
     }
   | { key: string; kind: 'completion'; title: string };
 
-type ModulePlanItem = { durationMinutes?: unknown };
-
 function notifyTrainingProgressUpdated() {
   window.dispatchEvent(new Event('TRAINING_PROGRESS_UPDATED'));
 }
@@ -226,28 +223,6 @@ function extractSlides(j: JourneyRow): SlideRow[] {
   const slides = p.slides;
   if (!Array.isArray(slides)) return [];
   return slides as SlideRow[];
-}
-
-function extractModuleDurationsMinutes(j: JourneyRow): number[] {
-  const planRaw = Array.isArray(j.modulePlan) ? (j.modulePlan as ModulePlanItem[]) : [];
-  const fromPlan = planRaw
-    .map((m) => Number(m?.durationMinutes))
-    .map((n) => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0));
-  if (fromPlan.some((n) => n > 0)) return fromPlan;
-
-  const modules = extractModules(j);
-  return modules.map((m: any) => {
-    const n = Number(m?.duration);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  });
-}
-
-function formatDurationHMS(ms: number): string {
-  const safe = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function mergeJourney(
@@ -809,10 +784,6 @@ export function Training() {
   const [completedSectionsByJourney, setCompletedSectionsByJourney] = useState<
     Record<string, Record<string, string[]>>
   >({});
-  const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
-  const [sessionManualDurationMs, setSessionManualDurationMs] = useState(0);
-  const [moduleElapsedMs, setModuleElapsedMs] = useState(0);
-  const [moduleManualDurationMs, setModuleManualDurationMs] = useState(0);
   const progressSyncInFlightRef = useRef<Set<string>>(new Set());
   /** POST /section/start déjà envoyé pour cette clé (même parcours). */
   const sectionStartSentRef = useRef<Set<string>>(new Set());
@@ -1465,8 +1436,6 @@ export function Training() {
       setFormationViewerQuizPage({});
       setQuizSlideWrongStrikes({});
       setQuizQuestionCountdownSec({});
-      setSessionElapsedMs(0);
-      setSessionManualDurationMs(0);
     }
     sectionStartSentRef.current.clear();
     sectionStartPromiseRef.current.clear();
@@ -1491,23 +1460,7 @@ export function Training() {
     });
   }, [selectedJourneyId, progressByJourney]);
 
-  useEffect(() => {
-    if (!selectedJourneyId) return;
-    const startedAt = Date.now();
-    const t = window.setInterval(() => {
-      setSessionElapsedMs(Date.now() - startedAt);
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [selectedJourneyId]);
-
-  const currentModuleIndex = useMemo(() => {
-    if (!currentFormationViewerSlide) return null;
-    if (currentFormationViewerSlide.kind === 'overview') return 0;
-    if (currentFormationViewerSlide.kind === 'completion') return null;
-    return currentFormationViewerSlide.moduleIndex;
-  }, [currentFormationViewerSlide]);
-
-  /** Après max tentatives échouées ou pendant lockedUntil : on fige le chrono « module » (API). */
+  /** Après max tentatives échouées ou pendant lockedUntil. */
   const quizModuleTimeFrozen = useMemo(() => {
     const slide = currentFormationViewerSlide;
     if (!slide || slide.kind !== 'quiz_group' || !selectedJourneyId || !selectedJourney) return false;
@@ -1544,18 +1497,6 @@ export function Training() {
     if (!anyPassed && att >= maxCap) return true;
     return false;
   }, [currentFormationViewerSlide, selectedJourneyId, selectedJourney, progressByJourney]);
-
-  useEffect(() => {
-    setModuleElapsedMs(0);
-    setModuleManualDurationMs(0);
-    if (!selectedJourneyId || currentModuleIndex == null) return;
-    if (quizModuleTimeFrozen) return;
-    const startedAt = Date.now();
-    const t = window.setInterval(() => {
-      setModuleElapsedMs(Date.now() - startedAt);
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [selectedJourneyId, currentModuleIndex, quizModuleTimeFrozen]);
 
   /** Persiste slide courante + pages quiz dans rep_training_tracking (debounce). */
   useEffect(() => {
@@ -2074,43 +2015,6 @@ export function Training() {
     completeSectionProgressAtLeave,
   ]);
 
-  const selectedJourneySummary = useMemo(
-    () =>
-      selectedJourneyId && slideProgressSummary?.journeys
-        ? slideProgressSummary.journeys.find((x) => x.journeyId === selectedJourneyId) || null
-        : null,
-    [slideProgressSummary, selectedJourneyId]
-  );
-  const moduleDurationsMinutes = useMemo(
-    () => (selectedJourney ? extractModuleDurationsMinutes(selectedJourney) : []),
-    [selectedJourney]
-  );
-  const plannedTotalMs = useMemo(
-    () => moduleDurationsMinutes.reduce((acc, n) => acc + Math.max(0, n), 0) * 60 * 1000,
-    [moduleDurationsMinutes]
-  );
-  const plannedCurrentModuleMs = useMemo(() => {
-    if (currentModuleIndex == null) return 0;
-    return Math.max(0, Number(moduleDurationsMinutes[currentModuleIndex] || 0)) * 60 * 1000;
-  }, [moduleDurationsMinutes, currentModuleIndex]);
-
-  const trackedFormationMs =
-    Math.max(0, Number(selectedJourneySummary?.followedDurationMs || 0)) +
-    sessionElapsedMs +
-    sessionManualDurationMs;
-  const trackedModuleMs = moduleElapsedMs + moduleManualDurationMs;
-
-  const formationRemainingMs =
-    plannedTotalMs > 0 ? Math.max(0, plannedTotalMs - trackedFormationMs) : 0;
-  const moduleRemainingMs =
-    plannedCurrentModuleMs > 0 ? Math.max(0, plannedCurrentModuleMs - trackedModuleMs) : 0;
-
-  const formationTimerLabel = useMemo(
-    () => formatDurationHMS(formationRemainingMs),
-    [formationRemainingMs]
-  );
-  const moduleTimerLabel = useMemo(() => formatDurationHMS(moduleRemainingMs), [moduleRemainingMs]);
-
   const syncQuizDuration = useCallback(
     async (
       moduleIndex: number,
@@ -2127,8 +2031,6 @@ export function Training() {
       if (!moduleId || !/^[a-f\d]{24}$/i.test(moduleId)) return;
       const base = trainingApiBase();
       if (!base) return;
-      setSessionManualDurationMs((ms) => ms + 40000);
-      setModuleManualDurationMs((ms) => ms + 40000);
       try {
         await axios.post(`${base}/training_journeys/rep-progress`, {
           repId,
@@ -2923,40 +2825,6 @@ export function Training() {
                 <h3 className="min-w-0 flex-1 truncate text-sm font-black text-white">
                   {journeyTitle(selectedJourney)}
                 </h3>
-                <div className="ml-auto grid w-full grid-cols-2 gap-2 sm:w-auto">
-                  <div
-                    className="rounded-xl border px-2.5 py-1.5 sm:px-3"
-                    style={{
-                      borderColor: viewerThemeTokens.accentBorder,
-                      background: viewerThemeTokens.cardBg,
-                      boxShadow: viewerThemeTokens.accentShadow,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Clock3 className="h-3.5 w-3.5 text-slate-200" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-300">
-                        Timer total
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-xs font-extrabold text-white">{formationTimerLabel}</p>
-                  </div>
-                  <div
-                    className="rounded-xl border px-2.5 py-1.5 sm:px-3"
-                    style={{
-                      borderColor: viewerThemeTokens.accentBorder,
-                      background: viewerThemeTokens.cardBg,
-                      boxShadow: viewerThemeTokens.accentShadow,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5 text-slate-200" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-300">
-                        Timer module
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-xs font-extrabold text-white">{moduleTimerLabel}</p>
-                  </div>
-                </div>
               </div>
               <div
                 className="relative flex-1 overflow-y-auto p-4 md:p-5"
@@ -3778,7 +3646,7 @@ export function Training() {
                   !showFormationCertificateCta ? (
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
-                        ? 'Nombre maximum de tentatives atteint. Le chrono « module » est en pause ; en cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
+                        ? 'Nombre maximum de tentatives atteint. En cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
                         : atLastFormationSlide ||
                             formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
                           ? 'Répondez à toutes les questions (40 s max par question). Le bouton Bravo s’active dès une note ≥ 70 %.'
