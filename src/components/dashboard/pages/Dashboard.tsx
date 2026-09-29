@@ -1178,11 +1178,9 @@ export function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-700">
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        <div className="xl:col-span-2 min-w-0 flex flex-col gap-4">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-5 rounded-[2rem] border border-rose-100 bg-white p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
               {t('dashboard.home.greeting', { name: displayName })}
@@ -1191,9 +1189,18 @@ export function Dashboard({ profile }: DashboardProps) {
               {t('dashboard.home.subtitle')}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={goToProduction}
+            className="harx-go-live group inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-300"
+          >
+            <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
+            {t('dashboard.home.goLive.title')}
+            <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="relative flex items-center gap-2">
               <Briefcase size={16} className="text-rose-500" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{String(t('dashboard.home.gigLabel')).replace(/\s*:\s*$/, '')}</span>
@@ -1351,17 +1358,77 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
             </div>
+      </div>
 
-            <button
-              type="button"
-              onClick={goToProduction}
-              className="harx-go-live group inline-flex shrink-0 items-center gap-2 self-start sm:self-auto rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-300"
-            >
-              <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
-              {t('dashboard.home.goLive.title')}
-              <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-            </button>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[108px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              {t('dashboard.home.pipeline.availableBalance')}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <WalletIcon size={14} />
+            </div>
           </div>
+          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.availableBalance)} €
+          </p>
+          <p className="text-[10px] font-semibold text-emerald-600 mt-auto pt-2">
+            {t('dashboard.home.pipeline.readyToWithdraw')}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 p-4 shadow-sm min-h-[108px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
+              {t('dashboard.home.pipeline.validatedEarnings')}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <ShieldCheck size={14} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-emerald-700 tracking-tight mt-2">
+            +{fmtMoney(earningsPipeline.validatedInPeriod)} €
+          </p>
+          <p className="text-[10px] text-emerald-600/80 mt-auto pt-2 truncate">
+            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount })}
+            {' · '}
+            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[108px] flex flex-col relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 leading-tight">
+              {t('dashboard.home.pipeline.periodTotal')}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
+              <Trophy size={14} />
+            </div>
+          </div>
+          <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.totalGains)} €
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[108px] flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              {earningsPipeline.periodStartTitle}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+              <CalendarDays size={14} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
+            {fmtMoney(earningsPipeline.periodStartBalance)} €
+          </p>
+          {earningsPipeline.periodStartDateLabel && (
+            <p className="text-[10px] text-slate-400 mt-auto pt-2">
+              {earningsPipeline.periodStartDateLabel}
+            </p>
+          )}
         </div>
       </div>
 
@@ -1760,70 +1827,9 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
         )}
       </div>
-                </div>
-        <div className="xl:col-span-1 min-w-0">
-      {/* Gains pipeline */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* 1. Solde au début de la période */}
-        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {earningsPipeline.periodStartTitle}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
-              <CalendarDays size={14} />
-                </div>
-              </div>
-          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.periodStartBalance)} €
-          </p>
-          {earningsPipeline.periodStartDateLabel && (
-            <p className="text-[10px] text-slate-400 mt-auto pt-2">
-              {earningsPipeline.periodStartDateLabel}
-            </p>
-          )}
-            </div>
 
-        {/* 2. Solde disponible */}
-        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[118px] flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {t('dashboard.home.pipeline.availableBalance')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-              <WalletIcon size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.availableBalance)} €
-          </p>
-          <p className="text-[10px] font-semibold text-emerald-600 mt-auto pt-2">
-            {t('dashboard.home.pipeline.readyToWithdraw')}
-          </p>
-        </div>
-
-        {/* 3. Gains validés */}
-        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
-              {t('dashboard.home.pipeline.validatedEarnings')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-              <ShieldCheck size={14} />
-                </div>
-              </div>
-          <p className="text-xl font-black text-emerald-700 tracking-tight mt-2">
-            +{fmtMoney(earningsPipeline.validatedInPeriod)} €
-          </p>
-          <p className="text-[10px] text-emerald-600/80 mt-auto pt-2 truncate">
-            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount })}
-            {' · '}
-            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
-          </p>
-            </div>
-
-        {/* 4. Rétractation */}
-        <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-4 shadow-sm min-h-[108px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
               {t('dashboard.home.pipeline.retraction')}
@@ -1839,18 +1845,17 @@ export function Dashboard({ profile }: DashboardProps) {
             {earningsPipeline.retractionCount > 0
               ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
               : t('dashboard.home.pipeline.noSales')}
-                </p>
-              </div>
+          </p>
+        </div>
 
-        {/* 5. Validation client */}
-        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
+        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm min-h-[108px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
               {t('dashboard.home.pipeline.clientValidation')}
             </p>
             <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
               <Building2 size={14} />
-                          </div>
+            </div>
           </div>
           <p className="text-xl font-black text-amber-700 tracking-tight mt-2">
             +{fmtMoney(earningsPipeline.clientValidationAmount)} €
@@ -1860,53 +1865,35 @@ export function Dashboard({ profile }: DashboardProps) {
               ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
               : t('dashboard.home.pipeline.nothingPending')}
           </p>
-      </div>
+        </div>
 
-        {/* 6. Total période */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[118px] flex flex-col relative overflow-hidden col-span-2 md:col-span-1">
-          <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
-          <div className="relative z-10 flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 leading-tight">
-              {t('dashboard.home.pipeline.periodTotal')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
-              <Trophy size={14} />
-            </div>
-          </div>
-          <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.totalGains)} €
-          </p>
-          </div>
-
-        <div className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
+        <div className={`rounded-2xl border p-4 shadow-sm min-h-[108px] flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
             <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${qualityAlerts.fraud > 0 ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
               <ShieldAlert size={14} />
-        </div>
             </div>
+          </div>
           <p className={`text-xl font-black tracking-tight mt-2 ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
             {qualityAlerts.fraud}
           </p>
           <p className="text-[10px] text-slate-500 mt-auto pt-2">
             {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
           </p>
-          </div>
+        </div>
 
-        <div className="rounded-2xl border border-indigo-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
+        <div className="rounded-2xl border border-indigo-200/70 bg-white p-4 shadow-sm min-h-[108px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
             <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
               <Award size={14} />
-                      </div>
-                      </div>
+            </div>
+          </div>
           <p className="text-xl font-black text-indigo-700 tracking-tight mt-2">
             {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
           </p>
           <p className="text-[10px] text-slate-500 mt-auto pt-2">Moyenne des appels scorés</p>
-                    </div>
-                    </div>
-                  </div>
+        </div>
       </div>
 
       {/* Réservations — bandeau style Planning */}
