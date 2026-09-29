@@ -1179,20 +1179,20 @@ export function Dashboard({ profile }: DashboardProps) {
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-700">
       {/* Dynamic Filter Header */}
-      <div className="flex flex-col gap-4 bg-white/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-xl shadow-slate-200/10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+      <div className="flex flex-col gap-5 rounded-[2rem] border border-rose-100 bg-white p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col gap-5">
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
               {t('dashboard.home.greeting', { name: displayName })}
             </h1>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+            <p className="text-[11px] font-semibold text-slate-500 tracking-wide mt-1 max-w-md">
               {t('dashboard.home.subtitle')}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex items-center gap-2.5">
-              <Briefcase size={16} className="text-purple-600 animate-pulse" />
+              <Briefcase size={16} className="text-rose-500" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.gigLabel')}</span>
               <div className="relative w-full min-w-0 sm:min-w-[220px] sm:max-w-[320px]">
                 <button
@@ -1351,7 +1351,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <button
               type="button"
               onClick={goToProduction}
-              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-harx px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/35 hover:shadow-harx-500/55 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-harx-400/40"
+              className="group ml-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-rose-300/50 ring-4 ring-rose-100 hover:ring-rose-200 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-rose-300"
             >
               <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
               {t('dashboard.home.goLive.title')}
