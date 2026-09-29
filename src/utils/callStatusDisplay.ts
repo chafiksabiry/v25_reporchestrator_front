@@ -159,7 +159,7 @@ export function isNonEvaluableCall(call: CallLike): boolean {
 }
 
 /** Minimum billable duration (seconds) before AI analysis is allowed. */
-export const MIN_CALL_ANALYSIS_SECONDS = 60;
+export const MIN_CALL_ANALYSIS_SECONDS = 30;
 
 /** True when the call is too short for a reliable commercial AI audit. */
 export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_call_status'>): boolean {
@@ -264,8 +264,8 @@ export function getTooShortAnalysisNotice(language: string = 'fr', durationSec?:
       ? ` (${Math.round(durationSec)}s)`
       : '';
   return language.toLowerCase().startsWith('en')
-    ? `Call too short${d} — AI analysis is only run for calls of at least ${MIN_CALL_ANALYSIS_SECONDS} seconds.`
-    : `Appel trop court${d} — l’analyse IA n’est lancée qu’à partir de ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
+    ? `Call too short${d} — the transcript is kept. QA analysis only runs for calls over ${MIN_CALL_ANALYSIS_SECONDS} seconds.`
+    : `Appel trop court${d} — la retranscription est conservée. L’analyse QA ne se lance qu’au-delà de ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
 }
 
 const UNSCORED_OUTCOMES = new Set([
