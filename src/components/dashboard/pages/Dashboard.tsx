@@ -1364,8 +1364,6 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
       </div>
-      </div>
-      </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
       <div className="bg-slate-950 rounded-[32px] border border-harx-500/30 ring-1 ring-harx-500/20 shadow-2xl shadow-harx-900/20 p-6 overflow-hidden relative">
@@ -1763,7 +1761,6 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
                 </div>
-      </div>
         <div className="xl:col-span-1 min-w-0">
       {/* Gains pipeline */}
       <div className="grid grid-cols-2 gap-3">
@@ -1910,7 +1907,6 @@ export function Dashboard({ profile }: DashboardProps) {
                     </div>
                     </div>
                   </div>
-      </div>
       </div>
 
       {/* Réservations — bandeau style Planning */}
