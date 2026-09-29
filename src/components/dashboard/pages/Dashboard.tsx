@@ -318,6 +318,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
   const [hoursGigId, setHoursGigId] = useState<string | null>(null);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
@@ -1391,8 +1392,12 @@ export function Dashboard({ profile }: DashboardProps) {
         <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap relative z-10 mb-6">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className={`flex items-center justify-between gap-4 flex-wrap relative z-10 ${goalsOpen ? 'mb-6' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setGoalsOpen((open) => !open)}
+            className="flex items-center gap-3 min-w-0 text-left"
+          >
             <div className="h-10 w-10 rounded-2xl bg-harx-500/20 text-harx-400 flex items-center justify-center shrink-0">
               <Target size={18} />
             </div>
@@ -1402,7 +1407,8 @@ export function Dashboard({ profile }: DashboardProps) {
                 {goals.label}
               </p>
             </div>
-          </div>
+            <ChevronDown size={16} className={`text-white/50 shrink-0 transition-transform ${goalsOpen ? 'rotate-180' : ''}`} />
+          </button>
           {/* Sélecteur période */}
           <div className="flex flex-wrap gap-1 shrink-0">
             {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
@@ -1426,6 +1432,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
+        {goalsOpen && (
         <div className="relative z-10 space-y-4">
 
           <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">GIG · heures minimum</p>
@@ -1772,6 +1779,7 @@ export function Dashboard({ profile }: DashboardProps) {
           )}
 
         </div>
+        )}
       </div>
                 </div>
         <div className="xl:col-span-2 min-w-0">
