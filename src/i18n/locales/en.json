@@ -119,6 +119,7 @@
         "ariaRetraction": "View sales in cooling-off period",
         "ariaClientValidation": "View commissions pending company validation"
       },
+      "historyButton": "View history",
       "transactions": {
         "title": "Transactions",
         "subtitle": "Your commissions & payouts",
@@ -161,11 +162,11 @@
       },
       "reservations": {
         "title": "My Reservations",
-        "subtitle": "Scheduled sessions & hours worked",
+        "subtitle": "Planned slots and hours worked",
         "count_one": "{{count}} reservation in period",
         "count_other": "{{count}} reservations in period",
         "total": "Total",
-        "sessions": "Sessions",
+        "sessions": "Slots",
         "upcoming": "Upcoming",
         "scheduled": "Scheduled",
         "completed": "Completed",
@@ -176,15 +177,15 @@
         "hoursScheduled": "/ {{hours}}h scheduled",
         "attendance": "Attendance",
         "attendanceRate": "Attendance rate",
-        "upcomingSessions": "Upcoming sessions"
+        "upcomingSessions": "Upcoming slots"
       },
       "goals": {
         "title": "My Goals",
-        "subtitle": "Calls, sessions and bonus for the period",
-        "callsTitle": "Calls",
-        "callsLabel": "Calls in this period",
-        "sessionsTitle": "Sessions",
-        "sessionsLabel": "Active reservations",
+        "subtitle": "Hours, transactions and bonus for the period",
+        "callsTitle": "Validated calls",
+        "callsLabel": "Validated calls in this period",
+        "sessionsTitle": "Slots",
+        "sessionsLabel": "Hours",
         "bonusTitle": "Bonus",
         "periodDay": "Day",
         "periodWeek": "Week",
