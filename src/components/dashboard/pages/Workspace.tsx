@@ -1410,6 +1410,7 @@ export function WorkspaceContent() {
         return (
           <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
+              gigId={activeEnrolledGigId || undefined}
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
               onAutoOpenHandled={handleAutoOpenHandled}

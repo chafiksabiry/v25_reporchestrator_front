@@ -156,6 +156,7 @@ export interface CallRecord {
   agentValidation?: string;
   companyValidation?: string;
   childCalls?: string[];
+  gigId?: string | { _id?: string; $oid?: string };
   from?: string;
   to?: string;
   transcript?: {
@@ -910,8 +911,9 @@ export function CallRecords({
       if (!recordLeadId) return false;
     }
     if (gigId) {
-      const recordGigId = normalizeMongoId(record.lead?.gigId);
-      if (recordGigId && recordGigId !== gigId) return false;
+      const recordGigId =
+        normalizeMongoId(record.gigId) || normalizeMongoId(record.lead?.gigId);
+      if (recordGigId !== gigId) return false;
     }
 
     // Call Validation Filter
