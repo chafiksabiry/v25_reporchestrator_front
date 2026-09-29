@@ -319,6 +319,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [hoursGigId, setHoursGigId] = useState<string | null>(null);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const goalsCardRef = useRef<HTMLDivElement>(null);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
@@ -326,6 +327,14 @@ export function Dashboard({ profile }: DashboardProps) {
   const [goalInput, setGoalInput] = useState('0');
   // Reservations cancellation stats period
   const [cancelStatsPeriod, setCancelStatsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
+
+  useEffect(() => {
+    if (!goalsOpen) return;
+    const frame = requestAnimationFrame(() => {
+      goalsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [goalsOpen]);
 
   useEffect(() => {
     const agentId = profile?._id || localStorage.getItem('agentId') || localStorage.getItem('userId');
@@ -1499,7 +1508,7 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div className="bg-slate-950 rounded-[32px] border border-harx-500/30 ring-1 ring-harx-500/20 shadow-2xl shadow-harx-900/20 p-3 sm:p-4 overflow-hidden relative">
+      <div ref={goalsCardRef} className="bg-slate-950 rounded-[32px] border border-harx-500/30 ring-1 ring-harx-500/20 shadow-2xl shadow-harx-900/20 p-3 sm:p-4 overflow-hidden relative scroll-mt-4">
         <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl -ml-16 -mb-16 pointer-events-none" />
 
