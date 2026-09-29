@@ -559,6 +559,17 @@ function isModuleIntroSectionNavigationLocked(
   return sectionIndex > firstInc;
 }
 
+/** `passed: true` côté serveur uniquement. `status: completed` sans ce drapeau ne compte pas. */
+function quizPassedOnServer(qz: unknown, mp: Record<string, unknown> | undefined): boolean {
+  if (!mp) return false;
+  const q = qz as { _id?: unknown; id?: unknown };
+  const qid = normalizeMongoId(q?._id) || normalizeMongoId(q?.id);
+  if (!qid) return false;
+  const qp = mp.quizProgress as Array<{ quizKey?: unknown; passed?: boolean }> | undefined;
+  if (!Array.isArray(qp)) return false;
+  return qp.some((row) => normalizeMongoId(row?.quizKey) === qid && row.passed === true);
+}
+
 function quizIsPassedFromProgress(qz: unknown, _qi: number, mp: Record<string, unknown> | undefined): boolean {
   if (!mp) return false;
   const q = qz as { _id?: unknown; id?: unknown; title?: unknown };
@@ -761,6 +772,8 @@ export function Training() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [formationViewerSlideIndex, setFormationViewerSlideIndex] = useState(0);
+  /** Modules débloqués dès qu’un quiz est réussi à l’écran, sans attendre le statut `locked` du serveur. */
+  const [locallyUnlockedModuleIds, setLocallyUnlockedModuleIds] = useState<string[]>([]);
   /** Onglet actif de la page : formations en cours / certifications obtenues. */
   const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications' | 'usecases'>('trainings');
   type QuizQuestionState = {
@@ -1149,6 +1162,7 @@ export function Training() {
     const nextModuleId = normalizeMongoId((nextModule as any)?._id) || normalizeMongoId((nextModule as any)?.id);
     const structured = structuredProgressByJourney[selectedJourneyId];
     if (!structured || !Array.isArray(structured.modules)) return false;
+    if (nextModuleId && locallyUnlockedModuleIds.includes(nextModuleId)) return false;
     const moduleState = structured.modules.find((m) => m.moduleId === nextModuleId);
     return moduleState?.status === 'locked';
   }, [
@@ -1158,6 +1172,7 @@ export function Training() {
     formationViewerSlideIndex,
     selectedJourney,
     structuredProgressByJourney,
+    locallyUnlockedModuleIds,
   ]);
 
   /** Dernière slide du viewer = une section : pas d’index suivant, il faut « Terminer » pour envoyer complete. */
@@ -1287,6 +1302,20 @@ export function Training() {
     selectedJourneyId,
     progressByJourney,
   ]);
+
+  /** Quiz réussi (≥ 70 %) : afficher Suivant tout de suite, même si le module suivant est encore `locked` en base. */
+  useEffect(() => {
+    const slide = currentFormationViewerSlide;
+    if (!slide || slide.kind !== 'quiz_group' || !isCurrentQuizPassed || !selectedJourney) return;
+    const modules = extractModules(selectedJourney);
+    const nextMod = modules[slide.moduleIndex + 1];
+    if (!nextMod) return;
+    const nextId =
+      normalizeMongoId((nextMod as { _id?: unknown; id?: unknown })?._id) ||
+      normalizeMongoId((nextMod as { _id?: unknown; id?: unknown })?.id);
+    if (!nextId) return;
+    setLocallyUnlockedModuleIds((prev) => (prev.includes(nextId) ? prev : [...prev, nextId]));
+  }, [currentFormationViewerSlide, isCurrentQuizPassed, selectedJourney]);
 
   /** Dernière slide + tout validé (local ou formation 100 %) → Certificat, pas Suivant. */
   const isSelectedFormationFullyDone = useMemo(() => {
@@ -1443,6 +1472,7 @@ export function Training() {
     prevFormationSlideIndexRef.current = null;
     quizOutcomeSentRef.current.clear();
     quizStartSentRef.current.clear();
+    setLocallyUnlockedModuleIds([]);
   }, [selectedJourneyId]);
 
   useEffect(() => {
@@ -2137,8 +2167,35 @@ export function Training() {
     if (!repId || !selectedJourneyId || !selectedJourney) return;
     const slide = currentFormationViewerSlide;
     if (!slide || slide.kind !== 'quiz_group' || !isCurrentQuizFullyAnswered) return;
-    // Revue : ne pas resoumettre les réponses d’une formation / quiz déjà validé(e).
-    if (isSelectedFormationFullyDone || isCurrentQuizPassed) return;
+    // Revue : ne pas resoumettre un quiz déjà validé en base.
+    // Ne pas sauter l’envoi quand seule la note locale est ≥ 70 % : sinon `passed` reste false
+    // et le module suivant reste verrouillé.
+    if (isSelectedFormationFullyDone) return;
+    const modulesForPass = extractModules(selectedJourney);
+    const modForPass = modulesForPass[slide.moduleIndex] as ModuleRow | undefined;
+    const moduleIdForPass =
+      normalizeMongoId((modForPass as any)?._id) || normalizeMongoId((modForPass as any)?.id) || '';
+    const mpForPass =
+      moduleIdForPass && /^[a-f\d]{24}$/i.test(moduleIdForPass)
+        ? (progressByJourney[selectedJourneyId]?.modules?.[moduleIdForPass] as
+            | Record<string, unknown>
+            | undefined)
+        : undefined;
+    const quizzesForPass = Array.isArray(modForPass?.quizzes) ? modForPass.quizzes : [];
+    const questionsForPass = Array.isArray(slide.questions) ? slide.questions : [];
+    const serverAlreadyPassed = quizzesForPass.some((qz) => {
+      const qid =
+        normalizeMongoId((qz as { _id?: unknown; id?: unknown })?._id) ||
+        normalizeMongoId((qz as { _id?: unknown; id?: unknown })?.id);
+      const title = String((qz as { title?: unknown })?.title || '').trim();
+      const onSlide = questionsForPass.some((q) => {
+        if (qid && (q.quizId === qid || String(q.quizKey || '') === qid)) return true;
+        if (title && String(q.quizTitle || '').trim() === title) return true;
+        return false;
+      });
+      return onSlide && quizPassedOnServer(qz, mpForPass);
+    });
+    if (serverAlreadyPassed) return;
 
     const modules = extractModules(selectedJourney);
     const mod = modules[slide.moduleIndex];
@@ -2240,7 +2297,7 @@ export function Training() {
     formationViewerQuizState,
     isCurrentQuizFullyAnswered,
     isSelectedFormationFullyDone,
-    isCurrentQuizPassed,
+    progressByJourney,
     fetchTrainingProgressRows,
     fetchSlideProgressSummary,
     fetchStructuredProgress,
