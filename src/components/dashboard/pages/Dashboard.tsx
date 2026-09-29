@@ -316,6 +316,8 @@ export function Dashboard({ profile }: DashboardProps) {
   // Simulateur : chiffres saisis par GIG. Les commissions et le bonus viennent du GIG.
   const [showCalculator, setShowCalculator] = useState(false);
   const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
+  const [hoursGigId, setHoursGigId] = useState<string | null>(null);
+  const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
@@ -1431,11 +1433,36 @@ export function Dashboard({ profile }: DashboardProps) {
           {selectedGigId === 'all' ? (
             <div className="space-y-3">
               <p className="text-[12px] font-bold text-white/70 leading-snug">
-                Chaque GIG a ses propres heures et son propre bonus. Tes objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
+                Chaque GIG a ses propres heures et son propre bonus. Les objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
               </p>
-              {goals.perGig.map((gig) => (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setHoursMenuOpen((open) => !open)}
+                  className="w-full flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-3 py-3 text-left"
+                >
+                  <span className="text-[12px] font-black text-white truncate">
+                    {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || 'Choisir un GIG'}
+                  </span>
+                  <ChevronDown size={14} className={`text-white/50 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {hoursMenuOpen && (
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-white/15 bg-slate-950 shadow-xl">
+                    {goals.perGig.map((gig) => (
+                      <button
+                        key={gig.id}
+                        type="button"
+                        onClick={() => { setHoursGigId(gig.id); setHoursMenuOpen(false); }}
+                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-white text-slate-900' : 'text-white/80 hover:bg-white/10'}`}
+                      >
+                        {gig.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {goals.perGig.filter((gig) => gig.id === hoursGigId).map((gig) => (
                 <div key={gig.id} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 space-y-2">
-                  <p className="text-[11px] font-black text-white truncate">{gig.title}</p>
                   {([
                     { label: 'Jour', row: gig.hours.daily },
                     { label: 'Semaine', row: gig.hours.weekly },
@@ -1455,9 +1482,9 @@ export function Dashboard({ profile }: DashboardProps) {
                         ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
                         : 'Pas de bonus sur ce GIG'}
                   </p>
-                  </div>
+                </div>
               ))}
-                  </div>
+            </div>
           ) : (
           <>
           {([
