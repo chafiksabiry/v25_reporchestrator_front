@@ -789,8 +789,6 @@ export function Training() {
   const [formationViewerQuizPage, setFormationViewerQuizPage] = useState<Record<string, number>>({});
   /** Fautes cumulées sur tout le bloc quiz du slide (pas par question). Max 3 affichées. */
   const [quizSlideWrongStrikes, setQuizSlideWrongStrikes] = useState<Record<string, number>>({});
-  const [quizQuestionCountdownSec, setQuizQuestionCountdownSec] = useState<Record<string, number>>({});
-  const quizTimerSlideRef = useRef<{ qk: string } | null>(null);
   const [progressByJourney, setProgressByJourney] = useState<Record<string, RepProgressRow>>({});
   const [slideProgressSummary, setSlideProgressSummary] = useState<RepSlideProgressSummary | null>(null);
   const [structuredProgressByJourney, setStructuredProgressByJourney] = useState<Record<string, StructuredProgressRow>>({});
@@ -1464,7 +1462,6 @@ export function Training() {
       setFormationViewerQuizState({});
       setFormationViewerQuizPage({});
       setQuizSlideWrongStrikes({});
-      setQuizQuestionCountdownSec({});
     }
     sectionStartSentRef.current.clear();
     sectionStartPromiseRef.current.clear();
@@ -1507,15 +1504,12 @@ export function Training() {
     );
     let maxCap = 3;
     let att = 0;
-    let lockUntil = 0;
     let anyPassed = false;
     for (const row of quizProg) {
       const k = String(row?.quizKey || '').trim();
       if (!activeKeys.has(k)) continue;
       maxCap = Math.max(maxCap, Number(row?.maxAttempts || 0) || 3);
       att = Math.max(att, Number(row?.attempts || 0));
-      const lu = Date.parse(String(row?.lockedUntil || ''));
-      if (Number.isFinite(lu)) lockUntil = Math.max(lockUntil, lu);
       if (row?.passed === true || String(row?.status) === 'passed') anyPassed = true;
     }
     const fromJourney = Math.max(
@@ -1523,7 +1517,6 @@ export function Training() {
       ...slide.questions.map((q) => Number((q as { maxAttempts?: unknown }).maxAttempts) || 3)
     );
     maxCap = Math.max(maxCap, fromJourney);
-    if (Date.now() < lockUntil) return true;
     if (!anyPassed && att >= maxCap) return true;
     return false;
   }, [currentFormationViewerSlide, selectedJourneyId, selectedJourney, progressByJourney]);
@@ -1811,10 +1804,6 @@ export function Training() {
       const quizzes = Array.isArray((moduleRow as any)?.quizzes) ? (moduleRow as any).quizzes : [];
       const totalSections = sections.length;
       const hasQuizzes = quizzes.length > 0;
-      const sectionDurationMs = Math.max(
-        10000,
-        Math.floor(Number((sec as any)?.duration || 0) * 60 * 1000) || 45000
-      );
       const syncKey = `complete:${sentKey}`;
       if (progressSyncInFlightRef.current.has(syncKey)) return;
       progressSyncInFlightRef.current.add(syncKey);
@@ -1847,7 +1836,6 @@ export function Training() {
           progress,
           status,
           completedSections: nextDone.filter((id) => /^[a-f\d]{24}$/i.test(id)),
-          durationMs: sectionDurationMs,
         });
 
       const finalizeComplete = async () => {
@@ -2067,14 +2055,12 @@ export function Training() {
           journeyId: selectedJourneyId,
           moduleId,
           status: 'in_progress',
-          durationMs: quizMeta ? 0 : 40000,
           quizUpdate: quizMeta
             ? {
                 quizKey: quizMeta.quizKey,
                 quizMongoId:
                   quizMeta.quizId && /^[a-f\d]{24}$/i.test(quizMeta.quizId) ? quizMeta.quizId : undefined,
                 status: 'in_progress',
-                durationMs: 40000,
               }
             : undefined,
         });
@@ -2303,36 +2289,15 @@ export function Training() {
     fetchStructuredProgress,
   ]);
 
-  const activeQuizTimerCtx = useMemo(() => {
-    const slide = currentFormationViewerSlide;
-    if (!slide || slide.kind !== 'quiz_group') return null;
-    const total = slide.questions.length;
-    const page = Math.min(Math.max(0, formationViewerQuizPage[slide.key] ?? 0), Math.max(0, total - 1));
-    const qk = `${slide.key}-q${page}`;
-    return { slide, page, qk, total };
-  }, [currentFormationViewerSlide, formationViewerQuizPage]);
-
-  const activeQuizQuestionLocked = activeQuizTimerCtx
-    ? !!formationViewerQuizState[activeQuizTimerCtx.qk]?.locked
-    : false;
-
   const restartQuizSlide = useCallback((slide: any) => {
     const slideKey = String(slide?.key || '');
     if (!slideKey) return;
-    quizTimerSlideRef.current = null;
     setFormationViewerQuizPage((prev) => ({ ...prev, [slideKey]: 0 }));
     setQuizSlideWrongStrikes((prev) => ({
       ...prev,
       [slideKey]: Math.min(maxQuizAttemptsForFormationSlide(slide), (prev[slideKey] ?? 0) + 1),
     }));
     setFormationViewerQuizState((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        if (k.startsWith(`${slideKey}-q`)) delete next[k];
-      });
-      return next;
-    });
-    setQuizQuestionCountdownSec((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((k) => {
         if (k.startsWith(`${slideKey}-q`)) delete next[k];
@@ -2376,41 +2341,6 @@ export function Training() {
       void requestQuizStartForSlide(slide, { ignoreSentRef: true });
     }
   }, [selectedJourney, selectedJourneyId, requestQuizStartForSlide]);
-
-  useEffect(() => {
-    if (!activeQuizTimerCtx || activeQuizQuestionLocked) return;
-    const { slide, page, qk, total } = activeQuizTimerCtx;
-    quizTimerSlideRef.current = { qk };
-    const endAt = Date.now() + 40000;
-    const id = window.setInterval(() => {
-      if (quizTimerSlideRef.current?.qk !== qk) return;
-      const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-      setQuizQuestionCountdownSec((m) => ({ ...m, [qk]: rem }));
-      if (rem > 0) return;
-      window.clearInterval(id);
-      if (quizTimerSlideRef.current?.qk !== qk) return;
-      const cq = slide.questions[page];
-      setQuizSlideWrongStrikes((prev) => ({
-        ...prev,
-        [slide.key]: Math.min(3, (prev[slide.key] ?? 0) + 1),
-      }));
-      setFormationViewerQuizState((prev) => ({
-        ...prev,
-        [qk]: { selected: null, revealed: true, locked: true, timedOut: true },
-      }));
-      void syncQuizDuration(slide.moduleIndex, cq ? { quizKey: cq.quizKey, quizId: cq.quizId } : undefined);
-      window.setTimeout(() => {
-        setFormationViewerQuizPage((prev) => {
-          const cur = Math.min(Math.max(0, prev[slide.key] ?? 0), Math.max(0, total - 1));
-          if (cur < total - 1) return { ...prev, [slide.key]: cur + 1 };
-          return prev;
-        });
-      }, 650);
-    }, 400);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [activeQuizTimerCtx, activeQuizQuestionLocked, syncQuizDuration]);
 
   return (
     <div className={selectedJourney ? 'w-full h-[calc(100vh-120px)]' : 'space-y-6 w-full'}>
@@ -3330,24 +3260,11 @@ export function Training() {
                             1,
                             maxAttemptsFromApi || maxQuizAttemptsForFormationSlide(slide)
                           );
-                          const lockedUntilTs = quizProgressRows.reduce((acc: number, row: any) => {
-                            if (!activeQuizKeys.has(String(row?.quizKey || '').trim())) return acc;
-                            const ts = Date.parse(String(row?.lockedUntil || ''));
-                            return Number.isFinite(ts) ? Math.max(acc, ts) : acc;
-                          }, 0);
-                          const moduleLockRemainingMs = Math.max(0, lockedUntilTs - Date.now());
-                          const moduleLockedByCooldown = moduleLockRemainingMs > 0;
-                          const quizAttemptsBlocked =
-                            !isCurrentQuizPassed &&
-                            (moduleLockedByCooldown || backendAttempts >= quizMaxCap);
+                          const quizAttemptsBlocked = !isCurrentQuizPassed && backendAttempts >= quizMaxCap;
                           const moduleStrikes = Math.min(
                             quizMaxCap,
                             Math.max(quizSlideWrongStrikes[slide.key] ?? 0, backendAttempts)
                           );
-                          const countdown =
-                            qState.locked || qState.revealed
-                              ? 0
-                              : Math.max(0, quizQuestionCountdownSec[qKey] ?? 40);
                           const correctIdx =
                             typeof currentQuestion?.correctAnswer === 'number'
                               ? currentQuestion.correctAnswer
@@ -3381,13 +3298,6 @@ export function Training() {
                                 </span>
                                 <span className="rounded-full border border-harx-400/35 bg-[#12172f] px-2.5 py-1 font-semibold text-harx-100">
                                   Essais (soumissions): {moduleStrikes} / {quizMaxCap}
-                                </span>
-                                <span className="rounded-full border border-amber-400/35 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100">
-                                  {moduleLockedByCooldown
-                                    ? `Cooldown ${Math.ceil(moduleLockRemainingMs / 60000)}m`
-                                    : qState.locked
-                                      ? '—'
-                                      : `${countdown}s`}
                                 </span>
                                 <div className="flex items-center gap-1.5">
                                   {!isSelectedFormationFullyDone ? (
@@ -3451,18 +3361,10 @@ export function Training() {
                                     <button
                                       key={oi}
                                       type="button"
-                                      disabled={
-                                        qState.revealed || qState.locked || moduleLockedByCooldown || quizAttemptsBlocked
-                                      }
-                                      aria-disabled={moduleLockedByCooldown || quizAttemptsBlocked}
+                                      disabled={qState.revealed || qState.locked || quizAttemptsBlocked}
+                                      aria-disabled={quizAttemptsBlocked}
                                       onClick={() => {
-                                        if (
-                                          qState.revealed ||
-                                          qState.locked ||
-                                          moduleLockedByCooldown ||
-                                          quizAttemptsBlocked
-                                        )
-                                          return;
+                                        if (qState.revealed || qState.locked || quizAttemptsBlocked) return;
                                         const wrong = oi !== correctIdx;
                                         if (wrong) {
                                           setQuizSlideWrongStrikes((prev) => ({
@@ -3534,7 +3436,7 @@ export function Training() {
                                     {qState.answerMissing
                                       ? 'Réponse non enregistrée pour cette question (soumission antérieure).'
                                       : qState.timedOut
-                                        ? 'Temps écoulé (40 s). Réponse enregistrée comme incorrecte.'
+                                        ? 'Réponse enregistrée comme incorrecte.'
                                         : isCorrect
                                           ? 'Bonne réponse !'
                                           : isWrong
@@ -3703,11 +3605,11 @@ export function Training() {
                   !showFormationCertificateCta ? (
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
-                        ? 'Nombre maximum de tentatives atteint. En cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
+                        ? 'Nombre maximum de tentatives atteint.'
                         : atLastFormationSlide ||
                             formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
-                          ? 'Répondez à toutes les questions (40 s max par question). Le bouton Bravo s’active dès une note ≥ 70 %.'
-                          : 'Répondez à toutes les questions (40 s max par question). Le bouton Suivant s’active dès une note ≥ 70 %.'}
+                          ? 'Répondez à toutes les questions. Le bouton Bravo s’active dès une note ≥ 70 %.'
+                          : 'Répondez à toutes les questions. Le bouton Suivant s’active dès une note ≥ 70 %.'}
                     </p>
                   ) : null}
                   {isNextModuleLocked ? (
