@@ -1430,6 +1430,72 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
           )}
         </div>
+
+        <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-3 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
+              {t('dashboard.home.pipeline.retraction')}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
+              <RotateCcw size={14} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-orange-700 tracking-tight mt-1">
+            {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
+          </p>
+          <p className="text-[10px] text-orange-600/80 pt-1">
+            {earningsPipeline.retractionCount > 0
+              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
+              : t('dashboard.home.pipeline.noSales')}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-3 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
+              {t('dashboard.home.pipeline.clientValidation')}
+            </p>
+            <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+              <Building2 size={14} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-amber-700 tracking-tight mt-1">
+            +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+          </p>
+          <p className="text-[10px] text-amber-600/80 pt-1">
+            {earningsPipeline.clientValidationCount > 0
+              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
+              : t('dashboard.home.pipeline.nothingPending')}
+          </p>
+        </div>
+
+        <div className={`rounded-2xl border p-3 shadow-sm flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${qualityAlerts.fraud > 0 ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
+              <ShieldAlert size={14} />
+            </div>
+          </div>
+          <p className={`text-xl font-black tracking-tight mt-1 ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+            {qualityAlerts.fraud}
+          </p>
+          <p className="text-[10px] text-slate-500 pt-1">
+            {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-indigo-200/70 bg-white p-3 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
+            <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+              <Award size={14} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-indigo-700 tracking-tight mt-1">
+            {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
+          </p>
+          <p className="text-[10px] text-slate-500 pt-1">Moyenne des appels scorés</p>
+        </div>
       </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
@@ -1826,74 +1892,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
         </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-3 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
-              {t('dashboard.home.pipeline.retraction')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
-              <RotateCcw size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-orange-700 tracking-tight mt-1">
-            {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
-          </p>
-          <p className="text-[10px] text-orange-600/80 pt-1">
-            {earningsPipeline.retractionCount > 0
-              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
-              : t('dashboard.home.pipeline.noSales')}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-3 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
-              {t('dashboard.home.pipeline.clientValidation')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-              <Building2 size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-amber-700 tracking-tight mt-1">
-            +{fmtMoney(earningsPipeline.clientValidationAmount)} €
-          </p>
-          <p className="text-[10px] text-amber-600/80 pt-1">
-            {earningsPipeline.clientValidationCount > 0
-              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
-              : t('dashboard.home.pipeline.nothingPending')}
-          </p>
-        </div>
-
-        <div className={`rounded-2xl border p-3 shadow-sm flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
-            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${qualityAlerts.fraud > 0 ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
-              <ShieldAlert size={14} />
-            </div>
-          </div>
-          <p className={`text-xl font-black tracking-tight mt-1 ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-            {qualityAlerts.fraud}
-          </p>
-          <p className="text-[10px] text-slate-500 pt-1">
-            {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-indigo-200/70 bg-white p-3 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
-            <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
-              <Award size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-indigo-700 tracking-tight mt-1">
-            {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
-          </p>
-          <p className="text-[10px] text-slate-500 pt-1">Moyenne des appels scorés</p>
-        </div>
       </div>
 
       {/* Réservations — bandeau style Planning */}
