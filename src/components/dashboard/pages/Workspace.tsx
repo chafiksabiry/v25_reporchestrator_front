@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
   BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye,
   MapPin, CreditCard, Info, Tag, X, Loader2,
-  PhoneMissed, Voicemail, PhoneOff, Repeat2, CalendarCheck, Handshake, Ban, PartyPopper, ListFilter
+  PhoneMissed, Voicemail, PhoneOff, Repeat2, CalendarCheck, Handshake, Ban, PartyPopper, ListFilter, Sparkles
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -800,6 +800,14 @@ export function WorkspaceContent() {
     return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
+  const isAddedThisRollingWeek = (raw?: string | null): boolean => {
+    if (!raw) return false;
+    const added = new Date(raw).getTime();
+    if (Number.isNaN(added)) return false;
+    const age = Date.now() - added;
+    return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000;
+  };
+
   const workspaceTools = [
     { id: 'voice', label: t('workspace.tabLeads'), icon: User },
     { id: 'calls', label: t('workspace.tabCallHistory'), icon: PhoneOutgoing },
@@ -1177,10 +1185,29 @@ export function WorkspaceContent() {
                                   </p>
                                 </div>
                                 {lead.Created_Time && (
-                                  <div className="flex items-center gap-1 text-gray-300">
-                                    <Calendar className="w-2.5 h-2.5" />
-                                    <span className="text-[9px] font-medium">{formatCreatedDate(lead.Created_Time)}</span>
+                                  <div
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 text-white border border-slate-700 shadow-sm"
+                                    title={t('workspace.addedOnLabel')}
+                                  >
+                                    <Calendar className="w-3 h-3 text-rose-300 shrink-0" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-rose-200">
+                                      {t('workspace.addedOnLabel')}
+                                    </span>
+                                    <span className="text-[11px] font-black tabular-nums text-white">
+                                      {formatCreatedDate(lead.Created_Time)}
+                                    </span>
                                   </div>
+                                )}
+                                {isAddedThisRollingWeek(lead.Created_Time) && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md shadow-rose-500/30"
+                                    title={t('workspace.newThisWeekHint')}
+                                  >
+                                    <Sparkles className="w-3 h-3 shrink-0" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest">
+                                      {t('workspace.newThisWeek')}
+                                    </span>
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -1890,9 +1917,20 @@ export function WorkspaceContent() {
                 <div>
                   <h2 className="text-lg font-black text-white tracking-tight">{prospectProfileLead.Deal_Name}</h2>
                   {prospectProfileLead.Created_Time && (
-                    <p className="text-[10px] text-white/70 font-medium mt-0.5 flex items-center gap-1">
-                      <Calendar className="w-2.5 h-2.5" />
-                      {t('workspace.profileAddedOn', 'Ajouté le')} {formatCreatedDate(prospectProfileLead.Created_Time)}
+                    <p className="text-[10px] text-white font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <Calendar className="w-3 h-3 text-white shrink-0" />
+                      <span className="uppercase tracking-widest text-white/90">
+                        {t('workspace.addedOnLabel')}
+                      </span>
+                      <span className="tabular-nums">{formatCreatedDate(prospectProfileLead.Created_Time)}</span>
+                      {isAddedThisRollingWeek(prospectProfileLead.Created_Time) && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white text-rose-600">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span className="text-[8px] font-black uppercase tracking-widest">
+                            {t('workspace.newThisWeek')}
+                          </span>
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>
