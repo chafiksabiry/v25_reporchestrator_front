@@ -140,15 +140,25 @@ type GoalsPeriod = Exclude<PeriodKey, 'all'>;
 
 const GOALS_PERIODS: GoalsPeriod[] = ['today', 'week', 'month', 'quarter', 'year'];
 
-const PERIOD_OF_MONTH: Record<GoalsPeriod, number> = {
-  today: 1 / 20,
-  week: 1 / 4,
-  month: 1,
-  quarter: 3,
-  year: 12,
-};
-
 type EarningsGoals = Record<GoalsPeriod, number>;
+type CountGoals = Record<GoalsPeriod, number>;
+
+function emptyCountGoals(): CountGoals {
+  return { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
+}
+
+function loadCountGoals(storageKey: string): CountGoals {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}') as Partial<CountGoals>;
+    const next = emptyCountGoals();
+    (Object.keys(next) as GoalsPeriod[]).forEach((key) => {
+      next[key] = Math.max(0, Number(parsed[key]) || 0);
+    });
+    return next;
+  } catch {
+    return emptyCountGoals();
+  }
+}
 
 function loadEarningsGoals(): EarningsGoals {
   const empty: EarningsGoals = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
@@ -167,15 +177,22 @@ function loadEarningsGoals(): EarningsGoals {
   }
 }
 
-function monthHours(availability: any): number {
+function hourMinimums(availability: any) {
   const hours = availability?.minimumHours || {};
-  const monthly = Number(hours.monthly || 0);
-  const weekly = Number(hours.weekly || 0);
-  const daily = Number(hours.daily || 0);
-  if (monthly > 0) return monthly;
-  if (weekly > 0) return weekly * 4;
-  if (daily > 0) return daily * 20;
-  return 0;
+  return {
+    daily: Number(hours.daily || 0),
+    weekly: Number(hours.weekly || 0),
+    monthly: Number(hours.monthly || 0),
+  };
+}
+
+function bonusPeriodKey(commission: any): GoalsPeriod {
+  const raw = String(commission?.minimumVolume?.period || commission?.bonusPeriod || commission?.bonusType || '').toLowerCase();
+  if (raw.includes('day') || raw.includes('jour') || raw === 'daily') return 'today';
+  if (raw.includes('week') || raw.includes('semaine')) return 'week';
+  if (raw.includes('quarter') || raw.includes('trimestre')) return 'quarter';
+  if (raw.includes('year') || raw.includes('ann')) return 'year';
+  return 'month';
 }
 
 function monthTransactions(commission: any): number {
@@ -194,11 +211,6 @@ function agentTxAmount(commission: any): number {
     return amount;
   }
   return 0;
-}
-
-function scaleTarget(monthly: number, period: GoalsPeriod): number {
-  if (monthly <= 0) return 0;
-  return Math.max(1, Math.round(monthly * PERIOD_OF_MONTH[period]));
 }
 
 const getPeriodStart = (period: PeriodKey): number => {
@@ -293,10 +305,13 @@ export function Dashboard({ profile }: DashboardProps) {
   // Calculator / Simulateur
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcCalls, setCalcCalls] = useState(12);
-  const [calcCallsPerTx, setCalcCallsPerTx] = useState(12);
-  const [calcCommission, setCalcCommission] = useState(25);
+  const [calcTransactions, setCalcTransactions] = useState(1);
+  const [calcCallCommission, setCalcCallCommission] = useState(0);
+  const [calcTxCommission, setCalcTxCommission] = useState(17.5);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
-  const [editingGoal, setEditingGoal] = useState(false);
+  const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
+  const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
+  const [editingGoal, setEditingGoal] = useState<null | 'earnings' | 'calls' | 'transactions'>(null);
   const [goalInput, setGoalInput] = useState('0');
   // Reservations cancellation stats period
   const [cancelStatsPeriod, setCancelStatsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
@@ -714,10 +729,17 @@ export function Dashboard({ profile }: DashboardProps) {
     const scopedGigs = selectedGigId === 'all'
       ? gigsData
       : gigsData.filter((g) => g._id === selectedGigId);
-    const monthlyHours = scopedGigs.reduce((sum, gig) => sum + monthHours(gig.availability), 0);
-    const monthlyTx = scopedGigs.reduce((sum, gig) => sum + monthTransactions(gig.commission), 0);
-    const hoursTarget = scaleTarget(monthlyHours, goalsPeriod);
-    const transactionTarget = scaleTarget(monthlyTx, goalsPeriod);
+    const hourTargets = scopedGigs.reduce(
+      (sum, gig) => {
+        const mins = hourMinimums(gig.availability);
+        return {
+          daily: sum.daily + mins.daily,
+          weekly: sum.weekly + mins.weekly,
+          monthly: sum.monthly + mins.monthly,
+        };
+      },
+      { daily: 0, weekly: 0, monthly: 0 }
+    );
     const bonusAmount = scopedGigs.reduce((sum, gig) => {
       const facing = getResolvedAgentFacing(gig.commission as any);
       const amount = Number(facing?.bonusAmount || 0);
@@ -732,56 +754,113 @@ export function Dashboard({ profile }: DashboardProps) {
       return id === selectedGigId;
     };
 
-    const validatedCalls = callsData.filter((call: any) => {
-      if (!matchesGig(call.gigId)) return false;
-      const ts = new Date(call.createdAt || call.startTime || call.date || 0).getTime();
-      if (!ts || ts < startTs) return false;
-      return call.valid === true || call.validByAI === true;
-    }).length;
+    const sales = dedupeSaleLedgerRows(repLedger);
+    const gigIdOf = (gigId: any) => (typeof gigId === 'object' ? (gigId?._id || gigId?.id) : gigId);
+    const isSuccessfulSale = (row: RepTransactionRow) =>
+      row.type === 'transaction' && (row.status === 'earned' || row.status === 'paid' || row.status === 'pending_retraction');
 
-    let slotHours = 0;
-    reservationsData.forEach((reservation: any) => {
-      if (!matchesGig(reservation.gigId)) return;
-      if (reservation.status === 'cancelled' || reservation.attended === false) return;
-      const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
-      if (!ts || ts < startTs || ts > Date.now()) return;
-      slotHours += Number(reservation.duration || 0);
-    });
-    slotHours = Math.round(slotHours * 10) / 10;
+    const countSales = (since: number, onlyGigId?: string) => {
+      let count = 0;
+      sales.forEach((row) => {
+        if (!isSuccessfulSale(row)) return;
+        const gid = gigIdOf(row.gigId);
+        if (onlyGigId) {
+          if (gid !== onlyGigId) return;
+        } else if (!matchesGig(row.gigId)) return;
+        const ts = new Date(row.createdAt || 0).getTime();
+        if (!ts || ts < since) return;
+        count += 1;
+      });
+      return count;
+    };
 
-    let validatedTransactions = 0;
+    const countSince = (since: number, kind: 'calls' | 'hours') => {
+      if (kind === 'calls') {
+        return callsData.filter((call: any) => {
+          if (!matchesGig(call.gigId)) return false;
+          const ts = new Date(call.createdAt || call.startTime || call.date || 0).getTime();
+          if (!ts || ts < since) return false;
+          return call.valid === true || call.validByAI === true;
+        }).length;
+      }
+      let hours = 0;
+      reservationsData.forEach((reservation: any) => {
+        if (!matchesGig(reservation.gigId)) return;
+        if (reservation.status === 'cancelled' || reservation.attended === false) return;
+        const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
+        if (!ts || ts < since || ts > Date.now()) return;
+        hours += Number(reservation.duration || 0);
+      });
+      return Math.round(hours * 10) / 10;
+    };
+
+    const validatedCalls = countSince(startTs, 'calls');
+    const hoursToday = countSince(getPeriodStart('today'), 'hours');
+    const hoursWeek = countSince(getPeriodStart('week'), 'hours');
+    const hoursMonth = countSince(getPeriodStart('month'), 'hours');
+    const validatedTransactions = countSales(startTs);
+
     let earned = 0;
-    repLedger.forEach((row) => {
+    sales.forEach((row) => {
       if (!matchesGig(row.gigId)) return;
       const ts = new Date(row.createdAt || 0).getTime();
       if (!ts || ts < startTs) return;
-      const isSale = row.type === 'transaction' && (row.status === 'earned' || row.status === 'paid' || row.status === 'pending_retraction');
-      if (isSale) validatedTransactions += 1;
       if (row.status === 'earned') earned += row.repShare || 0;
     });
 
-    const callsPerTx = Math.max(1, calcCallsPerTx);
-    const callsTarget = transactionTarget > 0 ? transactionTarget * callsPerTx : 0;
+    let bonusCurrent = 0;
+    let bonusTarget = 0;
+    let gigsTriggered = 0;
+    let gigsWithTarget = 0;
+    let bonusWindow: GoalsPeriod = 'month';
+    scopedGigs.forEach((gig) => {
+      const target = monthTransactions(gig.commission);
+      if (target <= 0) return;
+      gigsWithTarget += 1;
+      const periodKey = bonusPeriodKey(gig.commission);
+      bonusWindow = periodKey;
+      const current = countSales(getPeriodStart(periodKey), gig._id);
+      bonusTarget += target;
+      bonusCurrent += current;
+      if (current >= target) gigsTriggered += 1;
+    });
+    const bonusTriggered = gigsWithTarget > 0 && gigsTriggered === gigsWithTarget;
+
     const pct = (current: number, target: number) =>
       target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
     const labelGig = selectedGigId === 'all'
       ? t('dashboard.home.allGigs')
       : (gigsData.find((g) => g._id === selectedGigId)?.title || t('dashboard.home.gigFallback'));
 
+    const bar = (current: number, target: number) => ({
+      current,
+      target,
+      progressPct: pct(current, target),
+      reached: target > 0 && current >= target,
+    });
+
     return {
       label: labelGig,
-      hours: { current: slotHours, target: hoursTarget, progressPct: pct(slotHours, hoursTarget) },
-      transactions: { current: validatedTransactions, target: transactionTarget, progressPct: pct(validatedTransactions, transactionTarget) },
-      calls: { current: validatedCalls, target: callsTarget, progressPct: pct(validatedCalls, callsTarget) },
+      hours: {
+        daily: bar(hoursToday, hourTargets.daily),
+        weekly: bar(hoursWeek, hourTargets.weekly),
+        monthly: bar(hoursMonth, hourTargets.monthly),
+      },
+      transactions: { current: validatedTransactions },
+      calls: { current: validatedCalls },
       bonus: {
-        current: validatedTransactions,
-        target: transactionTarget,
+        current: bonusCurrent,
+        target: bonusTarget,
         bonusAmount: Math.round(bonusAmount * 100) / 100,
-        progressPct: pct(validatedTransactions, transactionTarget),
+        progressPct: pct(bonusCurrent, bonusTarget),
+        triggered: bonusTriggered,
+        period: bonusWindow,
+        gigsTriggered,
+        gigsWithTarget,
       },
       earned,
     };
-  }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, calcCallsPerTx, t]);
+  }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, t]);
 
   const companyTargets = useMemo(() => {
     const scoped = selectedGigId === 'all' ? gigsData : gigsData.filter((g) => g._id === selectedGigId);
@@ -794,24 +873,38 @@ export function Dashboard({ profile }: DashboardProps) {
   }, [selectedGigId, gigsData]);
 
   const calcResult = useMemo(() => {
-    const callsPerTx = Math.max(1, calcCallsPerTx);
-    const transactions = Math.floor(Math.max(0, calcCalls) / callsPerTx);
-    const earnings = transactions * calcCommission;
-    const goal = earningsGoals[goalsPeriod] || 0;
-    const transactionsForGoal = calcCommission > 0 && goal > 0 ? Math.ceil(goal / calcCommission) : 0;
+    const calls = Math.max(0, calcCalls);
+    const transactions = Math.max(0, calcTransactions);
+    const callEarnings = calls * calcCallCommission;
+    const transactionEarnings = transactions * calcTxCommission;
     return {
+      calls,
       transactions,
-      earnings,
-      callsPerTx,
-      transactionsForGoal,
-      callsForGoal: transactionsForGoal * callsPerTx,
+      callEarnings,
+      transactionEarnings,
+      earnings: callEarnings + transactionEarnings,
     };
-  }, [calcCalls, calcCallsPerTx, calcCommission, earningsGoals, goalsPeriod]);
+  }, [calcCalls, calcTransactions, calcCallCommission, calcTxCommission]);
 
   const repEarningsGoal = earningsGoals[goalsPeriod] || 0;
+  const repCallGoal = callGoals[goalsPeriod] || 0;
+  const repTxGoal = transactionGoals[goalsPeriod] || 0;
   const earningsGoalProgress = repEarningsGoal > 0
     ? Math.min(100, Math.round((goals.earned / repEarningsGoal) * 100))
     : 0;
+  const callGoalProgress = repCallGoal > 0
+    ? Math.min(100, Math.round((goals.calls.current / repCallGoal) * 100))
+    : 0;
+  const txGoalProgress = repTxGoal > 0
+    ? Math.min(100, Math.round((goals.transactions.current / repTxGoal) * 100))
+    : 0;
+  const bonusPeriodLabel: Record<GoalsPeriod, string> = {
+    today: "aujourd'hui",
+    week: 'cette semaine',
+    month: 'ce mois',
+    quarter: 'ce trimestre',
+    year: 'cette année',
+  };
 
   const qualityAlerts = useMemo(() => {
     let fraud = 0;
@@ -887,9 +980,10 @@ export function Dashboard({ profile }: DashboardProps) {
   // Sync simulateur avec les données réelles GIG quand on change de GIG
   useEffect(() => {
     if (companyTargets.transactionCommission > 0) {
-      setCalcCommission(companyTargets.transactionCommission);
-    } else if (companyTargets.commissionPerCall > 0) {
-      setCalcCommission(companyTargets.commissionPerCall);
+      setCalcTxCommission(companyTargets.transactionCommission);
+    }
+    if (companyTargets.commissionPerCall > 0) {
+      setCalcCallCommission(companyTargets.commissionPerCall);
     }
   }, [companyTargets.transactionCommission, companyTargets.commissionPerCall]);
 
@@ -904,7 +998,19 @@ export function Dashboard({ profile }: DashboardProps) {
       localStorage.setItem('harx_earnings_goals', JSON.stringify(next));
       return next;
     });
-    setEditingGoal(false);
+    setEditingGoal(null);
+  };
+
+  const saveCountGoal = (kind: 'calls' | 'transactions', raw: string) => {
+    const value = Math.max(0, Math.round(Number(raw) || 0));
+    const apply = (current: CountGoals) => {
+      const next = { ...current, [goalsPeriod]: value };
+      localStorage.setItem(kind === 'calls' ? 'harx_call_goals' : 'harx_transaction_goals', JSON.stringify(next));
+      return next;
+    };
+    if (kind === 'calls') setCallGoals(apply);
+    else setTransactionGoals(apply);
+    setEditingGoal(null);
   };
 
   const goToProduction = () => {
@@ -1210,7 +1316,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 onClick={() => {
                   setGoalsPeriod(key);
                   setSelectedPeriod(key);
-                  setEditingGoal(false);
+                  setEditingGoal(null);
                 }}
                 className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider transition ${
                   goalsPeriod === key
@@ -1226,96 +1332,130 @@ export function Dashboard({ profile }: DashboardProps) {
 
         <div className="relative z-10 space-y-4">
 
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Company · prérequis</p>
+          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">GIG · heures minimum</p>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <CalendarCheck size={13} className="text-violet-400 shrink-0" />
-                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
-                <span className="text-[10px] font-bold text-white/35 lowercase">{t('dashboard.home.goals.sessionsLabel')}</span>
+          {([
+            { label: 'Quotidien', row: goals.hours.daily },
+            { label: 'Semaine', row: goals.hours.weekly },
+            { label: 'Mois', row: goals.hours.monthly },
+          ] as const).map(({ label, row }) => (
+            <div key={label} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarCheck size={13} className="text-violet-400 shrink-0" />
+                  <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{label}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-white font-black tracking-tighter">
+                    {row.current}h<span className="text-white/40 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
+                  </span>
+                  <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-400' : 'text-white/60'}`}>
+                    {row.target > 0 ? `${row.progressPct}%` : '—'}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-white font-black tracking-tighter">
-                  {goals.hours.current}h<span className="text-white/40 font-bold text-sm">{goals.hours.target > 0 ? `/${goals.hours.target}h` : ''}</span>
-                </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.hours.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                  {goals.hours.target > 0 ? `${goals.hours.progressPct}%` : '—'}
-                </span>
-              </div>
-            </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${goals.hours.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${goals.hours.progressPct}%` }} />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Zap size={13} className="text-amber-400" />
-                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Transactions</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-black tracking-tighter">
-                  {goals.transactions.current}<span className="text-white/40 font-bold text-sm">{goals.transactions.target > 0 ? `/${goals.transactions.target}` : ''}</span>
-                </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.transactions.progressPct >= 100 ? 'text-emerald-400' : 'text-amber-300'}`}>
-                  {goals.transactions.target > 0 ? `${goals.transactions.progressPct}%` : '—'}
-                </span>
+              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${row.reached ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${row.progressPct}%` }} />
               </div>
             </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${goals.transactions.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`} style={{ width: `${goals.transactions.progressPct}%` }} />
-            </div>
-          </div>
+          ))}
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Phone size={13} className="text-cyan-400" />
-                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.callsTitle')}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-black tracking-tighter">
-                  {goals.calls.current}<span className="text-white/40 font-bold text-sm">{goals.calls.target > 0 ? `/${goals.calls.target}` : ''}</span>
-                </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.calls.progressPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                  {goals.calls.target > 0 ? `${goals.calls.progressPct}%` : '—'}
-                </span>
-              </div>
-            </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${goals.calls.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-cyan-400 to-cyan-500'}`} style={{ width: `${goals.calls.progressPct}%` }} />
-            </div>
-            <p className="text-[10px] font-bold text-white/35">
-              {calcResult.callsPerTx} appels validés = 1 transaction
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Flame size={13} className="text-orange-400" />
+                <Flame size={13} className={goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-400'} />
                 <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-emerald-300 font-black tracking-tight">
                   {goals.bonus.bonusAmount > 0 ? `+${goals.bonus.bonusAmount.toFixed(2)} €` : '—'}
                 </span>
-                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.progressPct >= 100 ? 'text-emerald-400' : 'text-orange-300'}`}>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-300'}`}>
                   {goals.bonus.target > 0 ? `${goals.bonus.progressPct}%` : '—'}
                 </span>
               </div>
             </div>
             <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${goals.bonus.progressPct >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-400'}`} style={{ width: `${goals.bonus.progressPct}%` }} />
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.bonus.triggered ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-400'}`} style={{ width: `${goals.bonus.progressPct}%` }} />
             </div>
             <p className="text-[10px] font-bold text-white/35">
-              {goals.bonus.target > 0
-                ? `${goals.bonus.current}/${goals.bonus.target} transactions validées pour déclencher le bonus`
-                : 'Le seuil de bonus vient du volume de transactions du GIG'}
+              {goals.bonus.gigsWithTarget > 1
+                ? `${goals.bonus.gigsTriggered}/${goals.bonus.gigsWithTarget} GIGs ont déclenché le bonus`
+                : goals.bonus.triggered
+                  ? `Bonus déclenché · ${goals.bonus.current} transactions réussies ${bonusPeriodLabel[goals.bonus.period]}`
+                  : goals.bonus.target > 0
+                    ? `${goals.bonus.current}/${goals.bonus.target} transactions réussies ${bonusPeriodLabel[goals.bonus.period]} · seuil du GIG`
+                    : 'Aucun volume minimum de transactions sur ce GIG'}
             </p>
           </div>
+
+          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] pt-1">Mes objectifs · {goalsPeriodLabels[goalsPeriod]}</p>
+
+          {([
+            {
+              kind: 'calls' as const,
+              title: t('dashboard.home.goals.callsTitle'),
+              icon: <Phone size={13} className="text-cyan-400" />,
+              current: goals.calls.current,
+              target: repCallGoal,
+              progress: callGoalProgress,
+            },
+            {
+              kind: 'transactions' as const,
+              title: 'Transactions',
+              icon: <Zap size={13} className="text-amber-400" />,
+              current: goals.transactions.current,
+              target: repTxGoal,
+              progress: txGoalProgress,
+            },
+          ]).map((item) => (
+            <div key={item.kind} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {item.icon}
+                  <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{item.title}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {editingGoal === item.kind ? (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        value={goalInput}
+                        onChange={(e) => setGoalInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
+                        className="w-16 bg-white/10 border border-white/20 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-harx-300"
+                        autoFocus
+                      />
+                      <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/30 text-emerald-300" aria-label="Enregistrer">
+                        <Check size={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-white font-black tracking-tighter">
+                        {item.current}<span className="text-white/40 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
+                      </span>
+                      <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-400' : 'text-white/50'}`}>
+                        {item.target > 0 ? `${item.progress}%` : 'à définir'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setGoalInput(String(item.target || '')); setEditingGoal(item.kind); }}
+                        className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
+                        aria-label={`Modifier l'objectif ${item.title}`}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${item.progress >= 100 && item.target > 0 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-300 to-harx-500'}`} style={{ width: `${item.target > 0 ? item.progress : 0}%` }} />
+              </div>
+            </div>
+          ))}
 
           <div className="rounded-2xl border border-harx-400/40 bg-harx-500/15 p-4 space-y-3 shadow-[0_0_40px_-12px_rgba(236,72,153,0.65)]">
             <div className="flex items-center justify-between gap-3">
@@ -1323,16 +1463,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <Trophy size={14} className="text-harx-300" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Mon objectif gains · {goalsPeriodLabels[goalsPeriod]}</span>
               </div>
-              {!editingGoal ? (
-                <button
-                  type="button"
-                  onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal(true); }}
-                  className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
-                  aria-label="Modifier l'objectif de gains"
-                >
-                  <Pencil size={12} />
-                </button>
-              ) : (
+              {editingGoal === 'earnings' ? (
                 <button
                   type="button"
                   onClick={() => saveEarningsGoal(goalInput)}
@@ -1341,9 +1472,18 @@ export function Dashboard({ profile }: DashboardProps) {
                 >
                   <Check size={12} />
                 </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
+                  className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
+                  aria-label="Modifier l'objectif de gains"
+                >
+                  <Pencil size={12} />
+                </button>
               )}
             </div>
-            {editingGoal ? (
+            {editingGoal === 'earnings' ? (
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -1394,57 +1534,62 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
             <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
-          <p className="text-[12px] font-black text-white">
-            {calcResult.callsPerTx} appels = 1 transaction = {fmtMoney(calcCommission)} €
+          <p className="text-[13px] font-bold text-white leading-snug">
+            {calcResult.calls} appels et {calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''} rapportent {fmtMoney(calcResult.earnings)} €.
           </p>
 
           {showCalculator && (
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels prévus</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={calcCalls}
-                    onChange={(e) => setCalcCalls(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels / transaction</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={calcCallsPerTx}
-                    onChange={(e) => setCalcCallsPerTx(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Commission € / transaction</label>
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels</label>
                   <input
                     type="number"
                     min={0}
-                    value={calcCommission}
-                    onChange={(e) => setCalcCommission(Math.max(0, Number(e.target.value)))}
+                    max={500}
+                    value={calcCalls}
+                    onChange={(e) => setCalcCalls(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Transactions</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={calcTransactions}
+                    onChange={(e) => setCalcTransactions(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">€ / appel</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={calcCallCommission}
+                    onChange={(e) => setCalcCallCommission(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">€ / transaction</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={calcTxCommission}
+                    onChange={(e) => setCalcTxCommission(Math.max(0, Number(e.target.value)))}
                     className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
                   />
                 </div>
               </div>
-              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3 flex items-center justify-between gap-3">
-                <p className="text-[11px] text-white/80 font-bold">
-                  {calcCalls} appels = <strong className="text-white">{calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''}</strong>
+              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3 space-y-1">
+                <p className="text-[11px] text-white/70 font-bold">
+                  {calcResult.calls} appels × {fmtMoney(calcCallCommission)} € + {calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''} × {fmtMoney(calcTxCommission)} €
                 </p>
                 <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(calcResult.earnings)} €</p>
               </div>
-              {repEarningsGoal > 0 && calcCommission > 0 && (
-                <p className="text-[11px] font-bold text-white/70">
-                  Pour {fmtMoney(repEarningsGoal)} € : {calcResult.transactionsForGoal} transactions, soit {calcResult.callsForGoal} appels validés
-                </p>
-              )}
             </div>
           )}
 
