@@ -1561,7 +1561,7 @@ export function Dashboard({ profile }: DashboardProps) {
                           setGoalInput(String(capped));
                         }}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
-                        className="w-16 bg-white/10 border border-white/20 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-harx-300"
+                        className="w-16 bg-white/10 border border-white/20 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-harx-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         autoFocus
                       />
                       <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/30 text-emerald-300" aria-label="Enregistrer">
@@ -1628,7 +1628,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-300"
+                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="Ex. 500"
                   autoFocus
                 />
@@ -1701,7 +1701,7 @@ export function Dashboard({ profile }: DashboardProps) {
                               value={simGigs[gig._id]?.calls ?? ''}
                               onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.callRate)} €</p>
                           </div>
@@ -1714,7 +1714,7 @@ export function Dashboard({ profile }: DashboardProps) {
                               value={simGigs[gig._id]?.transactions ?? ''}
                               onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.txRate)} €</p>
                             <p className="text-[9px] font-bold text-white/35 text-center">Pas plus que les appels</p>
