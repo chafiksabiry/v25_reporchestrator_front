@@ -915,7 +915,7 @@ export function Dashboard({ profile }: DashboardProps) {
       .map((gig) => {
         const entry = simGigs[gig._id];
         const calls = Math.max(0, Math.round(Number(entry.calls) || 0));
-        const transactions = Math.max(0, Math.round(Number(entry.transactions) || 0));
+        const transactions = Math.min(calls, Math.max(0, Math.round(Number(entry.transactions) || 0)));
         const callRate = agentCallAmount(gig.commission);
         const txRate = agentTxAmount(gig.commission);
         const bonusAmount = agentBonusAmount(gig.commission, gig.rewardBonus);
@@ -948,7 +948,7 @@ export function Dashboard({ profile }: DashboardProps) {
 
   const repEarningsGoal = earningsGoals[goalsPeriod] || 0;
   const repCallGoal = callGoals[goalsPeriod] || 0;
-  const repTxGoal = transactionGoals[goalsPeriod] || 0;
+  const repTxGoal = Math.min(transactionGoals[goalsPeriod] || 0, repCallGoal);
   const earningsGoalProgress = repEarningsGoal > 0
     ? Math.min(100, Math.round((goals.earned / repEarningsGoal) * 100))
     : 0;
@@ -1070,21 +1070,40 @@ export function Dashboard({ profile }: DashboardProps) {
   };
 
   const setSimField = (id: string, field: 'calls' | 'transactions', value: string) => {
-    setSimGigs((current) => ({
-      ...current,
-      [id]: { ...(current[id] || { calls: '', transactions: '' }), [field]: value },
-    }));
+    setSimGigs((current) => {
+      const prev = current[id] || { calls: '', transactions: '' };
+      if (value.trim() === '') {
+        if (field === 'calls') return { ...current, [id]: { calls: '', transactions: '' } };
+        return { ...current, [id]: { ...prev, transactions: '' } };
+      }
+      const digits = Math.max(0, Math.round(Number(value) || 0));
+      if (field === 'calls') {
+        const typedTx = prev.transactions.trim() === '' ? 0 : Math.max(0, Math.round(Number(prev.transactions) || 0));
+        const nextTx = prev.transactions.trim() === '' ? '' : String(Math.min(typedTx, digits));
+        return { ...current, [id]: { calls: String(digits), transactions: nextTx } };
+      }
+      const callCap = Math.max(0, Math.round(Number(prev.calls) || 0));
+      return { ...current, [id]: { ...prev, transactions: String(Math.min(digits, callCap)) } };
+    });
   };
 
   const saveCountGoal = (kind: 'calls' | 'transactions', raw: string) => {
-    const value = Math.max(0, Math.round(Number(raw) || 0));
-    const apply = (current: CountGoals) => {
-      const next = { ...current, [goalsPeriod]: value };
-      localStorage.setItem(kind === 'calls' ? 'harx_call_goals' : 'harx_transaction_goals', JSON.stringify(next));
+    let value = Math.max(0, Math.round(Number(raw) || 0));
+    if (kind === 'transactions') value = Math.min(value, callGoals[goalsPeriod] || 0);
+    const apply = (current: CountGoals, storageKey: string, nextValue: number) => {
+      const next = { ...current, [goalsPeriod]: nextValue };
+      localStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     };
-    if (kind === 'calls') setCallGoals(apply);
-    else setTransactionGoals(apply);
+    if (kind === 'calls') {
+      setCallGoals((current) => apply(current, 'harx_call_goals', value));
+      setTransactionGoals((current) => {
+        if ((current[goalsPeriod] || 0) <= value) return current;
+        return apply(current, 'harx_transaction_goals', value);
+      });
+    } else {
+      setTransactionGoals((current) => apply(current, 'harx_transaction_goals', value));
+    }
     setEditingGoal(null);
   };
 
@@ -1530,8 +1549,17 @@ export function Dashboard({ profile }: DashboardProps) {
                       <input
                         type="number"
                         min={0}
+                        max={item.kind === 'transactions' ? repCallGoal : undefined}
                         value={goalInput}
-                        onChange={(e) => setGoalInput(e.target.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (item.kind !== 'transactions' || raw.trim() === '') {
+                            setGoalInput(raw);
+                            return;
+                          }
+                          const capped = Math.min(Math.max(0, Math.round(Number(raw) || 0)), repCallGoal);
+                          setGoalInput(String(capped));
+                        }}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
                         className="w-16 bg-white/10 border border-white/20 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-harx-300"
                         autoFocus
@@ -1682,12 +1710,14 @@ export function Dashboard({ profile }: DashboardProps) {
                             <input
                               type="number"
                               min={0}
+                              max={Math.max(0, Math.round(Number(simGigs[gig._id]?.calls) || 0))}
                               value={simGigs[gig._id]?.transactions ?? ''}
                               onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
                               placeholder="0"
                               className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
                             />
                             <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.txRate)} €</p>
+                            <p className="text-[9px] font-bold text-white/35 text-center">Pas plus que les appels</p>
                           </div>
                         </div>
                         {row.bonusAmount > 0 && (
