@@ -839,6 +839,44 @@ export function Dashboard({ profile }: DashboardProps) {
       reached: target > 0 && current >= target,
     });
 
+    const hoursForGig = (gigId: string, since: number) => {
+      let hours = 0;
+      reservationsData.forEach((reservation: any) => {
+        if (gigIdOf(reservation.gigId) !== gigId) return;
+        if (reservation.status === 'cancelled' || reservation.attended === false) return;
+        const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
+        if (!ts || ts < since || ts > Date.now()) return;
+        hours += Number(reservation.duration || 0);
+      });
+      return Math.round(hours * 10) / 10;
+    };
+
+    const perGig = scopedGigs.map((gig) => {
+      const mins = hourMinimums(gig.availability);
+      const target = monthTransactions(gig.commission);
+      const period = bonusPeriodKey(gig.commission);
+      const current = countSales(getPeriodStart(period), gig._id);
+      const facing = getResolvedAgentFacing(gig.commission as any);
+      const amount = Number(facing?.bonusAmount || 0);
+      const gross = Number(gig.rewardBonus || 0);
+      return {
+        id: gig._id,
+        title: gig.title || t('dashboard.home.gigFallback'),
+        hours: {
+          daily: bar(hoursForGig(gig._id, getPeriodStart('today')), mins.daily),
+          weekly: bar(hoursForGig(gig._id, getPeriodStart('week')), mins.weekly),
+          monthly: bar(hoursForGig(gig._id, getPeriodStart('month')), mins.monthly),
+        },
+        bonus: {
+          current,
+          target,
+          period,
+          bonusAmount: amount > 0 ? amount : (gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0),
+          triggered: target > 0 && current >= target,
+        },
+      };
+    });
+
     return {
       label: labelGig,
       hours: {
@@ -858,6 +896,7 @@ export function Dashboard({ profile }: DashboardProps) {
         gigsTriggered,
         gigsWithTarget,
       },
+      perGig,
       earned,
     };
   }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, t]);
@@ -1334,6 +1373,38 @@ export function Dashboard({ profile }: DashboardProps) {
 
           <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">GIG · heures minimum</p>
 
+          {selectedGigId === 'all' ? (
+            <div className="space-y-3">
+              <p className="text-[12px] font-bold text-white/70 leading-snug">
+                Chaque GIG a ses propres heures et son propre bonus. Tes objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
+              </p>
+              {goals.perGig.map((gig) => (
+                <div key={gig.id} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 space-y-2">
+                  <p className="text-[11px] font-black text-white truncate">{gig.title}</p>
+                  {([
+                    { label: 'Jour', row: gig.hours.daily },
+                    { label: 'Semaine', row: gig.hours.weekly },
+                    { label: 'Mois', row: gig.hours.monthly },
+                  ] as const).map(({ label, row }) => (
+                    <div key={label} className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black text-white/45 uppercase tracking-widest">{label}</span>
+                      <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-400' : 'text-white'}`}>
+                        {row.target > 0 ? `${row.current}h / ${row.target}h` : `${row.current}h · pas de minimum`}
+                      </span>
+                    </div>
+                  ))}
+                  <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-400' : 'text-white/55'}`}>
+                    {gig.bonus.triggered
+                      ? `Bonus déclenché · +${gig.bonus.bonusAmount.toFixed(2)} €`
+                      : gig.bonus.target > 0
+                        ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
+                        : 'Pas de bonus sur ce GIG'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+          <>
           {([
             { label: 'Quotidien', row: goals.hours.daily },
             { label: 'Semaine', row: goals.hours.weekly },
@@ -1388,6 +1459,8 @@ export function Dashboard({ profile }: DashboardProps) {
                     : 'Aucun volume minimum de transactions sur ce GIG'}
             </p>
           </div>
+          </>
+          )}
 
           <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] pt-1">Mes objectifs · {goalsPeriodLabels[goalsPeriod]}</p>
 
