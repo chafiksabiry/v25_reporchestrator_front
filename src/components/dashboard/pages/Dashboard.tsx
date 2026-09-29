@@ -1643,12 +1643,6 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
             <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
-          <p className="text-[13px] font-bold text-white leading-snug">
-            {simRows.length === 0
-              ? 'Choisissez un ou plusieurs GIGs, puis saisissez les appels et les transactions.'
-              : `Résultat : ${fmtMoney(simTotal)} €`}
-          </p>
-
           {showCalculator && (
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
               {gigsData.length === 0 ? (
