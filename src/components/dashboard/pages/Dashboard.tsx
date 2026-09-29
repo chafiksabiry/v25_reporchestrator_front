@@ -213,6 +213,17 @@ function agentTxAmount(commission: any): number {
   return 0;
 }
 
+function agentCallAmount(commission: any): number {
+  return Number(getResolvedAgentFacing(commission)?.commission_per_call || 0);
+}
+
+function agentBonusAmount(commission: any, rewardBonus?: number): number {
+  const amount = Number(getResolvedAgentFacing(commission)?.bonusAmount || 0);
+  if (amount > 0) return amount;
+  const gross = Number(rewardBonus || 0);
+  return gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0;
+}
+
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
   switch (period) {
@@ -302,12 +313,9 @@ export function Dashboard({ profile }: DashboardProps) {
   }>({ availableBalance: 0, pendingCommissions: 0, pendingRetraction: 0, lifetimeEarnings: 0 });
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
 
-  // Calculator / Simulateur
+  // Simulateur : chiffres saisis par GIG. Les commissions et le bonus viennent du GIG.
   const [showCalculator, setShowCalculator] = useState(false);
-  const [calcCalls, setCalcCalls] = useState(12);
-  const [calcTransactions, setCalcTransactions] = useState(1);
-  const [calcCallCommission, setCalcCallCommission] = useState(0);
-  const [calcTxCommission, setCalcTxCommission] = useState(17.5);
+  const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
@@ -859,7 +867,7 @@ export function Dashboard({ profile }: DashboardProps) {
       const facing = getResolvedAgentFacing(gig.commission as any);
       const amount = Number(facing?.bonusAmount || 0);
       const gross = Number(gig.rewardBonus || 0);
-      return {
+    return {
         id: gig._id,
         title: gig.title || t('dashboard.home.gigFallback'),
         hours: {
@@ -901,29 +909,42 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, t]);
 
-  const companyTargets = useMemo(() => {
-    const scoped = selectedGigId === 'all' ? gigsData : gigsData.filter((g) => g._id === selectedGigId);
-    const transactionCommission = scoped.reduce((found, gig) => found || agentTxAmount(gig.commission), 0);
-    const commissionPerCall = scoped.reduce((found, gig) => {
-      if (found > 0) return found;
-      return Number(getResolvedAgentFacing(gig.commission as any)?.commission_per_call || 0);
-    }, 0);
-    return { transactionCommission, commissionPerCall };
-  }, [selectedGigId, gigsData]);
+  const simRows = useMemo(() => {
+    return gigsData
+      .filter((gig) => simGigs[gig._id])
+      .map((gig) => {
+        const entry = simGigs[gig._id];
+        const calls = Math.max(0, Math.round(Number(entry.calls) || 0));
+        const transactions = Math.max(0, Math.round(Number(entry.transactions) || 0));
+        const callRate = agentCallAmount(gig.commission);
+        const txRate = agentTxAmount(gig.commission);
+        const bonusAmount = agentBonusAmount(gig.commission, gig.rewardBonus);
+        const bonusTarget = monthTransactions(gig.commission);
+        const bonusPeriod = bonusPeriodKey(gig.commission);
+        const bonusIncluded = bonusAmount > 0 && (bonusTarget <= 0 || transactions >= bonusTarget);
+        const callEarnings = calls * callRate;
+        const transactionEarnings = transactions * txRate;
+        const bonusEarnings = bonusIncluded ? bonusAmount : 0;
+        return {
+          id: gig._id,
+          title: gig.title || t('dashboard.home.gigFallback'),
+          calls,
+          transactions,
+          callRate,
+          txRate,
+          bonusAmount,
+          bonusTarget,
+          bonusPeriod,
+          bonusIncluded,
+          callEarnings,
+          transactionEarnings,
+          bonusEarnings,
+          total: callEarnings + transactionEarnings + bonusEarnings,
+        };
+      });
+  }, [gigsData, simGigs, t]);
 
-  const calcResult = useMemo(() => {
-    const calls = Math.max(0, calcCalls);
-    const transactions = Math.max(0, calcTransactions);
-    const callEarnings = calls * calcCallCommission;
-    const transactionEarnings = transactions * calcTxCommission;
-    return {
-      calls,
-      transactions,
-      callEarnings,
-      transactionEarnings,
-      earnings: callEarnings + transactionEarnings,
-    };
-  }, [calcCalls, calcTransactions, calcCallCommission, calcTxCommission]);
+  const simTotal = simRows.reduce((sum, row) => sum + row.total, 0);
 
   const repEarningsGoal = earningsGoals[goalsPeriod] || 0;
   const repCallGoal = callGoals[goalsPeriod] || 0;
@@ -1016,15 +1037,12 @@ export function Dashboard({ profile }: DashboardProps) {
     setPeriodDropdownPos(null);
   };
 
-  // Sync simulateur avec les données réelles GIG quand on change de GIG
   useEffect(() => {
-    if (companyTargets.transactionCommission > 0) {
-      setCalcTxCommission(companyTargets.transactionCommission);
-    }
-    if (companyTargets.commissionPerCall > 0) {
-      setCalcCallCommission(companyTargets.commissionPerCall);
-    }
-  }, [companyTargets.transactionCommission, companyTargets.commissionPerCall]);
+    if (!selectedGigId || selectedGigId === 'all') return;
+    setSimGigs((current) => (
+      current[selectedGigId] ? current : { ...current, [selectedGigId]: { calls: '', transactions: '' } }
+    ));
+  }, [selectedGigId]);
 
   useEffect(() => {
     if (selectedPeriod !== 'all') setGoalsPeriod(selectedPeriod);
@@ -1038,6 +1056,24 @@ export function Dashboard({ profile }: DashboardProps) {
       return next;
     });
     setEditingGoal(null);
+  };
+
+  const toggleSimGig = (id: string) => {
+    setSimGigs((current) => {
+      if (current[id]) {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      return { ...current, [id]: { calls: '', transactions: '' } };
+    });
+  };
+
+  const setSimField = (id: string, field: 'calls' | 'transactions', value: string) => {
+    setSimGigs((current) => ({
+      ...current,
+      [id]: { ...(current[id] || { calls: '', transactions: '' }), [field]: value },
+    }));
   };
 
   const saveCountGoal = (kind: 'calls' | 'transactions', raw: string) => {
@@ -1400,9 +1436,9 @@ export function Dashboard({ profile }: DashboardProps) {
                         ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
                         : 'Pas de bonus sur ce GIG'}
                   </p>
-                </div>
+                  </div>
               ))}
-            </div>
+                  </div>
           ) : (
           <>
           {([
@@ -1417,18 +1453,18 @@ export function Dashboard({ profile }: DashboardProps) {
                   <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{label}</span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-white font-black tracking-tighter">
+                      <span className="text-white font-black tracking-tighter">
                     {row.current}h<span className="text-white/40 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
-                  </span>
+                      </span>
                   <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-400' : 'text-white/60'}`}>
                     {row.target > 0 ? `${row.progressPct}%` : '—'}
-                  </span>
-                </div>
-              </div>
+                      </span>
+                    </div>
+                  </div>
               <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ${row.reached ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${row.progressPct}%` }} />
-              </div>
-            </div>
+                  </div>
+                </div>
           ))}
 
           <div className="space-y-1.5">
@@ -1506,12 +1542,12 @@ export function Dashboard({ profile }: DashboardProps) {
                     </>
                   ) : (
                     <>
-                      <span className="text-white font-black tracking-tighter">
+                  <span className="text-white font-black tracking-tighter">
                         {item.current}<span className="text-white/40 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
-                      </span>
+                  </span>
                       <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-400' : 'text-white/50'}`}>
                         {item.target > 0 ? `${item.progress}%` : 'à définir'}
-                      </span>
+                  </span>
                       <button
                         type="button"
                         onClick={() => { setGoalInput(String(item.target || '')); setEditingGoal(item.kind); }}
@@ -1582,8 +1618,8 @@ export function Dashboard({ profile }: DashboardProps) {
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-300 to-harx-500'}`}
                     style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
-                  />
-                </div>
+                      />
+                    </div>
                 <p className="text-[11px] font-bold text-white/70">
                   {repEarningsGoal > 0
                     ? (earningsGoalProgress >= 100
@@ -1608,67 +1644,85 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
           <p className="text-[13px] font-bold text-white leading-snug">
-            {calcResult.calls} appels et {calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''} rapportent {fmtMoney(calcResult.earnings)} €.
+            {simRows.length === 0
+              ? 'Choisissez un ou plusieurs GIGs, puis saisissez les appels et les transactions.'
+              : `Résultat : ${fmtMoney(simTotal)} €`}
           </p>
 
           {showCalculator && (
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={500}
-                    value={calcCalls}
-                    onChange={(e) => setCalcCalls(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Transactions</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={calcTransactions}
-                    onChange={(e) => setCalcTransactions(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">€ / appel</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={calcCallCommission}
-                    onChange={(e) => setCalcCallCommission(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">€ / transaction</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={calcTxCommission}
-                    onChange={(e) => setCalcTxCommission(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3 space-y-1">
-                <p className="text-[11px] text-white/70 font-bold">
-                  {calcResult.calls} appels × {fmtMoney(calcCallCommission)} € + {calcResult.transactions} transaction{calcResult.transactions !== 1 ? 's' : ''} × {fmtMoney(calcTxCommission)} €
-                </p>
-                <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(calcResult.earnings)} €</p>
+              {gigsData.length === 0 ? (
+                <p className="text-[12px] font-bold text-white/50">Aucun GIG disponible.</p>
+              ) : gigsData.map((gig) => {
+                const selected = Boolean(simGigs[gig._id]);
+                const row = simRows.find((item) => item.id === gig._id);
+                return (
+                  <div key={gig._id} className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSimGig(gig._id)}
+                      className="w-full flex items-center gap-2 text-left"
+                    >
+                      <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-harx-500 border-harx-400 text-white' : 'border-white/30'}`}>
+                        {selected ? <Check size={10} /> : null}
+                      </span>
+                      <span className="text-[12px] font-black text-white truncate">{gig.title || t('dashboard.home.gigFallback')}</span>
+                    </button>
+                    {selected && row && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={simGigs[gig._id]?.calls ?? ''}
+                              onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                            />
+                            <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.callRate)} €</p>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Transactions</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={simGigs[gig._id]?.transactions ?? ''}
+                              onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400"
+                            />
+                            <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.txRate)} €</p>
+                          </div>
+                        </div>
+                        {row.bonusAmount > 0 && (
+                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-300' : 'text-white/45'}`}>
+                            {row.bonusIncluded
+                              ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
+                              : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
+                          </p>
+                        )}
+                        <p className="text-[11px] font-bold text-white/70">
+                          {row.calls} × {fmtMoney(row.callRate)} € + {row.transactions} × {fmtMoney(row.txRate)} €
+                          {row.bonusIncluded ? ` + ${fmtMoney(row.bonusAmount)} €` : ''}
+                          {' = '}{fmtMoney(row.total)} €
+                        </p>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3">
+                <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">Résultat</p>
+                <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(simTotal)} €</p>
               </div>
             </div>
           )}
 
         </div>
       </div>
-        </div>
+                </div>
         <div className="xl:col-span-2 min-w-0">
       {/* Gains pipeline */}
       <div className="grid grid-cols-2 gap-3">
@@ -1680,8 +1734,8 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
             <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
               <CalendarDays size={14} />
-            </div>
-          </div>
+                </div>
+              </div>
           <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
             {fmtMoney(earningsPipeline.periodStartBalance)} €
           </p>
@@ -1690,7 +1744,7 @@ export function Dashboard({ profile }: DashboardProps) {
               {earningsPipeline.periodStartDateLabel}
             </p>
           )}
-        </div>
+            </div>
 
         {/* 2. Solde disponible */}
         <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[118px] flex flex-col">
@@ -1718,8 +1772,8 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
             <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
               <ShieldCheck size={14} />
-            </div>
-          </div>
+                </div>
+              </div>
           <p className="text-xl font-black text-emerald-700 tracking-tight mt-2">
             +{fmtMoney(earningsPipeline.validatedInPeriod)} €
           </p>
@@ -1728,7 +1782,7 @@ export function Dashboard({ profile }: DashboardProps) {
             {' · '}
             {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
           </p>
-        </div>
+            </div>
 
         {/* 4. Rétractation */}
         <div className="rounded-2xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
@@ -1747,8 +1801,8 @@ export function Dashboard({ profile }: DashboardProps) {
             {earningsPipeline.retractionCount > 0
               ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
               : t('dashboard.home.pipeline.noSales')}
-          </p>
-        </div>
+                </p>
+              </div>
 
         {/* 5. Validation client */}
         <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm min-h-[118px] flex flex-col">
@@ -1758,7 +1812,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
             <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
               <Building2 size={14} />
-            </div>
+                          </div>
           </div>
           <p className="text-xl font-black text-amber-700 tracking-tight mt-2">
             +{fmtMoney(earningsPipeline.clientValidationAmount)} €
@@ -1768,7 +1822,7 @@ export function Dashboard({ profile }: DashboardProps) {
               ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
               : t('dashboard.home.pipeline.nothingPending')}
           </p>
-        </div>
+      </div>
 
         {/* 6. Total période */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[118px] flex flex-col relative overflow-hidden col-span-2 md:col-span-1">
@@ -1784,37 +1838,37 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
             {fmtMoney(earningsPipeline.totalGains)} €
           </p>
-        </div>
+          </div>
 
         <div className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
             <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${qualityAlerts.fraud > 0 ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
               <ShieldAlert size={14} />
+        </div>
             </div>
-          </div>
           <p className={`text-xl font-black tracking-tight mt-2 ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
             {qualityAlerts.fraud}
           </p>
           <p className="text-[10px] text-slate-500 mt-auto pt-2">
             {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
           </p>
-        </div>
+          </div>
 
         <div className="rounded-2xl border border-indigo-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
             <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
               <Award size={14} />
-            </div>
-          </div>
+                      </div>
+                      </div>
           <p className="text-xl font-black text-indigo-700 tracking-tight mt-2">
             {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
           </p>
           <p className="text-[10px] text-slate-500 mt-auto pt-2">Moyenne des appels scorés</p>
-        </div>
-      </div>
-        </div>
+                    </div>
+                    </div>
+                  </div>
       </div>
 
       {/* Réservations — bandeau style Planning */}
