@@ -151,6 +151,20 @@ function parseTimeToMinutes(time: string): number | null {
   return h * 60 + min;
 }
 
+function NewLeadFlash({ label, title }: { label: string; title?: string }) {
+  return (
+    <span
+      className="harx-new-flash gap-1 rounded-md px-2.5 py-1 text-white"
+      title={title}
+    >
+      <Sparkles className="relative z-10 h-3 w-3 shrink-0" />
+      <span className="relative z-10 text-[9px] font-black uppercase tracking-[0.2em]">
+        {label}
+      </span>
+    </span>
+  );
+}
+
 function isTodayReservation(rawDate: unknown, now: Date): boolean {
   const v = String(rawDate || '').trim();
   if (!v) return false;
@@ -1199,15 +1213,10 @@ export function WorkspaceContent() {
                                   </div>
                                 )}
                                 {isAddedThisRollingWeek(lead.Created_Time) && (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md shadow-rose-500/30"
+                                  <NewLeadFlash
+                                    label={t('workspace.newThisWeek')}
                                     title={t('workspace.newThisWeekHint')}
-                                  >
-                                    <Sparkles className="w-3 h-3 shrink-0" />
-                                    <span className="text-[9px] font-black uppercase tracking-widest">
-                                      {t('workspace.newThisWeek')}
-                                    </span>
-                                  </span>
+                                  />
                                 )}
                               </div>
                             </div>
@@ -1924,12 +1933,10 @@ export function WorkspaceContent() {
                       </span>
                       <span className="tabular-nums">{formatCreatedDate(prospectProfileLead.Created_Time)}</span>
                       {isAddedThisRollingWeek(prospectProfileLead.Created_Time) && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white text-rose-600">
-                          <Sparkles className="w-2.5 h-2.5" />
-                          <span className="text-[8px] font-black uppercase tracking-widest">
-                            {t('workspace.newThisWeek')}
-                          </span>
-                        </span>
+                        <NewLeadFlash
+                          label={t('workspace.newThisWeek')}
+                          title={t('workspace.newThisWeekHint')}
+                        />
                       )}
                     </p>
                   )}
