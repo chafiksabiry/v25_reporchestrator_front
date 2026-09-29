@@ -1190,10 +1190,11 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex items-center gap-2.5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex items-center gap-2">
               <Briefcase size={16} className="text-rose-500" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.gigLabel')}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{String(t('dashboard.home.gigLabel')).replace(/\s*:\s*$/, '')}</span>
               <div className="relative w-full min-w-0 sm:min-w-[220px] sm:max-w-[320px]">
                 <button
                   ref={gigTriggerRef}
@@ -1282,9 +1283,9 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
 
-            <div className="relative flex items-center gap-2.5">
+            <div className="relative flex items-center gap-2">
               <CalendarDays size={16} className="text-blue-600" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.periodLabel')}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{String(t('dashboard.home.periodLabel')).replace(/\s*:\s*$/, '')}</span>
               <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[240px]">
                 <button
                   ref={periodTriggerRef}
@@ -1347,11 +1348,12 @@ export function Dashboard({ profile }: DashboardProps) {
                 )}
               </div>
             </div>
+            </div>
 
             <button
               type="button"
               onClick={goToProduction}
-              className="group ml-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-rose-300/50 ring-4 ring-rose-100 hover:ring-rose-200 hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus:ring-rose-300"
+              className="harx-go-live group inline-flex shrink-0 items-center gap-2 self-start sm:self-auto rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-300"
             >
               <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
               {t('dashboard.home.goLive.title')}
