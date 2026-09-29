@@ -1178,6 +1178,8 @@ export function Dashboard({ profile }: DashboardProps) {
 
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-700">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div className="xl:col-span-2 min-w-0 flex flex-col gap-4">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-5 rounded-[2rem] border border-rose-100 bg-white p-5 sm:p-6 shadow-sm">
         <div className="flex flex-col gap-5">
@@ -1362,9 +1364,9 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
       </div>
+      </div>
+      </div>
 
-<div className="grid grid-cols-1 xl:grid-cols-5 gap-4 items-start">
-        <div className="xl:col-span-3 min-w-0">
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
       <div className="bg-slate-950 rounded-[32px] border border-harx-500/30 ring-1 ring-harx-500/20 shadow-2xl shadow-harx-900/20 p-6 overflow-hidden relative">
         <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/20 blur-3xl -mr-24 -mt-24 pointer-events-none" />
@@ -1761,7 +1763,8 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
                 </div>
-        <div className="xl:col-span-2 min-w-0">
+      </div>
+        <div className="xl:col-span-1 min-w-0">
       {/* Gains pipeline */}
       <div className="grid grid-cols-2 gap-3">
         {/* 1. Solde au début de la période */}
@@ -1907,6 +1910,7 @@ export function Dashboard({ profile }: DashboardProps) {
                     </div>
                     </div>
                   </div>
+      </div>
       </div>
 
       {/* Réservations — bandeau style Planning */}
