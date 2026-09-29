@@ -1519,7 +1519,14 @@ export function Dashboard({ profile }: DashboardProps) {
                 {goals.label}
               </p>
             </div>
-            <ChevronDown size={16} className={`text-white/50 shrink-0 transition-transform ${goalsOpen ? 'rotate-180' : ''}`} />
+            <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center">
+              {!goalsOpen && (
+                <span className="absolute inset-0 rounded-full bg-rose-400/80 motion-reduce:hidden animate-ping" />
+              )}
+              <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] text-white shadow-[0_0_18px_rgba(255,77,77,0.9)] ring-2 ring-white/80">
+                <ChevronDown size={18} className={`transition-transform duration-300 ${goalsOpen ? 'rotate-180' : ''}`} />
+              </span>
+            </span>
           </button>
           {/* Sélecteur période */}
           <div className="flex flex-wrap gap-1 shrink-0">
