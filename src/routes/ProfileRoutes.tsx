@@ -167,6 +167,23 @@ function ProfileImportPage({
           {t('profileImport.subtitle')}
         </p>
 
+        {/* Steps */}
+        <div className="mb-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+          {IMPORT_STEPS.map((s, i) => (
+            <div key={s.n} className="flex items-center gap-2.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
+                {s.n}
+              </span>
+              <span className="text-sm font-medium text-gray-600">{t(s.labelKey)}</span>
+              {i < IMPORT_STEPS.length - 1 && (
+                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+
         <button
           onClick={() => setIsImportOpen(true)}
           className="group inline-flex items-center gap-2 px-8 py-3 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
@@ -191,23 +208,6 @@ function ProfileImportPage({
               </span>
               <p className="text-sm font-semibold text-gray-900">{t(f.titleKey)}</p>
               <p className="text-xs text-gray-500 mt-0.5 max-w-[14rem]">{t(f.descKey)}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Steps */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
-          {IMPORT_STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
-                {s.n}
-              </span>
-              <span className="text-sm font-medium text-gray-600">{t(s.labelKey)}</span>
-              {i < IMPORT_STEPS.length - 1 && (
-                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
             </div>
           ))}
         </div>
