@@ -2118,89 +2118,62 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
 
-      {/* À faire du jour + Rappels — pavés compacts avec CTA apparent */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* To-Do du jour */}
-        <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden">
-          <div className="p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
-                <ListChecks size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">À faire aujourd'hui</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Formations · Scripts · Documents KB</p>
-              </div>
+      {/* À faire du jour + Rappels — deux lignes, action à droite */}
+      <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden divide-y divide-slate-200/70">
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+          <div className="flex items-center gap-3 sm:w-52 shrink-0">
+            <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
+              <ListChecks size={18} />
             </div>
-            <ul className="space-y-2 mb-4">
-              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-violet-50 border border-violet-100">
-                <GraduationCap size={14} className="text-violet-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-700 truncate">Formations assignées</p>
-                  <p className="text-[10px] text-slate-400">Accéder à HARX Academy</p>
-                </div>
-              </li>
-              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-blue-50 border border-blue-100">
-                <BookOpen size={14} className="text-blue-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-700 truncate">Scripts de vente</p>
-                  <p className="text-[10px] text-slate-400">Lire avant vos créneaux</p>
-                </div>
-              </li>
-              <li className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
-                <FileText size={14} className="text-emerald-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-700 truncate">Documents assignés (KB)</p>
-                  <p className="text-[10px] text-slate-400">Par votre Company</p>
-                </div>
-              </li>
-            </ul>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">À faire aujourd'hui</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Formations · Scripts · KB</p>
+            </div>
           </div>
-          {/* CTA apparent */}
+          <div className="flex flex-1 flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700">
+              <GraduationCap size={13} className="text-violet-600 shrink-0" />
+              Formations
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700">
+              <BookOpen size={13} className="text-blue-600 shrink-0" />
+              Scripts
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700">
+              <FileText size={13} className="text-emerald-600 shrink-0" />
+              Documents KB
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => navigate('/academy')}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-violet-600 text-white hover:bg-violet-700 transition-all group"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-violet-700 transition-all group"
           >
-            <div className="flex items-center gap-2">
-              <GraduationCap size={16} />
-              <span className="text-xs font-black uppercase tracking-widest">Accéder à l'Academy</span>
-            </div>
-            <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            <GraduationCap size={14} />
+            Academy
+            <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
-        {/* Rappels à effectuer */}
-        <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden">
-          <div className="p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                <PhoneCall size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">Rappels à effectuer</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Prospects · Callbacks planifiés</p>
-              </div>
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+          <div className="flex items-center gap-3 sm:w-52 shrink-0">
+            <div className="h-10 w-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+              <PhoneCall size={18} />
             </div>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
-                <PhoneCall size={20} />
-              </div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vos rappels apparaîtront ici</p>
-              <p className="text-[11px] text-slate-400 mt-1">Gérez vos prospects depuis l'espace dédié</p>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">Rappels à effectuer</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Prospects · Callbacks</p>
             </div>
           </div>
-          {/* CTA apparent */}
+          <p className="flex-1 text-[12px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
           <button
             type="button"
             onClick={() => navigate('/workspace')}
-            className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-amber-500 text-white hover:bg-amber-600 transition-all group"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-amber-600 transition-all group"
           >
-            <div className="flex items-center gap-2">
-              <PhoneCall size={16} />
-              <span className="text-xs font-black uppercase tracking-widest">Voir mes prospects</span>
-            </div>
-            <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            <PhoneCall size={14} />
+            Prospects
+            <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
       </div>
