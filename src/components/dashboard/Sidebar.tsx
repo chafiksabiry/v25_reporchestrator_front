@@ -11,6 +11,7 @@ import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenter
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
 import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
+import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
 
 // Declare qiankun global variables
 declare global {
@@ -81,6 +82,15 @@ const isProfilePublishedInStorage = (): boolean => {
     return JSON.parse(raw)?.status === 'completed';
   } catch {
     return false;
+  }
+};
+
+const readProfileFromStorage = (): any => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 };
 
@@ -372,7 +382,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               {!hideOnboardingCta && (
                 <button
                   type="button"
-                  onClick={() => navigate('/orchestrator')}
+                  onClick={() => {
+                    const step = getRepOnboardingStep(readProfileFromStorage());
+                    const path =
+                      step.path === '/dashboard' || step.kind === 'done'
+                        ? '/orchestrator'
+                        : step.path;
+                    navigate(path);
+                  }}
                   className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
                 >
                   {t('onboardingGuide.cta')}
