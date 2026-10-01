@@ -1204,32 +1204,69 @@ export const ProfileView: React.FC<{
           </p>
         </div>
 
-        {/* Phase 2 complete banner sits above the tabs so the CTA and review
-            guidance stay visible while browsing every profile section. */}
-        {!isRepProfilePublished(profile) &&
-          !isRepCoreOnboardingDone(profile) &&
-          profile.onboardingProgress?.phases?.phase2?.status === 'completed' && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
-            <div className="flex items-start gap-3 min-w-0">
-              <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <p className="text-sm font-black text-emerald-800">
-                  {t('profile.header.phase2Complete')}
+        {/* Onboarding banners always sit above the tabs so they stay visible
+            on every profile section, never buried inside one tab. */}
+        {!isRepProfilePublished(profile) && (
+          isRepCoreOnboardingDone(profile) ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm shrink-0">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-base font-black tracking-tight">
+                    {t('profile.header.publishReady')}
+                  </p>
+                  <p className="text-xs font-medium text-white/85 mt-0.5 leading-relaxed">
+                    {t('profile.header.publishReadyDescription')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap shrink-0"
+              >
+                {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
+              </button>
+            </div>
+          ) : profile.onboardingProgress?.phases?.phase2?.status === 'completed' ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
+              <div className="flex items-start gap-3 min-w-0">
+                <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-emerald-800">
+                    {t('profile.header.phase2Complete')}
+                  </p>
+                  <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
+                    {t('profile.header.phase2CompleteDescription')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(getRepOnboardingStep(profile).path)}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
+              >
+                {t('profile.header.continueOnboarding')}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-black text-yellow-800">
+                  {t('profile.header.completePhase2')}
                 </p>
-                <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
-                  {t('profile.header.phase2CompleteDescription')}
+                <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                  {t('profile.header.completePhase2Description')}
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate(getRepOnboardingStep(profile).path)}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
-            >
-              {t('profile.header.continueOnboarding')}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          )
         )}
 
         {/* Navigation Tabs at the Top */}
@@ -1304,47 +1341,6 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Onboarding banners. After formula: publish unlocks marketplace.
-                    status "completed" is the source of truth after logout/login. */}
-                {!isRepProfilePublished(profile) && (
-                isRepCoreOnboardingDone(profile) ? (
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
-                          <Sparkles className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-base font-black tracking-tight">
-                            {t('profile.header.publishReady')}
-                          </p>
-                          <p className="text-xs font-medium text-white/85 mt-0.5">
-                            {t('profile.header.publishReadyDescription')}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handlePublish}
-                        disabled={isPublishing}
-                        className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap"
-                      >
-                        {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
-                        {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
-                      </button>
-                    </div>
-                ) : profile.onboardingProgress?.phases?.phase2?.status !== 'completed' ? (
-                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
-                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-black text-yellow-800">
-                        {t('profile.header.completePhase2')}
-                      </p>
-                      <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                        {t('profile.header.completePhase2Description')}
-                      </p>
-                    </div>
-                  </div>
-                ) : null
-                )}
                 {/* Action Buttons Top Right */}
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
                   <div>

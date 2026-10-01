@@ -1054,7 +1054,7 @@ export function GigDetails() {
       console.log('✅ Application successful:', data);
 
       setApplicationStatus('success');
-      setApplicationMessage(data.message || t('gigDetails.applicationSent'));
+      setApplicationMessage(t('gigDetails.applicationSent'));
 
       // Mise à jour optimiste pour affichage immédiat
       setPendingGigIds(prev => [...prev, gigId!]);

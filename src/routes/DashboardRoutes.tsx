@@ -174,17 +174,17 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
             <Route path="/" element={<Dashboard profile={userProfile} />} />
             <Route path="/dashboard" element={<Dashboard profile={userProfile} />} />
             <Route path="/marketplace" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <GigsMarketplace />
               </PhaseProtectedRoute>
             } />
             <Route path="/gig/:gigId" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <GigDetails />
               </PhaseProtectedRoute>
             } />
             <Route path="/company/:companyId" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <CompanyProfile />
               </PhaseProtectedRoute>
             } />

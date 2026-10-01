@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { isCallCenterStaff } from '../../utils/callCenterStaff';
 
 // Composant d'écran de chargement
 const LoadingScreen = () => (
@@ -130,28 +132,38 @@ interface PhaseProtectedRouteProps {
   phases: Phases | undefined;
   children: React.ReactNode;
   requiredPhase?: number;
+  /** When true, profile must be published (`status === 'completed'`) before access. */
+  requirePublished?: boolean;
 }
+
+const isProfilePublishedInStorage = (): boolean => {
+  try {
+    const raw = localStorage.getItem('profileData');
+    if (!raw) return false;
+    return isRepProfilePublished(JSON.parse(raw));
+  } catch {
+    return false;
+  }
+};
 
 // PhaseProtectedRoute pour la logique des phases d'onboarding
 export const PhaseProtectedRoute = ({
   phases,
   children,
-  requiredPhase = 5
+  requiredPhase = 5,
+  requirePublished = false,
 }: PhaseProtectedRouteProps) => {
   const isPhaseCompleted = (phaseNumber: number): boolean => {
     if (!phases) return false;
     return phases[`phase${phaseNumber}` as keyof Phases]?.status === 'completed';
   };
 
-  console.log('🛡️ Phase Protected Route Check:', {
-    phases,
-    requiredPhase,
-    isAllowed: isPhaseCompleted(requiredPhase),
-    redirectingTo: !isPhaseCompleted(requiredPhase) ? '/profile' : null
-  });
-
   if (!isPhaseCompleted(requiredPhase)) {
     return <Navigate to="/profile" replace />;
+  }
+
+  if (requirePublished && !isCallCenterStaff() && !isProfilePublishedInStorage()) {
+    return <Navigate to="/orchestrator/subscription" replace />;
   }
 
   return <>{children}</>;
