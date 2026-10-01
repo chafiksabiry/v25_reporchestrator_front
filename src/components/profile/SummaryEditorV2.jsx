@@ -9,6 +9,7 @@ import axios from 'axios';
 import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
+import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
 import { repApiUrl } from '../../utils/repApiUrl';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -2605,6 +2606,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             onAnalysisComplete={(data) => {
               if (!data) return;
               const idx = videoModalExp.index;
+              const catalog = availableLanguages;
+              let pendingLanguageSave = null;
               setEditedProfile((prev) => {
                 const experience = [...(prev.experience || [])];
                 if (!experience[idx]) return prev;
@@ -2619,10 +2622,50 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   videoRelevance: data.relevance,
                   videoAnalyzedAt: new Date().toISOString(),
                 };
-                const updated = { ...prev, experience };
+
+                const existingLanguages = prev.personalInfo?.languages || [];
+                const missing = buildMissingLanguagesFromVideoAnalysis(
+                  data,
+                  existingLanguages,
+                  catalog
+                );
+                const languages =
+                  missing.length > 0
+                    ? [...existingLanguages, ...missing]
+                    : existingLanguages;
+
+                const updated = {
+                  ...prev,
+                  experience,
+                  personalInfo: {
+                    ...prev.personalInfo,
+                    languages,
+                  },
+                };
+
+                if (missing.length > 0 && (prev._id || prev.id)) {
+                  pendingLanguageSave = {
+                    id: prev._id || prev.id,
+                    personalInfo: updated.personalInfo,
+                    addedCount: missing.length,
+                  };
+                }
+
                 if (onProfileUpdate) onProfileUpdate(updated);
                 return updated;
               });
+
+              if (pendingLanguageSave) {
+                setHasUnsavedChanges(true);
+                setModifiedSections((prev) => ({ ...prev, personalInfo: true }));
+                setValidationErrors((prev) => ({ ...prev, languages: '' }));
+                void updateBasicInfo(
+                  pendingLanguageSave.id,
+                  pendingLanguageSave.personalInfo
+                ).catch((err) => {
+                  console.error('Failed to persist languages detected from video:', err);
+                });
+              }
             }}
           />
         )}

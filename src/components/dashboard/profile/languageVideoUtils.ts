@@ -240,6 +240,140 @@ export const buildSyncedLanguagesFromExperience = (profile: any): any[] | null =
   return changed ? next : null;
 };
 
+const normalizeCefr = (value: unknown): string => {
+  const match = String(value || '')
+    .toUpperCase()
+    .match(/[ABC][12]/);
+  return match ? match[0] : 'B1';
+};
+
+const labelFromRef = (ref: unknown): { label: string; code: string; id: string } => {
+  if (!ref) return { label: '', code: '', id: '' };
+  if (typeof ref === 'object' && ref !== null) {
+    const obj = ref as { _id?: string; name?: string; code?: string; iso639_1?: string };
+    return {
+      label: String(obj.name || ''),
+      code: String(obj.code || obj.iso639_1 || ''),
+      id: obj._id ? String(obj._id) : '',
+    };
+  }
+  const str = String(ref);
+  if (/^[a-f0-9]{24}$/i.test(str)) return { label: '', code: '', id: str };
+  if (/^[a-z]{2}(-[a-z]{2})?$/i.test(str)) return { label: '', code: str, id: '' };
+  return { label: str, code: '', id: '' };
+};
+
+const findCatalogLanguage = (catalog: any[], hint: { label: string; code: string; id: string }) => {
+  if (!Array.isArray(catalog) || catalog.length === 0) return null;
+  if (hint.id) {
+    const byId = catalog.find((l) => String(l?._id) === hint.id);
+    if (byId) return byId;
+  }
+  const code = String(hint.code || '').toLowerCase().trim();
+  if (code) {
+    const byCode = catalog.find(
+      (l) =>
+        String(l?.code || '').toLowerCase() === code ||
+        String(l?.iso639_1 || '').toLowerCase() === code
+    );
+    if (byCode) return byCode;
+  }
+  const label = String(hint.label || '').trim();
+  if (!label) return null;
+  return (
+    catalog.find(
+      (l) =>
+        labelsMatch(String(l?.name || ''), label) ||
+        labelsMatch(String(l?.nativeName || ''), label)
+    ) || null
+  );
+};
+
+const profileHasLanguage = (languages: any[], catalogLang: any): boolean => {
+  const id = catalogLang?._id ? String(catalogLang._id) : '';
+  const name = String(catalogLang?.name || '');
+  return (languages || []).some((entry) => {
+    const entryId = getLangId(entry);
+    const entryName = getLangName(entry);
+    if (id && entryId && entryId === id) return true;
+    if (name && entryName && labelsMatch(entryName, name)) return true;
+    return false;
+  });
+};
+
+/**
+ * From a video analysis payload, build language entries that are missing from
+ * personalInfo.languages (matched against the languages catalog).
+ */
+export const buildMissingLanguagesFromVideoAnalysis = (
+  analysisPayload: any,
+  existingLanguages: any[],
+  catalog: any[]
+): any[] => {
+  if (!analysisPayload || !Array.isArray(catalog) || catalog.length === 0) return [];
+
+  const candidates: Array<{ label: string; code: string; id: string; proficiency: string }> = [];
+
+  const spoken = analysisPayload?.analysis?.spokenLanguages;
+  if (Array.isArray(spoken)) {
+    for (const entry of spoken) {
+      if (!entry) continue;
+      if (typeof entry.score === 'number' && entry.score <= 0) continue;
+      const fromLang = labelFromRef(entry.language);
+      candidates.push({
+        label: entry.languageName || entry.name || fromLang.label,
+        code: fromLang.code,
+        id: fromLang.id,
+        proficiency: normalizeCefr(entry.level),
+      });
+    }
+  }
+
+  const assessed = analysisPayload?.languageAssessment?.languages;
+  if (Array.isArray(assessed)) {
+    for (const entry of assessed) {
+      if (!entry) continue;
+      const fromLang = labelFromRef(entry.language);
+      candidates.push({
+        label: entry.languageName || fromLang.label,
+        code: fromLang.code,
+        id: fromLang.id,
+        proficiency: normalizeCefr(entry.cefr),
+      });
+    }
+  }
+
+  const detectedSpeech = analysisPayload?.analysis?.detectedLanguageOfSpeech;
+  if (detectedSpeech) {
+    candidates.push({
+      label: String(detectedSpeech),
+      code: '',
+      id: '',
+      proficiency: 'B1',
+    });
+  }
+
+  const toAdd: any[] = [];
+  const seenIds = new Set<string>();
+
+  for (const candidate of candidates) {
+    const catalogLang = findCatalogLanguage(catalog, candidate);
+    if (!catalogLang?._id) continue;
+    const id = String(catalogLang._id);
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    if (profileHasLanguage(existingLanguages, catalogLang)) continue;
+    if (profileHasLanguage(toAdd, catalogLang)) continue;
+    toAdd.push({
+      language: catalogLang,
+      proficiency: candidate.proficiency,
+      source: 'experience_video',
+    });
+  }
+
+  return toAdd;
+};
+
 /** Resolve playable video + analysis payload for a profile language entry. */
 export const resolveLanguageMedia = (lang: any, profile: any): LanguageMediaContext | null => {
   const enriched = enrichLanguageFromExperience(lang, profile);
