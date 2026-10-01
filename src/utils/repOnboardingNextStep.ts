@@ -43,11 +43,37 @@ export const hasRepProfileContent = (profile: any): boolean => {
   return false;
 };
 
+/** Phase 2 gate (mirrors SummaryEditorV2 canContinue): photo + videos + schedule. */
+export const isRepPhase2Ready = (profile: any): boolean => {
+  if (!profile || typeof profile !== 'object') return false;
+
+  const hasPhoto = Boolean(profile?.personalInfo?.photo?.url);
+  if (!hasPhoto) return false;
+
+  const experiences = Array.isArray(profile.experience)
+    ? profile.experience
+    : Array.isArray(profile.experiences)
+      ? profile.experiences
+      : [];
+  if (experiences.length === 0) return false;
+  const allVideos = experiences.every(
+    (exp: any) => exp && (exp.videoUrl || exp.videoAnalysis)
+  );
+  if (!allVideos) return false;
+
+  const schedule = profile?.availability?.schedule;
+  const hasSchedule =
+    Array.isArray(schedule) &&
+    schedule.length > 0 &&
+    schedule.every((s: any) => s?.day && s?.hours?.start && s?.hours?.end);
+  return hasSchedule;
+};
+
 /**
  * Next route in the rep onboarding funnel (also used on reconnect):
  * - no CV → /profile-import
- * - CV imported, profile incomplete → /profile-editor
- * - profile complete (or plan chosen but not published) → /subscription
+ * - CV imported, phase 2 incomplete (photo/videos/availability) → /profile-editor
+ * - phase 2 ready (or plan chosen but not published) → /subscription
  * - published → /dashboard
  */
 export function getRepOnboardingStep(profile: any): RepOnboardingStep {
@@ -56,33 +82,22 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   }
 
   const phases = profile?.onboardingProgress?.phases;
-  const currentPhase = Number(profile?.onboardingProgress?.currentPhase) || 1;
   const hasCvOrProfile = hasRepProfileContent(profile);
-
-  // Plan chosen / phase 4 done but not yet published → stay on subscription to finalize.
-  // (Marketplace is gated on status === 'completed'; returning /marketplace here would loop.)
-  if (isPhaseCompleted(phases, 4) || profile?.plan) {
-    return { kind: 'continue-orchestrator', path: '/subscription' };
-  }
 
   if (!hasCvOrProfile) {
     return { kind: 'complete-profile', path: '/profile-import' };
   }
 
-  // After profile-editor (phase 2) → subscription. Phase 3 is auto-completed on the backend.
-  if (
-    isPhaseCompleted(phases, 2) ||
-    isPhaseCompleted(phases, 3) ||
-    currentPhase >= 4 ||
-    phases?.phase4?.status === 'in_progress'
-  ) {
-    return { kind: 'continue-orchestrator', path: '/subscription' };
-  }
-
-  // Phase 2 in progress / CV imported
-  if (profile?.isBasicProfileCompleted === true || hasCvOrProfile) {
+  // Never open subscription until photo + experience videos + availability are done.
+  if (!isRepPhase2Ready(profile)) {
     return { kind: 'complete-profile', path: '/profile-editor' };
   }
 
-  return { kind: 'complete-profile', path: '/profile-import' };
+  // Plan chosen / phase 4 done but not yet published → stay on subscription to finalize.
+  if (isPhaseCompleted(phases, 4) || profile?.plan) {
+    return { kind: 'continue-orchestrator', path: '/subscription' };
+  }
+
+  // Phase 2 ready → subscription (phase 3 is auto-completed on the backend).
+  return { kind: 'continue-orchestrator', path: '/subscription' };
 }
