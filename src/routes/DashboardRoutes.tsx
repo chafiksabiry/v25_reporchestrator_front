@@ -142,7 +142,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
     if (isRepProfilePublished(userProfile)) return;
 
     const path = location.pathname;
-    const allowedDuringOnboarding = ['/profile', '/account-settings'];
+    const allowedDuringOnboarding = ['/account-settings'];
     if (allowedDuringOnboarding.some((p) => path === p || path.startsWith(`${p}/`))) {
       return;
     }
