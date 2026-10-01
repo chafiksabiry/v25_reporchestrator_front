@@ -21,9 +21,9 @@
     "sectionPlanning": "Planification"
   },
   "onboardingGuide": {
-    "title": "Finalisez votre onboarding",
-    "description": "Le tableau de bord, le portefeuille et la planification se débloquent une fois votre profil créé et votre onboarding terminé.",
-    "cta": "Continuer Onboarding",
+    "title": "Finalisez votre intégration",
+    "description": "Le tableau de bord, le portefeuille et la planification se débloquent une fois votre profil créé et votre intégration terminée.",
+    "cta": "Poursuivre l'intégration",
     "tooltip": "Terminez les quatre phases (inscription, profil, évaluations et abonnement) pour débloquer toutes les fonctionnalités."
   },
   "topbar": {
