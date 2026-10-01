@@ -1,14 +1,12 @@
 // CV Parser implementation
 import { PDFParser } from './pdfParser';
 import { DocParser } from './docParser';
-import { TextParser } from './textParser';
 import { extractBasicInfo } from '../utils/textProcessing';
 
 export class CVParser {
   constructor() {
     this.pdfParser = new PDFParser();
     this.docParser = new DocParser();
-    this.textParser = new TextParser();
   }
 
   async parse(file) {
@@ -23,9 +21,6 @@ export class CVParser {
         case 'doc':
         case 'docx':
           text = await this.docParser.extractText(file);
-          break;
-        case 'txt':
-          text = await this.textParser.extractText(file);
           break;
         default:
           throw new Error('Unsupported file format');
