@@ -995,6 +995,7 @@
     "missingVideos_other": "{{count}} of {{total}} experiences still need a video. Use “Record & Analyze with AI” for each experience below. You cannot continue until every video is recorded.",
     "warnBottom": "Record a video for every experience above to unlock the Continue button.",
     "warnBottomAvail": "Set your working schedule above to unlock the Continue button.",
+    "warnBottomPhoto": "Add a profile photo above to unlock the Continue button.",
     "recordAnalyze": "Record & Analyze with AI",
     "viewAnalysis": "View AI analysis",
     "expVideoMissing": "Video required — record a video for this experience to continue.",
