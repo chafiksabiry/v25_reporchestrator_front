@@ -9,7 +9,7 @@ import progressService from '../../services/progressService';
 import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptionFlow';
 import { localizeRepPlan } from '../../utils/repPlanI18n';
 import { fetchProfileFromAPI, updateProfileData } from '../../utils/profileUtils';
-import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { getRepOnboardingStep, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 
 function Subscription() {
   const navigate = useNavigate();
@@ -21,58 +21,6 @@ function Subscription() {
   const [finalizing, setFinalizing] = useState(false);
   const [agentId, setAgentId] = useState<string | undefined>();
   const [customerEmail, setCustomerEmail] = useState<string | undefined>();
-
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        setLoading(true);
-        const userData = config.getUserData();
-        if (!userData.agentId) {
-          setError('Profil représentant introuvable. Reconnectez-vous.');
-          return;
-        }
-
-        setAgentId(userData.agentId);
-        setCustomerEmail(String(userData.email || '').trim() || undefined);
-
-        const planData = await getAgentPlan(userData.agentId);
-        if (planData?.plan?._id) {
-          setCurrentPlanId(String(planData.plan._id));
-          if (planData.plan.name) {
-            setActivePlanName(localizeRepPlan(planData.plan, t).name);
-          }
-        }
-
-        try {
-          const [agentData, profile] = await Promise.all([
-            getAgentData().catch(() => null),
-            fetchProfileFromAPI().catch(() => null),
-          ]);
-          if (isRepProfilePublished(agentData) || isRepProfilePublished(profile)) {
-            navigate('/marketplace', { replace: true });
-            return;
-          }
-        } catch {
-          /* optional */
-        }
-
-        const userProgress = await progressService.getUserProgress();
-        if (
-          !userProgress.completedPhaseIds.includes(4) &&
-          userProgress.inProgressPhaseId !== 4
-        ) {
-          await progressService.updatePhaseStatus(4, 'in-progress');
-        }
-      } catch (err) {
-        console.error('Subscription onboarding init failed:', err);
-        setError('Impossible de charger les formules d’abonnement.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void initialize();
-  }, [navigate, t]);
 
   const finalizeAfterPlan = useCallback(
     async (planName?: string) => {
@@ -105,6 +53,77 @@ function Subscription() {
     },
     [navigate, t]
   );
+
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        setLoading(true);
+        const userData = config.getUserData();
+        if (!userData.agentId) {
+          setError('Profil représentant introuvable. Reconnectez-vous.');
+          return;
+        }
+
+        setAgentId(userData.agentId);
+        setCustomerEmail(String(userData.email || '').trim() || undefined);
+
+        const planData = await getAgentPlan(userData.agentId);
+        if (planData?.plan?._id) {
+          setCurrentPlanId(String(planData.plan._id));
+          if (planData.plan.name) {
+            setActivePlanName(localizeRepPlan(planData.plan, t).name);
+          }
+        }
+
+        try {
+          const [agentData, profile] = await Promise.all([
+            getAgentData().catch(() => null),
+            fetchProfileFromAPI().catch(() => null),
+          ]);
+          const live = profile || agentData;
+          if (isRepProfilePublished(live)) {
+            navigate('/marketplace', { replace: true });
+            return;
+          }
+          if (live) {
+            const next = getRepOnboardingStep(live);
+            // Reconnect with plan already chosen but profile not published → finalize.
+            if (
+              next.path === '/subscription' &&
+              (planData?.plan?._id || live?.plan)
+            ) {
+              const name = planData?.plan?.name
+                ? localizeRepPlan(planData.plan, t).name
+                : undefined;
+              await finalizeAfterPlan(name);
+              return;
+            }
+            if (next.path !== '/subscription') {
+              navigate(next.path, { replace: true });
+              return;
+            }
+          }
+        } catch {
+          /* optional */
+        }
+
+        const userProgress = await progressService.getUserProgress();
+        if (
+          !userProgress.completedPhaseIds.includes(4) &&
+          userProgress.inProgressPhaseId !== 4
+        ) {
+          await progressService.updatePhaseStatus(4, 'in-progress');
+        }
+      } catch (err) {
+        console.error('Subscription onboarding init failed:', err);
+        setError('Impossible de charger les formules d’abonnement.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void initialize();
+  }, [navigate, t, finalizeAfterPlan]);
 
   const handlePlanSubscribed = useCallback(
     (plan?: { _id: string; name: string; description?: string; features?: string[]; stripePriceId?: string }) => {
