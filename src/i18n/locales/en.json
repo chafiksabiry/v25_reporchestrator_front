@@ -1348,6 +1348,7 @@
     "planJustActivated": "“{{name}}” is now your active plan.",
     "onboardingCompletePublish": "You have completed your onboarding. Publish your profile to access the missions marketplace and let COMPANIES see your profile.",
     "autoPublishHint": "As soon as you choose a plan, your profile is published automatically and the marketplace opens.",
+    "publishAfterPlanHint": "After choosing a plan, you can publish your profile and leave optional feedback before opening the marketplace.",
     "publish": "Publish",
     "publishSuccess": "Profile published — welcome to the marketplace!",
     "updating": "Updating…"
