@@ -73,7 +73,8 @@ export const isRepPhase2Ready = (profile: any): boolean => {
  * Next route in the rep onboarding funnel (also used on reconnect):
  * - no CV → /profile-import
  * - CV imported, phase 2 incomplete (photo/videos/availability) → /profile-editor
- * - phase 2 ready (or plan chosen but not published) → /subscription
+ * - phase 2 ready → /profile (confirm infos before plan)
+ * - plan chosen / phase 4 but not published → /subscription
  * - published → /dashboard
  */
 export function getRepOnboardingStep(profile: any): RepOnboardingStep {
@@ -88,7 +89,7 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
     return { kind: 'complete-profile', path: '/profile-import' };
   }
 
-  // Never open subscription until photo + experience videos + availability are done.
+  // Never leave the editor until photo + experience videos + availability are done.
   if (!isRepPhase2Ready(profile)) {
     return { kind: 'complete-profile', path: '/profile-editor' };
   }
@@ -98,6 +99,6 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
     return { kind: 'continue-orchestrator', path: '/subscription' };
   }
 
-  // Phase 2 ready → subscription (phase 3 is auto-completed on the backend).
-  return { kind: 'continue-orchestrator', path: '/subscription' };
+  // Phase 2 ready → profile page to review/confirm infos, then Continuer → subscription.
+  return { kind: 'continue-orchestrator', path: '/profile' };
 }
