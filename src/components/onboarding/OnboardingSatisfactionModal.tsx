@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Star, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getAgentId } from '../../utils/authUtils';
+import { updateOnboardingSatisfaction } from '../../lib/api/profiles';
 
 export const ONBOARDING_SATISFACTION_KEY = 'harx_onboarding_satisfaction_done';
 
@@ -12,6 +14,7 @@ type Props = {
 /**
  * Optional post-onboarding feedback when the rep first reaches the marketplace.
  * Score and comment are optional; dismiss / skip is always allowed.
+ * Persists to Agent.onboardingSatisfaction (+ localStorage cache).
  */
 export function OnboardingSatisfactionModal({ open, onClose }: Props) {
   const { t } = useTranslation();
@@ -21,27 +24,54 @@ export function OnboardingSatisfactionModal({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const persistAndClose = (payload?: { score: number | null; comment: string }) => {
+  const cacheLocal = (payload: {
+    score: number | null;
+    comment: string;
+    skipped: boolean;
+  }) => {
     try {
       localStorage.setItem(
         ONBOARDING_SATISFACTION_KEY,
         JSON.stringify({
           done: true,
           at: new Date().toISOString(),
-          score: payload?.score ?? null,
-          comment: payload?.comment?.trim() || '',
+          score: payload.score,
+          comment: payload.comment,
+          skipped: payload.skipped,
         })
       );
     } catch {
       /* ignore quota / private mode */
     }
-    onClose();
+  };
+
+  const persistAndClose = async (payload: {
+    score: number | null;
+    comment: string;
+    skipped: boolean;
+  }) => {
+    setSubmitting(true);
+    const body = {
+      skipped: payload.skipped,
+      score: payload.score,
+      comment: payload.comment.trim(),
+    };
+    try {
+      const agentId = getAgentId();
+      if (agentId) {
+        await updateOnboardingSatisfaction(agentId, body);
+      }
+    } catch (err) {
+      console.error('Failed to save onboarding satisfaction:', err);
+    } finally {
+      cacheLocal(payload);
+      setSubmitting(false);
+      onClose();
+    }
   };
 
   const handleSubmit = () => {
-    setSubmitting(true);
-    persistAndClose({ score, comment });
-    setSubmitting(false);
+    void persistAndClose({ score, comment, skipped: false });
   };
 
   return (
@@ -54,8 +84,9 @@ export function OnboardingSatisfactionModal({ open, onClose }: Props) {
       >
         <button
           type="button"
-          onClick={() => persistAndClose()}
-          className="absolute right-3 top-3 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          onClick={() => void persistAndClose({ score: null, comment: '', skipped: true })}
+          disabled={submitting}
+          className="absolute right-3 top-3 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
           aria-label={t('onboardingSatisfaction.close')}
         >
           <X className="h-4 w-4" />
@@ -79,7 +110,8 @@ export function OnboardingSatisfactionModal({ open, onClose }: Props) {
                 key={n}
                 type="button"
                 onClick={() => setScore(n)}
-                className="rounded-xl p-1.5 transition hover:scale-110 active:scale-95"
+                disabled={submitting}
+                className="rounded-xl p-1.5 transition hover:scale-110 active:scale-95 disabled:opacity-50"
                 aria-label={t('onboardingSatisfaction.starAria', { n })}
               >
                 <Star
@@ -103,16 +135,18 @@ export function OnboardingSatisfactionModal({ open, onClose }: Props) {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={3}
+            disabled={submitting}
             placeholder={t('onboardingSatisfaction.commentPlaceholder')}
-            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-harx-400 focus:outline-none focus:ring-2 focus:ring-harx-200"
+            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-harx-400 focus:outline-none focus:ring-2 focus:ring-harx-200 disabled:opacity-50"
           />
         </label>
 
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={() => persistAndClose()}
-            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            onClick={() => void persistAndClose({ score: null, comment: '', skipped: true })}
+            disabled={submitting}
+            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
           >
             {t('onboardingSatisfaction.skip')}
           </button>

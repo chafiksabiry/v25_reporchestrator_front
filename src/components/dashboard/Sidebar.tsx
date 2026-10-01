@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock } from 'lucide-react';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
@@ -11,6 +11,7 @@ import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenter
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
 import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
+import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
 
 // Declare qiankun global variables
 declare global {
@@ -342,7 +343,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
-        {/* ── Mascotte + consignes only while onboarding is incomplete (no CTA) ── */}
+        {/* ── Mascotte + onboarding CTA while incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
           <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
             <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
@@ -357,9 +358,37 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
                 />
               </div>
-              <p className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-medium leading-snug text-rose-50 shadow-inner backdrop-blur-sm">
-                {t('onboardingGuide.description')}
-              </p>
+              <div className="w-full rounded-2xl bg-[#E11D48] p-3.5 text-left shadow-inner">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-400/15">
+                    <Lock className="h-3.5 w-3.5 text-amber-300" strokeWidth={2.5} />
+                  </span>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-300 leading-tight">
+                    {t('onboardingGuide.title')}
+                  </h3>
+                </div>
+                <p className="text-[11px] font-medium leading-snug text-white/95">
+                  {t('onboardingGuide.description')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    let profile: any = null;
+                    try {
+                      const raw = localStorage.getItem('profileData');
+                      if (raw) profile = JSON.parse(raw);
+                    } catch {
+                      /* ignore */
+                    }
+                    const path = getRepOnboardingStep(profile).path || '/profile-import';
+                    navigate(path);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="mt-3 w-full rounded-xl bg-amber-400 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-900 shadow-md transition hover:bg-amber-300 active:scale-[0.98]"
+                >
+                  {t('onboardingGuide.cta')}
+                </button>
+              </div>
             </div>
           </div>
         )}
