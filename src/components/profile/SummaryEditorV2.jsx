@@ -1929,13 +1929,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     if (!canContinue) return;
     updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
       .then(() => {
-        // Step 2 done → subscription (auto-publish after plan choice).
-        navigate('/subscription');
+        // Step 2 done → profile page to confirm infos, then Continuer Onboarding → subscription.
+        navigate('/profile');
       })
       .catch(error => {
         console.error('Error updating isBasicProfileCompleted:', error);
         // Still only continue if gate is satisfied (defense in depth).
-        if (canContinue) navigate('/subscription');
+        if (canContinue) navigate('/profile');
       });
   };
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
-import { getRepOnboardingStep, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
@@ -1193,6 +1193,7 @@ export const ProfileView: React.FC<{
             Publish is automatic after plan choice — no Publier button here. */}
         {!isRepProfilePublished(profile) && (
           profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
+          isRepPhase2Ready(profile) ||
           isRepCoreOnboardingDone(profile) ? (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
               <div className="flex items-start gap-3 min-w-0">
@@ -1208,7 +1209,7 @@ export const ProfileView: React.FC<{
               </div>
               <button
                 type="button"
-                onClick={() => navigate(getRepOnboardingStep(profile).path)}
+                onClick={() => navigate('/subscription')}
                 className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
               >
                 {t('profile.header.continueOnboarding')}

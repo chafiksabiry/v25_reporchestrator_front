@@ -380,7 +380,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     } catch {
                       /* ignore */
                     }
-                    const path = getRepOnboardingStep(profile).path || '/profile-import';
+                    let path = getRepOnboardingStep(profile).path || '/profile-import';
+                    // Already reviewing the profile → next step is subscription.
+                    if (
+                      (location.pathname === '/profile' || location.pathname.startsWith('/profile/')) &&
+                      path === '/profile'
+                    ) {
+                      path = '/subscription';
+                    }
                     navigate(path);
                     setIsSidebarOpen(false);
                   }}
