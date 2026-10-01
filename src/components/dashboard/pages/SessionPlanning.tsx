@@ -9,7 +9,9 @@ import {
     engagementTone,
     ENGAGEMENT_TONE_CLASS,
     isDateInPeriod,
+    periodEnd,
     periodStart,
+    toLocalYmd,
     type StatsPeriod,
     zonedWallTimeToUtc,
     resolveIanaZone,
@@ -86,10 +88,11 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
         }
     }
 
-    let date = slot.date;
+    let date = slot.date || slot.reservationDate;
     if (!date && slot.startTime && slot.startTime.includes('T')) {
         date = slot.startTime.split('T')[0];
     }
+    if (date) date = String(date).slice(0, 10);
 
     return {
         id,
@@ -515,9 +518,16 @@ export function SessionPlanning() {
         const requiredWeekly = Number(mh?.weekly) || 0;
         const requiredMonthly = Number(mh?.monthly) || (requiredWeekly > 0 ? requiredWeekly * 4 : 0);
 
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const weekStart = periodStart('week');
-        const monthStart = periodStart('month');
+        // Period windows (local calendar):
+        // - day = today only
+        // - week = Monday → Sunday of the current week
+        // - month = 1st → last day of the current calendar month
+        const now = new Date();
+        const todayStr = toLocalYmd(now);
+        const weekFrom = toLocalYmd(periodStart('week', now));
+        const weekTo = toLocalYmd(periodEnd('week', now));
+        const monthFrom = toLocalYmd(periodStart('month', now));
+        const monthTo = toLocalYmd(periodEnd('month', now));
 
         const reservedMine = slots.filter(
             (s) =>
@@ -526,18 +536,18 @@ export function SessionPlanning() {
                 (!selectedGigId || s.gigId === selectedGigId)
         );
 
-        const hoursInRange = (from: Date, toStrInclusive?: string) =>
+        const hoursInRange = (fromYmd: string, toYmd: string) =>
             reservedMine.reduce((sum, s) => {
-                if (!s.date) return sum;
-                const d = new Date(`${s.date}T12:00:00`);
-                if (d < from) return sum;
-                if (toStrInclusive && s.date > toStrInclusive) return sum;
+                const ymd = String(s.date || '').slice(0, 10);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return sum;
+                // Inclusive calendar bounds (Mon–Sun week / current month / today).
+                if (ymd < fromYmd || ymd > toYmd) return sum;
                 return sum + (s.duration || 1);
             }, 0);
 
-        const plannedDaily = hoursInRange(new Date(`${todayStr}T00:00:00`), todayStr);
-        const plannedWeekly = hoursInRange(weekStart);
-        const plannedMonthly = hoursInRange(monthStart);
+        const plannedDaily = hoursInRange(todayStr, todayStr);
+        const plannedWeekly = hoursInRange(weekFrom, weekTo);
+        const plannedMonthly = hoursInRange(monthFrom, monthTo);
 
         const dailyTone = engagementTone(plannedDaily, requiredDaily, {
             dailyZeroWithActivity: plannedDaily === 0 && reservedMine.some((s) => s.date === todayStr),
