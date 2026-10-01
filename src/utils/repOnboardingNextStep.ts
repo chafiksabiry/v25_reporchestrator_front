@@ -59,14 +59,11 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   const phases = profile?.onboardingProgress?.phases;
   const currentPhase = Number(profile?.onboardingProgress?.currentPhase) || 1;
   const coreDone = isRepCoreOnboardingDone(profile);
-  const gigEngaged = hasRepGigEngagement(profile);
   const hasCvOrProfile = hasRepProfileContent(profile);
 
-  if (coreDone && gigEngaged) {
-    return { kind: 'publish', path: '/profile' };
-  }
+  // After formula (phase 4): publish unlocks marketplace — no gig-apply gate.
   if (coreDone || isPhaseCompleted(phases, 4)) {
-    return { kind: 'apply-gig', path: '/marketplace' };
+    return { kind: 'publish', path: '/orchestrator/subscription' };
   }
 
   // Until a CV/profile story exists, always return to Import CV — never the
