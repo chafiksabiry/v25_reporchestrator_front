@@ -1198,16 +1198,16 @@ export function Dashboard({ profile }: DashboardProps) {
               {t('dashboard.home.subtitle')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={goToProduction}
+        <button
+          type="button"
+          onClick={goToProduction}
             className="harx-go-live group inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-300"
           >
             <Rocket size={15} className="group-hover:rotate-12 transition-transform" />
-            {t('dashboard.home.goLive.title')}
+                  {t('dashboard.home.goLive.title')}
             <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
+        </button>
+      </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="relative flex items-center gap-2">
@@ -1364,9 +1364,9 @@ export function Dashboard({ profile }: DashboardProps) {
                   </>,
                   document.body
                 )}
-              </div>
             </div>
-            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -1491,14 +1491,14 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="text-[10px] text-slate-500 pt-1">
             {qualityAlerts.fraud > 0 ? 'Appels signalés sur la période' : 'Aucun signalement'}
           </p>
-        </div>
+            </div>
 
         <div className="rounded-2xl border border-indigo-200/70 bg-white p-3 shadow-sm flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
             <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
               <Award size={14} />
-            </div>
+          </div>
           </div>
           <p className="text-xl font-black text-indigo-700 tracking-tight mt-1">
             {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
@@ -1578,7 +1578,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 >
                   <span className="text-[12px] font-black text-white truncate">
                     {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || 'Choisir un GIG'}
-                  </span>
+                      </span>
                   <ChevronDown size={14} className={`text-white/50 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {hoursMenuOpen && (
@@ -1593,9 +1593,9 @@ export function Dashboard({ profile }: DashboardProps) {
                         {gig.title}
                       </button>
                     ))}
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
+                    </div>
               {goals.perGig.filter((gig) => gig.id === hoursGigId).map((gig) => (
                 <div key={gig.id} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 space-y-2">
                   {([
@@ -1617,9 +1617,9 @@ export function Dashboard({ profile }: DashboardProps) {
                         ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
                         : 'Pas de bonus sur ce GIG'}
                   </p>
-                </div>
+                  </div>
               ))}
-            </div>
+                  </div>
           ) : (
           <>
           {([
@@ -1634,18 +1634,18 @@ export function Dashboard({ profile }: DashboardProps) {
                   <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{label}</span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-white font-black tracking-tighter">
+                <span className="text-white font-black tracking-tighter">
                     {row.current}h<span className="text-white/40 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
-                      </span>
+                </span>
                   <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-400' : 'text-white/60'}`}>
                     {row.target > 0 ? `${row.progressPct}%` : '—'}
-                      </span>
-                    </div>
-                  </div>
+                </span>
+              </div>
+            </div>
               <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ${row.reached ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${row.progressPct}%` }} />
-                  </div>
-                </div>
+            </div>
+          </div>
           ))}
 
           <div className="space-y-1.5">
@@ -1855,10 +1855,10 @@ export function Dashboard({ profile }: DashboardProps) {
                     {selected && row && (
                       <>
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
+                <div className="space-y-1">
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels</label>
-                            <input
-                              type="number"
+                  <input
+                    type="number"
                               min={0}
                               value={simGigs[gig._id]?.calls ?? ''}
                               onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
@@ -1866,11 +1866,11 @@ export function Dashboard({ profile }: DashboardProps) {
                               className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.callRate)} €</p>
-                          </div>
-                          <div className="space-y-1">
+                </div>
+                <div className="space-y-1">
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Transactions</label>
-                            <input
-                              type="number"
+                  <input
+                    type="number"
                               min={0}
                               max={Math.max(0, Math.round(Number(simGigs[gig._id]?.calls) || 0))}
                               value={simGigs[gig._id]?.transactions ?? ''}
@@ -1880,8 +1880,8 @@ export function Dashboard({ profile }: DashboardProps) {
                             />
                             <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.txRate)} €</p>
                             <p className="text-[9px] font-bold text-white/35 text-center">Pas plus que les appels</p>
-                          </div>
-                        </div>
+                </div>
+                </div>
                         {row.bonusAmount > 0 && (
                           <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-300' : 'text-white/45'}`}>
                             {row.bonusIncluded
@@ -1895,18 +1895,18 @@ export function Dashboard({ profile }: DashboardProps) {
                           {' = '}{fmtMoney(row.total)} €
                         </p>
                       </>
-                    )}
-                  </div>
+            )}
+          </div>
                 );
               })}
               <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3">
                 <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">Résultat</p>
                 <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(simTotal)} €</p>
-              </div>
             </div>
+          </div>
           )}
 
-        </div>
+          </div>
         )}
       </div>
 
@@ -2052,19 +2052,19 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
               <Medal size={18} />
-            </div>
-            <div>
+              </div>
+              <div>
               <h2 className="text-base font-black text-white tracking-tight uppercase">Classement des gains</h2>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">
                 {selectedGigId === 'all' ? 'Sélectionnez un GIG pour voir le classement' : selectedGigLabel}
               </p>
+              </div>
             </div>
-          </div>
           <div className="flex items-center gap-2">
             <Users size={14} className="text-white/30" />
             <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">REPs inscrits</span>
-          </div>
-        </div>
+                </div>
+                </div>
         {selectedGigId === 'all' ? (
           <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
             <div className="h-14 w-14 rounded-2xl bg-white/5 text-white/20 flex items-center justify-center mb-3">
@@ -2074,49 +2074,18 @@ export function Dashboard({ profile }: DashboardProps) {
             <p className="text-[11px] text-white/20 mt-1">Le classement des REPs s'affiche par GIG</p>
           </div>
         ) : (
-          <div className="relative z-10">
-            {/* Podium — top 3 */}
-            <div className="flex items-end justify-center gap-3 mb-6">
-              {[2, 1, 3].map((pos) => {
-                const isFirst = pos === 1;
-                const podiumColors: Record<number, string> = {
-                  1: 'from-amber-400/30 to-amber-500/10 border-amber-500/30',
-                  2: 'from-slate-400/20 to-slate-500/10 border-slate-500/20',
-                  3: 'from-amber-700/20 to-amber-800/10 border-amber-700/20',
-                };
-                const rankColors: Record<number, string> = { 1: 'text-amber-400', 2: 'text-slate-300', 3: 'text-amber-700' };
-                const medalEmojis: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
-                if (pos === 1) {
-                  return (
-                    <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-5 py-4 ${isFirst ? 'pb-6' : 'pb-4'}`}>
-                      <span className="text-2xl">{medalEmojis[pos]}</span>
-                      <div className="h-10 w-10 rounded-2xl bg-harx-500/30 flex items-center justify-center">
-                        <Users size={16} className="text-harx-400" />
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-xs font-black ${rankColors[pos]}`}>#{pos}</p>
-                        <p className="text-[10px] font-bold text-white/60 truncate max-w-[80px]">{displayName}</p>
-                        <p className="text-sm font-black text-white">{fmtMoney(earningsPipeline.earnedInPeriod)} €</p>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={pos} className={`flex flex-col items-center gap-2 bg-gradient-to-b ${podiumColors[pos]} border rounded-[20px] px-4 py-3`}>
-                    <span className="text-lg opacity-30">{medalEmojis[pos]}</span>
-                    <div className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center">
-                      <Users size={13} className="text-white/20" />
-                    </div>
-                    <p className={`text-[10px] font-black ${rankColors[pos]} opacity-30`}>#{pos}</p>
-                    <p className="text-[10px] text-white/20">—</p>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-center text-[10px] font-bold text-white/20 italic">Classement complet disponible prochainement · Données multi-REP en cours d'intégration</p>
+          <div className="relative z-10 flex flex-col items-center justify-center py-8 text-center gap-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-400/80">Vos gains · période</p>
+            <p className="text-2xl font-black text-white tracking-tight">
+              {fmtMoney(earningsPipeline.earnedInPeriod)} €
+            </p>
+            <p className="text-[11px] font-bold text-white/45 truncate max-w-[220px]">{displayName}</p>
+            <p className="mt-3 text-[10px] font-bold text-white/25 italic max-w-sm">
+              Classement multi-REP bientôt disponible — aucune donnée fictive affichée.
+            </p>
           </div>
         )}
-      </div>
+          </div>
 
       {/* À faire du jour + Rappels — deux lignes, action à droite */}
       <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden divide-y divide-slate-200/70">
@@ -2128,8 +2097,8 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="min-w-0">
               <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">À faire aujourd'hui</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Formations · Scripts · KB</p>
-            </div>
-          </div>
+        </div>
+      </div>
           <div className="flex flex-1 flex-wrap gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700">
               <GraduationCap size={13} className="text-violet-600 shrink-0" />
@@ -2143,40 +2112,40 @@ export function Dashboard({ profile }: DashboardProps) {
               <FileText size={13} className="text-emerald-600 shrink-0" />
               Documents KB
             </span>
-          </div>
-          <button
-            type="button"
+                </div>
+                <button
+                  type="button"
             onClick={() => navigate('/academy')}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-violet-700 transition-all group"
-          >
+                >
             <GraduationCap size={14} />
             Academy
             <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
+                </button>
+              </div>
 
         <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
           <div className="flex items-center gap-3 sm:w-52 shrink-0">
             <div className="h-10 w-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
               <PhoneCall size={18} />
-            </div>
+                </div>
             <div className="min-w-0">
               <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">Rappels à effectuer</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Prospects · Callbacks</p>
-            </div>
-          </div>
+                </div>
+                </div>
           <p className="flex-1 text-[12px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
-          <button
-            type="button"
+                <button
+                  type="button"
             onClick={() => navigate('/workspace')}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-amber-600 transition-all group"
-          >
+                >
             <PhoneCall size={14} />
             Prospects
             <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-      </div>
+                </button>
+              </div>
+            </div>
 
     </div>
   );

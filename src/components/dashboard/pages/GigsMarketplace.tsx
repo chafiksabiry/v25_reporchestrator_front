@@ -9,7 +9,6 @@ import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
-import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
 import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
@@ -595,18 +594,20 @@ export function GigsMarketplace() {
     (async () => {
       try {
         const profile = await fetchProfileFromAPI();
-        if (!cancelled && profile) {
-          const published = profile.status === 'completed';
-          setIsProfilePublished(published);
-          setProfileGigEngaged(hasRepGigEngagement(profile));
-          if (published) {
-            try {
-              const done = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
-              if (!done) setShowSatisfaction(true);
-            } catch {
-              setShowSatisfaction(true);
-            }
-          }
+        if (cancelled || !profile) return;
+        const published = profile.status === 'completed';
+        setIsProfilePublished(published);
+        setProfileGigEngaged(hasRepGigEngagement(profile));
+        // Marketplace is only for published profiles — never apply-then-publish here.
+        if (!published) {
+          navigate('/orchestrator/subscription', { replace: true });
+          return;
+        }
+        try {
+          const done = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
+          if (!done) setShowSatisfaction(true);
+        } catch {
+          setShowSatisfaction(true);
         }
       } catch {
         // keep the cached value on failure
@@ -615,7 +616,7 @@ export function GigsMarketplace() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [navigate]);
 
   const handleSmartStart = (gigId: string) => {
     navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(gigId)}`, { state: { gigId } });
@@ -1031,11 +1032,6 @@ export function GigsMarketplace() {
     setApplyingGigId(gigId);
     setApplicationMessage(null);
 
-    // The "publish your profile" guidance is only relevant for the very first
-    // application. Once the rep already has an engagement (or already published),
-    // subsequent applications just get a plain confirmation.
-    const isFirstApplication = !hasMarketplaceGigEngagement && !isProfilePublished;
-
     try {
       console.log('🚀 Applying to gig:', gigId);
       console.log('👤 Agent ID:', agentId);
@@ -1074,13 +1070,9 @@ export function GigsMarketplace() {
           ]);
 
           showToast(
-            isFirstApplication
-              ? (isFrMarket
-                  ? 'Candidature en attente — publiez votre profil pour continuer.'
-                  : 'Application pending — publish your profile to continue.')
-              : (isFrMarket
-                  ? 'Cette mission est déjà en attente.'
-                  : 'This gig is already pending.'),
+            isFrMarket
+              ? 'Cette mission est déjà en attente.'
+              : 'This gig is already pending.',
             'success'
           );
 
@@ -1093,7 +1085,7 @@ export function GigsMarketplace() {
       const data = await response.json();
       console.log('✅ Application successful:', data);
 
-      setApplicationMessage({ gigId, message: 'Application sent successfully!', type: 'success' });
+      setApplicationMessage({ gigId, message: t('gigDetails.applicationSent'), type: 'success' });
       setProfileGigEngaged(true);
 
       // Rafraîchir tous les statuts pour mettre à jour l'UI
@@ -1106,13 +1098,7 @@ export function GigsMarketplace() {
       ]);
 
       showToast(
-        isFirstApplication
-          ? (isFrMarket
-              ? 'Candidature envoyée ! Prochaine étape : publier votre profil.'
-              : 'Application sent! Next step: publish your profile.')
-          : (isFrMarket
-              ? 'Candidature envoyée !'
-              : 'Application sent!'),
+        isFrMarket ? 'Candidature envoyée !' : 'Application sent!',
         'success'
       );
 
@@ -3042,18 +3028,6 @@ export function GigsMarketplace() {
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-      )}
-
-      {!loading && !isProfilePublished && (
-        <OnboardingNextStepButton
-          title={isFrMarket ? 'Publier' : 'Publish'}
-          hint={
-            isFrMarket
-              ? 'Publiez votre profil pour accéder à la marketplace'
-              : 'Publish your profile to access the marketplace'
-          }
-          onClick={() => navigate('/orchestrator/subscription')}
-        />
       )}
 
       <OnboardingSatisfactionModal
