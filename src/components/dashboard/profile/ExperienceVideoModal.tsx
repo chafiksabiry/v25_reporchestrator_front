@@ -844,19 +844,19 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       <div className="relative w-full max-w-4xl max-h-[calc(100vh-6rem)] bg-white rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-harx-500/20 rounded-xl">
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 flex-shrink-0">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="p-2 bg-harx-500/20 rounded-xl flex-shrink-0">
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1 pr-2">
               <h2 className="text-base font-black text-white">{t('headerTitle')}</h2>
-              <p className="text-xs text-slate-400 font-medium truncate max-w-xs">
+              <p className="text-xs text-slate-400 font-medium break-words whitespace-normal leading-relaxed">
                 {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
