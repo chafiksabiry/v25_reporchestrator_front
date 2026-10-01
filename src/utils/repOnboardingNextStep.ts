@@ -41,8 +41,7 @@ export const hasRepProfileContent = (profile: any): boolean => {
   if (typeof desc === 'string' && desc.trim()) return true;
   if (Array.isArray(profile.experience) && profile.experience.length > 0) return true;
   if (Array.isArray(profile.experiences) && profile.experiences.length > 0) return true;
-  const firstName = profile.personalInfo?.firstName || profile.personalInfo?.first_name;
-  if (typeof firstName === 'string' && firstName.trim()) return true;
+  // Registration / account-settings name alone does not mean CV upload started.
   return false;
 };
 
@@ -61,12 +60,19 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   const currentPhase = Number(profile?.onboardingProgress?.currentPhase) || 1;
   const coreDone = isRepCoreOnboardingDone(profile);
   const gigEngaged = hasRepGigEngagement(profile);
+  const hasCvOrProfile = hasRepProfileContent(profile);
 
   if (coreDone && gigEngaged) {
     return { kind: 'publish', path: '/profile' };
   }
   if (coreDone || isPhaseCompleted(phases, 4)) {
     return { kind: 'apply-gig', path: '/marketplace' };
+  }
+
+  // Until a CV/profile story exists, always return to Import CV — never the
+  // orchestrator hub (settings "Continue onboarding" must resume this step).
+  if (!hasCvOrProfile) {
+    return { kind: 'complete-profile', path: '/profile-import' };
   }
 
   // Phase 4 = subscription
@@ -88,20 +94,9 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   }
 
   // Phase 2 = enrich profile (after CV import/editor)
-  if (profile?.isBasicProfileCompleted === true) {
+  if (profile?.isBasicProfileCompleted === true || hasCvOrProfile) {
     return { kind: 'complete-profile', path: '/profile-editor' };
   }
 
-  if (hasRepProfileContent(profile)) {
-    // CV imported / editor started but not marked complete yet
-    return { kind: 'complete-profile', path: '/profile-editor' };
-  }
-
-  // Brand-new rep: start at Import CV
-  if (currentPhase <= 1 && !isPhaseCompleted(phases, 1) && !isPhaseCompleted(phases, 2)) {
-    return { kind: 'complete-profile', path: '/profile-import' };
-  }
-
-  // Account exists / phase1 done but no CV content yet
   return { kind: 'complete-profile', path: '/profile-import' };
 }
