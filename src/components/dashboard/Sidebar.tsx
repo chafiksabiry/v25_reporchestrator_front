@@ -365,20 +365,41 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
         {/* ── Orchestrator consignes only while onboarding is incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
-          <div className="space-y-4">
-            <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
+          <div className="space-y-3">
+            {isProfileCreationPage && (
+              <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
+                <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
+                <div className="pointer-events-none absolute -bottom-10 -right-6 h-20 w-20 rounded-full bg-fuchsia-500/30 blur-2xl" />
+                <div className="relative flex flex-col items-center text-center">
+                  <div className="relative mb-3">
+                    <div className="absolute inset-0 scale-110 rounded-full bg-gradient-to-br from-rose-400/50 to-fuchsia-500/40 blur-md" />
+                    <img
+                      src={mascotte}
+                      alt=""
+                      aria-hidden="true"
+                      className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+                    />
+                  </div>
+                  <p className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-medium leading-snug text-rose-50 shadow-inner backdrop-blur-sm">
+                    {t('cvGuide.mascotte')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="relative overflow-hidden rounded-2xl border border-amber-300/35 bg-gradient-to-br from-amber-500/25 via-orange-500/15 to-rose-500/10 p-4 shadow-[0_10px_28px_-16px_rgba(245,158,11,0.55)]">
+              <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-amber-300/30 blur-xl" />
+              <div className="relative flex items-center gap-2 mb-2">
+                <div className="rounded-lg bg-amber-400/25 p-1.5 text-amber-200 ring-1 ring-amber-200/30 shrink-0">
                   <Lock className="h-4 w-4" />
                 </div>
-                <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
+                <p className="text-[11px] font-black uppercase tracking-wide leading-tight text-amber-100">
                   {t('onboardingGuide.title')}
                 </p>
               </div>
-              <p className={`text-[11px] text-white/70 leading-relaxed${hideOnboardingCta ? '' : ' mb-3'}`}>
+              <p className={`relative text-[11px] leading-relaxed text-amber-50/85${hideOnboardingCta ? '' : ' mb-3'}`}>
                 {t('onboardingGuide.description')}
               </p>
-              {/* Hide CTA on orchestrator / profile edit — user is already in the flow. */}
               {!hideOnboardingCta && (
                 <button
                   type="button"
@@ -390,27 +411,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         : step.path;
                     navigate(path);
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
+                  className="relative w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-400 py-2.5 text-[11px] font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-500/30 transition-all hover:from-amber-200 hover:to-yellow-300 active:scale-[0.98]"
                 >
                   {t('onboardingGuide.cta')}
                 </button>
               )}
             </div>
-
-            {isProfileCreationPage && (
-              <div className="relative flex flex-col items-center text-center px-2 py-2">
-                <div className="pointer-events-none absolute inset-0 m-auto h-16 w-16 rounded-full bg-harx-500/20 blur-2xl" />
-                <img
-                  src={mascotte}
-                  alt=""
-                  aria-hidden="true"
-                  className="relative w-24 h-auto drop-shadow-xl"
-                />
-                <p className="relative mt-2 text-[11px] leading-snug text-white/80">
-                  {t('cvGuide.mascotte')}
-                </p>
-              </div>
-            )}
           </div>
         )}
 
