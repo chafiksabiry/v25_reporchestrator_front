@@ -651,7 +651,7 @@
       "finalStepDescription": "Publish your profile to access the missions marketplace and let COMPANIES see your profile.",
       "browseMissions": "Browse gigs",
       "phase2Complete": "Phase 2 completed",
-      "phase2CompleteDescription": "Review your information in the tabs below and edit anything if needed. When you are done, press “Continue Onboarding” to move on to the next step.",
+      "phase2CompleteDescription": "Review your information in the tabs below. When you are done, press “Continue Onboarding” to choose your plan — your profile will be published automatically.",
       "continueOnboarding": "Continue Onboarding",
       "completePhase2": "Complete Phase 2 to continue",
       "completePhase2Description": "Upload your profile photo to complete Phase 2.",
@@ -1347,6 +1347,7 @@
     "planActiveBanner": "Your plan “{{name}}” is active. Publish your profile to access the marketplace.",
     "planJustActivated": "“{{name}}” is now your active plan.",
     "onboardingCompletePublish": "You have completed your onboarding. Publish your profile to access the missions marketplace and let COMPANIES see your profile.",
+    "autoPublishHint": "As soon as you choose a plan, your profile is published automatically and the marketplace opens.",
     "publish": "Publish",
     "publishSuccess": "Profile published — welcome to the marketplace!",
     "updating": "Updating…"
