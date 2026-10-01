@@ -486,7 +486,7 @@
     "alreadyPendingRefresh": "Ce gig est déjà en attente. Actualisation du statut…",
     "statusAlreadyPending": "Statut mis à jour : ce gig est déjà en attente",
     "statusNowEnrolled": "Statut mis à jour : vous êtes inscrit à ce gig",
-    "applicationSent": "Candidature envoyée avec succès !",
+    "applicationSent": "Demande d’inscription envoyée avec succès",
     "applicationError": "Erreur lors de la candidature",
     "invitationNotFound": "Invitation introuvable. Veuillez rafraîchir la page.",
     "mustBeLoggedInInvite": "Vous devez être connecté pour répondre à l’invitation",

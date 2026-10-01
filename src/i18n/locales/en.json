@@ -486,7 +486,7 @@
     "alreadyPendingRefresh": "This gig is already pending. Refreshing status…",
     "statusAlreadyPending": "Status updated: This gig is already pending",
     "statusNowEnrolled": "Status updated: You are now enrolled in this gig",
-    "applicationSent": "Application sent successfully!",
+    "applicationSent": "Enrollment request sent successfully",
     "applicationError": "Error during application",
     "invitationNotFound": "Invitation not found. Please refresh the page.",
     "mustBeLoggedInInvite": "You must be logged in to respond to the invitation",

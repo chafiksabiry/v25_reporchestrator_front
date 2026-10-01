@@ -132,12 +132,9 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
     : 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30';
   const sectionLabelClass = isCallCenterStaff
     ? 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-emerald-200 to-teal-100 bg-clip-text text-transparent select-none'
-    : 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none';  const isOnboardingComplete = (): boolean =>
-    isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
-  // Published profile = onboarding funnel done (phases 1–4 + publish).
-  // Call-center staff skip marketplace onboarding — they are provisioned by employer.
+    : 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none';  // Full nav unlocks only after publish - phases 1-4 alone must not open marketplace.
   const onboardingComplete =
-    isCallCenterStaff || isProfilePublishedInStorage() || isOnboardingComplete();
+    isCallCenterStaff || isProfilePublishedInStorage();
 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||
