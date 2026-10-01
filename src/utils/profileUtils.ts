@@ -140,6 +140,7 @@ export const fetchProfileFromAPI = async () => {
     // Store the entire profile data in localStorage
     localStorage.setItem('profileData', JSON.stringify(profileData));
     localStorage.setItem('profileDataTimestamp', Date.now().toString());
+    window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
 
     return profileData;
   } catch (idError: any) {
@@ -167,6 +168,7 @@ export const fetchProfileFromAPI = async () => {
       // Store the entire profile data in localStorage
       localStorage.setItem('profileData', JSON.stringify(profileData));
       localStorage.setItem('profileDataTimestamp', Date.now().toString());
+      window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
 
       return profileData;
     } catch (fallbackError: any) {

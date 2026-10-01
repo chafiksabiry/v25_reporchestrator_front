@@ -12,6 +12,7 @@ import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
 import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
 import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
+import { PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
 
 // Declare qiankun global variables
 declare global {
@@ -134,8 +135,19 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const sectionLabelClass = isCallCenterStaff
     ? 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-emerald-200 to-teal-100 bg-clip-text text-transparent select-none'
     : 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none';  // Full nav unlocks only after publish - phases 1-4 alone must not open marketplace.
-  const onboardingComplete =
-    isCallCenterStaff || isProfilePublishedInStorage();
+  // Re-read on PROFILE_UPDATED so sidebar unlocks immediately after publish+avis
+  // without requiring a full page refresh.
+  const [profilePublished, setProfilePublished] = React.useState(() =>
+    isProfilePublishedInStorage()
+  );
+  useEffect(() => {
+    const sync = () => setProfilePublished(isProfilePublishedInStorage());
+    sync();
+    window.addEventListener(PROFILE_UPDATE_EVENT, sync);
+    return () => window.removeEventListener(PROFILE_UPDATE_EVENT, sync);
+  }, []);
+
+  const onboardingComplete = isCallCenterStaff || profilePublished;
 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||
