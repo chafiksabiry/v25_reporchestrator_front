@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
@@ -6,9 +6,10 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
+import { repApiUrl } from '../../utils/repApiUrl';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -497,6 +498,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [timezoneSearch, setTimezoneSearch] = useState('');
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [isSearchingTimezone, setIsSearchingTimezone] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+  const [showPhotoCamera, setShowPhotoCamera] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const photoInputRef = useRef(null);
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
   const [availableSkills, setAvailableSkills] = useState({
     technical: {},
     professional: {},
@@ -1529,6 +1537,137 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     setHasUnsavedChanges(true);
     setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
   };
+
+  const stopPhotoCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  };
+
+  const closePhotoCamera = () => {
+    stopPhotoCamera();
+    setShowPhotoCamera(false);
+    setCameraError(null);
+  };
+
+  const applyUploadedPhoto = (photoPayload) => {
+    setEditedProfile((prev) => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        photo: photoPayload,
+      },
+    }));
+    setPhotoError(null);
+  };
+
+  const uploadProfilePhotoBlob = async (blob, filename = 'profile.jpg') => {
+    const profileId = editedProfile?._id || profile?._id;
+    const token = localStorage.getItem('token');
+    if (!profileId || !token) {
+      throw new Error(t('photoAuthError'));
+    }
+    const formData = new FormData();
+    formData.append('photo', blob, filename);
+    const response = await fetch(repApiUrl(`/profiles/${profileId}/photo`), {
+      method: 'PUT',
+      body: formData,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error(t('photoUploadError'));
+    }
+    const data = await response.json().catch(() => ({}));
+    const photo =
+      data?.photo ||
+      data?.personalInfo?.photo ||
+      data?.data?.personalInfo?.photo ||
+      { url: URL.createObjectURL(blob) };
+    applyUploadedPhoto(photo);
+  };
+
+  const handleReviewPhotoSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingPhoto(true);
+      setPhotoError(null);
+      await uploadProfilePhotoBlob(file, file.name || 'profile.jpg');
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      setPhotoError(err?.message || t('photoUploadError'));
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
+
+  const startReviewPhotoCamera = async () => {
+    setCameraError(null);
+    setShowPhotoCamera(true);
+  };
+
+  useEffect(() => {
+    if (!showPhotoCamera) return undefined;
+    let cancelled = false;
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          await cameraVideoRef.current.play();
+        }
+      } catch (err) {
+        console.error('Camera access error:', err);
+        if (!cancelled) setCameraError(t('photoCameraError'));
+      }
+    };
+    void start();
+    return () => {
+      cancelled = true;
+      stopPhotoCamera();
+    };
+  }, [showPhotoCamera]);
+
+  const captureReviewPhoto = async () => {
+    const video = cameraVideoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    try {
+      setIsUploadingPhoto(true);
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('empty'))), 'image/jpeg', 0.92);
+      });
+      await uploadProfilePhotoBlob(blob, 'profile-camera.jpg');
+      closePhotoCamera();
+    } catch (err) {
+      console.error('Camera capture failed:', err);
+      setPhotoError(err?.message || t('photoUploadError'));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => stopPhotoCamera();
+  }, []);
 
   const pushToRepsProfile = () => {
     // Requirements are cancelled for now: confirm & continue without gating.
@@ -2666,6 +2805,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const allExperiencesHaveVideo =
     experienceList.length > 0 && experiencesWithVideo === experienceList.length;
   const missingVideosCount = experienceList.length - experiencesWithVideo;
+  const hasProfilePhoto = Boolean(editedProfile?.personalInfo?.photo?.url);
 
   const hasAvailabilitySet = (() => {
     const avail = editedProfile.availability;
@@ -2677,9 +2817,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     return hasSchedule;
   })();
 
-  // The "Continue" button is only unlocked when every experience has a video
-  // AND the availability (schedule + time zone) has been filled in.
-  const canContinue = allExperiencesHaveVideo && hasAvailabilitySet;
+  // The "Continue" button is only unlocked when every experience has a video,
+  // a profile photo is set, and availability (schedule) has been filled in.
+  const canContinue = allExperiencesHaveVideo && hasProfilePhoto && hasAvailabilitySet;
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -2714,6 +2854,75 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           </div>
 
+          {/* Guidance: re-read and edit extracted CV data */}
+          <div className="mb-4 relative overflow-hidden rounded-2xl border border-violet-300/70 bg-gradient-to-r from-violet-50 via-indigo-50 to-fuchsia-50 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 ring-4 ring-violet-200/60">
+                <Info className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-black uppercase tracking-wide text-violet-800">
+                  {t('reviewHintTitle')}
+                </p>
+                <p className="mt-1 text-sm font-medium text-violet-700/90 leading-relaxed">
+                  {t('reviewHintBody')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Mandatory: add / take a profile photo */}
+          {!hasProfilePhoto && (
+            <div className="mb-4 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-rose-50 to-red-50 p-5 shadow-lg shadow-red-200/40">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleReviewPhotoSelect}
+              />
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
+                    <Camera className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-base font-black uppercase tracking-wide text-red-700 flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      {t('warnPhotoTitle')}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-red-600 leading-relaxed">
+                      {t('warnPhotoBody')}
+                    </p>
+                    {photoError && (
+                      <p className="mt-2 text-xs font-semibold text-red-700">{photoError}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:pl-16">
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => photoInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-red-700 border border-red-200 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploadingPhoto ? t('photoUploading') : t('addPhoto')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => void startReviewPhotoCamera()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-harx-500/25 hover:opacity-95 disabled:opacity-60"
+                  >
+                    <Camera className="h-4 w-4" />
+                    {t('takePhoto')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Loud warning: record a video for every experience before continuing */}
           {!allExperiencesHaveVideo && (
             <div className="mb-8 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 p-5 shadow-lg shadow-red-200/50 animate-pulse">
@@ -2735,6 +2944,35 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       ? t('warnAddExp')
                       : t('missingVideos', { count: missingVideosCount, total: experienceList.length })}
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showPhotoCamera && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-800">{t('takePhoto')}</h3>
+                  <button type="button" onClick={closePhotoCamera} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-50">
+                    {t('cancel')}
+                  </button>
+                </div>
+                <div className="bg-slate-950 aspect-[3/4] overflow-hidden">
+                  <video ref={cameraVideoRef} playsInline muted className="h-full w-full object-cover" />
+                </div>
+                {cameraError && (
+                  <p className="px-5 pt-3 text-sm font-semibold text-red-600">{cameraError}</p>
+                )}
+                <div className="flex gap-2 p-5">
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto || Boolean(cameraError)}
+                    onClick={() => void captureReviewPhoto()}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 py-3 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {isUploadingPhoto ? t('photoUploading') : t('capturePhoto')}
+                  </button>
                 </div>
               </div>
             </div>
