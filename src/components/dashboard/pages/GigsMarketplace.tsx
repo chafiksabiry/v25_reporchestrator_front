@@ -600,7 +600,7 @@ export function GigsMarketplace() {
         setProfileGigEngaged(hasRepGigEngagement(profile));
         // Marketplace is only for published profiles — never apply-then-publish here.
         if (!published) {
-          navigate('/orchestrator/subscription', { replace: true });
+          navigate('/subscription', { replace: true });
           return;
         }
         try {

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles, Upload, ImagePlus } from 'lucide-react';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { getRepOnboardingStep, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
@@ -125,7 +125,6 @@ export const ProfileView: React.FC<{
     proficiency: string;
     languageId: string;
   } | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -574,22 +573,6 @@ export const ProfileView: React.FC<{
       setInlineAssessment(null);
     }
   };
-
-  const handlePublish = async () => {
-    if (!profile?._id) return;
-    try {
-      setIsPublishing(true);
-      const updatedData = await updateProfileData(profile._id, { status: 'completed' });
-      if (onProfileUpdate) onProfileUpdate(updatedData);
-      navigate('/marketplace');
-    } catch (error) {
-      console.error('Error publishing profile:', error);
-      alert(t('profile.errors.publish'));
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
 
   const getCountryDisplayName = () => {
     if (countryData?.countryName) return countryData.countryName;
@@ -1205,34 +1188,11 @@ export const ProfileView: React.FC<{
         </div>
 
         {/* Onboarding banners always sit above the tabs so they stay visible
-            on every profile section, never buried inside one tab. */}
+            on every profile section, never buried inside one tab.
+            Publish is automatic after plan choice — no Publier button here. */}
         {!isRepProfilePublished(profile) && (
+          profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
           isRepCoreOnboardingDone(profile) ? (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm shrink-0">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-base font-black tracking-tight">
-                    {t('profile.header.publishReady')}
-                  </p>
-                  <p className="text-xs font-medium text-white/85 mt-0.5 leading-relaxed">
-                    {t('profile.header.publishReadyDescription')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={isPublishing}
-                className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap shrink-0"
-              >
-                {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
-                {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
-              </button>
-            </div>
-          ) : profile.onboardingProgress?.phases?.phase2?.status === 'completed' ? (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
               <div className="flex items-start gap-3 min-w-0">
                 <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />

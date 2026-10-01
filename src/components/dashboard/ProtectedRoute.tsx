@@ -159,11 +159,11 @@ export const PhaseProtectedRoute = ({
   };
 
   if (!isPhaseCompleted(requiredPhase)) {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to="/onboarding/continue" replace />;
   }
 
   if (requirePublished && !isCallCenterStaff() && !isProfilePublishedInStorage()) {
-    return <Navigate to="/orchestrator/subscription" replace />;
+    return <Navigate to="/subscription" replace />;
   }
 
   return <>{children}</>;
