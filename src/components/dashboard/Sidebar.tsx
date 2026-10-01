@@ -405,11 +405,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   type="button"
                   onClick={() => {
                     const step = getRepOnboardingStep(readProfileFromStorage());
-                    const path =
-                      step.path === '/dashboard' || step.kind === 'done'
-                        ? '/orchestrator'
-                        : step.path;
-                    navigate(path);
+                    navigate(step.path);
                   }}
                   className="relative w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-400 py-2.5 text-[11px] font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-500/30 transition-all hover:from-amber-200 hover:to-yellow-300 active:scale-[0.98]"
                 >
