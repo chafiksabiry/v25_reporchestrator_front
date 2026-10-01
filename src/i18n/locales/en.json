@@ -530,6 +530,7 @@
     "applying": "Applying…",
     "enrolledBadge": "Enrolled",
     "invitedBadge": "Invited",
+    "declinedBadge": "Declined",
     "pendingBadge": "Pending",
     "accept": "Accept",
     "reject": "Decline",

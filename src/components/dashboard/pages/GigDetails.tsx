@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, DollarSign, Users, Globe, Calendar, Building, MapPin, Target, Phone, Mail, ChevronLeft, ChevronRight, Repeat, Star, FileText, Play, Sparkles, Check, X } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
-import { fetchEnrolledGigsFromProfile, fetchPendingRequests, refreshGigStatuses } from '../../../utils/gigStatusUtils';
+import { fetchEnrolledGigsFromProfile, fetchPendingRequests, fetchRejectedInvitations, refreshGigStatuses } from '../../../utils/gigStatusUtils';
 import { resolveGigStartRoute } from '../../../utils/gigStartRouting';
 import { getBonusPillDisplay, getTransactionPillDisplay, getResolvedAgentFacing, type GigCommissionExtended, type AgentFacingCommissionBlock } from '../../../utils/gigCommissionDisplay';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
@@ -412,7 +412,7 @@ export function GigDetails() {
   };
 
   // Fonction pour obtenir le statut de l'agent dans ce gig
-  const getAgentStatus = (): 'enrolled' | 'invited' | 'pending' | 'none' => {
+  const getAgentStatus = (): 'enrolled' | 'invited' | 'pending' | 'rejected' | 'none' => {
     const agentId = getAgentId();
     if (!agentId || !gig) return 'none';
 
@@ -422,14 +422,19 @@ export function GigDetails() {
       return 'enrolled';
     }
 
-    if (pendingGigIds.includes(gigId!)) {
-      console.log(`⏳ Agent has PENDING request for gig ${gigId} (from profile)`);
-      return 'pending';
-    }
-
     if (invitedGigIds.includes(gigId!)) {
       console.log(`📨 Agent is INVITED to gig ${gigId} (from invitations API)`);
       return 'invited';
+    }
+
+    if (rejectedGigIds.includes(gigId!)) {
+      console.log(`🚫 Agent REJECTED invitation for gig ${gigId}`);
+      return 'rejected';
+    }
+
+    if (pendingGigIds.includes(gigId!)) {
+      console.log(`⏳ Agent has PENDING request for gig ${gigId} (from profile)`);
+      return 'pending';
     }
 
     // 2. Vérifier les données du gig (fallback)
@@ -442,6 +447,10 @@ export function GigDetails() {
       if (agentStatus?.status === 'invited') {
         console.log(`📨 Agent is INVITED to gig ${gigId} (from gig data)`);
         return 'invited';
+      }
+      if (agentStatus?.status === 'rejected') {
+        console.log(`🚫 Agent REJECTED invitation for gig ${gigId} (from gig data)`);
+        return 'rejected';
       }
       if (agentStatus?.status === 'requested' || agentStatus?.status === 'pending') {
         console.log(`⏳ Agent has PENDING request for gig ${gigId} (from gig data)`);
@@ -457,10 +466,13 @@ export function GigDetails() {
   const [applying, setApplying] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [applicationMessage, setApplicationMessage] = useState('');
+  /** Distinguishes apply vs invitation accept/reject so pending merge only runs after apply. */
+  const [lastSuccessfulAction, setLastSuccessfulAction] = useState<'apply' | 'accept' | 'reject' | null>(null);
 
   // États pour les statuts depuis le profil
   const [pendingGigIds, setPendingGigIds] = useState<string[]>([]);
   const [enrolledGigIds, setEnrolledGigIds] = useState<string[]>([]);
+  const [rejectedGigIds, setRejectedGigIds] = useState<string[]>([]);
 
   // États pour les invitations (accepter / refuser)
   const [invitedGigIds, setInvitedGigIds] = useState<string[]>([]);
@@ -557,23 +569,52 @@ export function GigDetails() {
     const fetchStatusesFromProfile = async () => {
       try {
         console.log('🔍 Fetching statuses from agent profile...');
-        const [pendingIds, enrolledIds] = await Promise.all([
+        const [pendingIds, enrolledIds, rejectedIds] = await Promise.all([
           fetchPendingRequests(),
-          fetchEnrolledGigsFromProfile()
+          fetchEnrolledGigsFromProfile(),
+          fetchRejectedInvitations(),
         ]);
 
-        console.log('📝 Profile statuses fetched:', { pendingIds, enrolledIds });
+        console.log('📝 Profile statuses fetched:', { pendingIds, enrolledIds, rejectedIds });
 
-        // Fix: Si on vient de postuler avec succès, s'assurer que le gigId reste dans pendingIds
-        // Même si le serveur a un léger délai de mise à jour
-        let finalPendingIds = pendingIds;
-        if (applicationStatus === 'success' && gigId && !pendingIds.includes(gigId)) {
+        // Only merge optimistic pending after a successful APPLY — not after accept/reject invitation.
+        let finalPendingIds = pendingIds.filter((id) => !rejectedIds.includes(id));
+        if (
+          lastSuccessfulAction === 'apply' &&
+          applicationStatus === 'success' &&
+          gigId &&
+          !finalPendingIds.includes(gigId)
+        ) {
           console.log('🛡️ Merging optimistic pending gigId into fetched results to prevent flicker');
-          finalPendingIds = [...pendingIds, gigId];
+          finalPendingIds = [...finalPendingIds, gigId];
+        }
+
+        let finalEnrolledIds = enrolledIds;
+        if (
+          lastSuccessfulAction === 'accept' &&
+          applicationStatus === 'success' &&
+          gigId &&
+          !finalEnrolledIds.includes(gigId)
+        ) {
+          finalEnrolledIds = [...finalEnrolledIds, gigId];
+        }
+
+        let finalRejectedIds = rejectedIds;
+        if (
+          lastSuccessfulAction === 'reject' &&
+          applicationStatus === 'success' &&
+          gigId &&
+          !finalRejectedIds.includes(gigId)
+        ) {
+          finalRejectedIds = [...finalRejectedIds, gigId];
         }
 
         setPendingGigIds(finalPendingIds);
-        setEnrolledGigIds(enrolledIds);
+        setEnrolledGigIds(finalEnrolledIds);
+        setRejectedGigIds(finalRejectedIds);
+        if (finalRejectedIds.includes(gigId!)) {
+          setInvitedGigIds((prev) => prev.filter((id) => id !== gigId));
+        }
       } catch (error) {
         console.error('❌ Error fetching statuses from profile:', error);
       }
@@ -592,7 +633,7 @@ export function GigDetails() {
     return () => {
       window.removeEventListener('refreshGigStatuses', handleRefresh);
     };
-  }, [applicationStatus, gigId]);
+  }, [applicationStatus, gigId, lastSuccessfulAction]);
 
   // Vérifier le statut d'enrollment de l'agent
   useEffect(() => {
@@ -1055,6 +1096,7 @@ export function GigDetails() {
 
       setApplicationStatus('success');
       setApplicationMessage(t('gigDetails.applicationSent'));
+      setLastSuccessfulAction('apply');
 
       // Mise à jour optimiste pour affichage immédiat
       setPendingGigIds(prev => [...prev, gigId!]);
@@ -1112,7 +1154,10 @@ export function GigDetails() {
 
       // Mise à jour optimiste : l'agent est désormais enrôlé
       setInvitedGigIds(prev => prev.filter(id => id !== gigId));
+      setPendingGigIds(prev => prev.filter(id => id !== gigId));
+      setRejectedGigIds(prev => prev.filter(id => id !== gigId));
       setEnrolledGigIds(prev => (prev.includes(gigId!) ? prev : [...prev, gigId!]));
+      setLastSuccessfulAction('accept');
       setApplicationStatus('success');
       setApplicationMessage(t('gigDetails.invitationAccepted'));
 
@@ -1165,9 +1210,13 @@ export function GigDetails() {
 
       console.log('✅ Invitation refusée');
 
-      // Mise à jour optimiste : l'invitation est supprimée
+      // Mise à jour optimiste : garder l'historique avec statut refusé (pas de pending)
       setInvitedGigIds(prev => prev.filter(id => id !== gigId));
+      setPendingGigIds(prev => prev.filter(id => id !== gigId));
+      setEnrolledGigIds(prev => prev.filter(id => id !== gigId));
+      setRejectedGigIds(prev => (prev.includes(gigId!) ? prev : [...prev, gigId!]));
       setInvitationId(null);
+      setLastSuccessfulAction('reject');
       setApplicationStatus('success');
       setApplicationMessage(t('gigDetails.invitationDeclined'));
 
@@ -1334,7 +1383,7 @@ export function GigDetails() {
                     </p>
                   </div>
                 )}
-                {applicationStatus === 'success' && applicationMessage && (
+                {applicationStatus === 'success' && applicationMessage && getAgentStatus() !== 'rejected' && getAgentStatus() !== 'enrolled' && getAgentStatus() !== 'pending' && (
                   <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                     <p className="text-sm text-emerald-800 font-medium">
                       ✅ {applicationMessage}
@@ -1354,6 +1403,11 @@ export function GigDetails() {
                       {t('gigDetails.start')}
                     </button>
                   </div>
+                ) : getAgentStatus() === 'rejected' ? (
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-black text-xs uppercase tracking-widest border border-emerald-200 shadow-sm">
+                    <Check className="w-4 h-4" strokeWidth={3} />
+                    {t('gigDetails.invitationDeclined')}
+                  </span>
                 ) : getAgentStatus() === 'pending' ? (
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-xs uppercase tracking-widest border border-amber-400 shadow-[0_2px_10px_-2px_rgba(245,158,11,0.4)]">
                     ⌛ {t('gigDetails.pendingReview')}
