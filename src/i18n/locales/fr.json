@@ -995,6 +995,7 @@
     "missingVideos_other": "{{count}} expériences sur {{total}} n’ont pas encore de vidéo. Utilisez « Enregistrer et analyser avec l’IA » pour chaque expérience ci-dessous. Vous ne pouvez pas continuer tant que toutes les vidéos ne sont pas enregistrées.",
     "warnBottom": "Enregistrez une vidéo pour chaque expérience ci-dessus afin de débloquer le bouton Continuer.",
     "warnBottomAvail": "Renseignez vos horaires de travail ci-dessus afin de débloquer le bouton Continuer.",
+    "warnBottomPhoto": "Ajoutez une photo de profil ci-dessus afin de débloquer le bouton Continuer.",
     "recordAnalyze": "Enregistrer et analyser avec l’IA",
     "viewAnalysis": "Voir l’analyse IA",
     "expVideoMissing": "Vidéo requise — enregistrez une vidéo pour cette expérience afin de continuer.",
