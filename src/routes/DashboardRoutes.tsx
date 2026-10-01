@@ -142,8 +142,16 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
     if (isRepProfilePublished(userProfile)) return;
 
     const path = location.pathname;
-    const allowedDuringOnboarding = ['/account-settings'];
+    // /profile is the confirm step after phase 2 (before subscription).
+    const allowedDuringOnboarding = ['/account-settings', '/profile'];
     if (allowedDuringOnboarding.some((p) => path === p || path.startsWith(`${p}/`))) {
+      // Still bounce off /profile if phase 2 isn't ready yet.
+      if (path === '/profile' || path.startsWith('/profile/')) {
+        const next = getRepOnboardingStep(userProfile);
+        if (next.path === '/profile-editor' || next.path === '/profile-import') {
+          navigate(next.path, { replace: true });
+        }
+      }
       return;
     }
 
