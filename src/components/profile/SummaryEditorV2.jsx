@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
@@ -6,10 +6,12 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video, Camera, Upload, AlertTriangle, Info } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { repApiUrl } from '../../utils/repApiUrl';
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -500,11 +502,17 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [isSearchingTimezone, setIsSearchingTimezone] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState(null);
-  const [showPhotoCamera, setShowPhotoCamera] = useState(false);
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  const [imgSrc, setImgSrc] = useState('');
+  const [crop, setCrop] = useState();
+  const [completedCrop, setCompletedCrop] = useState();
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const photoInputRef = useRef(null);
   const cameraVideoRef = useRef(null);
   const cameraStreamRef = useRef(null);
+  const imgRef = useRef(null);
   const [availableSkills, setAvailableSkills] = useState({
     technical: {},
     professional: {},
@@ -1538,21 +1546,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
   };
 
-  const stopPhotoCamera = () => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-    }
+  const stopCameraStream = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
     if (cameraVideoRef.current) {
       cameraVideoRef.current.srcObject = null;
     }
-  };
+  }, []);
 
-  const closePhotoCamera = () => {
-    stopPhotoCamera();
-    setShowPhotoCamera(false);
+  const closeCameraModal = useCallback(() => {
+    stopCameraStream();
+    setShowCameraModal(false);
     setCameraError(null);
-  };
+  }, [stopCameraStream]);
 
   const applyUploadedPhoto = (photoPayload) => {
     setEditedProfile((prev) => ({
@@ -1590,84 +1596,136 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     applyUploadedPhoto(photo);
   };
 
-  const handleReviewPhotoSelect = async (event) => {
+  const openPhotoSourceModal = () => {
+    if (isUploadingPhoto) return;
+    setPhotoError(null);
+    setShowPhotoSourceModal(true);
+  };
+
+  const openDevicePicker = () => {
+    setShowPhotoSourceModal(false);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoSelect = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      setImgSrc(reader.result?.toString() || '');
+      setIsCropModalOpen(true);
+    });
+    reader.readAsDataURL(file);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  const startPhotoCamera = async () => {
+    setShowPhotoSourceModal(false);
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t('photoCameraError'));
+      setShowCameraModal(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setShowCameraModal(true);
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          void cameraVideoRef.current.play().catch(() => undefined);
+        }
+      });
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError(t('photoCameraError'));
+      setShowCameraModal(true);
+    }
+  };
+
+  const capturePhotoFromCamera = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setImgSrc(dataUrl);
+    setIsCropModalOpen(true);
+  };
+
+  const onImageLoad = (e) => {
+    const { width, height } = e.currentTarget;
+    setCrop(
+      centerCrop(
+        makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+        width,
+        height
+      )
+    );
+  };
+
+  const getCroppedImg = async (image, pixelCrop) => {
+    const canvas = document.createElement('canvas');
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    canvas.width = pixelCrop.width * scaleX;
+    canvas.height = pixelCrop.height * scaleY;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas unavailable');
+    ctx.drawImage(
+      image,
+      pixelCrop.x * scaleX,
+      pixelCrop.y * scaleY,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY,
+      0,
+      0,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY
+    );
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg', 0.95);
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!imgRef.current || !completedCrop) return;
     try {
       setIsUploadingPhoto(true);
-      setPhotoError(null);
-      await uploadProfilePhotoBlob(file, file.name || 'profile.jpg');
+      setIsCropModalOpen(false);
+      const croppedBlob = await getCroppedImg(imgRef.current, completedCrop);
+      await uploadProfilePhotoBlob(croppedBlob, 'profile.jpg');
+      setImgSrc('');
     } catch (err) {
       console.error('Photo upload failed:', err);
       setPhotoError(err?.message || t('photoUploadError'));
     } finally {
       setIsUploadingPhoto(false);
-      if (photoInputRef.current) photoInputRef.current.value = '';
-    }
-  };
-
-  const startReviewPhotoCamera = async () => {
-    setCameraError(null);
-    setShowPhotoCamera(true);
-  };
-
-  useEffect(() => {
-    if (!showPhotoCamera) return undefined;
-    let cancelled = false;
-    const start = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        cameraStreamRef.current = stream;
-        if (cameraVideoRef.current) {
-          cameraVideoRef.current.srcObject = stream;
-          await cameraVideoRef.current.play();
-        }
-      } catch (err) {
-        console.error('Camera access error:', err);
-        if (!cancelled) setCameraError(t('photoCameraError'));
-      }
-    };
-    void start();
-    return () => {
-      cancelled = true;
-      stopPhotoCamera();
-    };
-  }, [showPhotoCamera]);
-
-  const captureReviewPhoto = async () => {
-    const video = cameraVideoRef.current;
-    if (!video) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    try {
-      setIsUploadingPhoto(true);
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('empty'))), 'image/jpeg', 0.92);
-      });
-      await uploadProfilePhotoBlob(blob, 'profile-camera.jpg');
-      closePhotoCamera();
-    } catch (err) {
-      console.error('Camera capture failed:', err);
-      setPhotoError(err?.message || t('photoUploadError'));
-    } finally {
-      setIsUploadingPhoto(false);
     }
   };
 
   useEffect(() => {
-    return () => stopPhotoCamera();
-  }, []);
+    return () => stopCameraStream();
+  }, [stopCameraStream]);
 
   const pushToRepsProfile = () => {
     // Requirements are cancelled for now: confirm & continue without gating.
@@ -2874,13 +2932,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           {/* Mandatory: add / take a profile photo */}
           {!hasProfilePhoto && (
             <div className="mb-4 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-rose-50 to-red-50 p-5 shadow-lg shadow-red-200/40">
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleReviewPhotoSelect}
-              />
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
@@ -2897,31 +2948,36 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     {photoError && (
                       <p className="mt-2 text-xs font-semibold text-red-700">{photoError}</p>
                     )}
+                    {isUploadingPhoto && (
+                      <p className="mt-2 text-xs font-semibold text-red-700 flex items-center gap-2">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        {t('photoUploading')}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 sm:pl-16">
                   <button
                     type="button"
                     disabled={isUploadingPhoto}
-                    onClick={() => photoInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-red-700 border border-red-200 shadow-sm hover:bg-red-50 disabled:opacity-60"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {isUploadingPhoto ? t('photoUploading') : t('addPhoto')}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isUploadingPhoto}
-                    onClick={() => void startReviewPhotoCamera()}
+                    onClick={openPhotoSourceModal}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-harx-500/25 hover:opacity-95 disabled:opacity-60"
                   >
                     <Camera className="h-4 w-4" />
-                    {t('takePhoto')}
+                    {t('addPhoto')}
                   </button>
                 </div>
               </div>
             </div>
           )}
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoSelect}
+          />
 
           {/* Loud warning: record a video for every experience before continuing */}
           {!allExperiencesHaveVideo && (
@@ -2949,29 +3005,160 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           )}
 
-          {showPhotoCamera && (
-            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-800">{t('takePhoto')}</h3>
-                  <button type="button" onClick={closePhotoCamera} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-50">
-                    {t('cancel')}
-                  </button>
-                </div>
-                <div className="bg-slate-950 aspect-[3/4] overflow-hidden">
-                  <video ref={cameraVideoRef} playsInline muted className="h-full w-full object-cover" />
-                </div>
-                {cameraError && (
-                  <p className="px-5 pt-3 text-sm font-semibold text-red-600">{cameraError}</p>
-                )}
-                <div className="flex gap-2 p-5">
+          {/* Photo source chooser — same as ProfileView */}
+          {showPhotoSourceModal && (
+            <div
+              className="fixed inset-0 z-[125] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowPhotoSourceModal(false)}
+            >
+              <div
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                    {i18nT('profile.header.photoSourceTitle')}
+                  </h3>
                   <button
                     type="button"
-                    disabled={isUploadingPhoto || Boolean(cameraError)}
-                    onClick={() => void captureReviewPhoto()}
-                    className="flex-1 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 py-3 text-sm font-bold text-white disabled:opacity-50"
+                    onClick={() => setShowPhotoSourceModal(false)}
+                    className="p-2 hover:bg-slate-50 rounded-xl"
                   >
-                    {isUploadingPhoto ? t('photoUploading') : t('capturePhoto')}
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                <div className="p-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={openDevicePicker}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+                  >
+                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-600">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">
+                      {i18nT('profile.header.chooseFromDevice')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startPhotoCamera()}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+                  >
+                    <div className="p-2.5 rounded-xl bg-harx-50 text-harx-600">
+                      <ImagePlus className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">
+                      {i18nT('profile.header.takePhoto')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live camera capture — same as ProfileView */}
+          {showCameraModal && (
+            <div className="fixed inset-0 z-[130] bg-slate-900/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-lg font-black text-slate-900">{i18nT('profile.header.takePhoto')}</h3>
+                  <button type="button" onClick={closeCameraModal} className="p-2 hover:bg-slate-50 rounded-xl">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                <div className="p-5 bg-slate-950 flex items-center justify-center min-h-[280px]">
+                  {cameraError ? (
+                    <p className="text-sm font-semibold text-rose-200 text-center px-4">{cameraError}</p>
+                  ) : (
+                    <video
+                      ref={cameraVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full max-h-[55vh] rounded-2xl object-cover mirror-x scale-x-[-1]"
+                      aria-label={i18nT('profile.header.cameraPreview')}
+                    />
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeCameraModal}
+                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50"
+                  >
+                    {i18nT('profile.common.cancel')}
+                  </button>
+                  {!cameraError && (
+                    <button
+                      type="button"
+                      onClick={capturePhotoFromCamera}
+                      className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-harx-500/20"
+                    >
+                      {i18nT('profile.header.capturePhoto')}
+                    </button>
+                  )}
+                  {cameraError && (
+                    <button
+                      type="button"
+                      onClick={openDevicePicker}
+                      className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90"
+                    >
+                      {i18nT('profile.header.chooseFromDevice')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Image Crop Modal — same as ProfileView */}
+          {isCropModalOpen && imgSrc && (
+            <div className="fixed inset-0 z-[130] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-xl font-black text-slate-900">{i18nT('profile.header.cropPhoto')}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsCropModalOpen(false)}
+                    className="p-2 hover:bg-slate-50 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-auto p-6 bg-slate-50/50 flex justify-center items-center">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    aspect={1}
+                    circularCrop
+                  >
+                    <img
+                      ref={imgRef}
+                      src={imgSrc}
+                      alt={i18nT('profile.header.cropAlt')}
+                      onLoad={onImageLoad}
+                      className="max-w-full max-h-[50vh] object-contain"
+                    />
+                  </ReactCrop>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCropModalOpen(false)}
+                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    {i18nT('profile.common.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCropComplete()}
+                    className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-harx-500/20 active:scale-95"
+                  >
+                    {i18nT('profile.header.savePhoto')}
                   </button>
                 </div>
               </div>
