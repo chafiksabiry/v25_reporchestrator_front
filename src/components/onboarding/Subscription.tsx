@@ -136,7 +136,7 @@ function Subscription() {
 
       <button
         type="button"
-        onClick={() => navigate('/orchestrator')}
+        onClick={() => navigate('/orchestrator/skills')}
         className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="mr-2 h-5 w-5" />
