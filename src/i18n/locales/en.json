@@ -23,7 +23,7 @@
   "onboardingGuide": {
     "title": "Complete your onboarding",
     "description": "The Dashboard, Wallet, and Planning unlock once your profile is created and your onboarding is complete.",
-    "cta": "Continue onboarding",
+    "cta": "Continue Onboarding",
     "tooltip": "Complete all four phases (sign-up, profile, assessments, and subscription) to unlock every feature."
   },
   "topbar": {
@@ -651,11 +651,11 @@
       "finalStepDescription": "Browse the marketplace and apply to at least one gig to finish your onboarding.",
       "browseMissions": "Browse gigs",
       "phase2Complete": "Phase 2 completed",
-      "phase2CompleteDescription": "Your profile is complete. Continue your onboarding to unlock the rest.",
-      "continueOnboarding": "Continue onboarding",
+      "phase2CompleteDescription": "Review your information in the tabs below and edit anything if needed. When you are done, press “Continue Onboarding” to move on to the next step.",
+      "continueOnboarding": "Continue Onboarding",
       "completePhase2": "Complete Phase 2 to continue",
       "completePhase2Description": "Upload your profile photo to complete Phase 2.",
-      "selectPlan": "Select Representative Plan",
+      "selectPlan": "Choose your plan",
       "cropPhoto": "Crop Profile Photo",
       "cropAlt": "Crop",
       "savePhoto": "Save Photo"
@@ -1325,5 +1325,80 @@
   },
   "auth": {
     "verifying": "Verifying authentication..."
+  },
+  "subscriptionFlow": {
+    "backToOnboarding": "Back to onboarding",
+    "choosePlan": "Choose your plan",
+    "yourPlan": "Your plan",
+    "currentPlan": "Current plan",
+    "subscribe": "Subscribe",
+    "startTrial": "Start trial",
+    "freeTrial": "7 days free trial",
+    "perMonth": "/ month",
+    "loadingPlans": "Loading plans…",
+    "noPlans": "No plans available right now.",
+    "secureCheckout": "Secure checkout",
+    "initializingStripe": "Initializing Stripe…",
+    "finalizing": "Finalizing your subscription…",
+    "subscriptionActive": "Subscription active",
+    "subscribedTo": "You are subscribed to {{name}}.",
+    "continueOnboarding": "Continue Onboarding",
+    "planActivated": "Plan “{{name}}” activated",
+    "planActiveBanner": "Your plan “{{name}}” is active. Continue to the next onboarding step.",
+    "planJustActivated": "“{{name}}” is now your active plan.",
+    "updating": "Updating…"
+  },
+  "repPlans": {
+    "takeAChance": {
+      "name": "TAKE A CHANCE",
+      "description": "Completely free. Prove you can earn. No commitment. If you like it and hit €30, upgrade to unlock more.",
+      "features": {
+        "0": "Earn up to €30/month",
+        "1": "Dashboard: Real-time wallet balance; Basic analytics",
+        "2": "3 gigs only",
+        "3": "Slot Booking: First-Come, First-Served",
+        "4": "Call History: Cannot listen to recordings, see AI scores, or read transcripts",
+        "5": "Support by email — 24 hours"
+      }
+    },
+    "payTheBills": {
+      "name": "PAY THE BILLS",
+      "description": "Now I'm making real money.",
+      "features": {
+        "0": "Earn up to €200/month",
+        "1": "Dashboard: Advanced analytics",
+        "2": "10 gigs",
+        "3": "Slot Booking: Priority on waiting list",
+        "4": "Call History: Listen to recordings, see AI scores, and read transcripts",
+        "5": "Support by email or chat",
+        "6": "7 days free trial"
+      }
+    },
+    "moneyMustBeFunny": {
+      "name": "MONEY MUST BE FUNNY",
+      "description": "Bills paid. Fun money time.",
+      "features": {
+        "0": "Earn up to €500/month",
+        "1": "Dashboard: Advanced analytics",
+        "2": "100 gigs",
+        "3": "Slot Booking: Priority",
+        "4": "Call History: Listen to recordings, see AI scores, read transcripts",
+        "5": "Support by Phone, email or chat",
+        "6": "7 days free trial"
+      }
+    },
+    "richMansWorld": {
+      "name": "IN THE RICH MAN’S WORLD",
+      "description": "I'm elite. No limits.",
+      "features": {
+        "0": "Unlimited Monthly Earning",
+        "1": "Priority Access to Premium Gigs",
+        "2": "Priority to book slots",
+        "3": "All AI-powered features for free",
+        "4": "No extra fees for wallet management",
+        "5": "Support by Phone, email or chat",
+        "6": "7 days free trial"
+      }
+    }
   }
 }

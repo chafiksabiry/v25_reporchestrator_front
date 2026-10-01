@@ -11,7 +11,6 @@ import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenter
 import { getAgentId, getAuthToken } from '../../utils/authUtils';
 import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
 import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
-import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
 
 // Declare qiankun global variables
 declare global {
@@ -85,15 +84,6 @@ const isProfilePublishedInStorage = (): boolean => {
   }
 };
 
-const readProfileFromStorage = (): any => {
-  try {
-    const raw = localStorage.getItem('profileData');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
 export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const location = useLocation();
@@ -152,14 +142,6 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||
     location.pathname.includes('/profile-editor');
-
-  // Already on the orchestrator home — "Continue onboarding" would be a no-op.
-  const isOrchestratorPage =
-    location.pathname === '/' ||
-    location.pathname.endsWith('/orchestrator') ||
-    location.pathname.includes('/orchestrator');
-
-  const hideOnboardingCta = isProfileCreationPage || isOrchestratorPage || isCallCenterStaff;
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
@@ -366,27 +348,6 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {/* ── Orchestrator consignes only while onboarding is incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
           <div className="space-y-3">
-            {isProfileCreationPage && (
-              <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
-                <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
-                <div className="pointer-events-none absolute -bottom-10 -right-6 h-20 w-20 rounded-full bg-fuchsia-500/30 blur-2xl" />
-                <div className="relative flex flex-col items-center text-center">
-                  <div className="relative mb-3">
-                    <div className="absolute inset-0 scale-110 rounded-full bg-gradient-to-br from-rose-400/50 to-fuchsia-500/40 blur-md" />
-                    <img
-                      src={mascotte}
-                      alt=""
-                      aria-hidden="true"
-                      className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
-                    />
-                  </div>
-                  <p className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-medium leading-snug text-rose-50 shadow-inner backdrop-blur-sm">
-                    {t('cvGuide.mascotte')}
-                  </p>
-                </div>
-              </div>
-            )}
-
             <div className="relative overflow-hidden rounded-2xl border border-amber-300/35 bg-gradient-to-br from-amber-500/25 via-orange-500/15 to-rose-500/10 p-4 shadow-[0_10px_28px_-16px_rgba(245,158,11,0.55)]">
               <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-amber-300/30 blur-xl" />
               <div className="relative flex items-center gap-2 mb-2">
@@ -397,21 +358,28 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   {t('onboardingGuide.title')}
                 </p>
               </div>
-              <p className={`relative text-[11px] leading-relaxed text-amber-50/85${hideOnboardingCta ? '' : ' mb-3'}`}>
+              <p className="relative text-[11px] leading-relaxed text-amber-50/85">
                 {t('onboardingGuide.description')}
               </p>
-              {!hideOnboardingCta && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const step = getRepOnboardingStep(readProfileFromStorage());
-                    navigate(step.path);
-                  }}
-                  className="relative w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-400 py-2.5 text-[11px] font-black uppercase tracking-wider text-slate-900 shadow-lg shadow-amber-500/30 transition-all hover:from-amber-200 hover:to-yellow-300 active:scale-[0.98]"
-                >
-                  {t('onboardingGuide.cta')}
-                </button>
-              )}
+            </div>
+
+            <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
+              <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
+              <div className="pointer-events-none absolute -bottom-10 -right-6 h-20 w-20 rounded-full bg-fuchsia-500/30 blur-2xl" />
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative mb-3">
+                  <div className="absolute inset-0 scale-110 rounded-full bg-gradient-to-br from-rose-400/50 to-fuchsia-500/40 blur-md" />
+                  <img
+                    src={mascotte}
+                    alt=""
+                    aria-hidden="true"
+                    className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+                  />
+                </div>
+                <p className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-medium leading-snug text-rose-50 shadow-inner backdrop-blur-sm">
+                  {t('cvGuide.mascotte')}
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { CreditCard, ArrowLeft, Loader, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { getAgentPlan, getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
 import config from '../../config';
 import progressService from '../../services/progressService';
 import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptionFlow';
+import { localizeRepPlan } from '../../utils/repPlanI18n';
 
 function Subscription() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
@@ -36,7 +39,7 @@ function Subscription() {
         if (planData?.plan?._id) {
           setCurrentPlanId(String(planData.plan._id));
           if (planData.plan.name) {
-            setActivePlanName(String(planData.plan.name));
+            setActivePlanName(localizeRepPlan(planData.plan, t).name);
           }
         }
 
@@ -65,20 +68,21 @@ function Subscription() {
     };
 
     void initialize();
-  }, []);
+  }, [t]);
 
   const handlePlanSubscribed = useCallback(
-    (plan?: { _id: string; name: string }) => {
+    (plan?: { _id: string; name: string; description?: string; features?: string[]; stripePriceId?: string }) => {
       if (plan) {
         setCurrentPlanId(String(plan._id));
-        setActivePlanName(plan.name);
+        const localized = localizeRepPlan(plan, t).name;
+        setActivePlanName(localized);
+        toast.success(t('subscriptionFlow.planActivated', { name: localized }));
+      } else {
+        toast.success(t('subscriptionFlow.subscriptionActive'));
       }
       setJustActivated(true);
-      toast.success(
-        plan ? `Formule « ${plan.name} » activée` : 'Abonnement activé'
-      );
     },
-    []
+    [t]
   );
 
   const handleContinueOnboarding = useCallback(async () => {
@@ -118,7 +122,7 @@ function Subscription() {
         className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="mr-2 h-5 w-5" />
-        Retour à l’onboarding
+        {t('subscriptionFlow.backToOnboarding')}
       </button>
 
       {error && (
@@ -134,11 +138,11 @@ function Subscription() {
           </div>
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-900">
-              Choisissez votre formule
+              {t('subscriptionFlow.choosePlan')}
             </h2>
             {activePlanName && (
               <p className="mt-1 text-sm font-bold text-green-600">
-                Votre formule : {activePlanName}
+                {t('subscriptionFlow.yourPlan')} : {activePlanName}
               </p>
             )}
           </div>
@@ -150,10 +154,10 @@ function Subscription() {
               <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
               <p className="text-sm font-bold text-green-800">
                 {justActivated && activePlanName
-                  ? `« ${activePlanName} » est maintenant votre formule active.`
+                  ? t('subscriptionFlow.planJustActivated', { name: activePlanName })
                   : activePlanName
-                    ? `Votre formule « ${activePlanName} » est active. Passez à l’étape suivante de l’onboarding.`
-                    : 'Votre formule est active. Passez à l’étape suivante de l’onboarding.'}
+                    ? t('subscriptionFlow.planActiveBanner', { name: activePlanName })
+                    : t('subscriptionFlow.planActiveBanner', { name: '' })}
               </p>
             </div>
             <button
@@ -162,7 +166,7 @@ function Subscription() {
               disabled={continuing}
               className="shrink-0 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-black text-white transition hover:bg-green-700 disabled:opacity-60"
             >
-              {continuing ? 'Mise à jour…' : 'Continuer l’onboarding'}
+              {continuing ? t('subscriptionFlow.updating') : t('subscriptionFlow.continueOnboarding')}
             </button>
           </div>
         )}
