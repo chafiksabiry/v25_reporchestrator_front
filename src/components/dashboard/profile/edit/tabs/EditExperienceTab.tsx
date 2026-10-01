@@ -36,7 +36,13 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
   startEditingExperience,
   saveEditedExperience
 }) => {
-  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string; index: number } | null>(null);
+  const [videoModalExp, setVideoModalExp] = useState<{
+    title: string;
+    company: string;
+    description?: string;
+    responsibilities?: string[];
+    index: number;
+  } | null>(null);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -271,7 +277,15 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
                 )}
 
                 <button
-                  onClick={() => setVideoModalExp({ title: exp.title, company: exp.company, index })}
+                  onClick={() => setVideoModalExp({
+                    title: exp.title,
+                    company: exp.company,
+                    description: String((exp as any).description || ''),
+                    responsibilities: Array.isArray((exp as any).responsibilities)
+                      ? (exp as any).responsibilities.map(String)
+                      : [],
+                    index,
+                  })}
                   className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
                     exp.videoUrl || exp.videoAnalysis
                       ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
@@ -296,7 +310,12 @@ export const EditExperienceTab: React.FC<EditExperienceTabProps> = ({
         <ExperienceVideoModal
           isOpen={!!videoModalExp}
           onClose={() => setVideoModalExp(null)}
-          experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+          experience={{
+            title: videoModalExp.title,
+            company: videoModalExp.company,
+            description: videoModalExp.description,
+            responsibilities: videoModalExp.responsibilities,
+          }}
           experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
           referencePhotoUrl={profile?.personalInfo?.photo?.url || null}
