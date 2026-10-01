@@ -276,6 +276,7 @@ export function SessionPlanning() {
     const [allReservations, setAllReservations] = useState<any[]>([]);
     const [showAttendancePanel] = useState<boolean>(false);
     const [showAIPanel] = useState<boolean>(true);
+    const refreshSeqRef = React.useRef(0);
     const routeGigId = useMemo(() => {
         const fromSearch = String(new URLSearchParams(location.search).get('gigId') || '').trim();
         const fromState = String((location.state as { gigId?: string } | null)?.gigId || '').trim();
@@ -299,6 +300,7 @@ export function SessionPlanning() {
 
     const refreshData = async () => {
         if (!selectedRepId) return;
+        const seq = ++refreshSeqRef.current;
 
         try {
             if (userRole === 'rep') {
@@ -307,6 +309,9 @@ export function SessionPlanning() {
                     selectedGigId ? slotApi.getSlots(selectedGigId) : slotApi.getSlots(),
                     selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId)
                 ]);
+
+                // Ignore stale responses when gig/date changes rapidly (week navigation).
+                if (seq !== refreshSeqRef.current) return;
 
                 setAllReservations(Array.isArray(reservations) ? reservations : []);
 
@@ -350,6 +355,8 @@ export function SessionPlanning() {
                 if (!selectedGigId) return;
 
                 const gigAgents = await schedulerApi.getGigAgents(selectedGigId, 'enrolled');
+                if (seq !== refreshSeqRef.current) return;
+
                 const mappedReps = gigAgents.map(ga => ({
                     id: ga.agentId._id,
                     name: ga.agentId.personalInfo?.firstName + ' ' + ga.agentId.personalInfo?.lastName,
@@ -367,6 +374,7 @@ export function SessionPlanning() {
                     slotApi.getSlots(selectedGigId)
                 ]);
 
+                if (seq !== refreshSeqRef.current) return;
                 const mappedTimeSlots = Array.isArray(timeSlots) ? timeSlots.map((s: any) => mapBackendSlotToSlot(s, selectedRepId)) : [];
                 const mappedAvailableSlots = Array.isArray(availableSlots) ? availableSlots.map((s: any) => mapBackendSlotToSlot(s, selectedRepId)) : [];
 
@@ -390,6 +398,7 @@ export function SessionPlanning() {
                 setSlots(finalSlots);
             }
         } catch (error) {
+            if (seq !== refreshSeqRef.current) return;
             console.error('Error refreshing data:', error);
         }
     };
