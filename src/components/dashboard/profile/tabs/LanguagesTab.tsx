@@ -3,6 +3,11 @@ import { Star, Globe, Plus, X, Video, AlertTriangle, CheckCircle2, Trash2, PlayC
 import { useTranslation } from 'react-i18next';
 import { resolveLanguageMedia, enrichLanguageFromExperience, type LanguageMediaContext } from '../languageVideoUtils';
 import { LanguageAnalysisModal } from '../LanguageAnalysisModal';
+import {
+  getLanguageMetricScores,
+  scoreBarClass,
+  scoreTextClass,
+} from '../languageScoreDisplay';
 
 interface LanguagesTabProps {
   profile: any;
@@ -279,6 +284,7 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
               const mustReVerify = needsReVerification(lang);
               const hasScores = !!ar && ar.source !== 'cv';
               const cefrStyle = CEFR_STYLES[String(lang.proficiency || '').toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200';
+              const metrics = hasScores ? getLanguageMetricScores(lang) : null;
 
               const badge = (languageCode || languageName || '?').slice(0, 2).toUpperCase();
 
@@ -357,20 +363,22 @@ export const LanguagesTab: React.FC<LanguagesTabProps> = ({
                       </div>
                     </div>
 
-                    {hasScores ? (
+                    {hasScores && metrics ? (
                       <>
                         <div className="mt-4 grid grid-cols-3 gap-2.5">
                           {[
-                            { label: t('profile.languages.fluency'), value: ar.fluency?.score || 0 },
-                            { label: t('profile.languages.proficiency'), value: ar.proficiency?.score || 0 },
-                            { label: t('profile.languages.completeness'), value: ar.completeness?.score || 0 },
+                            { label: t('profile.languages.fluency'), value: metrics.fluency },
+                            { label: t('profile.languages.proficiency'), value: metrics.level },
+                            { label: t('profile.languages.completeness'), value: metrics.completeness },
                           ].map((metric) => (
                             <div key={metric.label} className="text-center">
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{metric.label}</div>
-                              <div className="text-base font-black text-slate-900 mt-0.5">{metric.value}%</div>
+                              <div className={`text-base font-black mt-0.5 tabular-nums ${scoreTextClass(metric.value)}`}>
+                                {metric.value}%
+                              </div>
                               <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200">
                                 <div
-                                  className={`h-full rounded-full ${isVerified ? 'bg-gradient-harx' : 'bg-sky-300'}`}
+                                  className={`h-full rounded-full transition-all duration-500 ${scoreBarClass(metric.value)}`}
                                   style={{ width: `${Math.min(100, Math.max(0, metric.value))}%` }}
                                 />
                               </div>
