@@ -211,9 +211,20 @@ function ScriptReadStatus({
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800">
-      <CheckCircle className="h-3.5 w-3.5" />
-      Script : <span className="font-black">lu</span>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800">
+      <span className="inline-flex items-center gap-1.5">
+        <CheckCircle className="h-3.5 w-3.5" />
+        Script : <span className="font-black">lu</span>
+      </span>
+      {onOpenScript ? (
+        <button
+          type="button"
+          onClick={onOpenScript}
+          className="font-black uppercase tracking-wider text-[10px] text-emerald-800 underline underline-offset-2 hover:text-emerald-950 shrink-0"
+        >
+          Relire
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -2689,7 +2700,7 @@ export function Training() {
                 {isCompleted && (journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
                   <ScriptReadStatus
                     scriptPending={scriptPending}
-                    onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
+                    onOpenScript={() => openScriptForJourney(j)}
                   />
                 )}
               </li>
@@ -2766,7 +2777,7 @@ export function Training() {
                   {(journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
                     <ScriptReadStatus
                       scriptPending={scriptPending}
-                      onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
+                      onOpenScript={() => openScriptForJourney(j)}
                     />
                   )}
                   <button
