@@ -1926,16 +1926,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   }, [stopCameraStream]);
 
   const pushToRepsProfile = () => {
-    // Requirements are cancelled for now: confirm & continue without gating.
     updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
       .then(() => {
-        // Always stay inside the unified app — internal SPA navigation only.
-        navigate('/profile');
+        // Step 2 done → subscription (auto-publish after plan choice).
+        navigate('/subscription');
       })
       .catch(error => {
         console.error('Error updating isBasicProfileCompleted:', error);
-        // Navigate anyway so the user is not stuck on the editor.
-        navigate('/profile');
+        navigate('/subscription');
       });
   };
 
