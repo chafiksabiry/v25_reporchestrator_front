@@ -10,6 +10,7 @@ import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFrom
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
+import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
@@ -524,7 +525,8 @@ export function GigsMarketplace() {
     return localizeTaxonomyEntity(entity, lang) || taxonomyLabel(entity.name);
   };
 
-  const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
+  const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('available');
+  const [initialTabResolved, setInitialTabResolved] = useState(false);
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
   const [invitedEnrollments, setInvitedEnrollments] = useState<InvitedEnrollment[]>([]);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
@@ -542,6 +544,15 @@ export function GigsMarketplace() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
+
+  // First visit → Disponibles. Already enrolled in a gig → Inscrites.
+  useEffect(() => {
+    if (loading || initialTabResolved) return;
+    const hasEnrolled = enrolledGigIds.length > 0 || enrolledGigs.length > 0;
+    setActiveTab(hasEnrolled ? 'enrolled' : 'available');
+    setInitialTabResolved(true);
+  }, [loading, enrolledGigIds, enrolledGigs, initialTabResolved]);
+
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
@@ -577,6 +588,7 @@ export function GigsMarketplace() {
       return false;
     }
   });
+  const [showSatisfaction, setShowSatisfaction] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -584,8 +596,17 @@ export function GigsMarketplace() {
       try {
         const profile = await fetchProfileFromAPI();
         if (!cancelled && profile) {
-          setIsProfilePublished(profile.status === 'completed');
+          const published = profile.status === 'completed';
+          setIsProfilePublished(published);
           setProfileGigEngaged(hasRepGigEngagement(profile));
+          if (published) {
+            try {
+              const done = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
+              if (!done) setShowSatisfaction(true);
+            } catch {
+              setShowSatisfaction(true);
+            }
+          }
         }
       } catch {
         // keep the cached value on failure
@@ -1830,10 +1851,6 @@ export function GigsMarketplace() {
     }
   };
 
-  const scrollToGigGrid = () => {
-    document.getElementById('rep-gig-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <div className="space-y-6">
       {/* Toast de notification (accept / reject invitation) */}
@@ -1866,71 +1883,23 @@ export function GigsMarketplace() {
         </div>
       </div>
 
-      {/* Onboarding status banner. Reaching this page means phases 1-4 are done,
-          so the final phase completes once the rep applies to / enrolls in a gig. */}
-      {!loading && (() => {
-        if (!hasMarketplaceGigEngagement) {
-          return (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
-                    {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
-                  </p>
-                  <p className="text-sm font-black text-yellow-800 mt-0.5">
-                    {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
-                  </p>
-                  <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                    {isFrMarket
-                      ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
-                      : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={scrollToGigGrid}
-                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap shrink-0"
-              >
-                {isFrMarket ? 'Voir les missions' : 'Browse gigs'}
-              </button>
-            </div>
-          );
-        }
-
-        // Profile already published → no onboarding banner at all.
-        if (isProfilePublished) {
-          return null;
-        }
-
-        return (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-            <div className="flex items-start gap-3">
-              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                  {isFrMarket ? 'Prochaine étape · Profil' : 'Next step · Profile'}
-                </p>
-                <p className="text-sm font-black text-emerald-800 mt-0.5">
-                  {isFrMarket ? 'Candidature envoyée — publiez votre profil' : 'Application sent — publish your profile'}
-                </p>
-                <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                  {isFrMarket
-                    ? 'Vous avez postulé (statut Pending). Publiez votre profil pour devenir visible aux entreprises — l’onglet Inscrites restera vide tant que votre candidature n’est pas acceptée.'
-                    : 'You applied (Pending status). Publish your profile to become visible — the Enrolled tab stays empty until your application is accepted.'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/profile')}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-            >
-              {isFrMarket ? 'Publier mon profil' : 'Publish my profile'}
-            </button>
-          </div>
-        );
-      })()}
+      {/* Étape 5 banner — always visible, informational only (no CTA button). */}
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
+        <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
+            {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
+          </p>
+          <p className="text-sm font-black text-yellow-800 mt-0.5">
+            {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
+          </p>
+          <p className="text-xs font-medium text-yellow-700 mt-0.5">
+            {isFrMarket
+              ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+              : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
+          </p>
+        </div>
+      </div>
 
       <div className="flex space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
@@ -3077,23 +3046,20 @@ export function GigsMarketplace() {
 
       {!loading && !isProfilePublished && (
         <OnboardingNextStepButton
-          title={
-            hasMarketplaceGigEngagement
-              ? (isFrMarket ? 'Publier mon profil' : 'Publish my profile')
-              : 'MARKETPLACE'
-          }
+          title={isFrMarket ? 'Publier' : 'Publish'}
           hint={
-            hasMarketplaceGigEngagement
-              ? (isFrMarket ? 'Dernière étape pour devenir visible' : 'Final step to become visible')
-              : (isFrMarket ? 'Postulez à au moins un gig ci-dessous' : 'Apply to at least one gig below')
+            isFrMarket
+              ? 'Publiez votre profil pour accéder à la marketplace'
+              : 'Publish your profile to access the marketplace'
           }
-          onClick={
-            hasMarketplaceGigEngagement
-              ? () => navigate('/profile')
-              : scrollToGigGrid
-          }
+          onClick={() => navigate('/orchestrator/subscription')}
         />
       )}
+
+      <OnboardingSatisfactionModal
+        open={showSatisfaction}
+        onClose={() => setShowSatisfaction(false)}
+      />
     </div>
   );
 }
