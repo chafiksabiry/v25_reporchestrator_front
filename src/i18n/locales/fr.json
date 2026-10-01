@@ -191,7 +191,16 @@
         "periodWeek": "Semaine",
         "periodMonth": "Mois",
         "periodQuarter": "Trimestre",
-        "periodYear": "Année"
+        "periodYear": "Année",
+        "howtoTitle": "Comment ça marche ?",
+        "howtoBody": "Saisissez les objectifs d'appels et de transactions que vous vous donnez : le simulateur calcule automatiquement vos gains potentiels si vous réalisez les objectifs saisis.",
+        "howtoHint": "Modifiez les objectifs avec le crayon · le résultat se met à jour en bas",
+        "simulatorTitle": "Simulateur",
+        "simulatorResult": "Gains potentiels",
+        "transactionsTitle": "Transactions",
+        "earningsTitle": "Mon objectif gains",
+        "hoursMinLabel": "GIG · heures minimum",
+        "myGoalsLabel": "Mes objectifs"
       },
       "gigGoal": {
         "title": "Objectif bonus",

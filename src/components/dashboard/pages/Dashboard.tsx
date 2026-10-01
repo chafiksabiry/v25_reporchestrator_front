@@ -1060,6 +1060,42 @@ export function Dashboard({ profile }: DashboardProps) {
     if (selectedPeriod !== 'all') setGoalsPeriod(selectedPeriod);
   }, [selectedPeriod]);
 
+  // Objectifs appels/transactions → alimentent automatiquement le simulateur
+  useEffect(() => {
+    const calls = callGoals[goalsPeriod] || 0;
+    const txs = Math.min(transactionGoals[goalsPeriod] || 0, calls);
+    if (calls <= 0 && txs <= 0) return;
+    if (gigsData.length === 0) return;
+
+    const preferredId =
+      (selectedGigId !== 'all' && gigsData.some((g) => g._id === selectedGigId) ? selectedGigId : null)
+      || (hoursGigId && gigsData.some((g) => g._id === hoursGigId) ? hoursGigId : null)
+      || gigsData[0]?._id
+      || null;
+    if (!preferredId) return;
+
+    setShowCalculator(true);
+    setSimGigs((current) => {
+      const ids = Object.keys(current).length > 0 ? Object.keys(current) : [preferredId];
+      const next: Record<string, { calls: string; transactions: string }> = { ...current };
+      ids.forEach((id) => {
+        next[id] = {
+          calls: calls > 0 ? String(calls) : '',
+          transactions: txs > 0 ? String(txs) : '',
+        };
+      });
+      if (!next[preferredId]) {
+        next[preferredId] = {
+          calls: calls > 0 ? String(calls) : '',
+          transactions: txs > 0 ? String(txs) : '',
+        };
+      }
+      return next;
+    });
+    // selectedGigId / hoursGigId / gigsData lus au moment du sync objectifs uniquement
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callGoals, transactionGoals, goalsPeriod, gigsData.length]);
+
   const saveEarningsGoal = (raw: string) => {
     const value = Math.max(0, Number(raw) || 0);
     setEarningsGoals((current) => {
@@ -1563,11 +1599,24 @@ export function Dashboard({ profile }: DashboardProps) {
         {goalsOpen && (
         <div className="relative z-10 space-y-3">
 
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">GIG · heures minimum</p>
+          {/* Consigne pédagogique */}
+          <div className="rounded-2xl border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-500/25 via-sky-500/15 to-violet-500/20 p-3.5 shadow-[0_0_28px_-8px_rgba(34,211,238,0.55)]">
+            <p className="text-[10px] font-black text-cyan-300 uppercase tracking-[0.18em] mb-1.5">
+              {t('dashboard.home.goals.howtoTitle')}
+            </p>
+            <p className="text-[13px] font-bold text-white leading-snug">
+              {t('dashboard.home.goals.howtoBody')}
+            </p>
+            <p className="text-[11px] font-semibold text-cyan-200/90 mt-2 leading-snug">
+              {t('dashboard.home.goals.howtoHint')}
+            </p>
+          </div>
+
+          <p className="text-[10px] font-black text-amber-300 uppercase tracking-[0.2em]">{t('dashboard.home.goals.hoursMinLabel')}</p>
 
           {selectedGigId === 'all' ? (
             <div className="space-y-3">
-              <p className="text-[12px] font-bold text-white/70 leading-snug">
+              <p className="text-[12px] font-bold text-white/85 leading-snug">
                 Chaque GIG a ses propres heures et son propre bonus. Les objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
               </p>
               <div className="relative">
@@ -1679,31 +1728,37 @@ export function Dashboard({ profile }: DashboardProps) {
           </>
           )}
 
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] pt-1">Mes objectifs · {goalsPeriodLabels[goalsPeriod]}</p>
+          <p className="text-[10px] font-black text-fuchsia-300 uppercase tracking-[0.2em] pt-1">
+            {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
+          </p>
 
           {([
             {
               kind: 'calls' as const,
               title: t('dashboard.home.goals.callsTitle'),
-              icon: <Phone size={13} className="text-cyan-400" />,
+              icon: <Phone size={13} className="text-cyan-300" />,
               current: goals.calls.current,
               target: repCallGoal,
               progress: callGoalProgress,
+              barClass: 'bg-gradient-to-r from-cyan-400 to-sky-400',
+              doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
             },
             {
               kind: 'transactions' as const,
-              title: 'Transactions',
-              icon: <Zap size={13} className="text-amber-400" />,
+              title: t('dashboard.home.goals.transactionsTitle'),
+              icon: <Zap size={13} className="text-amber-300" />,
               current: goals.transactions.current,
               target: repTxGoal,
               progress: txGoalProgress,
+              barClass: 'bg-gradient-to-r from-amber-400 to-orange-400',
+              doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
             },
           ]).map((item) => (
-            <div key={item.kind} className="space-y-1.5">
+            <div key={item.kind} className="space-y-1.5 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   {item.icon}
-                  <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{item.title}</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{item.title}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {editingGoal === item.kind ? (
@@ -1723,25 +1778,25 @@ export function Dashboard({ profile }: DashboardProps) {
                           setGoalInput(String(capped));
                         }}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
-                        className="w-16 bg-white/10 border border-white/20 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-harx-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-16 bg-white/15 border border-cyan-400/50 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         autoFocus
                       />
-                      <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/30 text-emerald-300" aria-label="Enregistrer">
+                      <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200" aria-label="Enregistrer">
                         <Check size={12} />
                       </button>
                     </>
                   ) : (
                     <>
                   <span className="text-white font-black tracking-tighter">
-                        {item.current}<span className="text-white/40 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
+                        {item.current}<span className="text-white/55 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
                   </span>
-                      <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-400' : 'text-white/50'}`}>
+                      <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-300' : 'text-cyan-200'}`}>
                         {item.target > 0 ? `${item.progress}%` : 'à définir'}
                   </span>
                       <button
                         type="button"
                         onClick={() => { setGoalInput(String(item.target || '')); setEditingGoal(item.kind); }}
-                        className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
+                        className="p-1.5 rounded-lg bg-cyan-500/25 text-cyan-200 hover:text-white hover:bg-cyan-500/40 transition ring-1 ring-cyan-400/40"
                         aria-label={`Modifier l'objectif ${item.title}`}
                       >
                         <Pencil size={12} />
@@ -1750,23 +1805,23 @@ export function Dashboard({ profile }: DashboardProps) {
                   )}
                 </div>
               </div>
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-700 ${item.progress >= 100 && item.target > 0 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-300 to-harx-500'}`} style={{ width: `${item.target > 0 ? item.progress : 0}%` }} />
+              <div className="h-2.5 w-full bg-white/15 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${item.progress >= 100 && item.target > 0 ? item.doneClass : item.barClass}`} style={{ width: `${item.target > 0 ? item.progress : 0}%` }} />
               </div>
             </div>
           ))}
 
-          <div className="rounded-2xl border border-harx-400/40 bg-harx-500/15 p-4 space-y-3 shadow-[0_0_40px_-12px_rgba(236,72,153,0.65)]">
+          <div className="rounded-2xl border-2 border-fuchsia-400/55 bg-gradient-to-br from-fuchsia-600/30 via-rose-600/25 to-pink-500/20 p-4 space-y-3 shadow-[0_0_40px_-10px_rgba(232,121,249,0.7)]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Trophy size={14} className="text-harx-300" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">Mon objectif gains · {goalsPeriodLabels[goalsPeriod]}</span>
+                <Trophy size={14} className="text-fuchsia-200" />
+                <span className="text-[10px] font-black text-fuchsia-100 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
               </div>
               {editingGoal === 'earnings' ? (
                 <button
                   type="button"
                   onClick={() => saveEarningsGoal(goalInput)}
-                  className="p-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 transition"
+                  className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200 hover:bg-emerald-500/60 transition"
                   aria-label="Enregistrer l'objectif de gains"
                 >
                   <Check size={12} />
@@ -1775,7 +1830,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <button
                   type="button"
                   onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
-                  className="p-1.5 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition"
+                  className="p-1.5 rounded-lg bg-fuchsia-500/30 text-fuchsia-100 hover:text-white hover:bg-fuchsia-500/50 transition ring-1 ring-fuchsia-300/50"
                   aria-label="Modifier l'objectif de gains"
                 >
                   <Pencil size={12} />
@@ -1790,27 +1845,27 @@ export function Dashboard({ profile }: DashboardProps) {
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                  className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-harx-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="flex-1 bg-white/15 border border-fuchsia-300/50 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-fuchsia-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="Ex. 500"
                   autoFocus
                 />
-                <span className="text-white/60 text-sm font-bold">€</span>
+                <span className="text-fuchsia-100 text-sm font-bold">€</span>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-3xl font-black text-white tracking-tighter">{fmtMoney(goals.earned)} €</span>
-                  <span className="text-sm font-bold text-white/50">
+                  <span className="text-sm font-bold text-fuchsia-100/90">
                     {repEarningsGoal > 0 ? `/ ${fmtMoney(repEarningsGoal)} €` : 'Objectif à définir'}
                   </span>
                 </div>
-                <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className="h-3 w-full bg-black/30 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-harx-300 to-harx-500'}`}
+                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-fuchsia-300 to-rose-400'}`}
                     style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
                       />
                     </div>
-                <p className="text-[11px] font-bold text-white/70">
+                <p className="text-[11px] font-bold text-fuchsia-50/95">
                   {repEarningsGoal > 0
                     ? (earningsGoalProgress >= 100
                       ? 'Objectif atteint'
@@ -1821,33 +1876,33 @@ export function Dashboard({ profile }: DashboardProps) {
             )}
           </div>
 
-          <div className="h-px bg-white/10" />
+          <div className="h-px bg-white/15" />
           <button
             type="button"
             onClick={() => setShowCalculator((open) => !open)}
-            className="w-full flex items-center justify-between gap-2 text-left group"
+            className="w-full flex items-center justify-between gap-2 text-left group rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-2.5 hover:bg-cyan-500/20 transition"
           >
             <div className="flex items-center gap-2">
-              <Calculator size={13} className="text-cyan-400" />
-              <span className="text-[10px] font-black text-white/70 uppercase tracking-widest group-hover:text-white transition">Simulateur</span>
+              <Calculator size={14} className="text-cyan-300" />
+              <span className="text-[11px] font-black text-cyan-100 uppercase tracking-widest group-hover:text-white transition">{t('dashboard.home.goals.simulatorTitle')}</span>
             </div>
-            <ChevronDown size={12} className={`text-white/30 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-cyan-200 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
           {showCalculator && (
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="rounded-2xl bg-slate-900/80 border-2 border-cyan-400/40 p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
               {gigsData.length === 0 ? (
-                <p className="text-[12px] font-bold text-white/50">Aucun GIG disponible.</p>
+                <p className="text-[12px] font-bold text-white/70">Aucun GIG disponible.</p>
               ) : gigsData.map((gig) => {
                 const selected = Boolean(simGigs[gig._id]);
                 const row = simRows.find((item) => item.id === gig._id);
                 return (
-                  <div key={gig._id} className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div key={gig._id} className={`rounded-xl border p-3 space-y-2 ${selected ? 'border-cyan-400/50 bg-cyan-500/10' : 'border-white/15 bg-black/25'}`}>
                     <button
                       type="button"
                       onClick={() => toggleSimGig(gig._id)}
                       className="w-full flex items-center gap-2 text-left"
                     >
-                      <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-harx-500 border-harx-400 text-white' : 'border-white/30'}`}>
+                      <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-cyan-400 border-cyan-300 text-slate-950' : 'border-white/40'}`}>
                         {selected ? <Check size={10} /> : null}
                       </span>
                       <span className="text-[12px] font-black text-white truncate">{gig.title || t('dashboard.home.gigFallback')}</span>
@@ -1856,19 +1911,19 @@ export function Dashboard({ profile }: DashboardProps) {
                       <>
                         <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Appels</label>
+                            <label className="text-[9px] font-black text-cyan-200 uppercase tracking-wider block">Appels</label>
                   <input
                     type="number"
                               min={0}
                               value={simGigs[gig._id]?.calls ?? ''}
                               onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full bg-white/10 border border-cyan-400/40 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
-                            <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.callRate)} €</p>
+                            <p className="text-[10px] font-bold text-cyan-100/80 text-center">× {fmtMoney(row.callRate)} €</p>
                 </div>
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-white/40 uppercase tracking-wider block">Transactions</label>
+                            <label className="text-[9px] font-black text-amber-200 uppercase tracking-wider block">Transactions</label>
                   <input
                     type="number"
                               min={0}
@@ -1876,20 +1931,20 @@ export function Dashboard({ profile }: DashboardProps) {
                               value={simGigs[gig._id]?.transactions ?? ''}
                               onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full bg-white/10 border border-amber-400/40 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
-                            <p className="text-[10px] font-bold text-white/45 text-center">× {fmtMoney(row.txRate)} €</p>
-                            <p className="text-[9px] font-bold text-white/35 text-center">Pas plus que les appels</p>
+                            <p className="text-[10px] font-bold text-amber-100/80 text-center">× {fmtMoney(row.txRate)} €</p>
+                            <p className="text-[9px] font-bold text-white/50 text-center">Pas plus que les appels</p>
                 </div>
                 </div>
                         {row.bonusAmount > 0 && (
-                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-300' : 'text-white/45'}`}>
+                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-300' : 'text-amber-200/80'}`}>
                             {row.bonusIncluded
                               ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
                               : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
                           </p>
                         )}
-                        <p className="text-[11px] font-bold text-white/70">
+                        <p className="text-[11px] font-bold text-white/85">
                           {row.calls} × {fmtMoney(row.callRate)} € + {row.transactions} × {fmtMoney(row.txRate)} €
                           {row.bonusIncluded ? ` + ${fmtMoney(row.bonusAmount)} €` : ''}
                           {' = '}{fmtMoney(row.total)} €
@@ -1899,9 +1954,9 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
                 );
               })}
-              <div className="rounded-xl bg-harx-500/20 border border-harx-400/30 px-4 py-3">
-                <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">Résultat</p>
-                <p className="text-xl font-black text-harx-300 tracking-tight">+{fmtMoney(simTotal)} €</p>
+              <div className="rounded-xl bg-gradient-to-r from-emerald-500/30 to-cyan-500/25 border-2 border-emerald-400/55 px-4 py-3 shadow-[0_0_24px_-6px_rgba(52,211,153,0.55)]">
+                <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">{t('dashboard.home.goals.simulatorResult')}</p>
+                <p className="text-2xl font-black text-emerald-300 tracking-tight">+{fmtMoney(simTotal)} €</p>
             </div>
           </div>
           )}
@@ -2031,8 +2086,8 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
 
-      <button
-        type="button"
+          <button
+            type="button"
         onClick={() => navigate('/calls')}
         className="w-full flex items-center justify-between gap-3 px-6 py-4 rounded-[28px] bg-slate-900 text-white shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all group"
       >
@@ -2043,7 +2098,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <span className="text-sm font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
         </span>
         <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
-      </button>
+          </button>
 
       {/* Classement des gains du GIG */}
       <div className="bg-slate-950 rounded-[32px] border border-slate-800 shadow-2xl shadow-slate-900/40 p-3 sm:p-4 overflow-hidden relative">
@@ -2063,16 +2118,16 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="flex items-center gap-2">
             <Users size={14} className="text-white/30" />
             <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">REPs inscrits</span>
-                </div>
-                </div>
+              </div>
+            </div>
         {selectedGigId === 'all' ? (
           <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
             <div className="h-14 w-14 rounded-2xl bg-white/5 text-white/20 flex items-center justify-center mb-3">
               <Medal size={24} />
-            </div>
+          </div>
             <p className="text-xs font-bold text-white/30 uppercase tracking-wider">Sélectionnez un GIG</p>
             <p className="text-[11px] text-white/20 mt-1">Le classement des REPs s'affiche par GIG</p>
-          </div>
+            </div>
         ) : (
           <div className="relative z-10 flex flex-col items-center justify-center py-8 text-center gap-2">
             <p className="text-[10px] font-black uppercase tracking-widest text-amber-400/80">Vos gains · période</p>
@@ -2083,9 +2138,9 @@ export function Dashboard({ profile }: DashboardProps) {
             <p className="mt-3 text-[10px] font-bold text-white/25 italic max-w-sm">
               Classement multi-REP bientôt disponible — aucune donnée fictive affichée.
             </p>
-          </div>
+        </div>
         )}
-          </div>
+      </div>
 
       {/* À faire du jour + Rappels — deux lignes, action à droite */}
       <div className="rounded-[28px] border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-xl shadow-slate-200/20 overflow-hidden divide-y divide-slate-200/70">
