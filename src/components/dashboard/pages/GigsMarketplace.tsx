@@ -1665,7 +1665,9 @@ export function GigsMarketplace() {
       profileGigEngaged ||
       enrolledGigIds.length > 0 ||
       enrolledGigs.length > 0 ||
-      pendingRequests.length > 0
+      pendingRequests.length > 0 ||
+      invitedEnrollments.length > 0 ||
+      requestedGigs.length > 0
     ) {
       return true;
     }
@@ -1674,14 +1676,26 @@ export function GigsMarketplace() {
     if (!agentId) return false;
 
     return gigs.some((gig) => {
+      const status = getGigStatus(gig._id);
+      if (status === 'enrolled' || status === 'pending' || status === 'invited') return true;
       if (!gig.agents || !Array.isArray(gig.agents)) return false;
       return gig.agents.some((agent: any) => {
         const id = agent.agentId?.$oid || agent.agentId;
         if (String(id) !== String(agentId)) return false;
-        return ['requested', 'enrolled', 'pending'].includes(String(agent.status || '').toLowerCase());
+        return ['requested', 'enrolled', 'pending', 'invited', 'accepted'].includes(
+          String(agent.status || '').toLowerCase()
+        );
       });
     });
-  }, [profileGigEngaged, enrolledGigIds, enrolledGigs, pendingRequests, gigs]);
+  }, [
+    profileGigEngaged,
+    enrolledGigIds,
+    enrolledGigs,
+    pendingRequests,
+    invitedEnrollments,
+    requestedGigs,
+    gigs,
+  ]);
 
   // Filter and sort gigs based on active tab
   const getFilteredAndSortedGigs = () => {
@@ -1886,23 +1900,25 @@ export function GigsMarketplace() {
         </div>
       </div>
 
-      {/* Étape 5 banner — always visible, informational only (no CTA button). */}
-      <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
-        <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
-            {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
-          </p>
-          <p className="text-sm font-black text-yellow-800 mt-0.5">
-            {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
-          </p>
-          <p className="text-xs font-medium text-yellow-700 mt-0.5">
-            {isFrMarket
-              ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
-              : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
-          </p>
+      {/* Étape 5 banner — only while the REP has not applied / enrolled yet. */}
+      {!hasMarketplaceGigEngagement && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
+          <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
+              {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
+            </p>
+            <p className="text-sm font-black text-yellow-800 mt-0.5">
+              {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
+            </p>
+            <p className="text-xs font-medium text-yellow-700 mt-0.5">
+              {isFrMarket
+                ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+                : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
