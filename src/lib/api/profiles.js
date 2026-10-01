@@ -111,6 +111,17 @@ export const addContactCenterAssessment = async (id, assessment) => {
   }
 };
 
+/** Persist post-onboarding satisfaction (marketplace popup). */
+export const updateOnboardingSatisfaction = async (id, payload) => {
+  try {
+    const { data } = await api.put(`/profiles/${id}/onboarding-satisfaction`, payload);
+    return data;
+  } catch (error) {
+    console.error('Error saving onboarding satisfaction:', error);
+    throw error.response?.data || error;
+  }
+};
+
 // Add checkProfileExists function
 export const checkProfileExists = async (userId) => {
   try {

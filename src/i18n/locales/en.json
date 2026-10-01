@@ -21,9 +21,9 @@
     "sectionPlanning": "Planning"
   },
   "onboardingGuide": {
-    "title": "Complete your onboarding",
-    "description": "The Dashboard, Wallet, and Planning unlock once your profile is created and your onboarding is complete.",
-    "cta": "Continue Onboarding",
+    "title": "Finish your onboarding",
+    "description": "The dashboard, wallet, and planning unlock once your profile is created and your onboarding is complete.",
+    "cta": "Continue onboarding",
     "tooltip": "Complete all four phases (sign-up, profile, assessments, and subscription) to unlock every feature."
   },
   "topbar": {
