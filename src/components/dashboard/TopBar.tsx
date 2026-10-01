@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings } from 'lucide-react';
+import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
@@ -15,6 +15,7 @@ import {
   PROFILE_UPDATE_EVENT,
   USER_FULLNAME_UPDATE_EVENT,
 } from '../../utils/profileUtils';
+import { hasRepProfileContent } from '../../utils/repOnboardingNextStep';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -79,6 +80,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [balance, setBalance] = useState(() => readWalletTotal());
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
   const [displayName, setDisplayName] = useState<string>('User');
+  const [canOpenProfile, setCanOpenProfile] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('profileData');
+      return hasRepProfileContent(raw ? JSON.parse(raw) : null);
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -177,6 +186,12 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       loadProfileData();
       resolveDisplayName();
       setOnboardingComplete(computeOnboardingComplete());
+      try {
+        const raw = localStorage.getItem('profileData');
+        setCanOpenProfile(hasRepProfileContent(raw ? JSON.parse(raw) : null));
+      } catch {
+        setCanOpenProfile(false);
+      }
     };
 
     // Immediate update when the user edits their name in Account Settings:
@@ -345,13 +360,38 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
               {/* ── Menu Items ── */}
               <div className="py-2 px-1.5">
                 <button
-                  onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-white/15 transition-colors group"
+                  type="button"
+                  disabled={!canOpenProfile}
+                  aria-disabled={!canOpenProfile}
+                  title={
+                    canOpenProfile
+                      ? undefined
+                      : t('topBar.profileLocked', 'Importez votre CV pour ouvrir le profil')
+                  }
+                  onClick={() => {
+                    if (!canOpenProfile) return;
+                    setIsDropdownOpen(false);
+                    navigate('/profile');
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors group ${
+                    canOpenProfile
+                      ? 'text-white hover:bg-white/15'
+                      : 'cursor-not-allowed bg-white/[0.04] text-white/30'
+                  }`}
                 >
-                  <div className="p-1.5 bg-white/20 text-white rounded-lg group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200">
+                  <div
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${
+                      canOpenProfile
+                        ? 'bg-white/20 text-white group-hover:bg-white group-hover:text-[#E6188D]'
+                        : 'bg-white/10 text-white/25'
+                    }`}
+                  >
                     <UserCircle className="h-4 w-4" />
                   </div>
-                  <span>Mon Profil</span>
+                  <span className="flex-1 text-left">Mon Profil</span>
+                  {!canOpenProfile && (
+                    <Lock className="h-3.5 w-3.5 shrink-0 text-white/25" aria-hidden="true" />
+                  )}
                 </button>
                 <button
                   onClick={() => { setIsDropdownOpen(false); navigate('/account-settings'); }}
