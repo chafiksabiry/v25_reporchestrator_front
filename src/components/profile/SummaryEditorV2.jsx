@@ -12,6 +12,8 @@ import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal'
 import { repApiUrl } from '../../utils/repApiUrl';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { setProfileData, getProfileData } from '../../utils/authUtils';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -509,6 +511,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState();
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const photoInputRef = useRef(null);
   const cameraVideoRef = useRef(null);
   const cameraStreamRef = useRef(null);
@@ -1569,6 +1572,31 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       },
     }));
     setPhotoError(null);
+
+    // Keep TopBar / local cache in sync so the header avatar updates immediately.
+    try {
+      const cached = getProfileData() || {};
+      setProfileData({
+        ...cached,
+        personalInfo: {
+          ...(cached.personalInfo || {}),
+          photo: photoPayload,
+        },
+      });
+      window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+    } catch (err) {
+      console.warn('Could not sync photo to profile cache:', err);
+    }
+  };
+
+  const normalizePhotoPayload = (raw, blob) => {
+    if (typeof raw === 'string' && raw.trim()) return { url: raw.trim() };
+    if (raw && typeof raw === 'object') {
+      const url = raw.url || raw.secure_url || raw.src || '';
+      if (url) return { ...raw, url };
+    }
+    if (blob) return { url: URL.createObjectURL(blob) };
+    return null;
   };
 
   const uploadProfilePhotoBlob = async (blob, filename = 'profile.jpg') => {
@@ -1588,11 +1616,43 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       throw new Error(t('photoUploadError'));
     }
     const data = await response.json().catch(() => ({}));
-    const photo =
+    let photo = normalizePhotoPayload(
       data?.photo ||
-      data?.personalInfo?.photo ||
-      data?.data?.personalInfo?.photo ||
-      { url: URL.createObjectURL(blob) };
+        data?.personalInfo?.photo ||
+        data?.data?.personalInfo?.photo ||
+        data?.data?.photo,
+      blob
+    );
+
+    // Prefer fresh API profile so TopBar and review page share the same URL.
+    try {
+      const refreshed = await fetchProfileFromAPI();
+      const refreshedPhoto = normalizePhotoPayload(refreshed?.personalInfo?.photo, null);
+      if (refreshedPhoto?.url) {
+        photo = refreshedPhoto;
+        if (refreshed) {
+          setEditedProfile((prev) => ({
+            ...prev,
+            ...refreshed,
+            personalInfo: {
+              ...(prev.personalInfo || {}),
+              ...(refreshed.personalInfo || {}),
+              photo: refreshedPhoto,
+            },
+          }));
+          setProfileData(refreshed);
+          window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+          setPhotoError(null);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Photo uploaded but profile refresh failed:', err);
+    }
+
+    if (!photo?.url) {
+      throw new Error(t('photoUploadError'));
+    }
     applyUploadedPhoto(photo);
   };
 
@@ -2897,7 +2957,53 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 {t('pageSubtitle')}
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-3 flex-shrink-0 self-start">
+              {/* Photo card — same interaction as Profile page */}
+              <div className="relative group shrink-0">
+                <div
+                  className={`w-28 h-28 sm:w-36 sm:h-36 rounded-[28px] shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
+                    hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
+                  }`}
+                  onClick={() => {
+                    if (hasProfilePhoto) {
+                      setShowImageModal(true);
+                      return;
+                    }
+                    openPhotoSourceModal();
+                  }}
+                >
+                  {hasProfilePhoto ? (
+                    <img
+                      src={editedProfile.personalInfo.photo.url}
+                      alt={i18nT('profile.header.profilePhotoAlt')}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl font-black text-red-200 bg-red-50 uppercase tracking-tighter">
+                      {(editedProfile.personalInfo?.name || '?').charAt(0)}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
+                    <div className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full border border-white/30 truncate">
+                      {hasProfilePhoto
+                        ? i18nT('profile.header.viewPhoto')
+                        : t('addPhoto')}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPhotoSourceModal();
+                  }}
+                  disabled={isUploadingPhoto}
+                  className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white shadow-lg hover:opacity-90 disabled:opacity-60"
+                  title={i18nT('profile.header.changePhoto')}
+                >
+                  {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                </button>
+              </div>
               {canContinue && (
                 <button
                   onClick={pushToRepsProfile}
@@ -3001,6 +3107,44 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       : t('missingVideos', { count: missingVideosCount, total: experienceList.length })}
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fullscreen photo preview — same as ProfileView */}
+          {showImageModal && editedProfile?.personalInfo?.photo?.url && (
+            <div
+              className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 backdrop-blur-md"
+              onClick={() => setShowImageModal(false)}
+            >
+              <div
+                className="relative max-w-2xl w-full bg-slate-100 rounded-3xl overflow-hidden shadow-2xl border border-slate-200/50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 p-2 bg-slate-900/20 hover:bg-slate-900/40 text-white rounded-full transition-colors z-10"
+                  onClick={() => setShowImageModal(false)}
+                >
+                  <X size={24} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImageModal(false);
+                    openPhotoSourceModal();
+                  }}
+                  className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black uppercase tracking-widest text-harx-700 shadow-lg hover:bg-white"
+                >
+                  <Camera className="w-4 h-4" />
+                  {i18nT('profile.header.changePhoto')}
+                </button>
+                <img
+                  src={editedProfile.personalInfo.photo.url}
+                  alt={i18nT('profile.header.profilePhotoAlt')}
+                  className="w-full h-auto object-contain"
+                  style={{ maxHeight: '80vh' }}
+                />
               </div>
             </div>
           )}
