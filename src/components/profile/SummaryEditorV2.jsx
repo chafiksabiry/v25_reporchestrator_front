@@ -3638,7 +3638,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('personalInfo')}</h3>
             {renderSectionControls('basic')}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 items-start">
             {isSectionEditing('basic') ? (
               <>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
