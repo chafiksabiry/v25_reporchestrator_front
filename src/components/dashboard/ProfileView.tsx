@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles, Upload, ImagePlus } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
-import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { getRepOnboardingStep, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
@@ -581,6 +581,7 @@ export const ProfileView: React.FC<{
       setIsPublishing(true);
       const updatedData = await updateProfileData(profile._id, { status: 'completed' });
       if (onProfileUpdate) onProfileUpdate(updatedData);
+      navigate('/marketplace');
     } catch (error) {
       console.error('Error publishing profile:', error);
       alert(t('profile.errors.publish'));
@@ -1303,11 +1304,10 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Onboarding banners (phases 1–4 + gig apply). Hidden once published —
+                {/* Onboarding banners. After formula: publish unlocks marketplace.
                     status "completed" is the source of truth after logout/login. */}
                 {!isRepProfilePublished(profile) && (
-                isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
-                  profile.status !== 'completed' ? (
+                isRepCoreOnboardingDone(profile) ? (
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
                       <div className="flex items-start gap-3">
                         <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
@@ -1331,28 +1331,6 @@ export const ProfileView: React.FC<{
                         {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
                       </button>
                     </div>
-                  ) : null
-                ) : isRepCoreOnboardingDone(profile) ? (
-                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-black text-amber-900">
-                          {t('profile.header.finalStep')}
-                        </p>
-                        <p className="text-xs font-medium text-amber-800 mt-0.5">
-                          {t('profile.header.finalStepDescription')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate('/marketplace')}
-                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-                    >
-                      {t('profile.header.browseMissions')}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
                 ) : profile.onboardingProgress?.phases?.phase2?.status !== 'completed' ? (
                   <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
                     <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />

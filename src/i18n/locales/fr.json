@@ -643,12 +643,12 @@
       "defaultPlan": "Représentant Standard",
       "defaultRole": "Représentant",
       "published": "Publié",
-      "publishReady": "Votre profil est prêt à être publié !",
-      "publishReadyDescription": "Toutes les phases sont terminées. Publiez votre profil pour être visible des entreprises.",
+      "publishReady": "Vous avez terminé votre onboarding",
+      "publishReadyDescription": "Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
       "publishing": "Publication...",
-      "publish": "Publier mon profil",
-      "finalStep": "Dernière étape : postuler à une mission",
-      "finalStepDescription": "Parcourez la place de marché et postulez à au moins une mission pour terminer votre intégration.",
+      "publish": "Publier",
+      "finalStep": "Dernière étape : publier votre profil",
+      "finalStepDescription": "Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
       "browseMissions": "Voir les gigs",
       "phase2Complete": "Phase 2 terminée",
       "phase2CompleteDescription": "Vérifiez vos informations dans les onglets ci-dessous et modifiez-les si nécessaire. Lorsque vous avez fini, appuyez sur le bouton « Continuer Onboarding » pour passer à l’étape suivante.",
@@ -786,7 +786,7 @@
       "weeklySchedule": "Horaire hebdomadaire",
       "on": "Activé",
       "off": "Indisponible",
-      "onboardingProgress": "Progression de l’intégration",
+      "onboardingProgress": "Progression de l’onboarding",
       "phase": "Phase {{number}}",
       "stepsVerified": "Étapes vérifiées avec succès",
       "requiresInformation": "Informations supplémentaires requises",
@@ -1154,7 +1154,7 @@
     }
   },
   "repOnboarding": {
-    "title": "Intégration REPS",
+    "title": "Onboarding REPS",
     "subtitle": "Effectuez les actions requises pour débloquer les phases suivantes",
     "refreshProgress": "Actualiser la progression",
     "syncing": "Synchronisation...",
@@ -1247,7 +1247,7 @@
       "scheduleFirstSession": "Planifiez votre première session",
       "reviewMetrics": "Consultez vos indicateurs de performance",
       "joinCommunity": "Rejoignez la communauté REPS",
-      "completeTraining": "Terminez la formation d’intégration",
+      "completeTraining": "Terminez la formation d’onboarding",
       "accessSupport": "Accédez aux ressources d’assistance",
       "connectMentor": "Prenez contact avec un mentor",
       "scheduleCheckIn": "Planifiez votre premier point de suivi",
@@ -1269,7 +1269,7 @@
     },
     "nextStep": {
       "label": "Étape suivante",
-      "defaultTitle": "Poursuivez votre intégration",
+      "defaultTitle": "Poursuivez votre onboarding",
       "defaultHint": "Passez à l’étape suivante",
       "close": "Fermer"
     }
@@ -1344,9 +1344,23 @@
     "subscribedTo": "Vous êtes abonné à {{name}}.",
     "continueOnboarding": "Continuer Onboarding",
     "planActivated": "Formule « {{name}} » activée",
-    "planActiveBanner": "Votre formule « {{name}} » est active. Passez à l’étape suivante de l’onboarding.",
+    "planActiveBanner": "Votre formule « {{name}} » est active. Publiez votre profil pour accéder à la marketplace.",
     "planJustActivated": "« {{name}} » est maintenant votre formule active.",
+    "onboardingCompletePublish": "Vous avez terminé votre onboarding. Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
+    "publish": "Publier",
+    "publishSuccess": "Profil publié — bienvenue sur la marketplace !",
     "updating": "Mise à jour…"
+  },
+  "onboardingSatisfaction": {
+    "title": "Comment s’est passé votre onboarding ?",
+    "subtitle": "Votre avis est optionnel. Notez et commentez si vous le souhaitez — vous pouvez aussi passer.",
+    "scoreOptional": "Note optionnelle",
+    "starAria": "Note {{n}} sur 5",
+    "commentLabel": "Commentaire (optionnel)",
+    "commentPlaceholder": "Dites-nous ce qui vous a plu ou ce qu’on peut améliorer…",
+    "skip": "Passer",
+    "submit": "Envoyer",
+    "close": "Fermer"
   },
   "repPlans": {
     "takeAChance": {
