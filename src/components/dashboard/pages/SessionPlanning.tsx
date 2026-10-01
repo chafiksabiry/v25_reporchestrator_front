@@ -56,12 +56,20 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
     const agentData = slot.agentId && typeof slot.agentId === 'object' ? slot.agentId : null;
     const gigData = slot.gigId && typeof slot.gigId === 'object' ? slot.gigId : null;
 
-    const id = slot.slotId || (slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID();
+    // Reservation docs must use their own _id. Preferring slotId collapsed every
+    // weekly occurrence of the same template into one row → monthly hours froze.
+    const isReservationDoc = Boolean(
+        slot.reservationDate ||
+        (slot.slotId && slot.agentId && !Array.isArray(slot.reservations))
+    );
+    const id = isReservationDoc
+        ? ((slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID())
+        : (slot.slotId || (slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID());
     let repId = (agentData as any)?._id || (agentData as any)?.$oid || slot.agentId?.toString() || slot.repId?.toString() || '';
     const gigId = (gigData as any)?._id || (gigData as any)?.$oid || slot.gigId?.toString() || '';
 
     let status = slot.status;
-    let isReservation = !!slot.isMember;
+    let isReservation = !!slot.isMember || isReservationDoc;
     let repNotes = '';
     let reservationId = '';
 
@@ -69,7 +77,13 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
     const reservedCount = slot.reservedCount !== undefined ? slot.reservedCount : reservations.length;
     const capacity = slot.capacity || 1;
 
-    if (slot.reservationId) {
+    if (isReservationDoc) {
+        status = String(slot.status || 'reserved').toLowerCase() === 'cancelled' ? 'cancelled' : 'reserved';
+        isReservation = status === 'reserved';
+        reservationId = ((slot._id as any)?.$oid || slot._id?.toString() || '') as string;
+        repNotes = slot.notes || '';
+        if (currentAgentId) repId = currentAgentId || repId;
+    } else if (slot.reservationId) {
         status = 'reserved';
         isReservation = true;
         reservationId = slot.reservationId;
@@ -88,7 +102,7 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
         }
     }
 
-    let date = slot.date || slot.reservationDate;
+    let date = slot.reservationDate || slot.date;
     if (!date && slot.startTime && slot.startTime.includes('T')) {
         date = slot.startTime.split('T')[0];
     }
@@ -529,32 +543,43 @@ export function SessionPlanning() {
         const monthFrom = toLocalYmd(periodStart('month', now));
         const monthTo = toLocalYmd(periodEnd('month', now));
 
-        const reservedMine = slots.filter(
-            (s) =>
-                s.status === 'reserved' &&
-                (s.repId === selectedRepId || s.isMember) &&
-                (!selectedGigId || s.gigId === selectedGigId)
-        );
+        // Count from raw reservations (one row per occurrence), not deduped slots.
+        const reservedRows = (allReservations || []).filter((r: any) => {
+            const status = String(r.status || 'reserved').toLowerCase();
+            if (status === 'cancelled' || status === 'canceled') return false;
+            const agent = String(r.agentId?._id || r.agentId?.$oid || r.agentId || '');
+            if (selectedRepId && agent && agent !== String(selectedRepId)) return false;
+            if (selectedGigId) {
+                const gid = String(r.gigId?._id || r.gigId?.$oid || r.gigId || '');
+                if (gid && gid !== String(selectedGigId)) return false;
+            }
+            return true;
+        });
 
         const hoursInRange = (fromYmd: string, toYmd: string) =>
-            reservedMine.reduce((sum, s) => {
-                const ymd = String(s.date || '').slice(0, 10);
+            reservedRows.reduce((sum: number, r: any) => {
+                const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return sum;
-                // Inclusive calendar bounds (Mon–Sun week / current month / today).
                 if (ymd < fromYmd || ymd > toYmd) return sum;
-                return sum + (s.duration || 1);
+                const dur = Number(r.duration);
+                return sum + (Number.isFinite(dur) && dur > 0 ? dur : 1);
             }, 0);
 
         const plannedDaily = hoursInRange(todayStr, todayStr);
         const plannedWeekly = hoursInRange(weekFrom, weekTo);
         const plannedMonthly = hoursInRange(monthFrom, monthTo);
+        const reservedTotal = reservedRows.length;
+
+        const hasReservedToday = reservedRows.some((r: any) => {
+            const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
+            return ymd === todayStr;
+        });
 
         const dailyTone = engagementTone(plannedDaily, requiredDaily, {
-            dailyZeroWithActivity: plannedDaily === 0 && reservedMine.some((s) => s.date === todayStr),
+            dailyZeroWithActivity: plannedDaily === 0 && hasReservedToday,
         });
-        // User: when daily is 0, if activity it's always green
         const dailyFinalTone =
-            plannedDaily === 0 && reservedMine.some((s) => s.date === todayStr && s.status === 'reserved')
+            plannedDaily === 0 && hasReservedToday
                 ? 'green'
                 : plannedDaily === 0 && requiredDaily === 0
                   ? 'green'
@@ -572,8 +597,9 @@ export function SessionPlanning() {
                 required: requiredMonthly,
                 tone: engagementTone(plannedMonthly, requiredMonthly),
             },
+            reservedTotal,
         };
-    }, [slots, selectedGig, selectedGigId, selectedRepId]);
+    }, [allReservations, selectedGig, selectedGigId, selectedRepId]);
 
     const attendanceScore = useMemo(() => {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -847,7 +873,7 @@ export function SessionPlanning() {
                                 </div>
                                 <div>
                                     <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.reserved')}</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.reservedSlots}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{engagementMetrics.reservedTotal}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
