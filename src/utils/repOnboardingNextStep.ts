@@ -44,9 +44,11 @@ export const hasRepProfileContent = (profile: any): boolean => {
 };
 
 /**
- * Next route in the rep onboarding funnel:
- * 1) Import CV → 2) Profile editor (phase 2) → 3) Subscription → auto-publish → marketplace.
- * No separate Publish button; no skills hub step.
+ * Next route in the rep onboarding funnel (also used on reconnect):
+ * - no CV → /profile-import
+ * - CV imported, profile incomplete → /profile-editor
+ * - profile complete (or plan chosen but not published) → /subscription
+ * - published → /dashboard
  */
 export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   if (isRepProfilePublished(profile)) {
@@ -57,9 +59,10 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   const currentPhase = Number(profile?.onboardingProgress?.currentPhase) || 1;
   const hasCvOrProfile = hasRepProfileContent(profile);
 
-  // Plan chosen / phase 4 done → marketplace (backend should already have auto-published)
+  // Plan chosen / phase 4 done but not yet published → stay on subscription to finalize.
+  // (Marketplace is gated on status === 'completed'; returning /marketplace here would loop.)
   if (isPhaseCompleted(phases, 4) || profile?.plan) {
-    return { kind: 'done', path: '/marketplace' };
+    return { kind: 'continue-orchestrator', path: '/subscription' };
   }
 
   if (!hasCvOrProfile) {

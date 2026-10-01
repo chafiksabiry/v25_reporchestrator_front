@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../../contexts/NotificationsContext';
@@ -9,16 +9,21 @@ import { fetchProfileFromAPI } from '../../utils/profileUtils';
 import { getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
+import { isCallCenterStaff } from '../../utils/callCenterStaff';
+import {
+  getRepOnboardingStep,
+  isRepProfilePublished,
+} from '../../utils/repOnboardingNextStep';
 import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
 import { usePageTitle } from '../../lib/tracking/usePageTitle';
 
 /**
- * Shared shell (Sidebar + TopBar) for the onboarding orchestrator pages.
- * Mirrors the dashboard shell so the whole rep app has one consistent layout.
- * Used as a layout route: child pages render through <Outlet />.
+ * Shared shell for onboarding pages. On reconnect, always resume the current
+ * step (CV import → profile editor → subscription) — never the orchestrator hub.
  */
 function OnboardingShellContent() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -38,8 +43,14 @@ function OnboardingShellContent() {
           try {
             const res = await api.get(`/escrow/agent/wallet/${agentId}`);
             if (res.data?.success) {
-              localStorage.setItem('rep_available_balance', String(Number(res.data.data.availableBalance ?? 0)));
-              localStorage.setItem('rep_pending_balance', String(Number(res.data.data.pendingCommissions ?? 0)));
+              localStorage.setItem(
+                'rep_available_balance',
+                String(Number(res.data.data.availableBalance ?? 0))
+              );
+              localStorage.setItem(
+                'rep_pending_balance',
+                String(Number(res.data.data.pendingCommissions ?? 0))
+              );
               window.dispatchEvent(new Event('WALLET_BALANCE_UPDATED'));
             }
           } catch {
@@ -50,8 +61,37 @@ function OnboardingShellContent() {
         // ignore profile errors; shell still renders
       }
     };
-    init();
+    void init();
   }, []);
+
+  useEffect(() => {
+    if (!userProfile || isCallCenterStaff()) return;
+
+    const path = location.pathname;
+    if (
+      path === '/onboarding/continue' ||
+      path === '/orchestrator' ||
+      (path.startsWith('/orchestrator/') && path !== '/orchestrator/subscription')
+    ) {
+      return;
+    }
+
+    const next = getRepOnboardingStep(userProfile);
+    const target = next.path || '/profile-import';
+
+    if (path === target) return;
+    if (target === '/subscription' && path.includes('subscription')) return;
+
+    if (
+      (target === '/dashboard' || target === '/marketplace') &&
+      isRepProfilePublished(userProfile)
+    ) {
+      navigate(target, { replace: true });
+      return;
+    }
+
+    navigate(target, { replace: true });
+  }, [userProfile, location.pathname, navigate]);
 
   return (
     <div className="flex h-screen bg-[#E6188D] overflow-hidden">
