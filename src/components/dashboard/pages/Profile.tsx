@@ -739,7 +739,6 @@ export function Profile() {
 
     const payload = {
       professionalSummary: {
-        ...currentSummary,
         [section]: updatedSection
       }
     };
@@ -775,7 +774,6 @@ export function Profile() {
 
     const payload = {
       professionalSummary: {
-        ...currentSummary,
         [section]: [trimmedValue, ...sourceIds]
       }
     };
