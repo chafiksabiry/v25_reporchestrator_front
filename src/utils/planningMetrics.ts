@@ -189,11 +189,20 @@ export function formatSlotTimeRange(
 
 export type StatsPeriod = 'week' | 'month' | 'quarter' | 'year';
 
+/** Local calendar yyyy-MM-dd (avoids UTC shift from toISOString). */
+export function toLocalYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Start of period (local midnight): week = Monday, month = 1st, etc. */
 export function periodStart(period: StatsPeriod, now = new Date()): Date {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
   if (period === 'week') {
-    const day = (d.getDay() + 6) % 7; // Mon=0
+    const day = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
     d.setDate(d.getDate() - day);
     return d;
   }
@@ -210,8 +219,29 @@ export function periodStart(period: StatsPeriod, now = new Date()): Date {
   return d;
 }
 
+/**
+ * Inclusive end of period (local end-of-day wall date):
+ * week = Sunday of the current Mon–Sun week,
+ * month = last calendar day of the current month.
+ */
+export function periodEnd(period: StatsPeriod, now = new Date()): Date {
+  const start = periodStart(period, now);
+  const d = new Date(start);
+  if (period === 'week') {
+    d.setDate(d.getDate() + 6);
+  } else if (period === 'month') {
+    d.setMonth(d.getMonth() + 1, 0);
+  } else if (period === 'quarter') {
+    d.setMonth(d.getMonth() + 3, 0);
+  } else {
+    d.setMonth(12, 0);
+  }
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 export function isDateInPeriod(dateStr: string, period: StatsPeriod, now = new Date()): boolean {
   if (!/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return false;
-  const dt = new Date(`${dateStr.slice(0, 10)}T12:00:00`);
-  return dt >= periodStart(period, now) && dt <= now;
+  const ymd = dateStr.slice(0, 10);
+  return ymd >= toLocalYmd(periodStart(period, now)) && ymd <= toLocalYmd(periodEnd(period, now));
 }
