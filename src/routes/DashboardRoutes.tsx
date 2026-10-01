@@ -31,6 +31,10 @@ import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
 import { getRepShellChrome } from '../utils/harxBrand';
 import { isCallCenterStaff } from '../utils/callCenterStaff';
+import {
+  getRepOnboardingStep,
+  isRepProfilePublished,
+} from '../utils/repOnboardingNextStep';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
 import {
   CALL_ANALYSIS_COMPLETE_EVENT,
@@ -129,6 +133,26 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
     window.addEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
     return () => window.removeEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
   }, [navigate]);
+
+  // After login / any dashboard deep-link: unfinished onboarding always resumes
+  // the current step — never stay on dashboard/orchestrator hub.
+  useEffect(() => {
+    if (loading || !userProfile) return;
+    if (isCallCenterStaff()) return;
+    if (isRepProfilePublished(userProfile)) return;
+
+    const path = location.pathname;
+    const allowedDuringOnboarding = ['/profile', '/account-settings'];
+    if (allowedDuringOnboarding.some((p) => path === p || path.startsWith(`${p}/`))) {
+      return;
+    }
+
+    const next = getRepOnboardingStep(userProfile);
+    if (next.path && next.path !== path) {
+      navigate(next.path, { replace: true });
+    }
+  }, [loading, userProfile, location.pathname, navigate]);
+
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
   const chrome = getRepShellChrome(isCallCenterStaff());
 
