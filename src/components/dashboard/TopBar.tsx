@@ -18,23 +18,15 @@ import {
 import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 
 /**
- * Onboarding is complete (agent profile created) only when phases 1-4 are all
- * completed. Returns false when there is no progress data yet, so Wallet and
- * Planning stay hidden by default until we know the rep is onboarded.
+ * Full shell (wallet, planning, marketplace nav) unlocks only after the
+ * profile is published — not merely when phases 1–4 are done.
  */
 const computeOnboardingComplete = (): boolean => {
+  if (isCallCenterStaff()) return true;
   try {
     const raw = localStorage.getItem('profileData');
     if (!raw) return false;
-    const profile = JSON.parse(raw);
-    const phases = profile?.onboardingProgress?.phases;
-    if (!phases) return false;
-
-    for (let i = 1; i <= 4; i++) {
-      const phase = phases[`phase${i}`];
-      if (!phase || phase.status !== 'completed') return false;
-    }
-    return true;
+    return isRepProfilePublished(JSON.parse(raw));
   } catch {
     return false;
   }
