@@ -1203,6 +1203,34 @@ export const ProfileView: React.FC<{
           </p>
         </div>
 
+        {/* Phase 2 complete banner sits above the tabs so the CTA and review
+            guidance stay visible while browsing every profile section. */}
+        {!isRepProfilePublished(profile) &&
+          !isRepCoreOnboardingDone(profile) &&
+          profile.onboardingProgress?.phases?.phase2?.status === 'completed' && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
+            <div className="flex items-start gap-3 min-w-0">
+              <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-sm font-black text-emerald-800">
+                  {t('profile.header.phase2Complete')}
+                </p>
+                <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
+                  {t('profile.header.phase2CompleteDescription')}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(getRepOnboardingStep(profile).path)}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
+            >
+              {t('profile.header.continueOnboarding')}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Navigation Tabs at the Top */}
         <div className="w-full">
           <ProfileNavbar
@@ -1325,28 +1353,7 @@ export const ProfileView: React.FC<{
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
-                ) : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
-                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-                    <div className="flex items-start gap-3">
-                      <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-black text-emerald-800">
-                          {t('profile.header.phase2Complete')}
-                        </p>
-                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                          {t('profile.header.phase2CompleteDescription')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate(getRepOnboardingStep(profile).path)}
-                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-                    >
-                      {t('profile.header.continueOnboarding')}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
+                ) : profile.onboardingProgress?.phases?.phase2?.status !== 'completed' ? (
                   <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
                     <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                     <div>
@@ -1358,7 +1365,7 @@ export const ProfileView: React.FC<{
                       </p>
                     </div>
                   </div>
-                )
+                ) : null
                 )}
                 {/* Action Buttons Top Right */}
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">

@@ -21,9 +21,9 @@
     "sectionPlanning": "Planification"
   },
   "onboardingGuide": {
-    "title": "Finalisez votre intégration",
-    "description": "Le tableau de bord, le portefeuille et la planification se débloquent une fois votre profil créé et votre intégration terminée.",
-    "cta": "Poursuivre l’intégration",
+    "title": "Finalisez votre onboarding",
+    "description": "Le tableau de bord, le portefeuille et la planification se débloquent une fois votre profil créé et votre onboarding terminé.",
+    "cta": "Continuer Onboarding",
     "tooltip": "Terminez les quatre phases (inscription, profil, évaluations et abonnement) pour débloquer toutes les fonctionnalités."
   },
   "topbar": {
@@ -39,7 +39,7 @@
   "dashboard": {
     "stats": {
       "repsScore": "Score REPS",
-      "onboarding": "Intégration",
+      "onboarding": "Onboarding",
       "gigsEnrolled": "Gigs inscrits",
       "callsPassed": "Appels passés",
       "current": "Actuel",
@@ -580,8 +580,8 @@
         "subtitle": "Présentez vos compétences linguistiques et vos capacités de communication."
       },
       "onboarding": {
-        "title": "Progression de l'Intégration",
-        "subtitle": "Suivez votre parcours à travers les étapes d'intégration."
+        "title": "Progression de l’onboarding",
+        "subtitle": "Suivez votre parcours à travers les étapes d’onboarding."
       },
       "specialization": {
         "title": "Secteurs d'Activité",
@@ -651,11 +651,11 @@
       "finalStepDescription": "Parcourez la place de marché et postulez à au moins une mission pour terminer votre intégration.",
       "browseMissions": "Voir les gigs",
       "phase2Complete": "Phase 2 terminée",
-      "phase2CompleteDescription": "Votre profil est complet. Poursuivez votre intégration pour débloquer la suite.",
-      "continueOnboarding": "Poursuivre l’intégration",
+      "phase2CompleteDescription": "Vérifiez vos informations dans les onglets ci-dessous et modifiez-les si nécessaire. Lorsque vous avez fini, appuyez sur le bouton « Continuer Onboarding » pour passer à l’étape suivante.",
+      "continueOnboarding": "Continuer Onboarding",
       "completePhase2": "Terminez la phase 2 pour continuer",
       "completePhase2Description": "Ajoutez votre photo de profil pour terminer la phase 2.",
-      "selectPlan": "Choisir un plan Représentant",
+      "selectPlan": "Choisissez votre formule",
       "cropPhoto": "Recadrer la photo de profil",
       "cropAlt": "Recadrage",
       "savePhoto": "Enregistrer la photo"
@@ -1325,5 +1325,80 @@
   },
   "auth": {
     "verifying": "Vérification de l'authentification..."
+  },
+  "subscriptionFlow": {
+    "backToOnboarding": "Retour à l’onboarding",
+    "choosePlan": "Choisissez votre formule",
+    "yourPlan": "Votre formule",
+    "currentPlan": "Formule actuelle",
+    "subscribe": "S’abonner",
+    "startTrial": "Démarrer l’essai",
+    "freeTrial": "7 jours d’essai gratuit",
+    "perMonth": "/ mois",
+    "loadingPlans": "Chargement des formules…",
+    "noPlans": "Aucune formule disponible pour le moment.",
+    "secureCheckout": "Paiement sécurisé",
+    "initializingStripe": "Initialisation Stripe…",
+    "finalizing": "Finalisation de votre abonnement…",
+    "subscriptionActive": "Abonnement actif",
+    "subscribedTo": "Vous êtes abonné à {{name}}.",
+    "continueOnboarding": "Continuer Onboarding",
+    "planActivated": "Formule « {{name}} » activée",
+    "planActiveBanner": "Votre formule « {{name}} » est active. Passez à l’étape suivante de l’onboarding.",
+    "planJustActivated": "« {{name}} » est maintenant votre formule active.",
+    "updating": "Mise à jour…"
+  },
+  "repPlans": {
+    "takeAChance": {
+      "name": "TAKE A CHANCE",
+      "description": "Entièrement gratuit. Prouvez que vous savez gagner. Sans engagement. Si vous aimez et atteignez 30 €, passez à une formule supérieure.",
+      "features": {
+        "0": "Gagnez jusqu’à 30 € / mois",
+        "1": "Tableau de bord : solde portefeuille en temps réel ; analytics de base",
+        "2": "3 gigs seulement",
+        "3": "Réservation de créneaux : premier arrivé, premier servi",
+        "4": "Historique d’appels : pas d’écoute, de scores IA ni de transcriptions",
+        "5": "Support e-mail — 24 h"
+      }
+    },
+    "payTheBills": {
+      "name": "PAY THE BILLS",
+      "description": "Là, je gagne vraiment de l’argent.",
+      "features": {
+        "0": "Gagnez jusqu’à 200 € / mois",
+        "1": "Tableau de bord : analytics avancées",
+        "2": "10 gigs",
+        "3": "Réservation de créneaux : priorité sur liste d’attente",
+        "4": "Historique d’appels : écoute, scores IA et transcriptions",
+        "5": "Support e-mail ou chat",
+        "6": "7 jours d’essai gratuit"
+      }
+    },
+    "moneyMustBeFunny": {
+      "name": "MONEY MUST BE FUNNY",
+      "description": "Factures payées. Place au fun money.",
+      "features": {
+        "0": "Gagnez jusqu’à 500 € / mois",
+        "1": "Tableau de bord : analytics avancées",
+        "2": "100 gigs",
+        "3": "Réservation de créneaux : priorité",
+        "4": "Historique d’appels : écoute, scores IA et transcriptions",
+        "5": "Support téléphone, e-mail ou chat",
+        "6": "7 jours d’essai gratuit"
+      }
+    },
+    "richMansWorld": {
+      "name": "IN THE RICH MAN’S WORLD",
+      "description": "Je suis elite. Sans limites.",
+      "features": {
+        "0": "Gains mensuels illimités",
+        "1": "Accès prioritaire aux gigs premium",
+        "2": "Priorité pour réserver les créneaux",
+        "3": "Toutes les fonctionnalités IA gratuites",
+        "4": "Aucun frais supplémentaire de gestion du portefeuille",
+        "5": "Support téléphone, e-mail ou chat",
+        "6": "7 jours d’essai gratuit"
+      }
+    }
   }
 }

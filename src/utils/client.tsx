@@ -381,6 +381,7 @@ export const profileApi = {
     priceId: string;
     planId: string;
     customerEmail?: string;
+    locale?: string;
   }) => repApiClient.post('/api/stripe/subscriptions/checkout/init', body),
   confirmRepSubscriptionCheckout: (body: { sessionId: string }) =>
     repApiClient.post('/api/stripe/subscriptions/checkout/confirm', body),

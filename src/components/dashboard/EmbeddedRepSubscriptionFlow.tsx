@@ -6,12 +6,14 @@ import {
   EmbeddedCheckout,
 } from '@stripe/react-stripe-js';
 import { X, ShieldCheck, Check, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   getRepresentativePlans,
   getRepStripeConfig,
   updateProfilePlan,
 } from '../../utils/profileUtils';
 import { profileApi } from '../../utils/client';
+import { localizeRepPlan } from '../../utils/repPlanI18n';
 
 interface ApiPlan {
   _id: string;
@@ -33,14 +35,14 @@ interface Props {
 const FALLBACK_PUBLIC_KEY =
   'pk_live_51TCj3DPJXYVCMk8pTo20zxqkRKZSes7sCY6TJjSYdXqNEjCSvrsbtprRhy52KoggYnNpiJi0se31LuahqFLqN9Ex00kbTYXVSK';
 
-function formatPrice(amount: number, currency?: string): string {
+function formatPrice(amount: number, currency: string | undefined, locale: string): string {
   const cur = (currency || 'EUR').toUpperCase();
   if (!Number.isFinite(amount)) return '—';
-  // Exact 2 decimals from a decimal string — do not Math.round euros.
   const [whole, frac = '00'] = Number(amount).toFixed(2).split('.');
   const normalized = `${whole}.${frac}`;
+  const intlLocale = locale.startsWith('fr') ? 'fr-FR' : 'en-US';
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(intlLocale, {
       style: 'currency',
       currency: cur,
       minimumFractionDigits: 2,
@@ -65,6 +67,9 @@ export function EmbeddedRepSubscriptionFlow({
   currentPlanId,
   onSubscribed,
 }: Props) {
+  const { t, i18n } = useTranslation();
+  const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
+
   const [plans, setPlans] = useState<ApiPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plansError, setPlansError] = useState<string | null>(null);
@@ -114,7 +119,7 @@ export function EmbeddedRepSubscriptionFlow({
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setPlansError(err instanceof Error ? err.message : 'Impossible de charger les formules');
+        setPlansError(err instanceof Error ? err.message : t('subscriptionFlow.loadingPlans'));
       })
       .finally(() => {
         if (!cancelled) setLoadingPlans(false);
@@ -122,7 +127,7 @@ export function EmbeddedRepSubscriptionFlow({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const closeModal = useCallback(() => {
     if (confirming) return;
@@ -200,6 +205,7 @@ export function EmbeddedRepSubscriptionFlow({
           priceId: plan.stripePriceId,
           planId: plan._id,
           customerEmail: customerEmail?.trim() || undefined,
+          locale: uiLang,
         });
 
         if (!data?.clientSecret) {
@@ -222,7 +228,7 @@ export function EmbeddedRepSubscriptionFlow({
         setInitLoading(false);
       }
     },
-    [agentId, customerEmail]
+    [agentId, customerEmail, uiLang]
   );
 
   const handlePlanAction = useCallback(
@@ -274,7 +280,7 @@ export function EmbeddedRepSubscriptionFlow({
       <div className="flex flex-col items-center justify-center gap-3 py-16">
         <Loader2 className="h-8 w-8 animate-spin text-harx-500" />
         <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-          Chargement des formules…
+          {t('subscriptionFlow.loadingPlans')}
         </p>
       </div>
     );
@@ -291,10 +297,12 @@ export function EmbeddedRepSubscriptionFlow({
   if (!plans.length) {
     return (
       <div className="rounded-2xl border border-slate-100 bg-slate-50 p-6 text-slate-600">
-        <p className="text-sm font-bold">Aucune formule disponible pour le moment.</p>
+        <p className="text-sm font-bold">{t('subscriptionFlow.noPlans')}</p>
       </div>
     );
   }
+
+  const selectedCopy = selectedPlan ? localizeRepPlan(selectedPlan, t) : null;
 
   return (
     <div>
@@ -311,6 +319,7 @@ export function EmbeddedRepSubscriptionFlow({
           const isBusy =
             (initLoading && selectedPlan?._id === plan._id) ||
             activatingFreePlanId === plan._id;
+          const copy = localizeRepPlan(plan, t);
 
           return (
             <div
@@ -323,31 +332,31 @@ export function EmbeddedRepSubscriptionFlow({
             >
               {isCurrent && (
                 <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-green-500 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow">
-                  <Check className="h-3 w-3" strokeWidth={3} /> Votre formule
+                  <Check className="h-3 w-3" strokeWidth={3} /> {t('subscriptionFlow.yourPlan')}
                 </span>
               )}
 
-              <h3 className="text-xl font-black tracking-tight text-slate-900">{plan.name}</h3>
-              {plan.description && (
-                <p className="mt-1 text-xs font-medium text-slate-500">{plan.description}</p>
+              <h3 className="text-xl font-black tracking-tight text-slate-900">{copy.name}</h3>
+              {copy.description && (
+                <p className="mt-1 text-xs font-medium text-slate-500">{copy.description}</p>
               )}
 
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-3xl font-black tracking-tight text-slate-900">
-                  {formatPrice(plan.price, plan.currency)}
+                  {formatPrice(plan.price, plan.currency, uiLang)}
                 </span>
-                <span className="text-xs font-bold text-slate-400">/ mois</span>
+                <span className="text-xs font-bold text-slate-400">{t('subscriptionFlow.perMonth')}</span>
               </div>
 
               {isPaid && (
                 <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-harx-600">
-                  7 jours d&apos;essai gratuit
+                  {t('subscriptionFlow.freeTrial')}
                 </p>
               )}
 
-              {Array.isArray(plan.features) && plan.features.length > 0 && (
+              {copy.features.length > 0 && (
                 <ul className="mt-4 flex-1 space-y-2">
-                  {plan.features.map((feat, i) => (
+                  {copy.features.map((feat, i) => (
                     <li
                       key={`${plan._id}-feat-${i}`}
                       className="flex items-start gap-2 text-xs font-medium text-slate-700"
@@ -370,12 +379,12 @@ export function EmbeddedRepSubscriptionFlow({
                 } disabled:cursor-default disabled:opacity-100`}
               >
                 {isCurrent
-                  ? 'Formule actuelle'
+                  ? t('subscriptionFlow.currentPlan')
                   : isBusy
-                    ? 'Chargement…'
+                    ? t('subscriptionFlow.updating')
                     : isPaid
-                      ? 'Démarrer l’essai'
-                      : 'S’abonner'}
+                      ? t('subscriptionFlow.startTrial')
+                      : t('subscriptionFlow.subscribe')}
               </button>
             </div>
           );
@@ -401,10 +410,12 @@ export function EmbeddedRepSubscriptionFlow({
                   </div>
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-black tracking-tight text-slate-900">
-                      Secure checkout
+                      {t('subscriptionFlow.secureCheckout')}
                     </h2>
                     <p className="truncate text-xs font-bold text-slate-500">
-                      {selectedPlan.name} — {formatPrice(selectedPlan.price, selectedPlan.currency)} / month
+                      {selectedCopy?.name || selectedPlan.name} —{' '}
+                      {formatPrice(selectedPlan.price, selectedPlan.currency, uiLang)}{' '}
+                      {t('subscriptionFlow.perMonth')}
                     </p>
                   </div>
                 </div>
@@ -430,7 +441,7 @@ export function EmbeddedRepSubscriptionFlow({
                   <div className="flex h-64 flex-col items-center justify-center gap-4">
                     <Loader2 className="h-8 w-8 animate-spin text-harx-500" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                      Initialisation Stripe…
+                      {t('subscriptionFlow.initializingStripe')}
                     </p>
                   </div>
                 )}
@@ -448,7 +459,7 @@ export function EmbeddedRepSubscriptionFlow({
 
                 {confirming && (
                   <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-center text-[11px] font-bold text-blue-800/80">
-                    Finalisation de votre abonnement…
+                    {t('subscriptionFlow.finalizing')}
                   </div>
                 )}
 
@@ -459,10 +470,12 @@ export function EmbeddedRepSubscriptionFlow({
                     </div>
                     <div>
                       <h3 className="text-lg font-black tracking-tight text-slate-900">
-                        Abonnement actif
+                        {t('subscriptionFlow.subscriptionActive')}
                       </h3>
                       <p className="mt-1 text-xs font-bold text-slate-500">
-                        Vous êtes abonné à {selectedPlan.name}.
+                        {t('subscriptionFlow.subscribedTo', {
+                          name: selectedCopy?.name || selectedPlan.name,
+                        })}
                       </p>
                     </div>
                     <button
@@ -470,7 +483,7 @@ export function EmbeddedRepSubscriptionFlow({
                       onClick={closeModal}
                       className="mt-2 rounded-xl bg-harx-500 px-6 py-2.5 text-sm font-black tracking-tight text-white shadow transition-all duration-200 hover:bg-harx-600"
                     >
-                      Continuer
+                      {t('subscriptionFlow.continueOnboarding')}
                     </button>
                   </div>
                 )}

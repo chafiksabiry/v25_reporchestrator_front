@@ -15,7 +15,7 @@ import {
   PROFILE_UPDATE_EVENT,
   USER_FULLNAME_UPDATE_EVENT,
 } from '../../utils/profileUtils';
-import { hasRepProfileContent } from '../../utils/repOnboardingNextStep';
+import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 
 /**
  * Onboarding is complete (agent profile created) only when phases 1-4 are all
@@ -35,6 +35,18 @@ const computeOnboardingComplete = (): boolean => {
       if (!phase || phase.status !== 'completed') return false;
     }
     return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Full profile page stays locked until the rep publishes (or is CC staff). */
+const computeCanOpenProfile = (): boolean => {
+  if (isCallCenterStaff()) return true;
+  try {
+    const raw = localStorage.getItem('profileData');
+    const profile = raw ? JSON.parse(raw) : null;
+    return isRepProfilePublished(profile);
   } catch {
     return false;
   }
@@ -80,14 +92,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [balance, setBalance] = useState(() => readWalletTotal());
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
   const [displayName, setDisplayName] = useState<string>('User');
-  const [canOpenProfile, setCanOpenProfile] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem('profileData');
-      return hasRepProfileContent(raw ? JSON.parse(raw) : null);
-    } catch {
-      return false;
-    }
-  });
+  const [canOpenProfile, setCanOpenProfile] = useState<boolean>(() => computeCanOpenProfile());
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -186,12 +191,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       loadProfileData();
       resolveDisplayName();
       setOnboardingComplete(computeOnboardingComplete());
-      try {
-        const raw = localStorage.getItem('profileData');
-        setCanOpenProfile(hasRepProfileContent(raw ? JSON.parse(raw) : null));
-      } catch {
-        setCanOpenProfile(false);
-      }
+      setCanOpenProfile(computeCanOpenProfile());
     };
 
     // Immediate update when the user edits their name in Account Settings:
@@ -366,7 +366,10 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                   title={
                     canOpenProfile
                       ? undefined
-                      : t('topBar.profileLocked', 'Importez votre CV pour ouvrir le profil')
+                      : t(
+                          'topBar.profileLocked',
+                          'Publiez votre profil pour ouvrir Mon Profil'
+                        )
                   }
                   onClick={() => {
                     if (!canOpenProfile) return;
