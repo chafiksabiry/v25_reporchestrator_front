@@ -1348,6 +1348,7 @@
     "planJustActivated": "« {{name}} » est maintenant votre formule active.",
     "onboardingCompletePublish": "Vous avez terminé votre onboarding. Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
     "autoPublishHint": "Dès que vous choisissez une formule, votre profil est publié automatiquement et la marketplace s’ouvre.",
+    "publishAfterPlanHint": "Après le choix de la formule, vous pourrez publier votre profil puis donner votre avis avant d’accéder à la marketplace.",
     "publish": "Publier",
     "publishSuccess": "Profil publié — bienvenue sur la marketplace !",
     "updating": "Mise à jour…"
