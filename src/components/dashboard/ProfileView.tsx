@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus } from 'lucide-react';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
+import { refreshOnboardingStatus } from '../../services/apiConfig';
+import progressService from '../../services/progressService';
+import { toast, Toaster } from 'react-hot-toast';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
@@ -148,6 +152,16 @@ export const ProfileView: React.FC<{
   const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
   const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showSatisfaction, setShowSatisfaction] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [finalizingPlan, setFinalizingPlan] = useState(false);
+
+  const hasSubscriptionStepDone = Boolean(
+    profile?.onboardingProgress?.phases?.phase4?.status === 'completed' ||
+      profile?.onboardingProgress?.phases?.phase4?.requiredActions?.subscriptionActivated === true
+  );
+
   const closePlanModal = useCallback(async () => {
     setIsPlanModalOpen(false);
     if (!profile?._id) return;
@@ -163,8 +177,32 @@ export const ProfileView: React.FC<{
     }
   }, [profile?._id]);
 
+  const handlePublishProfile = useCallback(async () => {
+    if (!profile?._id) return;
+    setPublishing(true);
+    try {
+      if (!isRepProfilePublished(profile)) {
+        await updateProfileData(profile._id, { status: 'completed' });
+      }
+      toast.success(t('subscriptionFlow.publishSuccess'));
+      setShowPublishModal(false);
+      setShowSatisfaction(true);
+      onProfileUpdate?.({ ...profile, status: 'completed' });
+    } catch (err) {
+      console.error('Profile publish failed:', err);
+      toast.error(t('profile.errors.publish'));
+    } finally {
+      setPublishing(false);
+    }
+  }, [profile, onProfileUpdate, t]);
+
+  const handleSatisfactionClose = useCallback(() => {
+    setShowSatisfaction(false);
+    navigate('/marketplace', { replace: true });
+  }, [navigate]);
+
   const handlePlanSubscribed = useCallback(
-    (activatedPlan?: { _id: string; name: string; price?: number }) => {
+    async (activatedPlan?: { _id: string; name: string; price?: number }) => {
       if (activatedPlan && profile?._id) {
         setPlanData((prev) => ({
           _id: prev?._id || String(profile._id),
@@ -179,9 +217,27 @@ export const ProfileView: React.FC<{
           },
         }));
       }
-      void closePlanModal();
+      setIsPlanModalOpen(false);
+      setFinalizingPlan(true);
+      try {
+        if (profile?._id) {
+          await refreshOnboardingStatus(String(profile._id)).catch(() => null);
+        }
+        await progressService.updatePhaseStatus(4, 'completed').catch(() => null);
+        toast.success(
+          activatedPlan?.name
+            ? t('subscriptionFlow.planActivated', { name: activatedPlan.name })
+            : t('subscriptionFlow.subscriptionActive')
+        );
+        setShowPublishModal(true);
+      } catch (err) {
+        console.error('Post-plan finalize failed:', err);
+        setShowPublishModal(true);
+      } finally {
+        setFinalizingPlan(false);
+      }
     },
-    [closePlanModal, profile?._id, profile?.userId]
+    [profile?._id, profile?.userId, t]
   );
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [publicInfoDraft, setPublicInfoDraft] = useState({
@@ -1469,13 +1525,13 @@ export const ProfileView: React.FC<{
                     <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-alt-500 relative z-10">
                       <Briefcase size={24} />
                     </div>
-                    <div className="relative z-10">
+                    <div className="relative z-10 min-w-0 flex-1">
                       <div className="text-[10px] font-black text-harx-alt-400 uppercase tracking-widest">{t('profile.header.growthPlan')}</div>
-                      {isEditingPublicInfo ? (
+                      {hasSubscriptionStepDone ? (
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors underline underline-offset-2"
+                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
                         >
                           {planData?.plan?.name || t('profile.header.choosePlan')}
                         </button>
@@ -1483,9 +1539,10 @@ export const ProfileView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-harx px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
                         >
-                          {planData?.plan?.name || t('profile.header.defaultPlan')}
+                          {t('profile.header.choosePlanCta')}
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -1502,6 +1559,8 @@ export const ProfileView: React.FC<{
           </div>
         </div>
       </div>
+
+      <Toaster position="top-right" />
 
       {/* Image Modal */}
       {showImageModal && profile.personalInfo?.photo?.url && (
@@ -1538,16 +1597,67 @@ export const ProfileView: React.FC<{
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-              <EmbeddedRepSubscriptionFlow
-                agentId={profile?._id ? String(profile._id) : undefined}
-                customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
-                currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
-                onSubscribed={handlePlanSubscribed}
-              />
+              {finalizingPlan ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16">
+                  <LoaderIcon className="h-8 w-8 animate-spin text-harx-500" />
+                  <p className="text-sm font-bold text-slate-500">{t('subscriptionFlow.finalizing')}</p>
+                </div>
+              ) : (
+                <EmbeddedRepSubscriptionFlow
+                  agentId={profile?._id ? String(profile._id) : undefined}
+                  customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
+                  currentPlanId={
+                    hasSubscriptionStepDone && planData?.plan?._id
+                      ? String(planData.plan._id)
+                      : undefined
+                  }
+                  onSubscribed={handlePlanSubscribed}
+                />
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {showPublishModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-publish-title"
+            className="relative w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-harx text-white shadow-lg shadow-harx-500/25">
+              <Rocket className="h-6 w-6" />
+            </div>
+            <h2 id="profile-publish-title" className="text-lg font-black tracking-tight text-slate-900">
+              {t('profile.header.publishReady')}
+            </h2>
+            <p className="mt-2 text-sm font-medium text-slate-500 leading-relaxed">
+              {planData?.plan?.name
+                ? t('subscriptionFlow.planActiveBanner', { name: planData.plan.name })
+                : t('subscriptionFlow.onboardingCompletePublish')}
+            </p>
+            <button
+              type="button"
+              onClick={() => void handlePublishProfile()}
+              disabled={publishing}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-harx px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/20 transition hover:opacity-90 disabled:opacity-60"
+            >
+              {publishing ? (
+                <>
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                  {t('profile.header.publishing')}
+                </>
+              ) : (
+                t('subscriptionFlow.publish')
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <OnboardingSatisfactionModal open={showSatisfaction} onClose={handleSatisfactionClose} />
 
       {/* Photo source chooser */}
       {showPhotoSourceModal && (
