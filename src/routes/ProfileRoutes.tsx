@@ -9,7 +9,7 @@ import mascotte from '../assets/mascotte2.png';
 import { buildRepPageTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { useTranslation } from 'react-i18next';
-import { getRepOnboardingStep } from '../utils/repOnboardingNextStep';
+import { getRepOnboardingStep, isRepProfilePublished } from '../utils/repOnboardingNextStep';
 
 // Heavy: PDF.js / OpenAI parsing — only needed when the import dialog opens.
 const ImportDialogV2 = lazy(() => import('../components/profile/ImportDialogV2.jsx'));
@@ -340,6 +340,9 @@ export default function ProfileRoutes() {
             if (parsed?.personalInfo) {
               if (!cancelled) {
                 applyProfileData(parsed);
+                if (isRepProfilePublished(parsed)) {
+                  navigate('/dashboard', { replace: true });
+                }
               }
               return;
             }
@@ -351,6 +354,9 @@ export default function ProfileRoutes() {
 
         if (isEditor) {
           applyProfileData(fromApi as ProfileRecord);
+          if (isRepProfilePublished(fromApi)) {
+            navigate('/dashboard', { replace: true });
+          }
           return;
         }
 

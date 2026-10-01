@@ -1,7 +1,6 @@
 export type RepOnboardingStepKind =
   | 'complete-profile'
   | 'continue-orchestrator'
-  | 'apply-gig'
   | 'publish'
   | 'done';
 
@@ -19,7 +18,7 @@ export const hasRepGigEngagement = (profile: any): boolean =>
     (g: any) => g && ['requested', 'enrolled'].includes(g.status)
   );
 
-/** Core onboarding = phases 1–4 only. Phase 5 in the DB is marketplace tracking, not a UI step. */
+/** Core onboarding = phases 1–4. Phase 3 is auto-skipped backend-side; phase 5 is marketplace. */
 export const isRepCoreOnboardingDone = (profile: any): boolean => {
   if (isRepProfilePublished(profile)) return true;
   return [1, 2, 3, 4].every((n) =>
@@ -41,15 +40,13 @@ export const hasRepProfileContent = (profile: any): boolean => {
   if (typeof desc === 'string' && desc.trim()) return true;
   if (Array.isArray(profile.experience) && profile.experience.length > 0) return true;
   if (Array.isArray(profile.experiences) && profile.experiences.length > 0) return true;
-  // Registration / account-settings name alone does not mean CV upload started.
   return false;
 };
 
 /**
- * Next route in the rep onboarding funnel.
- * Prefer live phase progress over the `isBasicProfileCompleted` flag alone
- * (that flag is only flipped at the end of the CV editor, so mid-funnel
- * users were incorrectly sent back to /profile-import after login).
+ * Next route in the rep onboarding funnel:
+ * 1) Import CV → 2) Profile editor (phase 2) → 3) Subscription → auto-publish → marketplace.
+ * No separate Publish button; no skills hub step.
  */
 export function getRepOnboardingStep(profile: any): RepOnboardingStep {
   if (isRepProfilePublished(profile)) {
@@ -58,39 +55,28 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
 
   const phases = profile?.onboardingProgress?.phases;
   const currentPhase = Number(profile?.onboardingProgress?.currentPhase) || 1;
-  const coreDone = isRepCoreOnboardingDone(profile);
   const hasCvOrProfile = hasRepProfileContent(profile);
 
-  // After formula (phase 4): publish unlocks marketplace — no gig-apply gate.
-  if (coreDone || isPhaseCompleted(phases, 4)) {
-    return { kind: 'publish', path: '/orchestrator/subscription' };
+  // Plan chosen / phase 4 done → marketplace (backend should already have auto-published)
+  if (isPhaseCompleted(phases, 4) || profile?.plan) {
+    return { kind: 'done', path: '/marketplace' };
   }
 
-  // Until a CV/profile story exists, always return to Import CV — never the
-  // orchestrator hub (settings "Continue onboarding" must resume this step).
   if (!hasCvOrProfile) {
     return { kind: 'complete-profile', path: '/profile-import' };
   }
 
-  // Phase 4 = subscription
+  // After profile-editor (phase 2) → subscription. Phase 3 is auto-completed on the backend.
   if (
+    isPhaseCompleted(phases, 2) ||
     isPhaseCompleted(phases, 3) ||
     currentPhase >= 4 ||
     phases?.phase4?.status === 'in_progress'
   ) {
-    return { kind: 'continue-orchestrator', path: '/orchestrator/subscription' };
+    return { kind: 'continue-orchestrator', path: '/subscription' };
   }
 
-  // Phase 3 = skills / assessments
-  if (
-    isPhaseCompleted(phases, 2) ||
-    currentPhase >= 3 ||
-    phases?.phase3?.status === 'in_progress'
-  ) {
-    return { kind: 'continue-orchestrator', path: '/orchestrator/skills' };
-  }
-
-  // Phase 2 = enrich profile (after CV import/editor)
+  // Phase 2 in progress / CV imported
   if (profile?.isBasicProfileCompleted === true || hasCvOrProfile) {
     return { kind: 'complete-profile', path: '/profile-editor' };
   }

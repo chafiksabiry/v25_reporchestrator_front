@@ -369,7 +369,7 @@ export function GigActivityNotificationsSync() {
                   key,
                   kind: 'action_assigned',
                   status: 'action_assigned',
-                  actionPath: '/orchestrator',
+                  actionPath: '/onboarding/continue',
                   ...copy(
                     isFr,
                     {

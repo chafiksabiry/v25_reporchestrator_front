@@ -651,7 +651,7 @@
       "finalStepDescription": "Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
       "browseMissions": "Voir les gigs",
       "phase2Complete": "Phase 2 terminée",
-      "phase2CompleteDescription": "Vérifiez vos informations dans les onglets ci-dessous et modifiez-les si nécessaire. Lorsque vous avez fini, appuyez sur le bouton « Continuer Onboarding » pour passer à l’étape suivante.",
+      "phase2CompleteDescription": "Vérifiez vos informations dans les onglets ci-dessous. Lorsque vous avez fini, appuyez sur « Continuer Onboarding » pour choisir votre formule — le profil sera publié automatiquement.",
       "continueOnboarding": "Continuer Onboarding",
       "completePhase2": "Terminez la phase 2 pour continuer",
       "completePhase2Description": "Ajoutez votre photo de profil pour terminer la phase 2.",
@@ -1347,6 +1347,7 @@
     "planActiveBanner": "Votre formule « {{name}} » est active. Publiez votre profil pour accéder à la marketplace.",
     "planJustActivated": "« {{name}} » est maintenant votre formule active.",
     "onboardingCompletePublish": "Vous avez terminé votre onboarding. Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
+    "autoPublishHint": "Dès que vous choisissez une formule, votre profil est publié automatiquement et la marketplace s’ouvre.",
     "publish": "Publier",
     "publishSuccess": "Profil publié — bienvenue sur la marketplace !",
     "updating": "Mise à jour…"
