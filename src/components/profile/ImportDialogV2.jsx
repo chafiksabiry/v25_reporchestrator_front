@@ -82,6 +82,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       return;
     }
 
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'doc' && ext !== 'docx') {
+      setError(t('profileImportDialog.errors.unsupportedFormat'));
+      return;
+    }
+
     try {
       setLoading(true);
       setProgress(25);
@@ -492,7 +498,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                   type="file"
                   ref={fileInputRef}
                   className="hidden"
-                  accept=".txt,.pdf,.doc,.docx"
+                  accept=".pdf,.doc,.docx"
                   onChange={handleFileUpload}
                 />
                 {uploadSuccess ? (

@@ -32,7 +32,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   const steps = [
     {
       title: "Choose Your CV Format",
-      description: "We support PDF, DOC, DOCX, and TXT files. Make sure your CV is up-to-date and includes your key achievements."
+      description: "We support PDF and DOC files. Make sure your CV is up-to-date and includes your key achievements."
     },
     {
       title: "Review Content",
@@ -50,6 +50,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB');
+      return;
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'doc' && ext !== 'docx') {
+      setError('Only PDF, DOC and DOCX files are accepted');
       return;
     }
 
@@ -520,7 +526,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
-                    accept=".txt,.pdf,.doc,.docx"
+                    accept=".pdf,.doc,.docx"
                     onChange={handleFileUpload}
                   />
                   {uploadSuccess ? (
@@ -543,7 +549,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                         or click to browse your files
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        Supports PDF, DOC, DOCX, TXT (max 5MB)
+                        Supports PDF and DOC (max 5MB)
                       </p>
                     </>
                   )}
