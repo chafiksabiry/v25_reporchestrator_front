@@ -25,7 +25,7 @@ import { ImportLeads } from '../components/dashboard/pages/ImportLeads';
 import { SessionPlanning } from '../components/dashboard/pages/SessionPlanning';
 import { Calls } from '../components/dashboard/pages/Calls';
 import CallReportCard from '../components/dashboard/CallReport';
-import { fetchProfileFromAPI } from '../utils/profileUtils';
+import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../utils/profileUtils';
 import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
 import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
@@ -84,6 +84,18 @@ function DashboardAppContent() {
 
     initializeProfileData();
 
+    const onProfileUpdated = () => {
+      // Cache was just written by fetchProfileFromAPI — read it (don't refetch,
+      // or we'd re-dispatch PROFILE_UPDATED in a loop).
+      try {
+        const raw = localStorage.getItem('profileData');
+        if (raw) setUserProfile(JSON.parse(raw));
+      } catch {
+        /* keep current */
+      }
+    };
+    window.addEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
+
     // Live wallet updates over WebSocket: refresh as soon as the backend books
     // new commissions for this rep (after a validated call/sale).
     const disposeSocket = connectRepEscrowSocket(
@@ -99,6 +111,7 @@ function DashboardAppContent() {
 
     return () => {
       disposeSocket();
+      window.removeEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
     };
   }, []);
 

@@ -198,7 +198,12 @@ export const ProfileView: React.FC<{
 
   const handleSatisfactionClose = useCallback(() => {
     setShowSatisfaction(false);
-    navigate('/marketplace', { replace: true });
+    // Ensure dashboard shell sees published status before marketplace nav.
+    void fetchProfileFromAPI()
+      .catch(() => null)
+      .finally(() => {
+        navigate('/marketplace', { replace: true });
+      });
   }, [navigate]);
 
   const handlePlanSubscribed = useCallback(

@@ -74,7 +74,11 @@ function Subscription() {
 
   const handleSatisfactionClose = useCallback(() => {
     setShowSatisfaction(false);
-    navigate('/marketplace', { replace: true });
+    void fetchProfileFromAPI()
+      .catch(() => null)
+      .finally(() => {
+        navigate('/marketplace', { replace: true });
+      });
   }, [navigate]);
 
   useEffect(() => {
