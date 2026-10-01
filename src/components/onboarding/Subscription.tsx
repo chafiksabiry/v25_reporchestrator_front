@@ -121,7 +121,9 @@ function Subscription() {
               await finalizeAfterPlan(name);
               return;
             }
-            if (next.path !== '/subscription') {
+            // Only bounce back if phase 2 is incomplete — user may open /subscription
+            // from the profile confirm step to choose a plan (next.path === '/profile').
+            if (next.path === '/profile-import' || next.path === '/profile-editor') {
               navigate(next.path, { replace: true });
               return;
             }
