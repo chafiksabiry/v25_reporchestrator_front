@@ -341,7 +341,11 @@ export default function ProfileRoutes() {
               if (!cancelled) {
                 applyProfileData(parsed);
                 const next = getRepOnboardingStep(parsed);
-                if (next.path !== '/profile-editor') {
+                // Stay on the editor to finish phase 2 — never bounce back to import.
+                if (
+                  next.path !== '/profile-editor' &&
+                  next.path !== '/profile-import'
+                ) {
                   navigate(next.path, { replace: true });
                 }
               }
@@ -356,7 +360,10 @@ export default function ProfileRoutes() {
         if (isEditor) {
           applyProfileData(fromApi as ProfileRecord);
           const next = getRepOnboardingStep(fromApi);
-          if (next.path !== '/profile-editor') {
+          if (
+            next.path !== '/profile-editor' &&
+            next.path !== '/profile-import'
+          ) {
             navigate(next.path, { replace: true });
           }
           return;
