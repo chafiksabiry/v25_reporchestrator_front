@@ -603,11 +603,18 @@ export function GigsMarketplace() {
           navigate('/subscription', { replace: true });
           return;
         }
+        const serverDone = Boolean(profile?.onboardingSatisfaction?.done);
         try {
-          const done = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
-          if (!done) setShowSatisfaction(true);
+          const localDone = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
+          if (!serverDone && !localDone) setShowSatisfaction(true);
+          if (serverDone && !localDone) {
+            localStorage.setItem(
+              ONBOARDING_SATISFACTION_KEY,
+              JSON.stringify({ done: true, at: new Date().toISOString(), synced: true })
+            );
+          }
         } catch {
-          setShowSatisfaction(true);
+          if (!serverDone) setShowSatisfaction(true);
         }
       } catch {
         // keep the cached value on failure
