@@ -2,13 +2,14 @@ import { getAgentId, getAuthToken } from './authUtils';
 import { repApiUrl } from './repApiUrl';
 
 // Types pour les statuts de gigs
-export type GigStatus = 'enrolled' | 'invited' | 'pending' | 'none';
+export type GigStatus = 'enrolled' | 'invited' | 'pending' | 'rejected' | 'none';
 
 // Interface pour les données de statut
 export interface GigStatusData {
   enrolledGigIds: string[];
   invitedGigIds: string[];
   pendingGigIds: string[];
+  rejectedGigIds?: string[];
 }
 
 const matchingApiBase = () =>
@@ -137,6 +138,14 @@ export const fetchEnrolledGigsFromProfile = async (): Promise<string[]> => {
   return fetchEnrolledFromProfile();
 };
 
+/** Invitations refusées par le REPS (historique). */
+export const fetchRejectedInvitations = async (): Promise<string[]> => {
+  const agentId = getAgentId();
+  const token = getAuthToken();
+  if (!agentId || !token) return [];
+  return fetchMatchingAgentGigIds('rejected');
+};
+
 // Fonction pour obtenir le statut d'un gig
 export const getGigStatus = (
   gigId: string,
@@ -148,6 +157,10 @@ export const getGigStatus = (
 
   if (statusData.invitedGigIds.includes(gigId)) {
     return 'invited';
+  }
+
+  if (statusData.rejectedGigIds?.includes(gigId)) {
+    return 'rejected';
   }
 
   if (statusData.pendingGigIds.includes(gigId)) {
