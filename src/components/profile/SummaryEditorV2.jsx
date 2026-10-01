@@ -2403,6 +2403,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       onClick={() => setVideoModalExp({
                         title: String(role.title || role.role || ''),
                         company: String(role.company || ''),
+                        description: String(role.description || ''),
+                        responsibilities: Array.isArray(role.responsibilities)
+                          ? role.responsibilities
+                          : (localizeList(role.responsibilities_i18n, uiLang).length
+                            ? localizeList(role.responsibilities_i18n, uiLang)
+                            : []),
                         index,
                       })}
                       className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
@@ -2425,7 +2431,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           <ExperienceVideoModal
             isOpen={!!videoModalExp}
             onClose={() => setVideoModalExp(null)}
-            experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+            experience={{
+              title: videoModalExp.title,
+              company: videoModalExp.company,
+              description: videoModalExp.description,
+              responsibilities: videoModalExp.responsibilities,
+            }}
             experienceIndex={videoModalExp.index}
             profileId={editedProfile._id || editedProfile.id || ''}
             referencePhotoUrl={editedProfile?.personalInfo?.photo?.url || null}
