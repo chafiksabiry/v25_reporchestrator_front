@@ -1926,6 +1926,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   }, [stopCameraStream]);
 
   const pushToRepsProfile = () => {
+    if (!canContinue) return;
     updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
       .then(() => {
         // Step 2 done → subscription (auto-publish after plan choice).
@@ -1933,7 +1934,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       })
       .catch(error => {
         console.error('Error updating isBasicProfileCompleted:', error);
-        navigate('/subscription');
+        // Still only continue if gate is satisfied (defense in depth).
+        if (canContinue) navigate('/subscription');
       });
   };
 
