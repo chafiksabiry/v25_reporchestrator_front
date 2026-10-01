@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Globe, Briefcase, CheckCircle, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LanguageMediaContext } from './languageVideoUtils';
+import { getLanguageMetricScores, scoreBarClass, scoreTextClass } from './languageScoreDisplay';
 
 interface LanguageAnalysisModalProps {
   isOpen: boolean;
@@ -38,13 +39,17 @@ export const LanguageAnalysisModal: React.FC<LanguageAnalysisModalProps> = ({
 
   if (!isOpen) return null;
 
+  const metricsFromLang = getLanguageMetricScores({
+    proficiency,
+    assessmentResults: ar,
+  });
   const metrics = [
-    { label: isFr ? 'Aisance' : 'Fluency', value: ar?.fluency?.score ?? entry?.fluency?.score ?? 0 },
-    { label: isFr ? 'Grammaire / Niveau' : 'Grammar / Level', value: ar?.proficiency?.score ?? entry?.grammar?.score ?? 0 },
-    { label: isFr ? 'Vocabulaire' : 'Vocabulary', value: ar?.completeness?.score ?? entry?.vocabulary?.score ?? 0 },
+    { label: isFr ? 'Aisance' : 'Fluency', value: metricsFromLang.fluency },
+    { label: isFr ? 'Niveau' : 'Level', value: metricsFromLang.level },
+    { label: isFr ? 'Complétude' : 'Completeness', value: metricsFromLang.completeness },
   ];
 
-  const overallScore = ar?.overall?.score ?? entry?.overallScore ?? null;
+  const overallScore = metricsFromLang.overall || ar?.overall?.score || entry?.overallScore || null;
   const summary =
     localizeText(entry?.summary, uiLang) ||
     localizeText(entry?.strengths, uiLang) ||
@@ -114,9 +119,12 @@ export const LanguageAnalysisModal: React.FC<LanguageAnalysisModalProps> = ({
               {metrics.map((m) => (
                 <div key={m.label} className="rounded-xl bg-white border border-slate-100 p-3 text-center">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{m.label}</div>
-                  <div className="text-lg font-black text-slate-900 mt-1">{m.value}%</div>
+                  <div className={`text-lg font-black mt-1 tabular-nums ${scoreTextClass(m.value)}`}>{m.value}%</div>
                   <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-harx rounded-full" style={{ width: `${Math.min(100, m.value)}%` }} />
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${scoreBarClass(m.value)}`}
+                      style={{ width: `${Math.min(100, m.value)}%` }}
+                    />
                   </div>
                 </div>
               ))}
