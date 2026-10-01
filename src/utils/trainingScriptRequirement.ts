@@ -248,14 +248,14 @@ export function scriptModuleStillPending(
   return true;
 }
 
-/** Afficher le bouton / lien « Lire le script ». */
+/** Afficher le bouton / lien « Script » (reste visible même après lecture). */
 export function shouldShowScriptCta(
   j: JourneyRowLite,
-  structured: StructuredProgressLite | undefined,
-  progress: RepProgressRowLite | undefined
+  _structured?: StructuredProgressLite | undefined,
+  _progress?: RepProgressRowLite | undefined
 ): boolean {
-  if (!gigIdFromJourney(j)) return false;
-  return scriptModuleStillPending(j, structured, progress);
+  // CTA must stay available after read so the REP can reopen / reread the script.
+  return Boolean(gigIdFromJourney(j));
 }
 
 export function scriptNotificationId(journeyId: string): string {
