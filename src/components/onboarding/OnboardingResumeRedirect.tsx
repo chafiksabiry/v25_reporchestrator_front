@@ -6,7 +6,7 @@ import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
 
 /**
  * Never show the old orchestrator hub. Always resume the concrete current step
- * (import CV → profile-editor → subscription → dashboard/marketplace).
+ * (import CV → profile-editor → profile confirm → subscription → dashboard).
  */
 export default function OnboardingResumeRedirect() {
   const navigate = useNavigate();

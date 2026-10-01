@@ -19,7 +19,7 @@ import { usePageTitle } from '../../lib/tracking/usePageTitle';
 
 /**
  * Shared shell for onboarding pages. On reconnect, always resume the current
- * step (CV import → profile editor → subscription) — never the orchestrator hub.
+ * step (CV import → profile editor → profile confirm → subscription) — never the orchestrator hub.
  */
 function OnboardingShellContent() {
   const location = useLocation();
@@ -81,6 +81,14 @@ function OnboardingShellContent() {
 
     if (path === target) return;
     if (target === '/subscription' && path.includes('subscription')) return;
+    // User left /profile via Continuer Onboarding — don't bounce them back.
+    if (
+      path.includes('subscription') &&
+      (target === '/profile' || target === '/profile-editor') &&
+      !isRepProfilePublished(userProfile)
+    ) {
+      return;
+    }
 
     if (
       (target === '/dashboard' || target === '/marketplace') &&
