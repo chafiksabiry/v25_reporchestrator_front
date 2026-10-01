@@ -696,10 +696,11 @@ export const ProfileView: React.FC<{
           ...(profile.professionalSummary?.profileDescription_i18n || {}),
           [(i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en']: value,
         };
+    // Only send bio fields — never spread the whole professionalSummary (that
+    // used to wipe video-detected industries/activities with empty arrays).
     await handleInlineUpdate(
       {
         professionalSummary: {
-          ...profile.professionalSummary,
           profileDescription: value,
           profileDescription_i18n: nextI18n,
         }
