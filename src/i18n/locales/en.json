@@ -191,7 +191,16 @@
         "periodWeek": "Week",
         "periodMonth": "Month",
         "periodQuarter": "Quarter",
-        "periodYear": "Year"
+        "periodYear": "Year",
+        "howtoTitle": "How it works",
+        "howtoBody": "Enter the call and transaction targets you set for yourself — the simulator automatically calculates your potential earnings if you hit those targets.",
+        "howtoHint": "Edit targets with the pencil · the result updates below",
+        "simulatorTitle": "Simulator",
+        "simulatorResult": "Potential earnings",
+        "transactionsTitle": "Transactions",
+        "earningsTitle": "My earnings goal",
+        "hoursMinLabel": "GIG · minimum hours",
+        "myGoalsLabel": "My goals"
       },
       "gigGoal": {
         "title": "Bonus goal",
