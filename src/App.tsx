@@ -6,7 +6,7 @@ import { getRouterBasename } from './utils/routerBasename';
 import VisitorTracker from './lib/VisitorTracker';
 
 import OnboardingShell from './components/layout/OnboardingShell';
-import OnboardingDashboard from './components/onboarding/Dashboard';
+import OrchestratorHubRedirect from './components/onboarding/OrchestratorHubRedirect';
 import SignUp from './components/onboarding/SignUp';
 import OnboardingProfile from './components/onboarding/Profile';
 import SkillsAssessment from './components/onboarding/SkillsAssessment';
@@ -46,7 +46,8 @@ function App() {
             The orchestrator home now lives at `/orchestrator` so the root `/`
             falls through to the dashboard catch-all below. */}
         <Route element={<OnboardingShell />}>
-          <Route path="/orchestrator" element={<OnboardingDashboard />} />
+          {/* Hub retired: redirect REPS to their concrete next onboarding step. */}
+          <Route path="/orchestrator" element={<OrchestratorHubRedirect />} />
           <Route path="/orchestrator/signup" element={<SignUp />} />
           <Route path="/orchestrator/profile" element={<OnboardingProfile />} />
           <Route path="/orchestrator/skills" element={<SkillsAssessment />} />
