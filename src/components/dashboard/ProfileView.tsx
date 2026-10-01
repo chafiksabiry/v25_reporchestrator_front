@@ -18,6 +18,7 @@ import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
 import { LanguageVideoModal } from './profile/LanguageVideoModal';
 import { enrichLanguageFromExperience } from './profile/languageVideoUtils';
+import { getProficiencyStars as getProficiencyStarsFromCefr } from './profile/languageScoreDisplay';
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -408,10 +409,8 @@ export const ProfileView: React.FC<{
   if (!profile) return null;
 
   // Helper functions used by tabs
-  const getProficiencyStars = (proficiency: string): number => {
-    const map: Record<string, number> = { 'A1': 1, 'Basic': 1, 'A2': 2, 'B1': 3, 'Intermediate': 3, 'B2': 4, 'C1': 5, 'Advanced': 5, 'C2': 6, 'Native': 6 };
-    return map[proficiency] || 0;
-  };
+  const getProficiencyStars = (proficiency: string): number =>
+    getProficiencyStarsFromCefr(proficiency);
 
   const getTimezoneMismatchInfo = () => {
     const tz = profile.availability?.timeZone;

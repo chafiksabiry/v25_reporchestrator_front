@@ -459,6 +459,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // (no global "Edit profile" mode). Keys: basic | experience | availability |
   // summary | companies.
   const [sectionEditing, setSectionEditing] = useState({});
+  // Per-section undo stacks (snapshots taken before each change).
+  const [sectionUndoStacks, setSectionUndoStacks] = useState({});
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | pending | saving | saved | error
+  const [autoSaveSection, setAutoSaveSection] = useState(null);
+  const autoSaveTimerRef = useRef(null);
+  const summaryUndoSkipRef = useRef(false);
+  const summaryTypingBaselineRef = useRef(null);
+  const summaryUndoIdleTimerRef = useRef(null);
+  const basicTypingBaselineRef = useRef(null);
+  const basicUndoIdleTimerRef = useRef(null);
+  const persistSectionRef = useRef(null);
+  const sectionEditingRef = useRef({});
   const [editedProfile, setEditedProfile] = useState(profileData);
   const [tempLanguage, setTempLanguage] = useState({ languageObj: null, proficiency: 'B1' });
   const [tempIndustry, setTempIndustry] = useState('');
@@ -553,8 +565,72 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     description: t(`proficiency.${value}.description`),
   }));
 
+  sectionEditingRef.current = sectionEditing;
+
+  const scheduleSectionAutoSave = useCallback((section) => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveSection(section);
+    setAutoSaveStatus('pending');
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (persistSectionRef.current) {
+        void persistSectionRef.current(section, { keepEditing: true, silent: true });
+      }
+    }, 900);
+  }, []);
+
+  const snapshotSection = (section, profile = editedProfile, summary = editedSummary) => {
+    if (section === 'summary') {
+      return {
+        summary,
+        profileDescription: profile.professionalSummary?.profileDescription,
+        profileDescription_i18n: profile.professionalSummary?.profileDescription_i18n
+          ? { ...profile.professionalSummary.profileDescription_i18n }
+          : undefined,
+      };
+    }
+    if (section === 'basic') {
+      return { personalInfo: JSON.parse(JSON.stringify(profile.personalInfo || {})) };
+    }
+    if (section === 'experience') {
+      return { experience: JSON.parse(JSON.stringify(profile.experience || [])) };
+    }
+    if (section === 'availability') {
+      return { availability: JSON.parse(JSON.stringify(profile.availability || {})) };
+    }
+    if (section === 'companies') {
+      return {
+        notableCompanies: JSON.parse(JSON.stringify(profile.professionalSummary?.notableCompanies || [])),
+        industries: JSON.parse(JSON.stringify(profile.professionalSummary?.industries || [])),
+        activities: JSON.parse(JSON.stringify(profile.professionalSummary?.activities || [])),
+      };
+    }
+    return null;
+  };
+
+  const pushSectionUndo = (section, snapshot) => {
+    if (!snapshot) return;
+    setSectionUndoStacks((prev) => {
+      const stack = Array.isArray(prev[section]) ? prev[section] : [];
+      return {
+        ...prev,
+        [section]: [...stack.slice(-19), snapshot],
+      };
+    });
+  };
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (summaryUndoIdleTimerRef.current) clearTimeout(summaryUndoIdleTimerRef.current);
+    if (basicUndoIdleTimerRef.current) clearTimeout(basicUndoIdleTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (profileData) {
+      // Avoid clobbering local edits while a section is open (autosave refreshes parent).
+      if (Object.values(sectionEditingRef.current).some(Boolean)) {
+        return;
+      }
+
       console.log('🔍 Initializing editedProfile with profileData:', profileData);
 
       setEditedProfile({
@@ -1132,6 +1208,17 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
 
   const handleProfileChange = (field, value) => {
+    if (sectionEditingRef.current.basic) {
+      if (basicTypingBaselineRef.current === null) {
+        basicTypingBaselineRef.current = snapshotSection('basic');
+        pushSectionUndo('basic', basicTypingBaselineRef.current);
+      }
+      if (basicUndoIdleTimerRef.current) clearTimeout(basicUndoIdleTimerRef.current);
+      basicUndoIdleTimerRef.current = setTimeout(() => {
+        basicTypingBaselineRef.current = null;
+      }, 1500);
+    }
+
     // Update the profile state immediately for UI responsiveness
     const updatedPersonalInfo = {
       ...editedProfile.personalInfo,
@@ -1146,6 +1233,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     setEditedProfile(updatedProfile);
     setHasUnsavedChanges(true);
     setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+    if (sectionEditingRef.current.basic) {
+      scheduleSectionAutoSave('basic');
+    }
 
     // Validation rules
     const validations = {
@@ -1409,6 +1499,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         languageEntry
       ];
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1424,6 +1518,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
       setShowLanguageDropdown(false);
       setLanguageSearch('');
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error adding language:', error);
     }
@@ -1448,6 +1545,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         }));
       }
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1459,6 +1560,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error removing language:', error);
     }
@@ -1470,6 +1574,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         i === index ? { ...lang, proficiency: newProficiency } : lang
       );
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1481,6 +1589,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error updating language proficiency:', error);
     }
@@ -1500,23 +1611,30 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       // the textarea shows the active-language string and we keep the _i18n mirror.
       const { active, i18n } = normalizeBilingualText(newSummary, uiLang);
 
-      // Update only local state, don't save to database yet
+      // Keep previous text undoable before replacing with AI output.
+      pushSectionUndo('summary', {
+        summary: editedSummary,
+        profileDescription: editedProfile.professionalSummary?.profileDescription,
+        profileDescription_i18n: editedProfile.professionalSummary?.profileDescription_i18n,
+      });
+      summaryTypingBaselineRef.current = null;
+
+      summaryUndoSkipRef.current = true;
       setEditedSummary(active);
-      setEditedProfile(prev => ({
+      setEditedProfile((prev) => ({
         ...prev,
         professionalSummary: {
           ...prev.professionalSummary,
           profileDescription: active,
-          profileDescription_i18n: i18n
-        }
+          profileDescription_i18n: i18n,
+        },
       }));
 
-      // Mark as having unsaved changes
       setHasUnsavedChanges(true);
-      setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+      setModifiedSections((prev) => ({ ...prev, professionalSummary: true }));
       setIsEditing(false);
       showToast(t('toasts.summaryRegenerated'));
-
+      scheduleSectionAutoSave('summary');
     } catch (error) {
       console.error('Failed to regenerate summary:', error);
       showToast(t('toasts.summaryRegenerateFailed'), 'error');
@@ -1526,27 +1644,47 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
 
   const handleSummaryChange = (newSummary) => {
-    // Update only local state
-    setEditedSummary(newSummary);
-    setEditedProfile(prev => ({
+    setEditedSummary((prev) => {
+      if (!summaryUndoSkipRef.current && prev !== newSummary) {
+        // One undo entry per typing burst (not per keystroke).
+        if (summaryTypingBaselineRef.current === null) {
+          summaryTypingBaselineRef.current = prev;
+          pushSectionUndo('summary', {
+            summary: prev,
+            profileDescription: prev,
+            profileDescription_i18n: {
+              en: '',
+              fr: '',
+              ...(editedProfile.professionalSummary?.profileDescription_i18n || {}),
+              [uiLang]: prev,
+            },
+          });
+        }
+        if (summaryUndoIdleTimerRef.current) clearTimeout(summaryUndoIdleTimerRef.current);
+        summaryUndoIdleTimerRef.current = setTimeout(() => {
+          summaryTypingBaselineRef.current = null;
+        }, 1500);
+      }
+      summaryUndoSkipRef.current = false;
+      return newSummary;
+    });
+    setEditedProfile((prev) => ({
       ...prev,
       professionalSummary: {
         ...prev.professionalSummary,
         profileDescription: newSummary,
-        // Keep the active-language slice of the _i18n mirror in sync so the
-        // read-only view (which prefers _i18n) reflects manual edits.
         profileDescription_i18n: {
           en: '',
           fr: '',
           ...(prev.professionalSummary?.profileDescription_i18n || {}),
           [uiLang]: newSummary,
         },
-      }
+      },
     }));
 
-    // Mark as having unsaved changes
     setHasUnsavedChanges(true);
-    setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+    setModifiedSections((prev) => ({ ...prev, professionalSummary: true }));
+    scheduleSectionAutoSave('summary');
   };
 
   const stopCameraStream = useCallback(() => {
@@ -1857,6 +1995,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             companies: ''
           }));
 
+          if (sectionEditingRef.current.companies) {
+            pushSectionUndo('companies', snapshotSection('companies'));
+          }
+
           // Local update only
           setEditedProfile(prev => ({
             ...prev,
@@ -1869,6 +2011,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           setTempCompany('');
           setHasUnsavedChanges(true);
           setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+          if (sectionEditingRef.current.companies) {
+            scheduleSectionAutoSave('companies');
+          }
 
         } else {
           // Handle skills (technical, professional, soft)
@@ -1912,6 +2057,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             }
           }
 
+          if (type === 'notableCompanies' && sectionEditingRef.current.companies) {
+            pushSectionUndo('companies', snapshotSection('companies'));
+          }
+
           // Local update only
           setEditedProfile(prev => ({
             ...prev,
@@ -1923,6 +2072,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
           setHasUnsavedChanges(true);
           setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+          if (type === 'notableCompanies' && sectionEditingRef.current.companies) {
+            scheduleSectionAutoSave('companies');
+          }
         } else {
           // Handle skills removal locally
           const currentSkills = editedProfile.skills?.[type] || [];
@@ -2499,6 +2651,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       };
       updatedExperiences[index] = merged;
 
+      if (sectionEditingRef.current.experience) {
+        pushSectionUndo('experience', snapshotSection('experience'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -2508,6 +2664,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setModifiedSections(prev => ({ ...prev, experience: true }));
       setEditingExperience(null);
       setEditingExperienceIndex(-1);
+      if (sectionEditingRef.current.experience) {
+        scheduleSectionAutoSave('experience');
+      }
     } catch (error) {
       console.error('Error updating experience:', error);
     }
@@ -2627,6 +2786,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       };
     }
 
+    if (sectionEditingRef.current.availability) {
+      pushSectionUndo('availability', snapshotSection('availability'));
+    }
+
     setEditedProfile(prev => ({
       ...prev,
       availability: updatedAvailability
@@ -2634,6 +2797,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     setHasUnsavedChanges(true);
     setModifiedSections(prev => ({ ...prev, availability: true }));
+    if (sectionEditingRef.current.availability) {
+      scheduleSectionAutoSave('availability');
+    }
   };
 
   // NEW: Save all profile changes at once
@@ -2753,9 +2919,57 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // ── Per-section editing ──────────────────────────────────────────────────
   const isSectionEditing = (section) => !!sectionEditing[section];
 
+  const applySectionSnapshot = (section, snapshot) => {
+    if (!snapshot) return;
+    if (section === 'summary') {
+      const text = snapshot.summary ?? snapshot.profileDescription ?? '';
+      summaryUndoSkipRef.current = true;
+      summaryTypingBaselineRef.current = null;
+      setEditedSummary(text);
+      setEditedProfile((prev) => ({
+        ...prev,
+        professionalSummary: {
+          ...prev.professionalSummary,
+          profileDescription: snapshot.profileDescription ?? text,
+          ...(snapshot.profileDescription_i18n
+            ? { profileDescription_i18n: snapshot.profileDescription_i18n }
+            : {}),
+        },
+      }));
+      return;
+    }
+    if (section === 'basic') {
+      setEditedProfile((prev) => ({ ...prev, personalInfo: snapshot.personalInfo }));
+      return;
+    }
+    if (section === 'experience') {
+      setEditedProfile((prev) => ({ ...prev, experience: snapshot.experience }));
+      return;
+    }
+    if (section === 'availability') {
+      setEditedProfile((prev) => ({ ...prev, availability: snapshot.availability }));
+      return;
+    }
+    if (section === 'companies') {
+      setEditedProfile((prev) => ({
+        ...prev,
+        professionalSummary: {
+          ...prev.professionalSummary,
+          notableCompanies: snapshot.notableCompanies || [],
+          industries: snapshot.industries || prev.professionalSummary?.industries || [],
+          activities: snapshot.activities || prev.professionalSummary?.activities || [],
+        },
+      }));
+    }
+  };
+
   const startSectionEdit = (section) => {
     setSectionEditing((prev) => ({ ...prev, [section]: true }));
+    setSectionUndoStacks((prev) => ({ ...prev, [section]: [] }));
+    setAutoSaveStatus('idle');
+    setAutoSaveSection(null);
     if (section === 'summary') {
+      summaryTypingBaselineRef.current = null;
       // Seed the editor with the CURRENT language version of the summary.
       const localized = localizeText(
         editedProfile.professionalSummary?.profileDescription_i18n,
@@ -2766,6 +2980,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         ...prev,
         professionalSummary: { ...prev.professionalSummary, profileDescription: localized },
       }));
+    }
+    if (section === 'basic') {
+      basicTypingBaselineRef.current = null;
     }
   };
 
@@ -2794,19 +3011,51 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       return next;
     });
     if (section === 'summary') {
-      setEditedSummary(profileData.professionalSummary?.profileDescription || '');
+      const localized = localizeText(
+        profileData.professionalSummary?.profileDescription_i18n,
+        uiLang
+      ) || profileData.professionalSummary?.profileDescription || '';
+      summaryUndoSkipRef.current = true;
+      summaryTypingBaselineRef.current = null;
+      setEditedSummary(localized);
       setIsEditing(false);
     }
   };
 
   const cancelSection = (section) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     revertSection(section);
     setSectionEditing((prev) => ({ ...prev, [section]: false }));
+    setSectionUndoStacks((prev) => ({ ...prev, [section]: [] }));
+    setAutoSaveStatus('idle');
+    setAutoSaveSection(null);
   };
 
-  const saveSection = async (section) => {
-    if (isSaving) return;
-    setIsSaving(true);
+  const undoSection = (section) => {
+    const stack = sectionUndoStacks[section] || [];
+    if (stack.length === 0) return;
+    const snapshot = stack[stack.length - 1];
+    setSectionUndoStacks((prev) => ({
+      ...prev,
+      [section]: (prev[section] || []).slice(0, -1),
+    }));
+    applySectionSnapshot(section, snapshot);
+    setHasUnsavedChanges(true);
+    scheduleSectionAutoSave(section);
+  };
+
+  const saveSection = async (section, options = {}) => {
+    const { keepEditing = false, silent = false } = options;
+    if (isSaving && !silent) return;
+    if (silent) {
+      setAutoSaveSection(section);
+      setAutoSaveStatus('saving');
+    } else {
+      setIsSaving(true);
+    }
     try {
       let savedProfile = editedProfile;
       if (section === 'basic') {
@@ -2856,53 +3105,93 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         setEditedProfile(savedProfile);
       }
       if (onProfileUpdate) onProfileUpdate(savedProfile);
-      setSectionEditing((prev) => ({ ...prev, [section]: false }));
-      if (section === 'summary') setIsEditing(false);
-      showToast(t('savedSuccess'), 'success');
+      if (!keepEditing) {
+        setSectionEditing((prev) => ({ ...prev, [section]: false }));
+        if (section === 'summary') setIsEditing(false);
+      }
+      if (silent) {
+        setAutoSaveStatus('saved');
+        setTimeout(() => {
+          setAutoSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev));
+        }, 2000);
+      } else {
+        showToast(t('savedSuccess'), 'success');
+      }
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error(`Error saving section "${section}":`, error);
-      showToast(t('saveError'), 'error');
+      if (silent) {
+        setAutoSaveStatus('error');
+      } else {
+        showToast(t('saveError'), 'error');
+      }
     } finally {
-      setIsSaving(false);
+      if (!silent) setIsSaving(false);
     }
   };
 
-  // Reusable Edit / Save / Cancel controls for a section header.
-  const renderSectionControls = (section) =>
-    isSectionEditing(section) ? (
-      <div className="flex items-center gap-2 flex-shrink-0">
+  persistSectionRef.current = saveSection;
+
+  // Reusable Edit / Undo / Cancel controls for a section header (autosave — no Save button).
+  const renderSectionControls = (section) => {
+    const canUndo = (sectionUndoStacks[section] || []).length > 0;
+    const showStatus = autoSaveSection === section && autoSaveStatus !== 'idle';
+
+    if (!isSectionEditing(section)) {
+      return (
         <button
+          onClick={() => startSectionEdit(section)}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          {t('edit')}
+        </button>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {showStatus && (
+          <span
+            className={`text-xs font-medium ${
+              autoSaveStatus === 'error'
+                ? 'text-red-600'
+                : autoSaveStatus === 'saved'
+                  ? 'text-green-600'
+                  : 'text-gray-500'
+            }`}
+          >
+            {autoSaveStatus === 'error'
+              ? t('autoSaveError')
+              : autoSaveStatus === 'saved'
+                ? t('autoSaved')
+                : t('autoSaving')}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => undoSection(section)}
+          disabled={!canUndo}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          title={t('undo')}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4" />
+          </svg>
+          {t('undo')}
+        </button>
+        <button
+          type="button"
           onClick={() => cancelSection(section)}
-          disabled={isSaving}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
         >
           {t('cancel')}
         </button>
-        <button
-          onClick={() => saveSection(section)}
-          disabled={isSaving}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
-        >
-          {isSaving && (
-            <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          )}
-          {isSaving ? t('saving') : t('save')}
-        </button>
       </div>
-    ) : (
-      <button
-        onClick={() => startSectionEdit(section)}
-        className="px-3 py-1.5 text-xs font-semibold rounded-lg text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
-      >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-        {t('edit')}
-      </button>
     );
+  };
 
   if (!editedProfile?.personalInfo) {
     return (

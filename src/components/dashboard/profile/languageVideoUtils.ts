@@ -113,13 +113,24 @@ const buildAssessmentFromExperience = (
     'Detected from experience video analysis';
 
   return {
-    completeness: { score, feedback },
+    completeness: {
+      score: typeof assessed?.coherence?.score === 'number'
+        ? assessed.coherence.score
+        : typeof assessed?.vocabulary?.score === 'number'
+          ? assessed.vocabulary.score
+          : score,
+      feedback,
+    },
     fluency: {
       score: typeof assessed?.fluency?.score === 'number' ? assessed.fluency.score : score,
       feedback,
     },
     proficiency: {
-      score: typeof assessed?.vocabulary?.score === 'number' ? assessed.vocabulary.score : score,
+      score: typeof assessed?.grammar?.score === 'number'
+        ? assessed.grammar.score
+        : typeof assessed?.vocabulary?.score === 'number'
+          ? assessed.vocabulary.score
+          : score,
       feedback,
     },
     overall: {
