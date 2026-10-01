@@ -2946,9 +2946,43 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     return hasSchedule;
   })();
 
-  // The "Continue" button is only unlocked when every experience has a video,
-  // a profile photo is set, and availability (schedule) has been filled in.
+  // The "Continue" button stays visible but locked until every experience has a
+  // video, a profile photo is set, and availability (schedule) has been filled in.
   const canContinue = allExperiencesHaveVideo && hasProfilePhoto && hasAvailabilitySet;
+  const continueBlockedReason = !hasProfilePhoto
+    ? t('warnBottomPhoto')
+    : !allExperiencesHaveVideo
+    ? t('warnBottom')
+    : !hasAvailabilitySet
+    ? t('warnBottomAvail')
+    : '';
+
+  const confirmContinueButton = (variant = 'header') => (
+    <button
+      type="button"
+      onClick={pushToRepsProfile}
+      disabled={!canContinue}
+      title={canContinue ? undefined : continueBlockedReason}
+      className={
+        variant === 'header'
+          ? `px-4 py-2 text-sm font-semibold rounded-xl inline-flex items-center gap-2 transition-colors ${
+              canContinue
+                ? 'text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700'
+                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'
+            }`
+          : `px-6 py-3 text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-2 transition-all duration-200 ${
+              canContinue
+                ? 'text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5'
+                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed shadow-none'
+            }`
+      }
+    >
+      {variant === 'header' ? t('confirmContinue') : t('continueToProfile')}
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+    </button>
+  );
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -3015,17 +3049,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 </button>
               </div>
-              {canContinue && (
-                <button
-                  onClick={pushToRepsProfile}
-                  className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
-                >
-                  {t('confirmContinue')}
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
-              )}
+              {confirmContinueButton('header')}
             </div>
           </div>
 
@@ -4144,32 +4168,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             )}
           </div>
 
-          {/* Action Buttons */}
-          {canContinue ? (
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
-              <p className="text-sm text-gray-600">
-                {t('everythingGood')}
-              </p>
-              <button
-                onClick={pushToRepsProfile}
-                className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-xl shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center justify-center gap-2"
-              >
-                {t('continueToProfile')}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <div className="mt-8 flex items-center gap-3 p-5 rounded-2xl bg-red-50 border-2 border-red-200">
-              <svg className="h-5 w-5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm font-bold text-red-700">
-                {!allExperiencesHaveVideo ? t('warnBottom') : t('warnBottomAvail')}
-              </p>
-            </div>
-          )}
+          {/* Action Buttons — always visible; grayed until requirements are met */}
+          <div
+            className={`mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl border ${
+              canContinue
+                ? 'bg-gray-50 border-gray-100'
+                : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <p className={`text-sm ${canContinue ? 'text-gray-600' : 'text-slate-500 font-medium'}`}>
+              {canContinue ? t('everythingGood') : continueBlockedReason}
+            </p>
+            {confirmContinueButton('footer')}
+          </div>
         </div>
       </div>
 
