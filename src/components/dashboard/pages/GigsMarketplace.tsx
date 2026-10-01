@@ -640,7 +640,7 @@ export function GigsMarketplace() {
   };
 
   // Fonction pour obtenir le statut d'un gig pour l'agent connecté
-  const getGigStatus = (gigId: string): 'enrolled' | 'invited' | 'pending' | 'none' => {
+  const getGigStatus = (gigId: string): 'enrolled' | 'invited' | 'pending' | 'rejected' | 'none' => {
     const agentId = getAgentId();
     if (!agentId) return 'none';
 
@@ -661,6 +661,9 @@ export function GigsMarketplace() {
     }
 
     const invitedGig = invitedEnrollments.find((ie) => ie.gig._id === gigId);
+    if (invitedGig?.enrollmentStatus === 'rejected') {
+      return 'rejected';
+    }
     if (invitedGig) {
       return 'invited';
     }
@@ -668,6 +671,9 @@ export function GigsMarketplace() {
       const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
       if (agentInGig?.status === 'invited') {
         return 'invited';
+      }
+      if (agentInGig?.status === 'rejected') {
+        return 'rejected';
       }
     }
 
@@ -916,15 +922,24 @@ export function GigsMarketplace() {
       console.log('✅ Invitation rejected successfully:', result);
       showToast('Invitation refusée.', 'success');
 
-      // Retirer immédiatement l'invitation de la liste (UI optimiste)
-      setInvitedEnrollments((prev: any[]) => prev.filter(enrollment => enrollment.id !== enrollmentId));
+      // Garder dans l'historique avec statut refusé (MAJ optimiste, sans refresh page)
+      setInvitedEnrollments((prev: InvitedEnrollment[]) =>
+        prev.map((enrollment) =>
+          enrollment.id === enrollmentId
+            ? { ...enrollment, enrollmentStatus: 'rejected', canEnroll: false, matchStatus: 'rejected' }
+            : enrollment
+        )
+      );
+      setPendingRequests((prev) =>
+        prev.filter((id) => id !== invitedEnrollments.find((e) => e.id === enrollmentId)?.gig?._id)
+      );
 
-      // Rafraîchir tous les statuts pour mettre à jour l'UI
+      // Rafraîchir en arrière-plan pour confirmer
       console.log('🔄 Refreshing all statuses after rejection...');
       await Promise.all([
-        fetchInvitedEnrollments(),     // Recharger les invitations
-        fetchEnrolledGigIdsFromProfile(), // Mettre à jour les IDs du profil
-        fetchPendingRequests()         // Mettre à jour les pending requests
+        fetchInvitedEnrollments(),
+        fetchEnrolledGigIdsFromProfile(),
+        fetchPendingRequests(),
       ]);
       console.log('✅ All statuses refreshed');
     } catch (error) {
@@ -1291,7 +1306,7 @@ export function GigsMarketplace() {
     }
   };
 
-  // Fonction pour récupérer les enrollments invités avec données complètes des gigs
+  // Fonction pour récupérer les enrollments invités (+ refusés, historique) avec données complètes
   const fetchInvitedEnrollments = async () => {
     const agentId = getAgentId();
     const token = getAuthToken();
@@ -1300,93 +1315,78 @@ export function GigsMarketplace() {
       return;
     }
 
-    try {
-      // Utiliser le nouvel endpoint /gig-agents/agents/{agentId}/gigs?status=invited
-      const enrollmentResponse = await fetch(
-        `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=invited`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
+    const transformRows = (rows: any[], fallbackStatus: string): InvitedEnrollment[] =>
+      (rows || [])
+        .filter((gigInvitation: any) => gigInvitation.gig)
+        .map((gigInvitation: any) => {
+          const currentAgentId = getAgentId();
+          const agentData = gigInvitation.gig.agents?.find((agent: any) =>
+            agent.agentId === currentAgentId || agent.agentId?.$oid === currentAgentId
+          );
+          const enrollmentId = agentData?.gigAgentId || agentData?.gigAgentId?.$oid;
+          const status = gigInvitation.status || fallbackStatus;
+          const invitationDate = new Date(gigInvitation.invitationDate || gigInvitation.updatedAt);
+          const expirationDate = new Date(invitationDate);
+          expirationDate.setDate(expirationDate.getDate() + 7);
 
-      if (!enrollmentResponse.ok) {
+          return {
+            id: enrollmentId,
+            gig: {
+              _id: gigInvitation.gig._id,
+              title: gigInvitation.gig.title,
+              description: gigInvitation.gig.description,
+              category: gigInvitation.gig.category,
+              destination_zone: gigInvitation.gig.destination_zone,
+              ...gigInvitation.gig,
+            },
+            enrollmentStatus: status,
+            invitationSentAt: gigInvitation.invitationDate || gigInvitation.updatedAt,
+            invitationExpiresAt: expirationDate.toISOString(),
+            isExpired: new Date() > expirationDate,
+            canEnroll: status === 'invited',
+            notes: gigInvitation.notes,
+            matchScore: 0,
+            matchStatus: status,
+          };
+        });
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [invitedRes, rejectedRes] = await Promise.all([
+        fetch(
+          `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=invited`,
+          { headers }
+        ),
+        fetch(
+          `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=rejected`,
+          { headers }
+        ),
+      ]);
+
+      if (!invitedRes.ok) {
         throw new Error('Failed to fetch invited enrollments');
       }
 
-      const enrollmentData = await enrollmentResponse.json();
-      console.log('📋 Invited enrollments response:', enrollmentData);
-      console.log('📊 Response count:', enrollmentData.count);
-      console.log('🔍 RAW RESPONSE DATA:', JSON.stringify(enrollmentData, null, 2));
+      const invitedData = await invitedRes.json();
+      const rejectedData = rejectedRes.ok ? await rejectedRes.json() : { gigs: [] };
 
-      // La réponse contient un objet avec la propriété 'gigs'
-      if (enrollmentData.gigs && Array.isArray(enrollmentData.gigs)) {
-        console.log('✅ Found invited enrollments:', enrollmentData.gigs.length);
-        if (enrollmentData.gigs.length > 0) {
-          console.log('🔍 First invited enrollment structure:', JSON.stringify(enrollmentData.gigs[0], null, 2));
-          console.log('🔍 First gig structure:', enrollmentData.gigs[0].gig);
-          console.log('🆔 Checking IDs in first enrollment:');
-          console.log('   - _id:', enrollmentData.gigs[0]._id);
-          console.log('   - id:', enrollmentData.gigs[0].id);
-          console.log('   - gigAgentId:', enrollmentData.gigs[0].gigAgentId);
-          console.log('🏢 CompanyId:', enrollmentData.gigs[0].gig?.companyId);
-          console.log('🏭 Industries:', enrollmentData.gigs[0].gig?.industries);
-          console.log('📊 Activities:', enrollmentData.gigs[0].gig?.activities);
-        }
+      const invitedRows = transformRows(invitedData.gigs || [], 'invited');
+      const rejectedRows = transformRows(rejectedData.gigs || [], 'rejected');
 
-        // Transformer les données pour correspondre à l'interface InvitedEnrollment
-        const transformedInvitations = enrollmentData.gigs
-          .filter((gigInvitation: any) => {
-            console.log('🔍 Checking invitation:', gigInvitation.gig?._id);
-            return gigInvitation.gig; // Filtrer les invitations sans gig
-          })
-          .map((gigInvitation: any) => {
-            console.log('🔄 Transforming invitation:', gigInvitation.gig._id);
+      // Invited first, then rejected history; de-dupe by gig id (invited wins).
+      const byGigId = new Map<string, InvitedEnrollment>();
+      [...rejectedRows, ...invitedRows].forEach((row) => {
+        if (row.gig?._id) byGigId.set(row.gig._id, row);
+      });
 
-            // ✅ Extraire le gigAgentId depuis gig.agents[]
-            const agentId = getAgentId();
-            const agentData = gigInvitation.gig.agents?.find((agent: any) =>
-              agent.agentId === agentId || agent.agentId?.$oid === agentId
-            );
-            const enrollmentId = agentData?.gigAgentId || agentData?.gigAgentId?.$oid;
+      const merged = Array.from(byGigId.values()).sort((a, b) => {
+        if (a.enrollmentStatus === 'invited' && b.enrollmentStatus !== 'invited') return -1;
+        if (b.enrollmentStatus === 'invited' && a.enrollmentStatus !== 'invited') return 1;
+        return new Date(b.invitationSentAt).getTime() - new Date(a.invitationSentAt).getTime();
+      });
 
-            console.log('🆔 Agent data from gig.agents:', agentData);
-            console.log('✅ Extracted gigAgentId:', enrollmentId);
-
-            // Calculer l'expiration basée sur invitationDate + 7 jours (par exemple)
-            const invitationDate = new Date(gigInvitation.invitationDate || gigInvitation.updatedAt);
-            const expirationDate = new Date(invitationDate);
-            expirationDate.setDate(expirationDate.getDate() + 7); // 7 jours pour répondre
-
-            return {
-              id: enrollmentId, // ✅ Utiliser l'ID du document GigAgent (enrollmentId)
-              gig: {
-                _id: gigInvitation.gig._id,
-                title: gigInvitation.gig.title,
-                description: gigInvitation.gig.description,
-                category: gigInvitation.gig.category,
-                destination_zone: gigInvitation.gig.destination_zone,
-                // Copier toutes les autres propriétés du gig (déjà populées)
-                ...gigInvitation.gig
-              },
-              enrollmentStatus: gigInvitation.status, // 'invited'
-              invitationSentAt: gigInvitation.invitationDate || gigInvitation.updatedAt,
-              invitationExpiresAt: expirationDate.toISOString(),
-              isExpired: new Date() > expirationDate,
-              canEnroll: gigInvitation.status === 'invited',
-              notes: gigInvitation.notes,
-              matchScore: 0, // Pas de match score dans cette réponse
-              matchStatus: 'invited'
-            };
-          });
-
-        console.log('✅ Transformed invited enrollments:', transformedInvitations);
-        setInvitedEnrollments(transformedInvitations);
-      } else {
-        console.error('Invalid invited enrollments data structure:', enrollmentData);
-        setInvitedEnrollments([]);
-      }
+      console.log('✅ Invited + rejected history:', merged.length);
+      setInvitedEnrollments(merged);
     } catch (error) {
       console.error('Error fetching invited enrollments:', error);
       setInvitedEnrollments([]);
@@ -1609,11 +1609,20 @@ export function GigsMarketplace() {
           );
         }
         // Reject / cancel: drop from pending so the gig returns to "Available".
-        if (data?.gigId && (data?.status === 'rejected' || data?.status === 'cancelled')) {
+        if (data?.gigId && (data?.status === 'rejected' || data?.status === 'cancelled' || data?.status === 'invitation_rejected')) {
           const gigId = String(data.gigId);
           setPendingRequests((prev) => prev.filter((id) => id !== gigId));
           setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
           setEnrolledGigIds((prev) => prev.filter((id) => id !== gigId));
+          if (data?.status === 'invitation_rejected') {
+            setInvitedEnrollments((prev) =>
+              prev.map((enrollment) =>
+                enrollment.gig._id === gigId
+                  ? { ...enrollment, enrollmentStatus: 'rejected', canEnroll: false, matchStatus: 'rejected' }
+                  : enrollment
+              )
+            );
+          }
         }
         refreshStatuses();
         const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
@@ -1637,6 +1646,7 @@ export function GigsMarketplace() {
             'success'
           );
         }
+        // invitation_rejected: toast already shown by rejectInvitation local handler
       },
       { onConnect: refreshStatuses }
     );
@@ -2032,9 +2042,10 @@ export function GigsMarketplace() {
                       ) : (
                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
                           gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
+                          gigStatus === 'rejected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
                           }`}>
-                          {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
+                          {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : gigStatus === 'rejected' ? `✓ ${t('gigsMarketplace.declinedBadge', 'Declined')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
                         </span>
                       )}
 
@@ -2302,9 +2313,10 @@ export function GigsMarketplace() {
                           ) : (
                             <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
                               gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
+                              gigStatus === 'rejected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
                               }`}>
-                              {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
+                              {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : gigStatus === 'rejected' ? `✓ ${t('gigsMarketplace.declinedBadge', 'Declined')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
                             </span>
                           )}
                           <button
@@ -2492,8 +2504,14 @@ export function GigsMarketplace() {
                           )}
                         </button>
                         <div className="flex items-center space-x-1">
-                          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-600 text-white border border-indigo-400 shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)]">
-                            ✉ {t('gigsMarketplace.invitedBadge')}
+                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)] ${
+                            enrollment.enrollmentStatus === 'rejected'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-none'
+                              : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-400'
+                          }`}>
+                            {enrollment.enrollmentStatus === 'rejected'
+                              ? `✓ ${t('gigsMarketplace.declinedBadge', 'Refusée')}`
+                              : `✉ ${t('gigsMarketplace.invitedBadge')}`}
                           </span>
                           <button
                             onClick={(e) => {
@@ -2601,50 +2619,52 @@ export function GigsMarketplace() {
                       </div>
 
                       <div className="mt-4 space-y-2">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleAcceptFromCard(enrollment.gig._id);
-                            }}
-                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
-                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
-                              ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
-                              }`}
-                          >
-                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'accept' ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
-                            ) : (
-                              <>
-                                <Check className="w-4 h-4" strokeWidth={3} />
-                                <span>{t('gigsMarketplace.accept')}</span>
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleRejectFromCard(enrollment.gig._id);
-                            }}
-                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
-                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
-                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                              : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
-                              }`}
-                          >
-                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'reject' ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
-                            ) : (
-                              <>
-                                <X className="w-4 h-4" strokeWidth={3} />
-                                <span>{t('gigsMarketplace.reject')}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        {enrollment.enrollmentStatus !== 'rejected' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAcceptFromCard(enrollment.gig._id);
+                              }}
+                              disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                              className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                                ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
+                                }`}
+                            >
+                              {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'accept' ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4" strokeWidth={3} />
+                                  <span>{t('gigsMarketplace.accept')}</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleRejectFromCard(enrollment.gig._id);
+                              }}
+                              disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                              className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                                ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                                : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+                                }`}
+                            >
+                              {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'reject' ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+                              ) : (
+                                <>
+                                  <X className="w-4 h-4" strokeWidth={3} />
+                                  <span>{t('gigsMarketplace.reject')}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
                         <button
                           onClick={() => navigate(`/gig/${enrollment.gig._id}`)}
                           className={`w-full ${DETAILS_BTN_CLASS}`}
