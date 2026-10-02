@@ -57,7 +57,8 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
       tone: 'bg-blue-50 text-blue-700 border-blue-200',
     },
     fraud: { label: 'Fraude', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
-    too_short: { label: 'Trop court', tone: 'bg-slate-50 text-slate-500 border-slate-200' },
+    // Legacy too_short → never show « Trop court » to the user.
+    too_short: { label: 'Sans suite', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
     connected_no_sale: { label: 'Sans suite', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
   };
   return map[outcome] || { label: outcome.replace(/_/g, ' '), tone: 'bg-slate-50 text-slate-600 border-slate-200' };
@@ -110,8 +111,41 @@ const PRIORITY_CALLOUTCOMES = new Set([
   'no_answer',
   'busy',
   'wrong_number',
-  'too_short',
+  'connected_no_sale',
 ]);
+
+/** Twilio / post-analysis badge when callOutcome is missing or legacy `too_short`. */
+export function resolveTwilioOrPostAnalysisBadge(call: CallLike): StatusBadge {
+  if (isCallVoicemail(call)) {
+    const badge = callOutcomeBadge('voicemail');
+    return badge
+      ? { ...badge, title: 'Répondeur — aucun échange avec le prospect' }
+      : { label: 'Appelé – Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' };
+  }
+
+  const status = String(call.status || '').toLowerCase();
+  if (status === 'busy') {
+    return callOutcomeBadge('busy') || { label: 'Appelé – Injoignable', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+  }
+  if (['no-answer', 'noanswer', 'canceled', 'cancelled'].includes(status)) {
+    return callOutcomeBadge('no_answer') || { label: 'Appelé – Injoignable', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+  }
+  if (status === 'failed') {
+    return callOutcomeBadge('wrong_number') || { label: 'Appelé – Numéro non attribué', tone: 'bg-rose-50 text-rose-700 border-rose-200' };
+  }
+
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (outcome && outcome !== 'too_short') {
+    const badge = callOutcomeBadge(outcome);
+    if (badge) return { ...badge, title: `Résultat appel : ${outcome}` };
+  }
+
+  return {
+    label: 'Sans suite',
+    tone: 'bg-slate-50 text-slate-600 border-slate-200',
+    title: 'Appel connecté sans suite commerciale',
+  };
+}
 
 export type CallLike = {
   validByAI?: boolean | null;
@@ -641,12 +675,9 @@ export function resolveCallDispositionStatus(
     if (badge) return { ...badge, title: 'Répondeur — aucun échange avec le prospect' };
   }
 
-  if (isCallTooShortForAnalysis(call)) {
-    return {
-      label: 'Trop court',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Moins d’une minute — pas d’analyse commerciale',
-    };
+  const outcomeRaw = String(call.callOutcome || '').toLowerCase();
+  if (outcomeRaw === 'too_short' || (!outcomeRaw && isCallTooShortForAnalysis(call))) {
+    return resolveTwilioOrPostAnalysisBadge(call);
   }
 
   if (isCallFraudDetected(call)) {
@@ -706,12 +737,9 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
       : { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Répondeur — aucune commission due' };
   }
 
-  if (isCallTooShortForAnalysis(call)) {
-    return {
-      label: 'Trop court',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Moins d’une minute — aucune commission due',
-    };
+  const outcomeRaw = String(call.callOutcome || '').toLowerCase();
+  if (outcomeRaw === 'too_short' || isCallTooShortForAnalysis(call)) {
+    return resolveTwilioOrPostAnalysisBadge(call);
   }
 
   if (isCallFraudDetected(call)) {
