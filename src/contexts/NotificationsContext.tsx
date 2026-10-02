@@ -183,15 +183,29 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     try {
       const rows = await fetchNotifications();
       const mapped = rows.map(mapApiRow);
-      const prevKeys = knownKeysRef.current;
-      const hasNew = mapped.some(
-        (n) => n.notificationKey && !prevKeys.has(n.notificationKey) && !n.read
-      );
-      if (hasNew) playNotificationSound();
-      knownKeysRef.current = new Set(
+      const serverKeys = new Set(
         mapped.map((n) => n.notificationKey).filter((k): k is string => Boolean(k))
       );
-      setNotifications(mapped);
+
+      setNotifications((prev) => {
+        // Keep recent optimistic rows until the server has them (avoid wipe on slow upsert).
+        const pendingOptimistic = prev.filter((n) => {
+          const key = n.notificationKey || n.id;
+          if (!key || serverKeys.has(key)) return false;
+          const age = Date.now() - (n.createdAt || 0);
+          return age >= 0 && age < 120_000;
+        });
+        const merged = [...pendingOptimistic, ...mapped];
+        const prevKeys = knownKeysRef.current;
+        const hasNew = merged.some(
+          (n) => n.notificationKey && !prevKeys.has(n.notificationKey) && !n.read
+        );
+        if (hasNew) playNotificationSound();
+        knownKeysRef.current = new Set(
+          merged.map((n) => n.notificationKey).filter((k): k is string => Boolean(k))
+        );
+        return merged;
+      });
     } catch (err) {
       console.warn('[Notifications] fetch failed', err);
     } finally {
@@ -359,9 +373,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         console.warn('[Notifications] enrollment/invite backfill failed', err);
       }
     };
-    // Defer so the first bell fetch paints immediately.
-    const start = window.setTimeout(() => void run(), 800);
-    const poll = window.setInterval(() => void run(), 90_000);
+    // Defer slightly so the first bell fetch paints, then backfill invites ASAP.
+    const start = window.setTimeout(() => void run(), 200);
+    const poll = window.setInterval(() => void run(), 60_000);
     return () => {
       cancelled = true;
       window.clearTimeout(start);

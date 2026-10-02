@@ -12,6 +12,7 @@ import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
+import { useNotifications } from '../../../contexts/NotificationsContext';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
@@ -506,6 +507,7 @@ export function GigsMarketplace() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const agentId = getAgentId();
+  const { addEnrollmentNotification } = useNotifications();
 
   const taxonomyLabel = (raw: string | undefined | null, _gig?: any): string => {
     const name = String(raw || '').trim();
@@ -1402,6 +1404,13 @@ export function GigsMarketplace() {
 
       console.log('✅ Pending invitations:', invitedRows.length);
       setInvitedEnrollments(invitedRows);
+
+      // Ensure each pending invite also appears in the top bell (even without WS).
+      for (const row of invitedRows) {
+        const gigId = row.gig?._id ? String(row.gig._id) : '';
+        if (!gigId) continue;
+        addEnrollmentNotification('invited', gigId, row.gig?.title ? String(row.gig.title) : undefined);
+      }
     } catch (error) {
       console.error('Error fetching invited enrollments:', error);
       setInvitedEnrollments([]);
