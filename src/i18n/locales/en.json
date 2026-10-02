@@ -350,7 +350,10 @@
     "dispFilterNone": "No status",
     "dispositionTitle": "Call status",
     "changeDisposition": "Edit",
-    "dispositionExclNote": "From Appointment booked onward, this prospect will be exclusively assigned to you.",
+    "dispositionExclNote": "From “Callback appointment” onward, this prospect is exclusively assigned to you.",
+    "dispGroupStart": "Start",
+    "dispGroupCalled": "Called",
+    "dispGroupArgued": "Argued call",
     "profileAddedOn": "Added on",
     "addedOnLabel": "Added:",
     "newThisWeek": "New",
@@ -372,6 +375,17 @@
       "argued_rdv": "Argued - Appointment / Thinking time",
       "argued_declined": "Argued - Transaction declined",
       "argued_done": "Argued - Transaction completed"
+    },
+    "dispShort": {
+      "to_call": "To call",
+      "called_unreachable": "Unreachable",
+      "called_voicemail": "Voicemail",
+      "called_wrong_number": "Wrong number",
+      "called_callback": "Wants a callback",
+      "called_rdv": "Callback appointment",
+      "argued_rdv": "Appointment / reflection",
+      "argued_declined": "Transaction declined",
+      "argued_done": "Transaction completed"
     }
   },
   "sessionPlanning": {
