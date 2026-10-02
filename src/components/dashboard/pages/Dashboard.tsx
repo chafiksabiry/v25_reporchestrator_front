@@ -401,7 +401,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
   const [hoursGigId, setHoursGigId] = useState<string | null>(null);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
-  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(true);
   const goalsCardRef = useRef<HTMLDivElement>(null);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
