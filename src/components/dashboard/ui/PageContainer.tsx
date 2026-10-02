@@ -5,7 +5,7 @@ type PageContainerVariant = 'default' | 'wide' | 'profile' | 'full' | 'dashboard
 const variantClass: Record<PageContainerVariant, string> = {
   default: 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6',
   wide: 'mx-auto w-full max-w-[1600px] px-3 sm:px-4 lg:px-6 py-3 sm:py-4',
-  dashboard: 'w-full max-w-none px-3 sm:px-4 lg:px-5 xl:px-6 py-2 sm:py-2.5',
+  dashboard: 'w-full max-w-none px-3 sm:px-4 lg:px-6 xl:px-8 2xl:px-10 py-2 sm:py-3 xl:py-4 2xl:py-5',
   profile: 'mx-auto w-full max-w-7xl px-3 sm:px-4 lg:px-6 py-4 sm:py-8 lg:py-12',
   full: 'w-full min-h-full',
 };
