@@ -62,6 +62,8 @@ interface Lead {
   lastCallOutcome?: string | null;
   repDisposition?: string | null;
   repDispositionAt?: string | null;
+  pendingDisposition?: string | null;
+  pendingDispositionAt?: string | null;
   assignedRepId?: string | null;
 }
 
@@ -798,12 +800,12 @@ export function WorkspaceContent() {
       });
       const data = await resp.json();
       if (data.success && data.data) {
-        // Update the lead in the local list
         const updated = data.data as Lead;
         setLeads((prev) => prev.map((l) => (l._id || l.id) === leadId ? { ...l, ...updated } : l));
         if (prospectProfileLead && (prospectProfileLead._id || prospectProfileLead.id) === leadId) {
           setProspectProfileLead((prev) => prev ? { ...prev, ...updated } : prev);
         }
+        setDispositionModalLead((prev) => prev && (prev._id || prev.id) === leadId ? { ...prev, ...updated } : prev);
         setDispositionModalLead(null);
       }
     } catch (err) {
@@ -1188,16 +1190,25 @@ export function WorkspaceContent() {
                           tabIndex={isSignedByMe ? 0 : undefined}
                         >
                           {/* Disposition badge */}
-                          {lead.repDisposition && (() => {
-                            const cfg = getDispConfig(lead.repDisposition);
-                            if (!cfg) return null;
-                            const cls = DISP_COLOR_MAP[cfg.color] || DISP_COLOR_MAP['gray'];
+                          {(lead.repDisposition || lead.pendingDisposition) && (() => {
+                            const cfg = getDispConfig(lead.repDisposition || 'to_call');
+                            const pendingCfg = lead.pendingDisposition ? getDispConfig(lead.pendingDisposition) : null;
+                            if (!cfg && !pendingCfg) return null;
+                            const cls = cfg ? (DISP_COLOR_MAP[cfg.color] || DISP_COLOR_MAP['gray']) : DISP_COLOR_MAP['gray'];
                             return (
-                              <div className="mb-2">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
-                                  <cfg.Icon className="w-2.5 h-2.5 shrink-0" />
-                                  {t(cfg.labelKey, cfg.value)}
-                                </span>
+                              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                                {cfg && (
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
+                                    <cfg.Icon className="w-2.5 h-2.5 shrink-0" />
+                                    {t(cfg.labelKey, cfg.value)}
+                                  </span>
+                                )}
+                                {pendingCfg && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border border-amber-200 bg-amber-50 text-amber-700">
+                                    <Clock className="w-2.5 h-2.5 shrink-0" />
+                                    {t('workspace.dispositionPendingShort', 'En attente')}: {t(pendingCfg.shortKey, t(pendingCfg.labelKey, pendingCfg.value))}
+                                  </span>
+                                )}
                               </div>
                             );
                           })()}
@@ -2012,7 +2023,7 @@ export function WorkspaceContent() {
               {/* Current disposition */}
               <div className="space-y-2">
                 <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileDisposition', 'Statut d\'appel')}</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {(() => {
                     const disposition = prospectProfileLead.repDisposition || 'to_call';
                     const cfg = getDispConfig(disposition);
@@ -2024,18 +2035,35 @@ export function WorkspaceContent() {
                       </span>
                     );
                   })()}
-                  {prospectProfileLead.repDispositionAt && (
+                  {prospectProfileLead.pendingDisposition && (() => {
+                    const pendingCfg = getDispConfig(prospectProfileLead.pendingDisposition);
+                    if (!pendingCfg) return null;
+                    return (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-200 bg-amber-50 text-amber-700">
+                        <Clock className="w-3 h-3 shrink-0" />
+                        {t('workspace.dispositionPendingShort', 'En attente')}: {t(pendingCfg.shortKey, t(pendingCfg.labelKey, pendingCfg.value))}
+                      </span>
+                    );
+                  })()}
+                  {prospectProfileLead.repDispositionAt && !prospectProfileLead.pendingDisposition && (
                     <span className="text-[9px] text-gray-400">{formatCreatedDate(prospectProfileLead.repDispositionAt)}</span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setDispositionModalLead(prospectProfileLead)}
-                    className="ml-auto px-3 py-1.5 rounded-xl border border-harx-200 text-harx-600 text-[9px] font-black uppercase tracking-widest hover:bg-harx-50 transition-all flex items-center gap-1"
-                  >
-                    <Tag className="w-2.5 h-2.5" />
-                    {t('workspace.changeDisposition', 'Modifier')}
-                  </button>
+                  {leadHasRecordedCall(prospectProfileLead) && (
+                    <button
+                      type="button"
+                      onClick={() => setDispositionModalLead(prospectProfileLead)}
+                      className="ml-auto px-3 py-1.5 rounded-xl border border-harx-200 text-harx-600 text-[9px] font-black uppercase tracking-widest hover:bg-harx-50 transition-all flex items-center gap-1"
+                    >
+                      <Tag className="w-2.5 h-2.5" />
+                      {t('workspace.changeDisposition', 'Modifier')}
+                    </button>
+                  )}
                 </div>
+                {prospectProfileLead.pendingDisposition && (
+                  <p className="text-[10px] text-amber-600 font-medium">
+                    {t('workspace.dispositionPendingHint', 'En attente de confirmation de l’entreprise.')}
+                  </p>
+                )}
               </div>
 
               {leadHasRecordedCall(prospectProfileLead) && (
@@ -2099,8 +2127,11 @@ export function WorkspaceContent() {
                       {items.map((d) => {
                         const iconBg = DISP_ICON_BG[d.color] || DISP_ICON_BG.gray;
                         const isActive =
-                          dispositionModalLead.repDisposition === d.value ||
-                          (!dispositionModalLead.repDisposition && d.value === 'to_call');
+                          dispositionModalLead.pendingDisposition === d.value ||
+                          (!dispositionModalLead.pendingDisposition &&
+                            (dispositionModalLead.repDisposition === d.value ||
+                              (!dispositionModalLead.repDisposition && d.value === 'to_call')));
+                        const isPendingChoice = dispositionModalLead.pendingDisposition === d.value;
                         return (
                           <button
                             key={d.value}
@@ -2129,9 +2160,18 @@ export function WorkspaceContent() {
                             </span>
                             <span className="flex-1 text-[13px] font-semibold text-slate-800 leading-snug">
                               {t(d.shortKey, t(d.labelKey, d.value))}
+                              {isPendingChoice && (
+                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                                  {t('workspace.dispositionPendingShort', 'En attente')}
+                                </span>
+                              )}
                             </span>
                             {isActive ? (
-                              <CheckCircle2 className="w-4 h-4 text-harx-500 shrink-0" />
+                              isPendingChoice ? (
+                                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4 text-harx-500 shrink-0" />
+                              )
                             ) : (
                               <span className="w-4 h-4 rounded-full border border-slate-200 shrink-0" />
                             )}
@@ -2147,8 +2187,8 @@ export function WorkspaceContent() {
             <div className="px-5 py-3 border-t border-slate-100 bg-white shrink-0">
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 {t(
-                  'workspace.dispositionExclNote',
-                  'À partir de « RDV pour rappel », ce prospect vous est affecté exclusivement.'
+                  'workspace.dispositionConfirmNote',
+                  'Votre choix est envoyé à l’entreprise pour confirmation. Le statut effectif ne change qu’après validation.'
                 )}
               </p>
             </div>
