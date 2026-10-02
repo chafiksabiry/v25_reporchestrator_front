@@ -12,6 +12,7 @@ import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
+import { NOTIFICATIONS_REFRESH_EVENT } from '../../../contexts/NotificationsContext';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
@@ -1559,9 +1560,18 @@ export function GigsMarketplace() {
 
     window.addEventListener('refreshGigStatuses', handleRefreshStatuses);
 
+    // Poll invitations so company invites appear without full page refresh
+    // (covers missed WS while matching redeploys / offline briefly).
+    const invitePoll = window.setInterval(() => {
+      if (!agentId) return;
+      void fetchInvitedEnrollments();
+      window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
+    }, 15_000);
+
     // Cleanup
     return () => {
       window.removeEventListener('refreshGigStatuses', handleRefreshStatuses);
+      window.clearInterval(invitePoll);
     };
   }, [applicationMessage]);
 
