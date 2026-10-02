@@ -1557,10 +1557,7 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* 2 · Finance — pleine largeur, une seule ligne */}
-      <section className="w-full space-y-1.5" aria-labelledby="dashboard-finance-heading">
-        <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
-          {t('dashboard.home.sections.finance', 'Finance')}
-        </h2>
+      <section className="w-full" aria-label={t('dashboard.home.sections.finance', 'Finance')}>
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
           <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
             <div className="flex items-center justify-between gap-1">
