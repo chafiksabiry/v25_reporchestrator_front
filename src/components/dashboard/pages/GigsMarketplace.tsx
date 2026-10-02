@@ -531,6 +531,8 @@ export function GigsMarketplace() {
   const [initialTabResolved, setInitialTabResolved] = useState(false);
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
   const [invitedEnrollments, setInvitedEnrollments] = useState<InvitedEnrollment[]>([]);
+  /** Local override after accept/reject — gigs list still embeds stale agents[].status=invited. */
+  const [dismissedInviteGigIds, setDismissedInviteGigIds] = useState<string[]>([]);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [requestedGigs, setRequestedGigs] = useState<RequestedGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<string[]>([]); // IDs des gigs avec demandes en attente
@@ -696,6 +698,13 @@ export function GigsMarketplace() {
       }
     }
 
+    // After local reject/accept, ignore stale `agents[].status === 'invited'` on the gigs payload.
+    if (dismissedInviteGigIds.includes(gigId)) {
+      if (pendingRequests.includes(gigId)) return 'pending';
+      return 'none';
+    }
+
+    // Live invitations list is the source of truth for "invited".
     const invitedGig = invitedEnrollments.find((ie) => ie.gig._id === gigId);
     if (invitedGig?.enrollmentStatus === 'rejected') {
       return 'rejected';
@@ -703,13 +712,17 @@ export function GigsMarketplace() {
     if (invitedGig) {
       return 'invited';
     }
+
+    // Fallback only when agents say invited AND we still have that invite in memory was cleared —
+    // do NOT use stale agents.invited once invitedEnrollments no longer lists this gig.
     if (currentGig?.agents && Array.isArray(currentGig.agents)) {
       const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
+      // Stale invited on gig payload without a live invite → treat as none (refused / expired).
       if (agentInGig?.status === 'invited') {
-        return 'invited';
+        return 'none';
       }
       if (agentInGig?.status === 'rejected') {
-        return 'rejected';
+        return 'none';
       }
     }
 
@@ -899,6 +912,9 @@ export function GigsMarketplace() {
       setInvitedEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
       if (acceptedGigId) {
         setEnrolledGigIds(prev => (prev.includes(acceptedGigId) ? prev : [...prev, acceptedGigId]));
+        setDismissedInviteGigIds((prev) =>
+          prev.includes(acceptedGigId) ? prev : [...prev, acceptedGigId]
+        );
       }
 
       showToast('Invitation acceptée ! Vous êtes maintenant inscrit à ce gig.', 'success');
@@ -958,13 +974,35 @@ export function GigsMarketplace() {
       console.log('✅ Invitation rejected successfully:', result);
       showToast('Invitation refusée.', 'success');
 
+      const rejectedGigId =
+        invitedEnrollments.find((e) => e.id === enrollmentId)?.gig?._id ||
+        result?.gigAgent?.gigId?._id ||
+        result?.gigAgent?.gigId ||
+        null;
+      const rejectedGigIdStr = rejectedGigId ? String(rejectedGigId) : '';
+
       // Retirer de l'onglet Invitations (plus d'action en attente)
       setInvitedEnrollments((prev: InvitedEnrollment[]) =>
         prev.filter((enrollment) => enrollment.id !== enrollmentId)
       );
-      setPendingRequests((prev) =>
-        prev.filter((id) => id !== invitedEnrollments.find((e) => e.id === enrollmentId)?.gig?._id)
-      );
+      if (rejectedGigIdStr) {
+        setDismissedInviteGigIds((prev) =>
+          prev.includes(rejectedGigIdStr) ? prev : [...prev, rejectedGigIdStr]
+        );
+        const me = getAgentId();
+        setGigs((prev) =>
+          prev.map((g) => {
+            if (String(g._id) !== rejectedGigIdStr) return g;
+            const agents = Array.isArray(g.agents)
+              ? g.agents.map((a: any) =>
+                  String(a.agentId) === String(me) ? { ...a, status: 'rejected' } : a
+                )
+              : g.agents;
+            return { ...g, agents };
+          })
+        );
+        setPendingRequests((prev) => prev.filter((id) => id !== rejectedGigIdStr));
+      }
 
       // Rafraîchir en arrière-plan pour confirmer
       console.log('🔄 Refreshing all statuses after rejection...');
