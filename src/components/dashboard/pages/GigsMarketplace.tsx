@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play, Check, X, AlertTriangle } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
@@ -504,6 +504,7 @@ export function GigsMarketplace() {
   const { t, i18n } = useTranslation();
   const isFrMarket = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const agentId = getAgentId();
 
   const taxonomyLabel = (raw: string | undefined | null, _gig?: any): string => {
@@ -544,13 +545,24 @@ export function GigsMarketplace() {
     setCurrentPage(1);
   }, [activeTab]);
 
-  // First visit → Disponibles. Already enrolled in a gig → Inscrites.
+  // First visit → URL tab if any, else Inscrites when enrolled, else Disponibles.
   useEffect(() => {
     if (loading || initialTabResolved) return;
-    const hasEnrolled = enrolledGigIds.length > 0 || enrolledGigs.length > 0;
-    setActiveTab(hasEnrolled ? 'enrolled' : 'available');
+    const tab = (searchParams.get('tab') || '').toLowerCase();
+    if (tab === 'invited' || tab === 'invitations') {
+      setActiveTab('invited');
+    } else if (tab === 'enrolled' || tab === 'inscrites') {
+      setActiveTab('enrolled');
+    } else if (tab === 'requested' || tab === 'pending' || tab === 'attente') {
+      setActiveTab('requested');
+    } else if (tab === 'favorite' || tab === 'favoris') {
+      setActiveTab('favorite');
+    } else {
+      const hasEnrolled = enrolledGigIds.length > 0 || enrolledGigs.length > 0;
+      setActiveTab(hasEnrolled ? 'enrolled' : 'available');
+    }
     setInitialTabResolved(true);
-  }, [loading, enrolledGigIds, enrolledGigs, initialTabResolved]);
+  }, [loading, enrolledGigIds, enrolledGigs, initialTabResolved, searchParams]);
 
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
@@ -1587,6 +1599,23 @@ export function GigsMarketplace() {
           setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
           setEnrolledGigIds((prev) =>
             prev.includes(gigId) ? prev : [...prev, gigId]
+          );
+        }
+        // Company invite → refresh Invitations tab live (no page refresh)
+        if (data?.status === 'invited') {
+          void fetchInvitedEnrollments();
+          setActiveTab('invited');
+          const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+          const gigTitle = data?.gigTitle ? String(data.gigTitle) : '';
+          showToast(
+            isFr
+              ? gigTitle
+                ? `Nouvelle invitation : ${gigTitle}`
+                : 'Nouvelle invitation reçue'
+              : gigTitle
+                ? `New invitation: ${gigTitle}`
+                : 'New invitation received',
+            'success'
           );
         }
         // Reject / cancel: drop from pending so the gig returns to "Available".
