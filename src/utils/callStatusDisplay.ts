@@ -63,12 +63,15 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
   return map[outcome] || { label: outcome.replace(/_/g, ' '), tone: 'bg-slate-50 text-slate-600 border-slate-200' };
 }
 
-const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string }> = [
-  { key: 'RDV', label: 'RDV', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-  { key: 'A plus tard', label: 'Plus tard', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'PAS INTÉRESSÉS', label: 'Pas intéressé', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'PAS AU COURANT', label: 'Pas au courant', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-  { key: 'DÉJÀ ÉQUIPÉS', label: 'Déjà équipé', tone: 'bg-blue-50 text-blue-700 border-blue-200' },
+const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string; legacyKeys?: string[] }> = [
+  { key: 'called_unreachable', label: 'Appelé – Injoignable', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'called_voicemail', label: 'Appelé – Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { key: 'called_wrong_number', label: 'Appelé – Numéro non attribué', tone: 'bg-rose-50 text-rose-700 border-rose-200', legacyKeys: ['PAS AU COURANT'] },
+  { key: 'called_callback', label: 'Appelé – Souhaite être rappelé', tone: 'bg-amber-50 text-amber-700 border-amber-200', legacyKeys: ['A plus tard'] },
+  { key: 'called_rdv', label: 'Appelé – RDV pris pour rappel', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { key: 'argued_rdv', label: 'Appel argumenté – RDV / délai', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', legacyKeys: ['RDV'] },
+  { key: 'argued_declined', label: 'Appel argumenté – Transaction déclinée', tone: 'bg-rose-50 text-rose-700 border-rose-200', legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'] },
+  { key: 'argued_done', label: 'Appel argumenté – Transaction aboutie', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];
 
 export function getProspectStatusBadge(
@@ -82,13 +85,16 @@ export function getProspectStatusBadge(
   let best: { rubric: typeof PROSPECT_RUBRICS[number]; score: number } | null = null;
 
   for (const rubric of PROSPECT_RUBRICS) {
-    const metric = aiCallScore[rubric.key];
-    if (!metric) continue;
-    const passed = typeof metric.passed === 'boolean' ? metric.passed : (metric.score ?? 0) >= 50;
-    if (!passed) continue;
-    const score = metric.score ?? 0;
-    if (!best || score >= best.score) {
-      best = { rubric, score };
+    const keys = [rubric.key, ...(rubric.legacyKeys || [])];
+    for (const key of keys) {
+      const metric = aiCallScore[key];
+      if (!metric) continue;
+      const passed = typeof metric.passed === 'boolean' ? metric.passed : (metric.score ?? 0) >= 50;
+      if (!passed) continue;
+      const score = metric.score ?? 0;
+      if (!best || score >= best.score) {
+        best = { rubric, score };
+      }
     }
   }
 
