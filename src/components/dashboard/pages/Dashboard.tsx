@@ -1489,13 +1489,12 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 6. Total période */}
-        <div className="relative col-span-2 flex flex-col overflow-hidden rounded-xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] to-[#1c1218] px-2.5 py-1.5 shadow-sm md:col-span-1">
-          <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-rose-500/20 blur-2xl" />
+        <div className="relative col-span-2 flex flex-col overflow-hidden rounded-xl border border-rose-200 bg-gradient-to-br from-rose-500 to-pink-600 px-2.5 py-1.5 shadow-sm md:col-span-1">
           <div className="relative z-10 flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-rose-100/60 leading-tight">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-white/80 leading-tight">
               {t('dashboard.home.pipeline.periodTotal')}
             </p>
-            <Trophy size={12} className="shrink-0 text-rose-100" />
+            <Trophy size={12} className="shrink-0 text-white" />
           </div>
           <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
             {fmtMoney(earningsPipeline.totalGains)} €
@@ -1526,8 +1525,8 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-rose-800/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 ring-1 ring-rose-500/20 shadow-lg shadow-rose-950/20 sm:p-2.5">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-rose-500/20 blur-3xl" />
+      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-rose-100 bg-white p-2 shadow-sm sm:p-2.5">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-rose-200/40 blur-3xl" />
 
         {/* Header */}
         <div className={`relative z-10 flex flex-wrap items-center justify-between gap-2 ${goalsOpen ? 'mb-2' : ''}`}>
@@ -1536,12 +1535,12 @@ export function Dashboard({ profile }: DashboardProps) {
             onClick={() => setGoalsOpen((open) => !open)}
             className="flex min-w-0 items-center gap-2 text-left"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-harx-500/20 text-harx-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
               <Target size={15} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-black uppercase tracking-tight text-white">{t('dashboard.home.goals.title')}</h2>
-              <p className="truncate text-[9px] font-bold uppercase tracking-widest text-white/40">
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">{t('dashboard.home.goals.title')}</h2>
+              <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 {goals.label}
               </p>
             </div>
@@ -1549,7 +1548,7 @@ export function Dashboard({ profile }: DashboardProps) {
               {!goalsOpen && (
                 <span className="absolute inset-0 rounded-full bg-rose-400/80 motion-reduce:hidden animate-ping" />
               )}
-              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] text-white shadow-[0_0_14px_rgba(255,77,77,0.85)] ring-2 ring-white/80">
+              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] text-white shadow-[0_0_14px_rgba(255,77,77,0.55)] ring-2 ring-rose-100">
                 <ChevronDown size={14} className={`transition-transform duration-300 ${goalsOpen ? 'rotate-180' : ''}`} />
               </span>
             </span>
@@ -1567,8 +1566,8 @@ export function Dashboard({ profile }: DashboardProps) {
                 }}
                 className={`rounded px-2 py-0.5 text-[8px] font-black uppercase tracking-wider transition ${
                   goalsPeriod === key
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'bg-white/10 text-white/55 hover:bg-white/20 hover:text-white'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-700'
                 }`}
               >
                 {goalsPeriodLabels[key]}
@@ -1581,44 +1580,44 @@ export function Dashboard({ profile }: DashboardProps) {
         <div className="relative z-10 space-y-3">
 
           {/* Consigne pédagogique */}
-          <div className="rounded-2xl border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-500/25 via-sky-500/15 to-violet-500/20 p-3.5 shadow-[0_0_28px_-8px_rgba(34,211,238,0.55)]">
-            <p className="text-[10px] font-black text-cyan-300 uppercase tracking-[0.18em] mb-1.5">
+          <div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-violet-50 p-3.5 shadow-sm">
+            <p className="text-[10px] font-black text-cyan-700 uppercase tracking-[0.18em] mb-1.5">
               {t('dashboard.home.goals.howtoTitle')}
             </p>
-            <p className="text-[13px] font-bold text-white leading-snug">
+            <p className="text-[13px] font-bold text-slate-800 leading-snug">
               {t('dashboard.home.goals.howtoBody')}
             </p>
-            <p className="text-[11px] font-semibold text-cyan-200/90 mt-2 leading-snug">
+            <p className="text-[11px] font-semibold text-cyan-700/90 mt-2 leading-snug">
               {t('dashboard.home.goals.howtoHint')}
             </p>
           </div>
 
-          <p className="text-[10px] font-black text-amber-300 uppercase tracking-[0.2em]">{t('dashboard.home.goals.hoursMinLabel')}</p>
+          <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{t('dashboard.home.goals.hoursMinLabel')}</p>
 
           {selectedGigId === 'all' ? (
             <div className="space-y-3">
-              <p className="text-[12px] font-bold text-white/85 leading-snug">
+              <p className="text-[12px] font-bold text-slate-600 leading-snug">
                 Chaque GIG a ses propres heures et son propre bonus. Les objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
               </p>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setHoursMenuOpen((open) => !open)}
-                  className="w-full flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-3 py-3 text-left"
+                  className="w-full flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
                 >
-                  <span className="text-[12px] font-black text-white truncate">
+                  <span className="text-[12px] font-black text-slate-900 truncate">
                     {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || 'Choisir un GIG'}
                       </span>
-                  <ChevronDown size={14} className={`text-white/50 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {hoursMenuOpen && (
-                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-rose-800/40 bg-[#1c1218] shadow-xl">
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
                     {goals.perGig.map((gig) => (
                       <button
                         key={gig.id}
                         type="button"
                         onClick={() => { setHoursGigId(gig.id); setHoursMenuOpen(false); }}
-                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-white text-slate-900' : 'text-white/80 hover:bg-white/10'}`}
+                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-rose-50'}`}
                       >
                         {gig.title}
                       </button>
@@ -1627,20 +1626,20 @@ export function Dashboard({ profile }: DashboardProps) {
               )}
                     </div>
               {goals.perGig.filter((gig) => gig.id === hoursGigId).map((gig) => (
-                <div key={gig.id} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 space-y-2">
+                <div key={gig.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
                   {([
                     { label: 'Jour', row: gig.hours.daily },
                     { label: 'Semaine', row: gig.hours.weekly },
                     { label: 'Mois', row: gig.hours.monthly },
                   ] as const).map(({ label, row }) => (
                     <div key={label} className="flex items-center justify-between gap-3">
-                      <span className="text-[10px] font-black text-white/45 uppercase tracking-widest">{label}</span>
-                      <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-400' : 'text-white'}`}>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+                      <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-600' : 'text-slate-900'}`}>
                         {row.target > 0 ? `${row.current}h / ${row.target}h` : `${row.current}h · pas de minimum`}
                       </span>
                     </div>
                   ))}
-                  <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-400' : 'text-white/55'}`}>
+                  <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-600' : 'text-slate-500'}`}>
                     {gig.bonus.triggered
                       ? `Bonus déclenché · +${gig.bonus.bonusAmount.toFixed(2)} €`
                       : gig.bonus.target > 0
@@ -1661,18 +1660,18 @@ export function Dashboard({ profile }: DashboardProps) {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <CalendarCheck size={13} className="text-violet-400 shrink-0" />
-                  <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{label}</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                <span className="text-white font-black tracking-tighter">
-                    {row.current}h<span className="text-white/40 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
+                <span className="text-slate-900 font-black tracking-tighter">
+                    {row.current}h<span className="text-slate-400 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
                 </span>
-                  <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-400' : 'text-white/60'}`}>
+                  <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-600' : 'text-slate-500'}`}>
                     {row.target > 0 ? `${row.progressPct}%` : '—'}
                 </span>
               </div>
             </div>
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ${row.reached ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${row.progressPct}%` }} />
             </div>
           </div>
@@ -1682,7 +1681,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Flame size={13} className={goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-400'} />
-                <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-emerald-300 font-black tracking-tight">
@@ -1693,10 +1692,10 @@ export function Dashboard({ profile }: DashboardProps) {
                 </span>
               </div>
             </div>
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all duration-700 ${goals.bonus.triggered ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-400'}`} style={{ width: `${goals.bonus.progressPct}%` }} />
             </div>
-            <p className="text-[10px] font-bold text-white/35">
+            <p className="text-[10px] font-bold text-slate-400">
               {goals.bonus.gigsWithTarget > 1
                 ? `${goals.bonus.gigsTriggered}/${goals.bonus.gigsWithTarget} GIGs ont déclenché le bonus`
                 : goals.bonus.triggered
@@ -1709,7 +1708,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </>
           )}
 
-          <p className="text-[10px] font-black text-fuchsia-300 uppercase tracking-[0.2em] pt-1">
+          <p className="text-[10px] font-black text-fuchsia-600 uppercase tracking-[0.2em] pt-1">
             {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
           </p>
 
@@ -1735,11 +1734,11 @@ export function Dashboard({ profile }: DashboardProps) {
               doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
             },
           ]).map((item) => (
-            <div key={item.kind} className="space-y-1.5 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2.5">
+            <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   {item.icon}
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{item.title}</span>
+                  <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{item.title}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {editingGoal === item.kind ? (
@@ -1759,7 +1758,7 @@ export function Dashboard({ profile }: DashboardProps) {
                           setGoalInput(String(capped));
                         }}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
-                        className="w-16 bg-white/15 border border-cyan-400/50 text-white rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-16 bg-white border border-cyan-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         autoFocus
                       />
                       <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200" aria-label="Enregistrer">
@@ -1768,8 +1767,8 @@ export function Dashboard({ profile }: DashboardProps) {
                     </>
                   ) : (
                     <>
-                  <span className="text-white font-black tracking-tighter">
-                        {item.current}<span className="text-white/55 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
+                  <span className="text-slate-900 font-black tracking-tighter">
+                        {item.current}<span className="text-slate-400 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
                   </span>
                       <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-300' : 'text-cyan-200'}`}>
                         {item.target > 0 ? `${item.progress}%` : 'à définir'}
@@ -1777,7 +1776,7 @@ export function Dashboard({ profile }: DashboardProps) {
                       <button
                         type="button"
                         onClick={() => { setGoalInput(String(item.target || '')); setEditingGoal(item.kind); }}
-                        className="p-1.5 rounded-lg bg-cyan-500/25 text-cyan-200 hover:text-white hover:bg-cyan-500/40 transition ring-1 ring-cyan-400/40"
+                        className="p-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition ring-1 ring-cyan-200"
                         aria-label={`Modifier l'objectif ${item.title}`}
                       >
                         <Pencil size={12} />
@@ -1786,17 +1785,17 @@ export function Dashboard({ profile }: DashboardProps) {
                   )}
                 </div>
               </div>
-              <div className="h-2.5 w-full bg-white/15 rounded-full overflow-hidden">
+              <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ${item.progress >= 100 && item.target > 0 ? item.doneClass : item.barClass}`} style={{ width: `${item.target > 0 ? item.progress : 0}%` }} />
               </div>
             </div>
           ))}
 
-          <div className="rounded-2xl border-2 border-fuchsia-400/55 bg-gradient-to-br from-fuchsia-600/30 via-rose-600/25 to-pink-500/20 p-4 space-y-3 shadow-[0_0_40px_-10px_rgba(232,121,249,0.7)]">
+          <div className="rounded-2xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-rose-50 to-pink-50 p-4 space-y-3 shadow-[0_0_40px_-10px_rgba(232,121,249,0.7)]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Trophy size={14} className="text-fuchsia-200" />
-                <span className="text-[10px] font-black text-fuchsia-100 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
+                <span className="text-[10px] font-black text-fuchsia-800 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
               </div>
               {editingGoal === 'earnings' ? (
                 <button
@@ -1811,7 +1810,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <button
                   type="button"
                   onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
-                  className="p-1.5 rounded-lg bg-fuchsia-500/30 text-fuchsia-100 hover:text-white hover:bg-fuchsia-500/50 transition ring-1 ring-fuchsia-300/50"
+                  className="p-1.5 rounded-lg bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 transition ring-1 ring-fuchsia-200"
                   aria-label="Modifier l'objectif de gains"
                 >
                   <Pencil size={12} />
@@ -1826,7 +1825,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                  className="flex-1 bg-white/15 border border-fuchsia-300/50 text-white rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-fuchsia-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="flex-1 bg-white border border-fuchsia-200 text-slate-900 rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-fuchsia-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="Ex. 500"
                   autoFocus
                 />
@@ -1835,18 +1834,18 @@ export function Dashboard({ profile }: DashboardProps) {
             ) : (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-3xl font-black text-white tracking-tighter">{fmtMoney(goals.earned)} €</span>
-                  <span className="text-sm font-bold text-fuchsia-100/90">
+                  <span className="text-3xl font-black text-slate-900 tracking-tighter">{fmtMoney(goals.earned)} €</span>
+                  <span className="text-sm font-bold text-fuchsia-700/90">
                     {repEarningsGoal > 0 ? `/ ${fmtMoney(repEarningsGoal)} €` : 'Objectif à définir'}
                   </span>
                 </div>
-                <div className="h-3 w-full bg-black/30 rounded-full overflow-hidden">
+                <div className="h-3 w-full bg-white rounded-full border border-fuchsia-100 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-fuchsia-300 to-rose-400'}`}
                     style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
                       />
                     </div>
-                <p className="text-[11px] font-bold text-fuchsia-50/95">
+                <p className="text-[11px] font-bold text-fuchsia-800/90">
                   {repEarningsGoal > 0
                     ? (earningsGoalProgress >= 100
                       ? 'Objectif atteint'
@@ -1857,27 +1856,27 @@ export function Dashboard({ profile }: DashboardProps) {
             )}
           </div>
 
-          <div className="h-px bg-white/15" />
+          <div className="h-px bg-slate-200" />
           <button
             type="button"
             onClick={() => setShowCalculator((open) => !open)}
-            className="w-full flex items-center justify-between gap-2 text-left group rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-2.5 hover:bg-cyan-500/20 transition"
+            className="w-full flex items-center justify-between gap-2 text-left group rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 hover:bg-cyan-500/20 transition"
           >
             <div className="flex items-center gap-2">
               <Calculator size={14} className="text-cyan-300" />
-              <span className="text-[11px] font-black text-cyan-100 uppercase tracking-widest group-hover:text-white transition">{t('dashboard.home.goals.simulatorTitle')}</span>
+              <span className="text-[11px] font-black text-cyan-800 uppercase tracking-widest group-hover:text-cyan-950 transition">{t('dashboard.home.goals.simulatorTitle')}</span>
             </div>
             <ChevronDown size={14} className={`text-cyan-200 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
           {showCalculator && (
-            <div className="rounded-2xl border-2 border-cyan-400/40 bg-[#241820]/90 p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
+            <div className="rounded-2xl border border-cyan-200 bg-white p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
               {gigsData.length === 0 ? (
-                <p className="text-[12px] font-bold text-white/70">Aucun GIG disponible.</p>
+                <p className="text-[12px] font-bold text-slate-500">Aucun GIG disponible.</p>
               ) : gigsData.map((gig) => {
                 const selected = Boolean(simGigs[gig._id]);
                 const row = simRows.find((item) => item.id === gig._id);
                 return (
-                  <div key={gig._id} className={`rounded-xl border p-3 space-y-2 ${selected ? 'border-cyan-400/50 bg-cyan-500/10' : 'border-white/15 bg-black/25'}`}>
+                  <div key={gig._id} className={`rounded-xl border p-3 space-y-2 ${selected ? 'border-cyan-400/50 bg-cyan-500/10' : 'border-slate-200 bg-slate-50'}`}>
                     <button
                       type="button"
                       onClick={() => toggleSimGig(gig._id)}
@@ -1886,7 +1885,7 @@ export function Dashboard({ profile }: DashboardProps) {
                       <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-cyan-400 border-cyan-300 text-slate-950' : 'border-white/40'}`}>
                         {selected ? <Check size={10} /> : null}
                       </span>
-                      <span className="text-[12px] font-black text-white truncate">{gig.title || t('dashboard.home.gigFallback')}</span>
+                      <span className="text-[12px] font-black text-slate-900 truncate">{gig.title || t('dashboard.home.gigFallback')}</span>
                     </button>
                     {selected && row && (
                       <>
@@ -1899,9 +1898,9 @@ export function Dashboard({ profile }: DashboardProps) {
                               value={simGigs[gig._id]?.calls ?? ''}
                               onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-cyan-400/40 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full bg-white border border-cyan-200 text-slate-900 rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
-                            <p className="text-[10px] font-bold text-cyan-100/80 text-center">× {fmtMoney(row.callRate)} €</p>
+                            <p className="text-[10px] font-bold text-cyan-700/80 text-center">× {fmtMoney(row.callRate)} €</p>
                 </div>
                 <div className="space-y-1">
                             <label className="text-[9px] font-black text-amber-200 uppercase tracking-wider block">Transactions</label>
@@ -1912,20 +1911,20 @@ export function Dashboard({ profile }: DashboardProps) {
                               value={simGigs[gig._id]?.transactions ?? ''}
                               onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
                               placeholder="0"
-                              className="w-full bg-white/10 border border-amber-400/40 text-white rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full bg-white border border-amber-200 text-slate-900 rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
-                            <p className="text-[10px] font-bold text-amber-100/80 text-center">× {fmtMoney(row.txRate)} €</p>
-                            <p className="text-[9px] font-bold text-white/50 text-center">Pas plus que les appels</p>
+                            <p className="text-[10px] font-bold text-amber-700/80 text-center">× {fmtMoney(row.txRate)} €</p>
+                            <p className="text-[9px] font-bold text-slate-400 text-center">Pas plus que les appels</p>
                 </div>
                 </div>
                         {row.bonusAmount > 0 && (
-                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-300' : 'text-amber-200/80'}`}>
+                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-600' : 'text-amber-200/80'}`}>
                             {row.bonusIncluded
                               ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
                               : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
                           </p>
                         )}
-                        <p className="text-[11px] font-bold text-white/85">
+                        <p className="text-[11px] font-bold text-slate-700">
                           {row.calls} × {fmtMoney(row.callRate)} € + {row.transactions} × {fmtMoney(row.txRate)} €
                           {row.bonusIncluded ? ` + ${fmtMoney(row.bonusAmount)} €` : ''}
                           {' = '}{fmtMoney(row.total)} €
@@ -1935,9 +1934,9 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
                 );
               })}
-              <div className="rounded-xl bg-gradient-to-r from-emerald-500/30 to-cyan-500/25 border-2 border-emerald-400/55 px-4 py-3 shadow-[0_0_24px_-6px_rgba(52,211,153,0.55)]">
-                <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">{t('dashboard.home.goals.simulatorResult')}</p>
-                <p className="text-2xl font-black text-emerald-300 tracking-tight">+{fmtMoney(simTotal)} €</p>
+              <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 px-4 py-3 shadow-[0_0_24px_-6px_rgba(52,211,153,0.55)]">
+                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{t('dashboard.home.goals.simulatorResult')}</p>
+                <p className="text-2xl font-black text-emerald-600 tracking-tight">+{fmtMoney(simTotal)} €</p>
             </div>
           </div>
           )}
@@ -1948,54 +1947,54 @@ export function Dashboard({ profile }: DashboardProps) {
 
       {/* Réservations + Classement côte à côte sur grand écran */}
       <div className="grid gap-1.5 xl:grid-cols-5">
-      <div className="relative overflow-hidden rounded-2xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 shadow-lg shadow-rose-950/25 sm:p-2.5 xl:col-span-3">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-rose-500/15 blur-2xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-3">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
         {/* Header */}
         <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
               <CalendarCheck size={15} />
             </div>
             <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-white">{t('dashboard.home.reservations.title')}</h2>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">{t('dashboard.home.reservations.title')}</h2>
             </div>
           </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
             {t('dashboard.home.reservations.count', { count: reservationStats.total })}
           </span>
         </div>
 
         {/* Métriques compactes */}
         <div className="relative z-10 flex flex-wrap gap-1.5">
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-white/10 bg-white/10 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.total')}</span>
-            <span className="text-lg font-black tracking-tighter text-white leading-none">{reservationStats.total}</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
+            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-500/20 bg-blue-500/10 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.upcoming')}</span>
-            <span className="text-lg font-black tracking-tighter text-blue-400 leading-none">{reservationStats.upcoming}</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
+            <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.completed')}</span>
-            <span className="text-lg font-black tracking-tighter text-emerald-400 leading-none">{reservationStats.completed}</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
+            <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-500/20 bg-rose-500/10 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.missed')}</span>
-            <span className="text-lg font-black tracking-tighter text-rose-400 leading-none">{reservationStats.noShow + reservationStats.cancelled}</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
+            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow + reservationStats.cancelled}</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.hoursWorked')}</span>
-            <span className="text-lg font-black tracking-tighter text-amber-400 leading-none">{reservationStats.workedHours}h</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
+            <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-harx-500/25 bg-harx-500/15 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('dashboard.home.reservations.attendance')}</span>
-            <span className="text-lg font-black tracking-tighter text-white leading-none">{reservationStats.attendanceRate}%</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50/80 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.attendance')}</span>
+            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.attendanceRate}%</span>
           </div>
-          <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-white/10 bg-white/8 px-2.5 py-1.5">
+          <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
             <div className="flex items-center gap-1.5">
-              <Ban size={11} className="text-rose-400" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-white/40">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-              <p className="ml-auto text-sm font-black tracking-tight text-white leading-none">
+              <Ban size={11} className="text-rose-500" />
+              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+              <p className="ml-auto text-sm font-black tracking-tight text-slate-900 leading-none">
                 {cancelRate == null ? '—' : `${cancelRate}%`}
               </p>
             </div>
@@ -2006,7 +2005,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   type="button"
                   onClick={() => setCancelStatsPeriod(key)}
                   className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                    cancelStatsPeriod === key ? 'bg-white text-slate-900' : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    cancelStatsPeriod === key ? 'bg-rose-600 text-white' : 'bg-white text-slate-500 hover:bg-rose-50'
                   }`}
                 >
                   {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
@@ -2029,16 +2028,16 @@ export function Dashboard({ profile }: DashboardProps) {
                     key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}
                     type="button"
                     onClick={() => { const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId; if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`); }}
-                    className="group flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/8 px-2 py-1 text-left transition hover:bg-white/15"
+                    className="group flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 text-left transition hover:bg-violet-50 hover:border-violet-200"
                   >
-                    <CalendarClock size={12} className="shrink-0 text-violet-400" />
+                    <CalendarClock size={12} className="shrink-0 text-violet-500" />
                     <div>
-                      <p className="max-w-[120px] truncate text-[9px] font-black text-white">{gigTitle}</p>
-                      <p className="text-[8px] font-bold text-white/40">
+                      <p className="max-w-[120px] truncate text-[9px] font-black text-slate-800">{gigTitle}</p>
+                      <p className="text-[8px] font-bold text-slate-400">
                         {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
                       </p>
                     </div>
-                    <span className="rounded-md bg-white/10 px-1 py-0.5 text-[8px] font-black text-white/40">{r.duration}h</span>
+                    <span className="rounded-md bg-white px-1 py-0.5 text-[8px] font-black text-slate-500 border border-slate-200">{r.duration}h</span>
                   </button>
                 );
               })}
@@ -2051,28 +2050,28 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
         onClick={() => navigate('/calls')}
-        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-rose-900/30 bg-gradient-to-r from-[#2a1822] to-[#22151c] px-3 py-2 text-white shadow-md shadow-rose-950/20 transition-all hover:from-[#342028] hover:to-[#2a1822]"
+        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-rose-100 bg-white px-3 py-2 text-slate-900 shadow-sm transition-all hover:border-rose-200 hover:bg-rose-50"
       >
         <span className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-500/15 text-rose-200">
+          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
             <Phone size={14} />
           </span>
           <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
         </span>
-        <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500" />
           </button>
 
       {/* Classement des gains du GIG */}
-      <div className="relative flex-1 overflow-hidden rounded-2xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 shadow-lg shadow-rose-950/25 sm:p-2.5">
-        <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-500/10 blur-3xl" />
+      <div className="relative flex-1 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
         <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <Medal size={15} />
               </div>
               <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-white">Classement des gains</h2>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-white/40">
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">Classement des gains</h2>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
               </p>
               </div>
@@ -2080,18 +2079,18 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
         {selectedGigId === 'all' ? (
           <div className="relative z-10 flex items-center justify-center gap-2 py-2 text-center">
-            <Medal size={16} className="text-white/20" />
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">Choisissez un GIG</p>
+            <Medal size={16} className="text-amber-300" />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choisissez un GIG</p>
             </div>
         ) : (
           <div className="relative z-10 flex items-baseline justify-between gap-2 py-1">
             <div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-amber-400/80">Vos gains · période</p>
-              <p className="text-xl font-black tracking-tight text-white leading-none">
+              <p className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">Vos gains · période</p>
+              <p className="text-xl font-black tracking-tight text-slate-900 leading-none">
                 {fmtMoney(earningsPipeline.earnedInPeriod)} €
               </p>
             </div>
-            <p className="truncate text-[10px] font-bold text-white/45 max-w-[120px]">{displayName}</p>
+            <p className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">{displayName}</p>
         </div>
         )}
       </div>
