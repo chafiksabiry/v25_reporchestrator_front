@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { connectRepEnrollmentSocket } from '../lib/enrollmentSocket';
-import { getAgentId } from '../utils/authUtils';
+import { getAgentId, getAuthToken } from '../utils/authUtils';
 import i18n from '../i18n';
 import {
   fetchNotifications,
@@ -19,6 +19,7 @@ import {
   clearAllNotifications,
   type ApiNotification,
 } from '../services/api/notificationsApi';
+import { fetchEnrolledGigsForAgent } from '../utils/trainingScriptRequirement';
 
 export type RepNotificationKind =
   | 'enrollment'
@@ -186,7 +187,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     void refreshNotifications();
     const onRefresh = () => void refreshNotifications();
     window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
-    return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+    const poll = window.setInterval(() => void refreshNotifications(), 45_000);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+      window.clearInterval(poll);
+    };
   }, [refreshNotifications]);
 
   const upsertNotification = useCallback((input: UpsertNotificationInput) => {
@@ -199,7 +204,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           message: input.message,
           gigId: input.gigId,
           journeyId: input.journeyId,
-          actionPath: input.actionPath,
+          actionPath: input.actionPath || (input.kind === 'enrollment' ? '/gigs' : undefined),
           status: input.status,
         });
         if (created && input.playSound !== false) playNotificationSound();
@@ -221,11 +226,54 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         title,
         message,
         gigId,
+        actionPath: '/gigs',
         playSound: true,
       });
     },
     [upsertNotification]
   );
+
+  // Backfill: enrolled gigs without a persisted enrollment notification → write to DB
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const agentId = getAgentId();
+      const token = getAuthToken();
+      if (!agentId || !token) return;
+      try {
+        const [rows, enrolled] = await Promise.all([
+          fetchNotifications(),
+          fetchEnrolledGigsForAgent(agentId, token),
+        ]);
+        if (cancelled) return;
+        const keys = new Set(
+          rows.map((r) => r.notificationKey).filter((k): k is string => Boolean(k))
+        );
+        for (const gig of enrolled) {
+          const key = `enrollment-${gig.gigId}-enrolled`;
+          if (keys.has(key)) continue;
+          const { title, message } = buildEnrollmentMessage('enrolled');
+          await upsertNotificationApi({
+            notificationKey: key,
+            kind: 'enrollment',
+            status: 'enrolled',
+            title,
+            message: `${message}${gig.title ? ` (${gig.title})` : ''}`,
+            gigId: gig.gigId,
+            actionPath: '/gigs',
+          });
+          keys.add(key);
+        }
+        if (!cancelled) await refreshNotifications();
+      } catch (err) {
+        console.warn('[Notifications] enrollment backfill failed', err);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshNotifications]);
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
@@ -272,14 +320,23 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [refreshNotifications]);
 
   useEffect(() => {
-    const dispose = connectRepEnrollmentSocket((data) => {
-      const status = String(data?.status || '');
-      if (status === 'enrolled' || status === 'rejected') {
-        addEnrollmentNotification(status, data?.gigId ? String(data.gigId) : undefined);
+    const dispose = connectRepEnrollmentSocket(
+      (data) => {
+        const status = String(data?.status || '');
+        if (status === 'enrolled' || status === 'rejected') {
+          addEnrollmentNotification(status, data?.gigId ? String(data.gigId) : undefined);
+        }
+        // Always refresh from DB after WS events (server may have persisted already)
+        void refreshNotifications();
+      },
+      {
+        onConnect: () => {
+          void refreshNotifications();
+        },
       }
-    });
+    );
     return dispose;
-  }, [addEnrollmentNotification]);
+  }, [addEnrollmentNotification, refreshNotifications]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({
