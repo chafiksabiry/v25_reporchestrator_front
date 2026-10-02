@@ -31,6 +31,9 @@ import {
   ThumbsDown,
   Lightbulb,
   AlertTriangle,
+  PhoneMissed,
+  Voicemail,
+  PhoneOff,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
@@ -178,12 +181,16 @@ type AiRubricMetricData = {
 
 function getAiRubricMetric(
   scores: CallRecord['ai_call_score'] | undefined,
-  key: string
+  key: string,
+  legacyKeys: string[] = []
 ): AiRubricMetricData | undefined {
   if (!scores) return undefined;
-  const raw = (scores as Record<string, unknown>)[key];
-  if (!raw || typeof raw !== 'object' || !('score' in raw)) return undefined;
-  return raw as AiRubricMetricData;
+  const tryKey = (k: string) => {
+    const raw = (scores as Record<string, unknown>)[k];
+    if (!raw || typeof raw !== 'object' || !('score' in raw)) return undefined;
+    return raw as AiRubricMetricData;
+  };
+  return tryKey(key) || legacyKeys.map(tryKey).find(Boolean);
 }
 
 interface Lead {
@@ -1921,7 +1928,7 @@ export function CallRecords({
                       <div className="space-y-6">
                         <div className="flex items-center gap-4 px-4 pt-4">
                           <div className="h-px flex-1 bg-slate-200/60"></div>
-                          <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center">Statuts & Réponses Prospect</h5>
+                          <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center">État d’avancement du prospect</h5>
                           <div className="h-px flex-1 bg-slate-200/60"></div>
                         </div>
 
@@ -1936,13 +1943,16 @@ export function CallRecords({
                             };
 
                             return [
-                              { label: 'Pas intéressé', key: "PAS INTÉRESSÉS", icon: ShieldAlert, color: 'rose' },
-                              { label: 'Pas au courant', key: "PAS AU COURANT", icon: Globe, color: 'blue' },
-                              { label: 'Déjà équipé / Fourni', key: "DÉJÀ ÉQUIPÉS", icon: ShieldCheck, color: 'indigo' },
-                              { label: 'Prise de RDV', key: "RDV", icon: Calendar, color: 'emerald' },
-                              { label: 'À plus tard / Rappel', key: "A plus tard", icon: Clock, color: 'amber' }
+                              { label: 'Appelé – Injoignable', key: 'called_unreachable', legacyKeys: [] as string[], icon: PhoneMissed, color: 'amber' },
+                              { label: 'Appelé – Répondeur', key: 'called_voicemail', legacyKeys: [] as string[], icon: Voicemail, color: 'amber' },
+                              { label: 'Appelé – Numéro non attribué', key: 'called_wrong_number', legacyKeys: ['PAS AU COURANT'], icon: PhoneOff, color: 'rose' },
+                              { label: 'Appelé – Souhaite être rappelé', key: 'called_callback', legacyKeys: ['A plus tard'], icon: Clock, color: 'amber' },
+                              { label: 'Appelé – RDV pris pour rappel', key: 'called_rdv', legacyKeys: [] as string[], icon: Calendar, color: 'indigo' },
+                              { label: 'Appel argumenté – RDV / délai', key: 'argued_rdv', legacyKeys: ['RDV'], icon: Calendar, color: 'indigo' },
+                              { label: 'Appel argumenté – Transaction déclinée', key: 'argued_declined', legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'], icon: ShieldAlert, color: 'rose' },
+                              { label: 'Appel argumenté – Transaction aboutie', key: 'argued_done', legacyKeys: [] as string[], icon: ShieldCheck, color: 'emerald' },
                             ].map((metric, mIdx) => {
-                              const metricData = getAiRubricMetric(selectedCall.ai_call_score, metric.key);
+                              const metricData = getAiRubricMetric(selectedCall.ai_call_score, metric.key, metric.legacyKeys);
                               if (!metricData) return null;
                               const score = metricData?.score || 0;
                               const scoreColorClass = score >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 bg-slate-50';
