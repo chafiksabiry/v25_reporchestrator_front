@@ -1323,9 +1323,9 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-1.5 pb-1 animate-in fade-in duration-500">
+    <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-3">
       {/* Dynamic Filter Header */}
-      <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:px-4 xl:py-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-black uppercase tracking-tight text-slate-800 sm:text-xl">
@@ -1501,34 +1501,37 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
+      {/* Ops + Finance : 2 colonnes sur grand écran pour remplir la hauteur */}
+      <div className="grid flex-1 grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-3 xl:items-stretch">
+
       {/* ── Opérations ── */}
-      <section className="space-y-1.5" aria-labelledby="dashboard-ops-heading">
-        <h2 id="dashboard-ops-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+      <section className="flex flex-col gap-2 xl:gap-2.5" aria-labelledby="dashboard-ops-heading">
+        <h2 id="dashboard-ops-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
           {t('dashboard.home.sections.operations', 'Opérations')}
         </h2>
 
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-          <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+        <div className="grid grid-cols-2 gap-1.5 xl:gap-2">
+          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5 ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
             <div className="flex items-center justify-between gap-1">
-              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight xl:text-[10px] ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
               <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
             </div>
-            <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+            <p className={`mt-0.5 text-base font-black tracking-tight leading-none xl:text-lg ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
               {qualityAlerts.fraud}
             </p>
           </div>
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[10px]">Score qualité</p>
               <Award size={12} className="shrink-0 text-indigo-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
+            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none xl:text-lg">
               {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm xl:px-4">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <div className="flex shrink-0 items-center gap-1.5">
               <ListChecks size={14} className="text-violet-600" />
@@ -1586,7 +1589,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
+        <div className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
           <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1657,7 +1660,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
 
-          <div className="relative z-10 mt-1.5">
+          <div className="relative z-10 mt-auto pt-2">
             <button
               type="button"
               onClick={() => {
@@ -1675,13 +1678,13 @@ export function Dashboard({ profile }: DashboardProps) {
       </section>
 
       {/* ── Finance ── */}
-      <section className="space-y-1.5" aria-labelledby="dashboard-finance-heading">
-        <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+      <section className="flex flex-col gap-2 xl:gap-2.5" aria-labelledby="dashboard-finance-heading">
+        <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
           {t('dashboard.home.sections.finance', 'Finance')}
         </h2>
 
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3">
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
             <div className="flex items-center justify-between gap-1">
               <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
                 {earningsPipeline.periodStartTitle}
@@ -1794,7 +1797,7 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
+      <div ref={goalsCardRef} className="relative flex flex-1 flex-col scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
@@ -2237,6 +2240,7 @@ export function Dashboard({ profile }: DashboardProps) {
         )}
       </div>
       </section>
+      </div>
 
     </div>
   );
