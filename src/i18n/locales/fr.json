@@ -163,8 +163,9 @@
       "reservations": {
         "title": "Mes Réservations",
         "subtitle": "Créneaux planifiés et heures travaillées",
-        "count_one": "{{count}} réservation sur la période",
-        "count_other": "{{count}} réservations sur la période",
+        "count_one": "{{count}} réservation · {{period}}",
+        "count_other": "{{count}} réservations · {{period}}",
+        "countPeriodAll": "toutes périodes",
         "total": "Total",
         "sessions": "Créneaux",
         "upcoming": "À venir",

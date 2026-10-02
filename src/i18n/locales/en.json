@@ -163,8 +163,9 @@
       "reservations": {
         "title": "My Reservations",
         "subtitle": "Planned slots and hours worked",
-        "count_one": "{{count}} reservation in period",
-        "count_other": "{{count}} reservations in period",
+        "count_one": "{{count}} reservation · {{period}}",
+        "count_other": "{{count}} reservations · {{period}}",
+        "countPeriodAll": "all time",
         "total": "Total",
         "sessions": "Slots",
         "upcoming": "Upcoming",
