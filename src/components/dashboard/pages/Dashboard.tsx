@@ -1224,17 +1224,17 @@ export function Dashboard({ profile }: DashboardProps) {
   return (
     <div className="space-y-1.5 pb-1 animate-in fade-in duration-500">
       {/* Dynamic Filter Header */}
-      <div className="flex flex-col gap-1.5 rounded-2xl border border-rose-100 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-black uppercase tracking-tight text-slate-900 sm:text-xl">
+            <h1 className="truncate text-lg font-black uppercase tracking-tight text-slate-800 sm:text-xl">
               {t('dashboard.home.greeting', { name: displayName })}
             </h1>
           </div>
           <button
             type="button"
             onClick={goToProduction}
-            className="harx-go-live group inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+            className="harx-go-live group inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
           >
             <Rocket size={13} className="transition-transform group-hover:rotate-12" />
             {t('dashboard.home.goLive.title')}
@@ -1244,7 +1244,7 @@ export function Dashboard({ profile }: DashboardProps) {
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <div className="relative flex items-center gap-1.5">
-              <Briefcase size={14} className="text-rose-500" />
+              <Briefcase size={14} className="text-slate-500" />
               <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[260px]">
                 <button
                   ref={gigTriggerRef}
@@ -1400,17 +1400,17 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* KPIs — ordre 24 sept : Début de période → Disponible → Gains → Rétractation → Validation → Total */}
-      <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-6">
+      {/* KPIs — 8 cartes sur une seule ligne (xl) */}
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
         {/* 1. Début de mois / semaine / … (selon la période filtrée) */}
-        <div className="flex flex-col rounded-xl border border-slate-200/70 bg-white px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
               {earningsPipeline.periodStartTitle}
             </p>
-            <CalendarDays size={12} className="shrink-0 text-slate-500" />
+            <CalendarDays size={12} className="shrink-0 text-slate-400" />
           </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
+          <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
             {fmtMoney(earningsPipeline.periodStartBalance)} €
           </p>
           {earningsPipeline.periodStartDateLabel && (
@@ -1419,14 +1419,14 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 2. Solde disponible */}
-        <div className="flex flex-col rounded-xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
               {t('dashboard.home.pipeline.availableBalance')}
             </p>
-            <WalletIcon size={12} className="shrink-0 text-emerald-600" />
+            <WalletIcon size={12} className="shrink-0 text-emerald-500" />
           </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
+          <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
             {fmtMoney(earningsPipeline.availableBalance)} €
           </p>
           <p className="mt-0.5 text-[9px] font-semibold text-emerald-600">
@@ -1435,12 +1435,12 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 3. Gains validés */}
-        <div className="flex flex-col rounded-xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
               {t('dashboard.home.pipeline.validatedEarnings')}
             </p>
-            <ShieldCheck size={12} className="shrink-0 text-emerald-600" />
+            <ShieldCheck size={12} className="shrink-0 text-emerald-500" />
           </div>
           <p className="mt-0.5 text-base font-black tracking-tight text-emerald-700 leading-none">
             +{fmtMoney(earningsPipeline.validatedInPeriod)} €
@@ -1453,12 +1453,12 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 4. Rétractation */}
-        <div className="flex flex-col rounded-xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
               {t('dashboard.home.pipeline.retraction')}
             </p>
-            <RotateCcw size={12} className="shrink-0 text-orange-600" />
+            <RotateCcw size={12} className="shrink-0 text-orange-500" />
           </div>
           <p className="mt-0.5 text-base font-black tracking-tight text-orange-700 leading-none">
             {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
@@ -1471,12 +1471,12 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 5. Validation client */}
-        <div className="flex flex-col rounded-xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
               {t('dashboard.home.pipeline.clientValidation')}
             </p>
-            <Building2 size={12} className="shrink-0 text-amber-600" />
+            <Building2 size={12} className="shrink-0 text-amber-500" />
           </div>
           <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
             +{fmtMoney(earningsPipeline.clientValidationAmount)} €
@@ -1489,44 +1489,44 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
         {/* 6. Total période */}
-        <div className="relative col-span-2 flex flex-col overflow-hidden rounded-xl border border-rose-200 bg-gradient-to-br from-rose-500 to-pink-600 px-2.5 py-1.5 shadow-sm md:col-span-1">
+        <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
           <div className="relative z-10 flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/80 leading-tight">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight">
               {t('dashboard.home.pipeline.periodTotal')}
             </p>
-            <Trophy size={12} className="shrink-0 text-white" />
+            <Trophy size={12} className="shrink-0 text-amber-300" />
           </div>
           <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
             {fmtMoney(earningsPipeline.totalGains)} €
           </p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
-        <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
+        {/* 7. Fraude */}
+        <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
           <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
-            <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-600'}`} />
+            <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+            <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
           </div>
-          <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+          <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
             {qualityAlerts.fraud}
           </p>
         </div>
 
-        <div className="flex flex-col rounded-xl border border-indigo-200/70 bg-white px-2.5 py-1.5 shadow-sm">
+        {/* 8. Score qualité */}
+        <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-indigo-700 leading-tight">Score qualité</p>
-            <Award size={12} className="shrink-0 text-indigo-600" />
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
+            <Award size={12} className="shrink-0 text-indigo-500" />
           </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-indigo-700 leading-none">
+          <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
             {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
           </p>
         </div>
       </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-rose-100 bg-white p-2 shadow-sm sm:p-2.5">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-rose-200/40 blur-3xl" />
+      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
         <div className={`relative z-10 flex flex-wrap items-center justify-between gap-2 ${goalsOpen ? 'mb-2' : ''}`}>
@@ -1535,20 +1535,20 @@ export function Dashboard({ profile }: DashboardProps) {
             onClick={() => setGoalsOpen((open) => !open)}
             className="flex min-w-0 items-center gap-2 text-left"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
               <Target size={15} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">{t('dashboard.home.goals.title')}</h2>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.goals.title')}</h2>
               <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 {goals.label}
               </p>
             </div>
             <span className="relative inline-flex h-7 w-7 shrink-0 items-center justify-center">
               {!goalsOpen && (
-                <span className="absolute inset-0 rounded-full bg-rose-400/80 motion-reduce:hidden animate-ping" />
+                <span className="absolute inset-0 rounded-full bg-slate-300/70 motion-reduce:hidden animate-ping" />
               )}
-              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-[#ff4d4d] to-[#db2777] text-white shadow-[0_0_14px_rgba(255,77,77,0.55)] ring-2 ring-rose-100">
+              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-white ring-2 ring-slate-200">
                 <ChevronDown size={14} className={`transition-transform duration-300 ${goalsOpen ? 'rotate-180' : ''}`} />
               </span>
             </span>
@@ -1566,8 +1566,8 @@ export function Dashboard({ profile }: DashboardProps) {
                 }}
                 className={`rounded px-2 py-0.5 text-[8px] font-black uppercase tracking-wider transition ${
                   goalsPeriod === key
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-700'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
                 }`}
               >
                 {goalsPeriodLabels[key]}
@@ -1617,7 +1617,7 @@ export function Dashboard({ profile }: DashboardProps) {
                         key={gig.id}
                         type="button"
                         onClick={() => { setHoursGigId(gig.id); setHoursMenuOpen(false); }}
-                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-rose-50'}`}
+                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-slate-800 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
                       >
                         {gig.title}
                       </button>
@@ -1708,7 +1708,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </>
           )}
 
-          <p className="text-[10px] font-black text-fuchsia-600 uppercase tracking-[0.2em] pt-1">
+          <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] pt-1">
             {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
           </p>
 
@@ -1791,11 +1791,11 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           ))}
 
-          <div className="rounded-2xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-rose-50 to-pink-50 p-4 space-y-3 shadow-[0_0_40px_-10px_rgba(232,121,249,0.7)]">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Trophy size={14} className="text-fuchsia-200" />
-                <span className="text-[10px] font-black text-fuchsia-800 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
+                <Trophy size={14} className="text-amber-500" />
+                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
               </div>
               {editingGoal === 'earnings' ? (
                 <button
@@ -1810,7 +1810,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 <button
                   type="button"
                   onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
-                  className="p-1.5 rounded-lg bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 transition ring-1 ring-fuchsia-200"
+                  className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition ring-1 ring-slate-200"
                   aria-label="Modifier l'objectif de gains"
                 >
                   <Pencil size={12} />
@@ -1825,27 +1825,27 @@ export function Dashboard({ profile }: DashboardProps) {
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                  className="flex-1 bg-white border border-fuchsia-200 text-slate-900 rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-fuchsia-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="flex-1 bg-white border border-slate-200 text-slate-900 rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-slate-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="Ex. 500"
                   autoFocus
                 />
-                <span className="text-fuchsia-100 text-sm font-bold">€</span>
+                <span className="text-slate-600 text-sm font-bold">€</span>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-3xl font-black text-slate-900 tracking-tighter">{fmtMoney(goals.earned)} €</span>
-                  <span className="text-sm font-bold text-fuchsia-700/90">
+                  <span className="text-3xl font-black text-slate-800 tracking-tighter">{fmtMoney(goals.earned)} €</span>
+                  <span className="text-sm font-bold text-slate-500">
                     {repEarningsGoal > 0 ? `/ ${fmtMoney(repEarningsGoal)} €` : 'Objectif à définir'}
                   </span>
                 </div>
-                <div className="h-3 w-full bg-white rounded-full border border-fuchsia-100 overflow-hidden">
+                <div className="h-3 w-full bg-white rounded-full border border-slate-200 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-fuchsia-300 to-rose-400'}`}
+                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-slate-500 to-slate-700'}`}
                     style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
                       />
                     </div>
-                <p className="text-[11px] font-bold text-fuchsia-800/90">
+                <p className="text-[11px] font-bold text-slate-500">
                   {repEarningsGoal > 0
                     ? (earningsGoalProgress >= 100
                       ? 'Objectif atteint'
@@ -1956,7 +1956,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <CalendarCheck size={15} />
             </div>
             <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">{t('dashboard.home.reservations.title')}</h2>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h2>
             </div>
           </div>
           <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
@@ -1986,15 +1986,15 @@ export function Dashboard({ profile }: DashboardProps) {
             <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
             <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50/80 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.attendance')}</span>
-            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.attendanceRate}%</span>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
+            <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
           </div>
           <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
             <div className="flex items-center gap-1.5">
-              <Ban size={11} className="text-rose-500" />
+              <Ban size={11} className="text-slate-500" />
               <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-              <p className="ml-auto text-sm font-black tracking-tight text-slate-900 leading-none">
+              <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
                 {cancelRate == null ? '—' : `${cancelRate}%`}
               </p>
             </div>
@@ -2005,7 +2005,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   type="button"
                   onClick={() => setCancelStatsPeriod(key)}
                   className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                    cancelStatsPeriod === key ? 'bg-rose-600 text-white' : 'bg-white text-slate-500 hover:bg-rose-50'
+                    cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
                   }`}
                 >
                   {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
@@ -2050,15 +2050,15 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
         onClick={() => navigate('/calls')}
-        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-rose-100 bg-white px-3 py-2 text-slate-900 shadow-sm transition-all hover:border-rose-200 hover:bg-rose-50"
+        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50"
       >
         <span className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
             <Phone size={14} />
           </span>
           <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
         </span>
-        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500" />
+        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600" />
           </button>
 
       {/* Classement des gains du GIG */}
@@ -2070,7 +2070,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <Medal size={15} />
               </div>
               <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-900">Classement des gains</h2>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h2>
               <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
               </p>
@@ -2105,7 +2105,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <ListChecks size={14} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-900">À faire aujourd'hui</h3>
+              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-800">À faire aujourd'hui</h3>
         </div>
       </div>
           <div className="flex flex-1 flex-wrap gap-1">
@@ -2139,7 +2139,7 @@ export function Dashboard({ profile }: DashboardProps) {
               <PhoneCall size={14} />
                 </div>
             <div className="min-w-0">
-              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-900">Rappels à effectuer</h3>
+              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-800">Rappels à effectuer</h3>
                 </div>
                 </div>
           <p className="flex-1 text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
