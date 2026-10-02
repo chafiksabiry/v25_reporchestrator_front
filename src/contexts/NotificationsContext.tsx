@@ -299,13 +299,18 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     ) => {
       const { title, message } = buildEnrollmentMessage(status, gigTitle);
       // Invites: unique key per invite wave (re-invite after reject → new bell row).
+      // Never use Date.now() for stable poll sync — that would spam a new row every tick.
       let key: string;
       if (status === 'invited') {
         const inviteMs =
           meta?.invitationSentAt != null ? new Date(meta.invitationSentAt).getTime() : NaN;
-        key = Number.isFinite(inviteMs)
-          ? `enrollment-${gigId || 'general'}-invited-${meta?.enrollmentId || 'x'}-${inviteMs}`
-          : `enrollment-${gigId || 'general'}-invited-${meta?.enrollmentId || gigId || 'x'}-${Date.now()}`;
+        if (Number.isFinite(inviteMs)) {
+          key = `enrollment-${gigId || 'general'}-invited-${meta?.enrollmentId || 'x'}-${inviteMs}`;
+        } else if (meta?.enrollmentId) {
+          key = `enrollment-${gigId || 'general'}-invited-${meta.enrollmentId}`;
+        } else {
+          key = `enrollment-${gigId || 'general'}-invited`;
+        }
       } else {
         key = `enrollment-${gigId || 'general'}-${status}`;
       }
@@ -332,7 +337,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [upsertNotification]
   );
 
-  // Backfill once after load, then rarely — WS handles realtime.
+  // Keep invite/enrollment alerts in the bell on EVERY page (not only after opening Gigs).
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -349,11 +354,21 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         const keys = new Set(
           rows.map((r) => r.notificationKey).filter((k): k is string => Boolean(k))
         );
+
+        // Invites: optimistic local insert so Dashboard/TopBar badge updates immediately.
+        for (const gig of invited) {
+          addEnrollmentNotification('invited', gig.gigId, gig.title, {
+            enrollmentId: gig.enrollmentId,
+            invitationSentAt: gig.invitationSentAt,
+          });
+        }
+
+        // Enrolled backfill (API only — quieter, no sound spam on every poll).
         let wrote = false;
         const upserts: Promise<unknown>[] = [];
         for (const gig of enrolled) {
           const key = `enrollment-${gig.gigId}-enrolled`;
-          if (keys.has(key)) continue;
+          if (keys.has(key) || knownKeysRef.current.has(key)) continue;
           const { title, message } = buildEnrollmentMessage('enrolled', gig.title);
           upserts.push(
             upsertNotificationApi({
@@ -369,44 +384,21 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           keys.add(key);
           wrote = true;
         }
-        for (const gig of invited) {
-          const inviteMs = gig.invitationSentAt
-            ? new Date(gig.invitationSentAt).getTime()
-            : NaN;
-          const key = Number.isFinite(inviteMs)
-            ? `enrollment-${gig.gigId}-invited-${gig.enrollmentId || 'x'}-${inviteMs}`
-            : `enrollment-${gig.gigId}-invited-${gig.enrollmentId || gig.gigId}`;
-          if (keys.has(key)) continue;
-          const { title, message } = buildEnrollmentMessage('invited', gig.title);
-          upserts.push(
-            upsertNotificationApi({
-              notificationKey: key,
-              kind: 'enrollment',
-              status: 'invited',
-              title,
-              message,
-              gigId: gig.gigId,
-              actionPath: '/marketplace?tab=invited',
-            })
-          );
-          keys.add(key);
-          wrote = true;
-        }
         if (upserts.length) await Promise.all(upserts);
         if (!cancelled && wrote) await refreshNotifications();
       } catch (err) {
-        console.warn('[Notifications] enrollment/invite backfill failed', err);
+        console.warn('[Notifications] enrollment/invite sync failed', err);
       }
     };
-    // Defer slightly so the first bell fetch paints, then backfill invites ASAP.
-    const start = window.setTimeout(() => void run(), 200);
-    const poll = window.setInterval(() => void run(), 60_000);
+    // Run ASAP on any page (Dashboard included), then keep in sync.
+    const start = window.setTimeout(() => void run(), 80);
+    const poll = window.setInterval(() => void run(), 20_000);
     return () => {
       cancelled = true;
       window.clearTimeout(start);
       window.clearInterval(poll);
     };
-  }, [refreshNotifications]);
+  }, [refreshNotifications, addEnrollmentNotification]);
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>

@@ -13,6 +13,7 @@ import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement
 import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
 import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
 import { PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { useNotifications } from '../../contexts/NotificationsContext';
 
 // Declare qiankun global variables
 declare global {
@@ -91,6 +92,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { notifications } = useNotifications();
+  const inviteBadgeCount = notifications.filter(
+    (n) => !n.read && (n.status === 'invited' || String(n.notificationKey || '').includes('-invited'))
+  ).length;
 
   // While the profile is still loading, `phases` is undefined. Rather than
   // momentarily assuming onboarding is incomplete (which flashes the warning
@@ -614,6 +619,11 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                       {!isCollapsed && (
                         <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex items-center gap-1.5 min-w-0">
                           <span className="truncate">{item.label}</span>
+                          {item.path === '/marketplace' && inviteBadgeCount > 0 ? (
+                            <span className="shrink-0 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black leading-[1.1rem] text-center shadow-sm">
+                              {inviteBadgeCount > 9 ? '9+' : inviteBadgeCount}
+                            </span>
+                          ) : null}
                           {item.path === '/marketplace' ? (
                             <span
                               className="relative shrink-0 group/gigsinfo"
@@ -633,7 +643,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                           ) : null}
                         </span>
                       )}
-                      {isCollapsed && item.subItems && (
+                      {isCollapsed && item.path === '/marketplace' && inviteBadgeCount > 0 && (
+                        <div className="absolute top-0 right-0 min-w-[0.9rem] h-[0.9rem] px-0.5 rounded-full bg-rose-500 text-white text-[8px] font-black leading-[0.9rem] text-center border-2 border-slate-950 translate-x-1/2 -translate-y-1/2">
+                          {inviteBadgeCount > 9 ? '9+' : inviteBadgeCount}
+                        </div>
+                      )}
+                      {isCollapsed && item.subItems && !(item.path === '/marketplace' && inviteBadgeCount > 0) && (
                         <div className="absolute top-0 right-0 w-2 h-2 bg-harx-500 rounded-full border-2 border-slate-950 translate-x-1/2 -translate-y-1/2"></div>
                       )}
                       {isCollapsed && (
