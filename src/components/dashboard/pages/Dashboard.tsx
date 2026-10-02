@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText, History } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { repApiUrl } from '../../../utils/repApiUrl';
@@ -1501,294 +1501,297 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* KPIs — 8 cartes sur une seule ligne (xl) */}
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
-        {/* 1. Début de mois / semaine / … (selon la période filtrée) */}
-        <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {earningsPipeline.periodStartTitle}
-            </p>
-            <CalendarDays size={12} className="shrink-0 text-slate-400" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
-            {fmtMoney(earningsPipeline.periodStartBalance)} €
-          </p>
-          {earningsPipeline.periodStartDateLabel && (
-            <p className="mt-0.5 truncate text-[9px] text-slate-400">{earningsPipeline.periodStartDateLabel}</p>
-          )}
-        </div>
+      {/* ── Opérations ── */}
+      <section className="space-y-1.5" aria-labelledby="dashboard-ops-heading">
+        <h2 id="dashboard-ops-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+          {t('dashboard.home.sections.operations', 'Opérations')}
+        </h2>
 
-        {/* 2. Solde disponible */}
-        <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {t('dashboard.home.pipeline.availableBalance')}
-            </p>
-            <WalletIcon size={12} className="shrink-0 text-emerald-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
-            {fmtMoney(earningsPipeline.availableBalance)} €
-          </p>
-          <p className="mt-0.5 text-[9px] font-semibold text-emerald-600">
-            {t('dashboard.home.pipeline.readyToWithdraw')}
-          </p>
-        </div>
-
-        {/* 3. Gains validés */}
-        <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
-              {t('dashboard.home.pipeline.validatedEarnings')}
-            </p>
-            <ShieldCheck size={12} className="shrink-0 text-emerald-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-emerald-700 leading-none">
-            +{fmtMoney(earningsPipeline.validatedInPeriod)} €
-          </p>
-          <p className="mt-0.5 truncate text-[9px] text-emerald-600/80">
-            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })}
-            {' · '}
-            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}
-          </p>
-        </div>
-
-        {/* 4. Rétractation */}
-        <div className="flex flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
-              {t('dashboard.home.pipeline.retraction')}
-            </p>
-            <RotateCcw size={12} className="shrink-0 text-orange-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-orange-700 leading-none">
-            {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
-          </p>
-          <p className="mt-0.5 text-[9px] text-orange-600/80">
-            {earningsPipeline.retractionCount > 0
-              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
-              : t('dashboard.home.pipeline.noSales')}
-          </p>
-        </div>
-
-        {/* 5. Validation client */}
-        <div className="flex flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
-              {t('dashboard.home.pipeline.clientValidation')}
-            </p>
-            <Building2 size={12} className="shrink-0 text-amber-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
-            +{fmtMoney(earningsPipeline.clientValidationAmount)} €
-          </p>
-          <p className="mt-0.5 text-[9px] text-amber-600/80">
-            {earningsPipeline.clientValidationCount > 0
-              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
-              : t('dashboard.home.pipeline.nothingPending')}
-          </p>
-        </div>
-
-        {/* 6. Total période */}
-        <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
-          <div className="relative z-10 flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight">
-              {t('dashboard.home.pipeline.periodTotal')}
-            </p>
-            <Trophy size={12} className="shrink-0 text-amber-300" />
-          </div>
-          <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
-            {fmtMoney(earningsPipeline.totalGains)} €
-          </p>
-        </div>
-
-        {/* 7. Fraude */}
-        <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
-          <div className="flex items-center justify-between gap-1">
-            <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
-            <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
-          </div>
-          <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
-            {qualityAlerts.fraud}
-          </p>
-        </div>
-
-        {/* 8. Score qualité */}
-        <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
-            <Award size={12} className="shrink-0 text-indigo-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
-            {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
-          </p>
-        </div>
-      </div>
-
-      {/* À faire + Rappels — sous les 8 KPIs */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <div className="flex shrink-0 items-center gap-1.5">
-            <ListChecks size={14} className="text-violet-600" />
-            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-            <GraduationCap size={11} className="shrink-0 text-violet-600" />
-            Formations
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-            <BookOpen size={11} className="shrink-0 text-blue-600" />
-            Scripts
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-            <FileText size={11} className="shrink-0 text-emerald-600" />
-            KB
-          </span>
-          <button
-            type="button"
-            onClick={() => navigate('/academy')}
-            className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-          >
-            <GraduationCap size={11} />
-            Academy
-            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-          </button>
-        </div>
-
-        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
-
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <div className="flex shrink-0 items-center gap-1.5">
-            <PhoneCall size={14} className="text-amber-600" />
-            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
-          </div>
-          <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
-          <button
-            type="button"
-            onClick={() => navigate('/workspace')}
-            className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-          >
-            <PhoneCall size={11} />
-            Prospects
-            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Réservations + Classement côte à côte sur grand écran */}
-      <div className="grid gap-1.5 xl:grid-cols-5">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-3">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
-        {/* Header */}
-        <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-              <CalendarCheck size={15} />
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-center justify-between gap-1">
+              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+              <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
             </div>
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h2>
+            <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+              {qualityAlerts.fraud}
+            </p>
+          </div>
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
+              <Award size={12} className="shrink-0 text-indigo-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
+              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <ListChecks size={14} className="text-violet-600" />
+              <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+              <GraduationCap size={11} className="shrink-0 text-violet-600" />
+              Formations
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+              <BookOpen size={11} className="shrink-0 text-blue-600" />
+              Scripts
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+              <FileText size={11} className="shrink-0 text-emerald-600" />
+              KB
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/academy')}
+              className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+            >
+              <GraduationCap size={11} />
+              Academy
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+
+          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <PhoneCall size={14} className="text-amber-600" />
+              <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
+            </div>
+            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
+            <button
+              type="button"
+              onClick={() => navigate('/workspace')}
+              className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
+            >
+              <PhoneCall size={11} />
+              Prospects
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/workspace?tab=calls')}
+              className="harx-flash harx-flash--slate group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              <History size={11} />
+              {t('dashboard.home.sections.callHistory', 'Historique')}
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
+          <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <CalendarCheck size={15} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h3>
+              </div>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              {t('dashboard.home.reservations.count', {
+                count: reservationStats.total,
+                period: selectedPeriod === 'all'
+                  ? t('dashboard.home.reservations.countPeriodAll')
+                  : selectedPeriodLabel,
+              })}
+            </span>
+          </div>
+
+          <div className="relative z-10 flex flex-wrap gap-1.5">
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
+              <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
+              <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
+              <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
+              <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
+            </div>
+            <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <Ban size={11} className="text-slate-500" />
+                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+                <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
+                  {cancelRate == null ? '—' : `${cancelRate}%`}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setCancelStatsPeriod(key)}
+                    className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
+                      cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-            {t('dashboard.home.reservations.count', {
-              count: reservationStats.total,
-              period: selectedPeriod === 'all'
-                ? t('dashboard.home.reservations.countPeriodAll')
-                : selectedPeriodLabel,
-            })}
-          </span>
-        </div>
 
-        {/* Métriques compactes */}
-        <div className="relative z-10 flex flex-wrap gap-1.5">
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
-            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
+          <div className="relative z-10 mt-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+                navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
+              }}
+              className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+            >
+              <CalendarCheck size={12} />
+              {t('dashboard.home.reservations.book')}
+              <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
           </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
-            <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
-            <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
-            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
-            <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
-            <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
-          </div>
-          <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <Ban size={11} className="text-slate-500" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-              <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
-                {cancelRate == null ? '—' : `${cancelRate}%`}
+        </div>
+      </section>
+
+      {/* ── Finance ── */}
+      <section className="space-y-1.5" aria-labelledby="dashboard-finance-heading">
+        <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+          {t('dashboard.home.sections.finance', 'Finance')}
+        </h2>
+
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+                {earningsPipeline.periodStartTitle}
               </p>
+              <CalendarDays size={12} className="shrink-0 text-slate-400" />
             </div>
-            <div className="flex flex-wrap gap-0.5">
-              {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setCancelStatsPeriod(key)}
-                  className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                    cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
-                  }`}
-                >
-                  {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
-                </button>
-              ))}
-            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
+              {fmtMoney(earningsPipeline.periodStartBalance)} €
+            </p>
+            {earningsPipeline.periodStartDateLabel && (
+              <p className="mt-0.5 truncate text-[9px] text-slate-400">{earningsPipeline.periodStartDateLabel}</p>
+            )}
           </div>
-        </div>
 
-        {/* CTA réservation */}
-        <div className="relative z-10 mt-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              const gigId = selectedGigId !== 'all' ? selectedGigId : '';
-              navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
-            }}
-            className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
-          >
-            <CalendarCheck size={12} />
-            {t('dashboard.home.reservations.book')}
-            <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5 xl:col-span-2">
-      {/* Classement des gains du GIG */}
-      <div className="relative flex-1 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
-        <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
-        <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-              <Medal size={15} />
-            </div>
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h2>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
+          <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+                {t('dashboard.home.pipeline.availableBalance')}
               </p>
+              <WalletIcon size={12} className="shrink-0 text-emerald-500" />
             </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
+              {fmtMoney(earningsPipeline.availableBalance)} €
+            </p>
+            <p className="mt-0.5 text-[9px] font-semibold text-emerald-600">
+              {t('dashboard.home.pipeline.readyToWithdraw')}
+            </p>
+          </div>
+
+          <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
+                {t('dashboard.home.pipeline.validatedEarnings')}
+              </p>
+              <ShieldCheck size={12} className="shrink-0 text-emerald-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-emerald-700 leading-none">
+              +{fmtMoney(earningsPipeline.validatedInPeriod)} €
+            </p>
+            <p className="mt-0.5 truncate text-[9px] text-emerald-600/80">
+              {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })}
+              {' · '}
+              {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}
+            </p>
+          </div>
+
+          <div className="flex flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
+                {t('dashboard.home.pipeline.retraction')}
+              </p>
+              <RotateCcw size={12} className="shrink-0 text-orange-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-orange-700 leading-none">
+              {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
+            </p>
+            <p className="mt-0.5 text-[9px] text-orange-600/80">
+              {earningsPipeline.retractionCount > 0
+                ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
+                : t('dashboard.home.pipeline.noSales')}
+            </p>
+          </div>
+
+          <div className="flex flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
+                {t('dashboard.home.pipeline.clientValidation')}
+              </p>
+              <Building2 size={12} className="shrink-0 text-amber-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
+              +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+            </p>
+            <p className="mt-0.5 text-[9px] text-amber-600/80">
+              {earningsPipeline.clientValidationCount > 0
+                ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
+                : t('dashboard.home.pipeline.nothingPending')}
+            </p>
+          </div>
+
+          <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
+            <div className="relative z-10 flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight">
+                {t('dashboard.home.pipeline.periodTotal')}
+              </p>
+              <Trophy size={12} className="shrink-0 text-amber-300" />
+            </div>
+            <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
+              {fmtMoney(earningsPipeline.totalGains)} €
+            </p>
           </div>
         </div>
-        {/* Classement vide tant qu'aucune donnée de ranking n'est branchée */}
-        <div className="relative z-10 min-h-[2.5rem]" aria-hidden={true} />
-      </div>
-      </div>
-      </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
+          <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
+          <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                <Medal size={15} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h3>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                  {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="relative z-10 min-h-[2.5rem]" aria-hidden={true} />
+        </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
       <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
@@ -1999,7 +2002,7 @@ export function Dashboard({ profile }: DashboardProps) {
 
           <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] pt-1">
             {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
-          </p>
+          </p>y
 
           {([
             {
@@ -2233,6 +2236,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         )}
       </div>
+      </section>
 
     </div>
   );

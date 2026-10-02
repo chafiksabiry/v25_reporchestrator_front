@@ -68,6 +68,11 @@
       "gigFallback": "Gig",
       "filterByGig": "Filter by gig",
       "filterByPeriod": "Filter by period",
+      "sections": {
+        "operations": "Operations",
+        "finance": "Finance",
+        "callHistory": "History"
+      },
       "goLive": {
         "eyebrow": "Now's the time",
         "title": "Go live",
