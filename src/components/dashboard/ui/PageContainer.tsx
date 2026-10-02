@@ -22,7 +22,10 @@ export function resolvePageContainerVariant(pathname: string): PageContainerVari
   if (
     pathname.includes('/workspace') ||
     pathname.includes('/session-planning') ||
-    pathname.includes('/calls')
+    pathname.includes('/calls') ||
+    pathname.includes('/marketplace') ||
+    pathname.includes('/gig/') ||
+    pathname.includes('/company/')
   ) {
     return 'wide';
   }
