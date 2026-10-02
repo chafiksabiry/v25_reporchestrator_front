@@ -211,6 +211,38 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [refreshNotifications]);
 
   const upsertNotification = useCallback((input: UpsertNotificationInput) => {
+    const optimistic: RepNotification = {
+      id: input.id,
+      notificationKey: input.id,
+      kind: input.kind,
+      status: input.status,
+      title: input.title,
+      message: input.message,
+      gigId: input.gigId,
+      journeyId: input.journeyId,
+      actionPath:
+        input.actionPath ||
+        (input.kind === 'enrollment' && input.status === 'invited'
+          ? '/marketplace?tab=invited'
+          : input.kind === 'enrollment' && input.gigId
+            ? `/gig/${input.gigId}`
+            : input.kind === 'enrollment'
+              ? '/marketplace'
+              : undefined),
+      createdAt: Date.now(),
+      read: false,
+    };
+
+    // Show instantly in the bell (don't wait for network).
+    setNotifications((prev) => {
+      const without = prev.filter(
+        (n) => n.notificationKey !== input.id && n.id !== input.id
+      );
+      return [optimistic, ...without];
+    });
+    knownKeysRef.current.add(input.id);
+    if (input.playSound !== false) playNotificationSound();
+
     void (async () => {
       try {
         const created = await upsertNotificationApi({
@@ -220,13 +252,21 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           message: input.message,
           gigId: input.gigId,
           journeyId: input.journeyId,
-                        actionPath: input.actionPath || (input.kind === 'enrollment' && input.gigId ? `/gig/${input.gigId}` : input.kind === 'enrollment' ? '/marketplace' : undefined),
+          actionPath: optimistic.actionPath,
           status: input.status,
         });
-        if (created && input.playSound !== false) playNotificationSound();
-        await refreshNotifications();
+        if (created?.id && created.id !== input.id) {
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n.notificationKey === input.id || n.id === input.id
+                ? { ...n, id: created.id, createdAt: created.createdAt || n.createdAt }
+                : n
+            )
+          );
+        }
       } catch (err) {
         console.warn('[Notifications] upsert failed', err);
+        void refreshNotifications();
       }
     })();
   }, [refreshNotifications]);
@@ -235,6 +275,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     (status: string, gigId?: string, gigTitle?: string) => {
       const { title, message } = buildEnrollmentMessage(status, gigTitle);
       const key = `enrollment-${gigId || 'general'}-${status}`;
+      if (knownKeysRef.current.has(key)) {
+        // Already shown — avoid duplicate sound / re-insert.
+        return;
+      }
       upsertNotification({
         id: key,
         kind: 'enrollment',
@@ -254,7 +298,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [upsertNotification]
   );
 
-  // Backfill: enrolled + pending invites missing from bell DB → upsert
+  // Backfill once after load, then rarely — WS handles realtime.
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -272,19 +316,22 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           rows.map((r) => r.notificationKey).filter((k): k is string => Boolean(k))
         );
         let wrote = false;
+        const upserts: Promise<unknown>[] = [];
         for (const gig of enrolled) {
           const key = `enrollment-${gig.gigId}-enrolled`;
           if (keys.has(key)) continue;
           const { title, message } = buildEnrollmentMessage('enrolled', gig.title);
-          await upsertNotificationApi({
-            notificationKey: key,
-            kind: 'enrollment',
-            status: 'enrolled',
-            title,
-            message,
-            gigId: gig.gigId,
-            actionPath: `/gig/${gig.gigId}`,
-          });
+          upserts.push(
+            upsertNotificationApi({
+              notificationKey: key,
+              kind: 'enrollment',
+              status: 'enrolled',
+              title,
+              message,
+              gigId: gig.gigId,
+              actionPath: `/gig/${gig.gigId}`,
+            })
+          );
           keys.add(key);
           wrote = true;
         }
@@ -292,28 +339,32 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           const key = `enrollment-${gig.gigId}-invited`;
           if (keys.has(key)) continue;
           const { title, message } = buildEnrollmentMessage('invited', gig.title);
-          await upsertNotificationApi({
-            notificationKey: key,
-            kind: 'enrollment',
-            status: 'invited',
-            title,
-            message,
-            gigId: gig.gigId,
-            actionPath: '/marketplace?tab=invited',
-          });
+          upserts.push(
+            upsertNotificationApi({
+              notificationKey: key,
+              kind: 'enrollment',
+              status: 'invited',
+              title,
+              message,
+              gigId: gig.gigId,
+              actionPath: '/marketplace?tab=invited',
+            })
+          );
           keys.add(key);
           wrote = true;
         }
+        if (upserts.length) await Promise.all(upserts);
         if (!cancelled && wrote) await refreshNotifications();
-        else if (!cancelled) await refreshNotifications();
       } catch (err) {
         console.warn('[Notifications] enrollment/invite backfill failed', err);
       }
     };
-    void run();
-    const poll = window.setInterval(() => void run(), 20_000);
+    // Defer so the first bell fetch paints immediately.
+    const start = window.setTimeout(() => void run(), 800);
+    const poll = window.setInterval(() => void run(), 90_000);
     return () => {
       cancelled = true;
+      window.clearTimeout(start);
       window.clearInterval(poll);
     };
   }, [refreshNotifications]);
@@ -367,14 +418,15 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       (data) => {
         const status = String(data?.status || '');
         if (status === 'enrolled' || status === 'rejected' || status === 'invited') {
+          // Optimistic bell update (instant). No extra full refresh — upsert syncs id.
           addEnrollmentNotification(
             status,
             data?.gigId ? String(data.gigId) : undefined,
             data?.gigTitle ? String(data.gigTitle) : undefined
           );
+        } else {
+          void refreshNotifications();
         }
-        // Always refresh from DB after WS events (server may have persisted already)
-        void refreshNotifications();
       },
       {
         onConnect: () => {
