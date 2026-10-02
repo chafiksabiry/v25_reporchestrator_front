@@ -265,6 +265,37 @@ const getPeriodStart = (period: PeriodKey): number => {
   }
 };
 
+/** Inclusive end of period (local calendar day), or null for "all". */
+const getPeriodEndYmd = (period: PeriodKey): string | null => {
+  const now = new Date();
+  switch (period) {
+    case 'today': {
+      return toLocalYmd(getPeriodStart('today'));
+    }
+    case 'week': {
+      const start = new Date(getPeriodStart('week'));
+      start.setDate(start.getDate() + 6); // Sunday
+      return toLocalYmd(start.getTime());
+    }
+    case 'month': {
+      const d = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return toLocalYmd(d.getTime());
+    }
+    case 'quarter': {
+      const q = Math.floor(now.getMonth() / 3);
+      const d = new Date(now.getFullYear(), q * 3 + 3, 0);
+      return toLocalYmd(d.getTime());
+    }
+    case 'year': {
+      const d = new Date(now.getFullYear(), 11, 31);
+      return toLocalYmd(d.getTime());
+    }
+    case 'all':
+    default:
+      return null;
+  }
+};
+
 /** Local calendar day yyyy-MM-dd for a reservation. */
 function reservationYmd(r: { reservationDate?: string; date?: string }): string {
   return String(r.reservationDate || r.date || '').slice(0, 10);
@@ -577,21 +608,23 @@ export function Dashboard({ profile }: DashboardProps) {
     });
   }, [callsData, selectedGigId, periodStartTs]);
 
-  // Reservations filtered by gig + period (period applies to reservation calendar day)
+  // Reservations filtered by gig + period (inclusive calendar range for the selected period)
   const filteredReservations = useMemo(() => {
-    const periodYmd = periodStartTs > 0 ? toLocalYmd(periodStartTs) : '';
+    const startYmd = periodStartTs > 0 ? toLocalYmd(periodStartTs) : '';
+    const endYmd = getPeriodEndYmd(selectedPeriod);
     return reservationsData.filter((r: any) => {
       if (selectedGigId !== 'all') {
         const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
         if (String(rGigId || '') !== String(selectedGigId)) return false;
       }
-      if (periodYmd) {
+      if (startYmd && endYmd) {
         const ymd = reservationYmd(r);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || ymd < periodYmd) return false;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+        if (ymd < startYmd || ymd > endYmd) return false;
       }
       return true;
     });
-  }, [reservationsData, selectedGigId, periodStartTs]);
+  }, [reservationsData, selectedGigId, periodStartTs, selectedPeriod]);
 
   const callActivityDateById = useMemo(() => {
     const map = new Map<string, string>();
