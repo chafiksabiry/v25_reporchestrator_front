@@ -19,7 +19,7 @@ import {
   clearAllNotifications,
   type ApiNotification,
 } from '../services/api/notificationsApi';
-import { fetchEnrolledGigsForAgent } from '../utils/trainingScriptRequirement';
+import { fetchEnrolledGigsForAgent, fetchInvitedGigsForAgent } from '../utils/trainingScriptRequirement';
 
 export type RepNotificationKind =
   | 'enrollment'
@@ -254,7 +254,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [upsertNotification]
   );
 
-  // Backfill: enrolled gigs without a persisted enrollment notification → write to DB
+  // Backfill: enrolled + pending invites missing from bell DB → upsert
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -262,37 +262,59 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       const token = getAuthToken();
       if (!agentId || !token) return;
       try {
-        const [rows, enrolled] = await Promise.all([
+        const [rows, enrolled, invited] = await Promise.all([
           fetchNotifications(),
           fetchEnrolledGigsForAgent(agentId, token),
+          fetchInvitedGigsForAgent(agentId, token),
         ]);
         if (cancelled) return;
         const keys = new Set(
           rows.map((r) => r.notificationKey).filter((k): k is string => Boolean(k))
         );
+        let wrote = false;
         for (const gig of enrolled) {
           const key = `enrollment-${gig.gigId}-enrolled`;
           if (keys.has(key)) continue;
-          const { title, message } = buildEnrollmentMessage('enrolled');
+          const { title, message } = buildEnrollmentMessage('enrolled', gig.title);
           await upsertNotificationApi({
             notificationKey: key,
             kind: 'enrollment',
             status: 'enrolled',
             title,
-            message: `${message}${gig.title ? ` (${gig.title})` : ''}`,
+            message,
             gigId: gig.gigId,
             actionPath: `/gig/${gig.gigId}`,
           });
           keys.add(key);
+          wrote = true;
         }
-        if (!cancelled) await refreshNotifications();
+        for (const gig of invited) {
+          const key = `enrollment-${gig.gigId}-invited`;
+          if (keys.has(key)) continue;
+          const { title, message } = buildEnrollmentMessage('invited', gig.title);
+          await upsertNotificationApi({
+            notificationKey: key,
+            kind: 'enrollment',
+            status: 'invited',
+            title,
+            message,
+            gigId: gig.gigId,
+            actionPath: '/marketplace?tab=invited',
+          });
+          keys.add(key);
+          wrote = true;
+        }
+        if (!cancelled && wrote) await refreshNotifications();
+        else if (!cancelled) await refreshNotifications();
       } catch (err) {
-        console.warn('[Notifications] enrollment backfill failed', err);
+        console.warn('[Notifications] enrollment/invite backfill failed', err);
       }
     };
     void run();
+    const poll = window.setInterval(() => void run(), 20_000);
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
     };
   }, [refreshNotifications]);
 

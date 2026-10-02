@@ -34,7 +34,14 @@ function notificationIcon(n: RepNotification) {
       </div>
     );
   }
-  if (n.status === 'enrolled' || n.kind === 'enrollment') {
+  if (n.status === 'invited') {
+    return (
+      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-indigo-500/35 text-indigo-100">
+        <Mail className="h-4 w-4" />
+      </div>
+    );
+  }
+  if (n.status === 'enrolled') {
     return (
       <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-emerald-500/30 text-emerald-200">
         <CheckCheck className="h-4 w-4" />
@@ -45,6 +52,13 @@ function notificationIcon(n: RepNotification) {
     return (
       <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-rose-500/30 text-rose-200">
         <Check className="h-4 w-4" />
+      </div>
+    );
+  }
+  if (n.kind === 'enrollment') {
+    return (
+      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-emerald-500/30 text-emerald-200">
+        <CheckCheck className="h-4 w-4" />
       </div>
     );
   }

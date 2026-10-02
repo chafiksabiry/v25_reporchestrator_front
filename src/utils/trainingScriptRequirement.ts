@@ -312,6 +312,38 @@ export async function fetchEnrolledGigsForAgent(
   return out;
 }
 
+/** Pending company invitations for this REP (marketplace Invitations tab). */
+export async function fetchInvitedGigsForAgent(
+  agentId: string,
+  token: string
+): Promise<{ gigId: string; title: string }[]> {
+  const base = String(import.meta.env.VITE_MATCHING_API_URL || '').replace(/\/$/, '');
+  if (!base) return [];
+
+  const res = await fetch(
+    `${base}/gig-agents/agents/${encodeURIComponent(agentId)}/gigs?status=invited`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as { gigs?: unknown[] };
+  const gigs = Array.isArray(data.gigs) ? data.gigs : [];
+  const out: { gigId: string; title: string }[] = [];
+  for (const item of gigs) {
+    const g = item as { gig?: { _id?: unknown; title?: string }; status?: string };
+    const status = String(g.status || 'invited').toLowerCase();
+    if (status && status !== 'invited') continue;
+    const gigId = normalizeMongoId(g.gig?._id);
+    if (gigId) {
+      out.push({
+        gigId,
+        title: String(g.gig?.title || 'Gig').trim() || 'Gig',
+      });
+    }
+  }
+  return out;
+}
+
 type GigScriptPhase = { phase?: string; actor?: string; replica?: string };
 
 type GigScriptPayload = {
