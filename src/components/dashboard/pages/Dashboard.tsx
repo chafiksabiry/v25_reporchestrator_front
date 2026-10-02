@@ -1400,7 +1400,9 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
+      {/* KPIs — ordre 24 sept : Début de période → Disponible → Gains → Rétractation → Validation → Total */}
+      <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-6">
+        {/* 1. Début de mois / semaine / … (selon la période filtrée) */}
         <div className="flex flex-col rounded-xl border border-slate-200/70 bg-white px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
@@ -1411,8 +1413,12 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
             {fmtMoney(earningsPipeline.periodStartBalance)} €
           </p>
+          {earningsPipeline.periodStartDateLabel && (
+            <p className="mt-0.5 truncate text-[9px] text-slate-400">{earningsPipeline.periodStartDateLabel}</p>
+          )}
         </div>
 
+        {/* 2. Solde disponible */}
         <div className="flex flex-col rounded-xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
@@ -1423,8 +1429,12 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
             {fmtMoney(earningsPipeline.availableBalance)} €
           </p>
+          <p className="mt-0.5 text-[9px] font-semibold text-emerald-600">
+            {t('dashboard.home.pipeline.readyToWithdraw')}
+          </p>
         </div>
 
+        {/* 3. Gains validés */}
         <div className="flex flex-col rounded-xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
@@ -1435,8 +1445,14 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="mt-0.5 text-base font-black tracking-tight text-emerald-700 leading-none">
             +{fmtMoney(earningsPipeline.validatedInPeriod)} €
           </p>
+          <p className="mt-0.5 truncate text-[9px] text-emerald-600/80">
+            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })}
+            {' · '}
+            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}
+          </p>
         </div>
 
+        {/* 4. Rétractation */}
         <div className="flex flex-col rounded-xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
@@ -1447,8 +1463,14 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="mt-0.5 text-base font-black tracking-tight text-orange-700 leading-none">
             {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
           </p>
+          <p className="mt-0.5 text-[9px] text-orange-600/80">
+            {earningsPipeline.retractionCount > 0
+              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
+              : t('dashboard.home.pipeline.noSales')}
+          </p>
         </div>
 
+        {/* 5. Validation client */}
         <div className="flex flex-col rounded-xl border border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
@@ -1459,21 +1481,29 @@ export function Dashboard({ profile }: DashboardProps) {
           <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
             +{fmtMoney(earningsPipeline.clientValidationAmount)} €
           </p>
+          <p className="mt-0.5 text-[9px] text-amber-600/80">
+            {earningsPipeline.clientValidationCount > 0
+              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
+              : t('dashboard.home.pipeline.nothingPending')}
+          </p>
         </div>
 
-        <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-1.5 shadow-sm">
-          <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
+        {/* 6. Total période */}
+        <div className="relative col-span-2 flex flex-col overflow-hidden rounded-xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] to-[#1c1218] px-2.5 py-1.5 shadow-sm md:col-span-1">
+          <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-rose-500/20 blur-2xl" />
           <div className="relative z-10 flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/50 leading-tight">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-rose-100/60 leading-tight">
               {t('dashboard.home.pipeline.periodTotal')}
             </p>
-            <Trophy size={12} className="shrink-0 text-white" />
+            <Trophy size={12} className="shrink-0 text-rose-100" />
           </div>
           <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
             {fmtMoney(earningsPipeline.totalGains)} €
           </p>
         </div>
+      </div>
 
+      <div className="grid grid-cols-2 gap-1.5">
         <div className={`flex flex-col rounded-xl border px-2.5 py-1.5 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-300 bg-rose-50' : 'border-emerald-200/70 bg-white'}`}>
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-rose-700 leading-tight">Fraude</p>
@@ -1496,8 +1526,8 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-harx-500/30 bg-slate-950 p-2 ring-1 ring-harx-500/20 shadow-lg shadow-harx-900/15 sm:p-2.5">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-harx-500/20 blur-3xl" />
+      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-rose-800/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 ring-1 ring-rose-500/20 shadow-lg shadow-rose-950/20 sm:p-2.5">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-rose-500/20 blur-3xl" />
 
         {/* Header */}
         <div className={`relative z-10 flex flex-wrap items-center justify-between gap-2 ${goalsOpen ? 'mb-2' : ''}`}>
@@ -1582,7 +1612,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   <ChevronDown size={14} className={`text-white/50 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {hoursMenuOpen && (
-                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-white/15 bg-slate-950 shadow-xl">
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-rose-800/40 bg-[#1c1218] shadow-xl">
                     {goals.perGig.map((gig) => (
                       <button
                         key={gig.id}
@@ -1840,7 +1870,7 @@ export function Dashboard({ profile }: DashboardProps) {
             <ChevronDown size={14} className={`text-cyan-200 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
           </button>
           {showCalculator && (
-            <div className="rounded-2xl bg-slate-900/80 border-2 border-cyan-400/40 p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
+            <div className="rounded-2xl border-2 border-cyan-400/40 bg-[#241820]/90 p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
               {gigsData.length === 0 ? (
                 <p className="text-[12px] font-bold text-white/70">Aucun GIG disponible.</p>
               ) : gigsData.map((gig) => {
@@ -1918,8 +1948,8 @@ export function Dashboard({ profile }: DashboardProps) {
 
       {/* Réservations + Classement côte à côte sur grand écran */}
       <div className="grid gap-1.5 xl:grid-cols-5">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-lg shadow-slate-900/30 sm:p-2.5 xl:col-span-3">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-500/15 blur-2xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 shadow-lg shadow-rose-950/25 sm:p-2.5 xl:col-span-3">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-rose-500/15 blur-2xl" />
         {/* Header */}
         <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -2021,10 +2051,10 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
         onClick={() => navigate('/calls')}
-        className="group flex w-full items-center justify-between gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-white shadow-md shadow-slate-900/20 transition-all hover:bg-slate-800"
+        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-rose-900/30 bg-gradient-to-r from-[#2a1822] to-[#22151c] px-3 py-2 text-white shadow-md shadow-rose-950/20 transition-all hover:from-[#342028] hover:to-[#2a1822]"
       >
         <span className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/10">
+          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-500/15 text-rose-200">
             <Phone size={14} />
           </span>
           <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
@@ -2033,7 +2063,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </button>
 
       {/* Classement des gains du GIG */}
-      <div className="relative flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-lg shadow-slate-900/30 sm:p-2.5">
+      <div className="relative flex-1 overflow-hidden rounded-2xl border border-rose-900/40 bg-gradient-to-br from-[#2a1822] via-[#22151c] to-[#1c1218] p-2 shadow-lg shadow-rose-950/25 sm:p-2.5">
         <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-500/10 blur-3xl" />
         <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
