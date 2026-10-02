@@ -177,7 +177,8 @@
         "hoursScheduled": "/ {{hours}}h prévues",
         "attendance": "Assiduité",
         "attendanceRate": "Taux d'assiduité",
-        "upcomingSessions": "Prochains créneaux"
+        "upcomingSessions": "Prochains créneaux",
+        "book": "Réserver"
       },
       "goals": {
         "title": "Mes Objectifs",
