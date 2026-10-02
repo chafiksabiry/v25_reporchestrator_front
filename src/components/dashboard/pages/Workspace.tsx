@@ -71,6 +71,8 @@ type LucideIcon = React.ComponentType<{ className?: string }>;
 interface DispConfig {
   value: string;
   labelKey: string;
+  shortKey: string;
+  group: 'start' | 'called' | 'argued';
   color: string;
   /** dot color class for the indicator */
   dot: string;
@@ -78,26 +80,43 @@ interface DispConfig {
 }
 
 const HARX_DISPOSITIONS: DispConfig[] = [
-  { value: 'to_call',            labelKey: 'workspace.disp.to_call',            color: 'gray',    dot: 'bg-gray-400',    Icon: Phone },
-  { value: 'called_unreachable', labelKey: 'workspace.disp.called_unreachable', color: 'orange',  dot: 'bg-orange-500',  Icon: PhoneMissed },
-  { value: 'called_voicemail',   labelKey: 'workspace.disp.called_voicemail',   color: 'orange',  dot: 'bg-orange-400',  Icon: Voicemail },
-  { value: 'called_wrong_number',labelKey: 'workspace.disp.called_wrong_number',color: 'red',     dot: 'bg-red-500',     Icon: PhoneOff },
-  { value: 'called_callback',    labelKey: 'workspace.disp.called_callback',    color: 'amber',   dot: 'bg-amber-500',   Icon: Repeat2 },
-  { value: 'called_rdv',         labelKey: 'workspace.disp.called_rdv',         color: 'violet',  dot: 'bg-violet-500',  Icon: CalendarCheck },
-  { value: 'argued_rdv',         labelKey: 'workspace.disp.argued_rdv',         color: 'indigo',  dot: 'bg-indigo-500',  Icon: Handshake },
-  { value: 'argued_declined',    labelKey: 'workspace.disp.argued_declined',    color: 'rose',    dot: 'bg-rose-500',    Icon: Ban },
-  { value: 'argued_done',        labelKey: 'workspace.disp.argued_done',        color: 'emerald', dot: 'bg-emerald-500', Icon: PartyPopper },
+  { value: 'to_call',             labelKey: 'workspace.disp.to_call',             shortKey: 'workspace.dispShort.to_call',             group: 'start',  color: 'gray',    dot: 'bg-gray-400',    Icon: Phone },
+  { value: 'called_unreachable',  labelKey: 'workspace.disp.called_unreachable',  shortKey: 'workspace.dispShort.called_unreachable',  group: 'called', color: 'orange',  dot: 'bg-orange-500',  Icon: PhoneMissed },
+  { value: 'called_voicemail',    labelKey: 'workspace.disp.called_voicemail',    shortKey: 'workspace.dispShort.called_voicemail',    group: 'called', color: 'orange',  dot: 'bg-orange-400',  Icon: Voicemail },
+  { value: 'called_wrong_number', labelKey: 'workspace.disp.called_wrong_number', shortKey: 'workspace.dispShort.called_wrong_number', group: 'called', color: 'red',     dot: 'bg-red-500',     Icon: PhoneOff },
+  { value: 'called_callback',     labelKey: 'workspace.disp.called_callback',     shortKey: 'workspace.dispShort.called_callback',     group: 'called', color: 'amber',   dot: 'bg-amber-500',   Icon: Repeat2 },
+  { value: 'called_rdv',          labelKey: 'workspace.disp.called_rdv',          shortKey: 'workspace.dispShort.called_rdv',          group: 'called', color: 'violet',  dot: 'bg-violet-500',  Icon: CalendarCheck },
+  { value: 'argued_rdv',          labelKey: 'workspace.disp.argued_rdv',          shortKey: 'workspace.dispShort.argued_rdv',          group: 'argued', color: 'indigo',  dot: 'bg-indigo-500',  Icon: Handshake },
+  { value: 'argued_declined',     labelKey: 'workspace.disp.argued_declined',     shortKey: 'workspace.dispShort.argued_declined',     group: 'argued', color: 'rose',    dot: 'bg-rose-500',    Icon: Ban },
+  { value: 'argued_done',         labelKey: 'workspace.disp.argued_done',         shortKey: 'workspace.dispShort.argued_done',         group: 'argued', color: 'emerald', dot: 'bg-emerald-500', Icon: PartyPopper },
+];
+
+const DISP_GROUPS: Array<{ id: DispConfig['group']; labelKey: string }> = [
+  { id: 'start', labelKey: 'workspace.dispGroupStart' },
+  { id: 'called', labelKey: 'workspace.dispGroupCalled' },
+  { id: 'argued', labelKey: 'workspace.dispGroupArgued' },
 ];
 
 const DISP_COLOR_MAP: Record<string, string> = {
-  gray:    'bg-gray-50 text-gray-500 border-gray-200',
+  gray:    'bg-gray-50 text-gray-600 border-gray-200',
   orange:  'bg-orange-50 text-orange-600 border-orange-200',
   red:     'bg-red-50 text-red-600 border-red-200',
-  amber:   'bg-amber-50 text-amber-600 border-amber-200',
+  amber:   'bg-amber-50 text-amber-700 border-amber-200',
   violet:  'bg-violet-50 text-violet-700 border-violet-200',
   indigo:  'bg-indigo-50 text-indigo-700 border-indigo-200',
   rose:    'bg-rose-50 text-rose-600 border-rose-200',
   emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+const DISP_ICON_BG: Record<string, string> = {
+  gray:    'bg-slate-100 text-slate-600',
+  orange:  'bg-orange-100 text-orange-600',
+  red:     'bg-red-100 text-red-600',
+  amber:   'bg-amber-100 text-amber-700',
+  violet:  'bg-violet-100 text-violet-700',
+  indigo:  'bg-indigo-100 text-indigo-700',
+  rose:    'bg-rose-100 text-rose-600',
+  emerald: 'bg-emerald-100 text-emerald-700',
 };
 
 function getDispConfig(value: string | null | undefined): DispConfig | null {
@@ -2039,56 +2058,98 @@ export function WorkspaceContent() {
       {/* ── Disposition Setter Modal ───────────────────────────────── */}
       {dispositionModalLead && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-[2px] animate-in fade-in duration-200"
           onClick={() => !dispositionSaving && setDispositionModalLead(null)}
         >
           <div
-            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="relative w-full sm:max-w-md max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-black uppercase tracking-tight text-gray-900 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-harx-500" />
-                {t('workspace.dispositionTitle', 'Statut d\'appel')}
-              </h3>
-              <button
-                onClick={() => !dispositionSaving && setDispositionModalLead(null)}
-                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-harx-600 mb-1">
+                    {t('workspace.dispositionTitle', "Statut d'appel")}
+                  </p>
+                  <h3 className="text-base font-bold text-slate-900 truncate">
+                    {dispositionModalLead.Deal_Name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !dispositionSaving && setDispositionModalLead(null)}
+                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <div className="px-6 py-4 space-y-2">
-              <p className="text-[10px] text-gray-500 font-medium mb-3">
-                {dispositionModalLead.Deal_Name}
-              </p>
-              {HARX_DISPOSITIONS.map((d) => {
-                const cls = DISP_COLOR_MAP[d.color] || DISP_COLOR_MAP['gray'];
-                const isActive = dispositionModalLead.repDisposition === d.value
-                  || (!dispositionModalLead.repDisposition && d.value === 'to_call');
+
+            <div className="px-3 py-3 overflow-y-auto flex-1 space-y-4">
+              {DISP_GROUPS.map((group) => {
+                const items = HARX_DISPOSITIONS.filter((d) => d.group === group.id);
+                if (items.length === 0) return null;
                 return (
-                  <button
-                    key={d.value}
-                    type="button"
-                    disabled={dispositionSaving}
-                    onClick={() => void setLeadDisposition(dispositionModalLead._id || dispositionModalLead.id, d.value)}
-                    className={`w-full text-left px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${isActive ? cls + ' shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50'}`}
-                  >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-white/60' : cls + ' border'}`}>
-                      {dispositionSaving && isActive
-                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : <d.Icon className="w-3 h-3" />
-                      }
+                  <div key={group.id}>
+                    <p className="px-2 mb-1.5 text-[11px] font-semibold text-slate-400">
+                      {t(group.labelKey)}
+                    </p>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 overflow-hidden divide-y divide-slate-100">
+                      {items.map((d) => {
+                        const iconBg = DISP_ICON_BG[d.color] || DISP_ICON_BG.gray;
+                        const isActive =
+                          dispositionModalLead.repDisposition === d.value ||
+                          (!dispositionModalLead.repDisposition && d.value === 'to_call');
+                        return (
+                          <button
+                            key={d.value}
+                            type="button"
+                            disabled={dispositionSaving}
+                            onClick={() =>
+                              void setLeadDisposition(
+                                dispositionModalLead._id || dispositionModalLead.id,
+                                d.value
+                              )
+                            }
+                            className={`w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors disabled:opacity-60 ${
+                              isActive
+                                ? 'bg-white ring-1 ring-inset ring-harx-400/70'
+                                : 'hover:bg-white/80'
+                            }`}
+                          >
+                            <span
+                              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+                            >
+                              {dispositionSaving && isActive ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <d.Icon className="w-3.5 h-3.5" />
+                              )}
+                            </span>
+                            <span className="flex-1 text-[13px] font-semibold text-slate-800 leading-snug">
+                              {t(d.shortKey, t(d.labelKey, d.value))}
+                            </span>
+                            {isActive ? (
+                              <CheckCircle2 className="w-4 h-4 text-harx-500 shrink-0" />
+                            ) : (
+                              <span className="w-4 h-4 rounded-full border border-slate-200 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {t(d.labelKey, d.value)}
-                    {isActive && <CheckCircle2 className="w-3.5 h-3.5 ml-auto shrink-0" />}
-                  </button>
+                  </div>
                 );
               })}
             </div>
-            <div className="px-6 py-3 bg-gray-50 text-center">
-              <p className="text-[9px] text-gray-400 font-medium">
-                {t('workspace.dispositionExclNote', 'À partir de "Appelé – RDV pris", ce prospect vous sera affecté exclusivement.')}
+
+            <div className="px-5 py-3 border-t border-slate-100 bg-white shrink-0">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {t(
+                  'workspace.dispositionExclNote',
+                  'À partir de « RDV pour rappel », ce prospect vous est affecté exclusivement.'
+                )}
               </p>
             </div>
           </div>
