@@ -1582,13 +1582,11 @@ export function GigsMarketplace() {
 
     window.addEventListener('refreshGigStatuses', handleRefreshStatuses);
 
-    // Poll invitations so company invites appear without full page refresh
-    // (covers missed WS while matching redeploys / offline briefly).
+    // Light invite poll (WS is primary). Do not spam bell refreshes.
     const invitePoll = window.setInterval(() => {
       if (!agentId) return;
       void fetchInvitedEnrollments();
-      window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT));
-    }, 15_000);
+    }, 30_000);
 
     // Cleanup
     return () => {
