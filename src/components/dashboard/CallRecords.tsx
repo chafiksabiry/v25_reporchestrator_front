@@ -289,7 +289,7 @@ function isAnalysisStale(record: CallRecord): boolean {
 const HISTORY_STATUS_FILTERS: Array<{ id: string; label: string; group?: 'line' }> = [
   { id: 'all', label: 'Tous statuts' },
   { id: 'completed', label: 'Terminé' },
-  { id: 'too_short', label: 'Trop court' },
+  { id: 'too_short', label: 'Sans suite (<30s)' },
   { id: 'in-progress', label: 'En cours' },
   { id: 'line', label: '', group: 'line' },
   // HARX ladder (Twilio AMD→Répondeur, Busy/No-Answer→Injoignable, Failed→Numéro non attribué)
@@ -349,7 +349,7 @@ function dispositionBadge(
     return callOutcomeBadge('fraud');
   }
   if (isCallTooShortForAnalysis(record)) {
-    return { label: 'Trop court', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+    return resolveCallDispositionStatus(record, ledgerTxStatus);
   }
   if (isCallRejectedByAI(record)) return null;
   const status = resolveCallDispositionStatus(record, ledgerTxStatus);
@@ -1680,12 +1680,17 @@ export function CallRecords({
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
                   {selectedCallTooShort ? (
                     <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
-                        <Clock className="w-7 h-7" />
-                      </div>
-                      <p className="text-sm font-black uppercase tracking-widest text-slate-700">
-                        {t('calls.calibration.tooShortTitle')}
-                      </p>
+                      {(() => {
+                        const disposition = resolveCallDispositionStatus(selectedCall);
+                        return (
+                          <span
+                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest border ${disposition.tone}`}
+                            title={disposition.title}
+                          >
+                            {disposition.label}
+                          </span>
+                        );
+                      })()}
                       <p className="text-sm font-medium text-slate-500 max-w-lg leading-relaxed">
                         {getTooShortAnalysisNotice(i18n.language, Number(selectedCall.duration) || undefined)}
                       </p>
