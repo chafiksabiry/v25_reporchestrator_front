@@ -397,7 +397,7 @@ export function Dashboard({ profile }: DashboardProps) {
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
 
   // Simulateur : chiffres saisis par GIG. Les commissions et le bonus viennent du GIG.
-  const [showCalculator, setShowCalculator] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(true);
   const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
   const [hoursGigId, setHoursGigId] = useState<string | null>(null);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
@@ -1876,17 +1876,25 @@ export function Dashboard({ profile }: DashboardProps) {
         {goalsOpen && (
         <div className="relative z-10 space-y-3">
 
-          {/* Consigne pédagogique */}
+          {/* Consigne claire — 3 étapes */}
           <div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-violet-50 p-3.5 shadow-sm">
-            <p className="text-[10px] font-black text-cyan-700 uppercase tracking-[0.18em] mb-1.5">
+            <p className="text-[10px] font-black text-cyan-700 uppercase tracking-[0.18em] mb-2">
               {t('dashboard.home.goals.howtoTitle')}
             </p>
-            <p className="text-[13px] font-bold text-slate-800 leading-snug">
-              {t('dashboard.home.goals.howtoBody')}
-            </p>
-            <p className="text-[11px] font-semibold text-cyan-700/90 mt-2 leading-snug">
-              {t('dashboard.home.goals.howtoHint')}
-            </p>
+            <ol className="grid gap-2 sm:grid-cols-3">
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5">1 · {t('dashboard.home.goals.step1Title', 'Objectifs')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug">{t('dashboard.home.goals.step1Body', 'À gauche : fixez appels, transactions et gains avec le crayon.')}</p>
+              </li>
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5">2 · {t('dashboard.home.goals.step2Title', 'Simulateur')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug">{t('dashboard.home.goals.step2Body', 'À droite : estimez ce que vous gagnez si vous atteignez ces volumes.')}</p>
+              </li>
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5">3 · {t('dashboard.home.goals.step3Title', 'Heures GIG')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug">{t('dashboard.home.goals.step3Body', 'En haut : respectez le minimum d’heures du GIG pour rester conforme.')}</p>
+              </li>
+            </ol>
           </div>
 
           <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{t('dashboard.home.goals.hoursMinLabel')}</p>
@@ -2009,11 +2017,19 @@ export function Dashboard({ profile }: DashboardProps) {
           </>
           )}
 
-          <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] pt-1">
-            {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
-          </p>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+          {/* Colonne Objectifs */}
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
+          <div>
+            <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">
+              {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-500 leading-snug">
+              {t('dashboard.home.goals.goalsColHint', 'Cliquez sur le crayon pour définir vos cibles. Ce sont vos objectifs personnels, pas ceux du GIG.')}
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2">
           {([
             {
               kind: 'calls' as const,
@@ -2038,7 +2054,7 @@ export function Dashboard({ profile }: DashboardProps) {
               unit: '',
             },
           ]).map((item) => (
-            <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   {item.icon}
@@ -2095,7 +2111,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           ))}
 
-          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Trophy size={13} className="text-amber-500" />
@@ -2146,21 +2162,31 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
           </div>
+          </div>
 
-          <div className="h-px bg-slate-200" />
-          <button
-            type="button"
-            onClick={() => setShowCalculator((open) => !open)}
-            className="w-full flex items-center justify-between gap-2 text-left group rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 hover:bg-cyan-500/20 transition"
-          >
-            <div className="flex items-center gap-2">
-              <Calculator size={14} className="text-cyan-300" />
-              <span className="text-[11px] font-black text-cyan-800 uppercase tracking-widest group-hover:text-cyan-950 transition">{t('dashboard.home.goals.simulatorTitle')}</span>
+          {/* Colonne Simulateur */}
+          <div className="space-y-2 rounded-2xl border border-cyan-200 bg-cyan-50/60 p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calculator size={14} className="text-cyan-600" />
+                <p className="text-[10px] font-black text-cyan-800 uppercase tracking-[0.2em]">{t('dashboard.home.goals.simulatorTitle')}</p>
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-cyan-800/80 leading-snug">
+                {t('dashboard.home.goals.simulatorHint', 'Cochez un GIG, saisissez appels et transactions : le gain potentiel s’affiche en bas. Les transactions ne peuvent pas dépasser les appels.')}
+              </p>
             </div>
-            <ChevronDown size={14} className={`text-cyan-200 transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
-          </button>
+            <button
+              type="button"
+              onClick={() => setShowCalculator((open) => !open)}
+              className="shrink-0 rounded-lg border border-cyan-200 bg-white p-1.5 text-cyan-700 hover:bg-cyan-100 transition"
+              aria-label={showCalculator ? 'Réduire' : 'Ouvrir'}
+            >
+              <ChevronDown size={14} className={`transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
           {showCalculator && (
-            <div className="rounded-2xl border border-cyan-200 bg-white p-4 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
+            <div className="rounded-2xl border border-cyan-200 bg-white p-3 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
               {gigsData.length === 0 ? (
                 <p className="text-[12px] font-bold text-slate-500">Aucun GIG disponible.</p>
               ) : gigsData.map((gig) => {
@@ -2182,7 +2208,7 @@ export function Dashboard({ profile }: DashboardProps) {
                       <>
                         <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-cyan-200 uppercase tracking-wider block">Appels</label>
+                            <label className="text-[9px] font-black text-cyan-700 uppercase tracking-wider block">Appels</label>
                   <input
                     type="number"
                               min={0}
@@ -2194,7 +2220,7 @@ export function Dashboard({ profile }: DashboardProps) {
                             <p className="text-[10px] font-bold text-cyan-700/80 text-center">× {fmtMoney(row.callRate)} €</p>
                 </div>
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-amber-200 uppercase tracking-wider block">Transactions</label>
+                            <label className="text-[9px] font-black text-amber-700 uppercase tracking-wider block">Transactions</label>
                   <input
                     type="number"
                               min={0}
@@ -2209,7 +2235,7 @@ export function Dashboard({ profile }: DashboardProps) {
                 </div>
                 </div>
                         {row.bonusAmount > 0 && (
-                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-600' : 'text-amber-200/80'}`}>
+                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-600' : 'text-amber-700/80'}`}>
                             {row.bonusIncluded
                               ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
                               : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
@@ -2231,6 +2257,8 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
           )}
+          </div>
+          </div>
 
           </div>
         )}
