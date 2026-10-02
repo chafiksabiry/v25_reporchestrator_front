@@ -7,17 +7,55 @@ export interface StatusBadge {
 export function callOutcomeBadge(outcome: string | null | undefined): StatusBadge | null {
   if (!outcome) return null;
   const map: Record<string, StatusBadge> = {
-    transaction: { label: 'Vente', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    appointment: { label: 'RDV', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-    callback_requested: { label: 'Rappel', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-    argued_interested: { label: 'Argumenté', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    refusal: { label: 'Refus', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-    not_interested: { label: 'Pas intéressé', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-    already_equipped: { label: 'Déjà équipé', tone: 'bg-blue-50 text-blue-700 border-blue-200' },
-    voicemail: { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' },
-    no_answer: { label: 'Non décroché', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    busy: { label: 'Occupé', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    wrong_number: { label: 'Faux numéro', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
+    // Twilio telephony → HARX ladder
+    voicemail: {
+      label: 'Appelé – Répondeur',
+      tone: 'bg-orange-50 text-orange-700 border-orange-200',
+      title: 'Twilio AMD / répondeur',
+    },
+    busy: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio Busy',
+    },
+    no_answer: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio No-Answer',
+    },
+    wrong_number: {
+      label: 'Appelé – Numéro non attribué',
+      tone: 'bg-rose-50 text-rose-700 border-rose-200',
+      title: 'Twilio Failed',
+    },
+    callback_requested: {
+      label: 'Appelé – Souhaite être rappelé',
+      tone: 'bg-amber-50 text-amber-700 border-amber-200',
+    },
+    appointment: {
+      label: 'Appelé – RDV pris pour rappel',
+      tone: 'bg-violet-50 text-violet-700 border-violet-200',
+    },
+    transaction: {
+      label: 'Appel argumenté – Transaction aboutie',
+      tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    argued_interested: {
+      label: 'Appel argumenté – RDV pris / délai de réflexion',
+      tone: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    },
+    refusal: {
+      label: 'Appel argumenté – Transaction déclinée',
+      tone: 'bg-rose-50 text-rose-700 border-rose-200',
+    },
+    not_interested: {
+      label: 'Appel argumenté – Transaction déclinée',
+      tone: 'bg-rose-50 text-rose-700 border-rose-200',
+    },
+    already_equipped: {
+      label: 'Appel argumenté – Transaction déclinée',
+      tone: 'bg-blue-50 text-blue-700 border-blue-200',
+    },
     fraud: { label: 'Fraude', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
     too_short: { label: 'Trop court', tone: 'bg-slate-50 text-slate-500 border-slate-200' },
     connected_no_sale: { label: 'Sans suite', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
@@ -100,7 +138,7 @@ function isMachineAnswer(call: CallLike): boolean {
   return answeredBy.startsWith('machine') || answeredBy === 'fax';
 }
 
-/** Twilio Call status. `completed` means audio was transferred: a person, an IVR, or a voicemail. */
+/** Twilio Call status → HARX ladder labels where applicable. */
 export function twilioCallStatusBadge(status?: string | null): StatusBadge {
   const key = String(status || '').toLowerCase();
   const table: Record<string, StatusBadge> = {
@@ -113,12 +151,36 @@ export function twilioCallStatusBadge(status?: string | null): StatusBadge {
       tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
       title: 'Connexion établie puis raccrochée. Une personne, un serveur vocal ou un répondeur.',
     },
-    busy: { label: 'Occupé', tone: 'bg-amber-50 text-amber-800 border-amber-200', title: 'Le numéro a répondu occupé.' },
-    'no-answer': { label: 'Pas de réponse', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Personne n’a décroché avant le délai.' },
-    noanswer: { label: 'Pas de réponse', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Personne n’a décroché avant le délai.' },
-    canceled: { label: 'Annulé', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Appel annulé avant décroché.' },
-    cancelled: { label: 'Annulé', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Appel annulé avant décroché.' },
-    failed: { label: 'Échec', tone: 'bg-rose-50 text-rose-700 border-rose-100', title: 'Le transporteur n’a pas pu connecter l’appel.' },
+    busy: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio Busy → Appelé – Injoignable',
+    },
+    'no-answer': {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio No-Answer → Appelé – Injoignable',
+    },
+    noanswer: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio No-Answer → Appelé – Injoignable',
+    },
+    canceled: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio Canceled → Appelé – Injoignable',
+    },
+    cancelled: {
+      label: 'Appelé – Injoignable',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Twilio Cancelled → Appelé – Injoignable',
+    },
+    failed: {
+      label: 'Appelé – Numéro non attribué',
+      tone: 'bg-rose-50 text-rose-700 border-rose-100',
+      title: 'Twilio Failed → Appelé – Numéro non attribué',
+    },
   };
   return table[key] || { label: status || '—', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
 }
@@ -183,6 +245,7 @@ export function historyDisposition(call: CallLike): string | null {
   }
   if (outcome === 'callback_requested') return 'called_callback';
   if (outcome === 'appointment') return 'called_rdv';
+  if (outcome === 'argued_interested') return 'argued_rdv';
   if (outcome === 'transaction') return 'argued_done';
   if (['refusal', 'not_interested', 'already_equipped'].includes(outcome)) return 'argued_declined';
   const stored = String(call.lead?.repDisposition || '').trim();
