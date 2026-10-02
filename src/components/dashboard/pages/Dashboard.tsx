@@ -1924,18 +1924,20 @@ export function Dashboard({ profile }: DashboardProps) {
                     </div>
               {goals.perGig.filter((gig) => gig.id === hoursGigId).map((gig) => (
                 <div key={gig.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {([
                     { label: 'Jour', row: gig.hours.daily },
                     { label: 'Semaine', row: gig.hours.weekly },
                     { label: 'Mois', row: gig.hours.monthly },
                   ] as const).map(({ label, row }) => (
-                    <div key={label} className="flex items-center justify-between gap-3">
+                    <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-2.5 py-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
                       <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-600' : 'text-slate-900'}`}>
                         {row.target > 0 ? `${row.current}h / ${row.target}h` : `${row.current}h · pas de minimum`}
                       </span>
                     </div>
                   ))}
+                  </div>
                   <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-600' : 'text-slate-500'}`}>
                     {gig.bonus.triggered
                       ? `Bonus déclenché · +${gig.bonus.bonusAmount.toFixed(2)} €`
@@ -1948,12 +1950,13 @@ export function Dashboard({ profile }: DashboardProps) {
                   </div>
           ) : (
           <>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {([
             { label: 'Quotidien', row: goals.hours.daily },
             { label: 'Semaine', row: goals.hours.weekly },
             { label: 'Mois', row: goals.hours.monthly },
           ] as const).map(({ label, row }) => (
-            <div key={label} className="space-y-1.5">
+            <div key={label} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <CalendarCheck size={13} className="text-violet-400 shrink-0" />
@@ -1973,8 +1976,9 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
           ))}
+          </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Flame size={13} className={goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-400'} />
@@ -2009,7 +2013,7 @@ export function Dashboard({ profile }: DashboardProps) {
             {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
           </p>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {([
             {
               kind: 'calls' as const,
@@ -2020,6 +2024,7 @@ export function Dashboard({ profile }: DashboardProps) {
               progress: callGoalProgress,
               barClass: 'bg-gradient-to-r from-cyan-400 to-sky-400',
               doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
+              unit: '',
             },
             {
               kind: 'transactions' as const,
@@ -2030,6 +2035,7 @@ export function Dashboard({ profile }: DashboardProps) {
               progress: txGoalProgress,
               barClass: 'bg-gradient-to-r from-amber-400 to-orange-400',
               doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
+              unit: '',
             },
           ]).map((item) => (
             <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -2088,71 +2094,57 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
           ))}
-          </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 shadow-sm">
+          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Trophy size={14} className="text-amber-500" />
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')} · {goalsPeriodLabels[goalsPeriod]}</span>
+                <Trophy size={13} className="text-amber-500" />
+                <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')}</span>
               </div>
-              {editingGoal === 'earnings' ? (
-                <button
-                  type="button"
-                  onClick={() => saveEarningsGoal(goalInput)}
-                  className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200 hover:bg-emerald-500/60 transition"
-                  aria-label="Enregistrer l'objectif de gains"
-                >
-                  <Check size={12} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
-                  className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition ring-1 ring-slate-200"
-                  aria-label="Modifier l'objectif de gains"
-                >
-                  <Pencil size={12} />
-                </button>
-              )}
-            </div>
-            {editingGoal === 'earnings' ? (
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  value={goalInput}
-                  onChange={(e) => setGoalInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                  className="flex-1 bg-white border border-slate-200 text-slate-900 rounded-xl px-3 py-2 text-sm font-black focus:outline-none focus:border-slate-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="Ex. 500"
-                  autoFocus
-                />
-                <span className="text-slate-600 text-sm font-bold">€</span>
+                {editingGoal === 'earnings' ? (
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      value={goalInput}
+                      onChange={(e) => setGoalInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
+                      className="w-20 bg-white border border-amber-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      autoFocus
+                    />
+                    <button type="button" onClick={() => saveEarningsGoal(goalInput)} className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200" aria-label="Enregistrer l'objectif de gains">
+                      <Check size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-slate-900 font-black tracking-tighter">
+                      {fmtMoney(goals.earned)}€
+                      <span className="text-slate-400 font-bold text-sm">{repEarningsGoal > 0 ? `/${fmtMoney(repEarningsGoal)}€` : ''}</span>
+                    </span>
+                    <span className={`text-[10px] font-black text-right ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'text-emerald-300' : 'text-amber-500'}`}>
+                      {repEarningsGoal > 0 ? `${earningsGoalProgress}%` : 'à définir'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
+                      className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition ring-1 ring-amber-200"
+                      aria-label="Modifier l'objectif de gains"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </>
+                )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-3xl font-black text-slate-800 tracking-tighter">{fmtMoney(goals.earned)} €</span>
-                  <span className="text-sm font-bold text-slate-500">
-                    {repEarningsGoal > 0 ? `/ ${fmtMoney(repEarningsGoal)} €` : 'Objectif à définir'}
-                  </span>
-                </div>
-                <div className="h-3 w-full bg-white rounded-full border border-slate-200 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-slate-500 to-slate-700'}`}
-                    style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
-                      />
-                    </div>
-                <p className="text-[11px] font-bold text-slate-500">
-                  {repEarningsGoal > 0
-                    ? (earningsGoalProgress >= 100
-                      ? 'Objectif atteint'
-                      : `${earningsGoalProgress}% · il reste ${fmtMoney(Math.max(0, repEarningsGoal - goals.earned))} €`)
-                    : 'Fixez votre gain cible pour le jour, la semaine ou le mois'}
-                </p>
-              </div>
-            )}
+            </div>
+            <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`}
+                style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
+              />
+            </div>
+          </div>
           </div>
 
           <div className="h-px bg-slate-200" />
