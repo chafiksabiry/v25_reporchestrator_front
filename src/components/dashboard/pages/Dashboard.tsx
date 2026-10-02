@@ -1556,6 +1556,149 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
+      {/* Réservations + Classement côte à côte sur grand écran */}
+      <div className="grid gap-1.5 xl:grid-cols-5">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-3">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
+        {/* Header */}
+        <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <CalendarCheck size={15} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h2>
+            </div>
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            {t('dashboard.home.reservations.count', {
+              count: reservationStats.total,
+              period: selectedPeriod === 'all'
+                ? t('dashboard.home.reservations.countPeriodAll')
+                : selectedPeriodLabel,
+            })}
+          </span>
+        </div>
+
+        {/* Métriques compactes */}
+        <div className="relative z-10 flex flex-wrap gap-1.5">
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
+            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
+          </div>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
+            <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
+          </div>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
+            <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
+          </div>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
+            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow + reservationStats.cancelled}</span>
+          </div>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
+            <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
+          </div>
+          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
+            <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
+          </div>
+          <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <Ban size={11} className="text-slate-500" />
+              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+              <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
+                {cancelRate == null ? '—' : `${cancelRate}%`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-0.5">
+              {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCancelStatsPeriod(key)}
+                  className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
+                    cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* CTA réservation */}
+        <div className="relative z-10 mt-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+              navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+          >
+            <CalendarCheck size={12} />
+            {t('dashboard.home.reservations.book')}
+            <ChevronRight size={12} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5 xl:col-span-2">
+          <button
+            type="button"
+        onClick={() => navigate('/calls')}
+        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50"
+      >
+        <span className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <Phone size={14} />
+          </span>
+          <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
+        </span>
+        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600" />
+          </button>
+
+      {/* Classement des gains du GIG */}
+      <div className="relative flex-1 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
+        <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <Medal size={15} />
+              </div>
+              <div>
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h2>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
+              </p>
+              </div>
+            </div>
+            </div>
+        {selectedGigId === 'all' ? (
+          <div className="relative z-10 flex items-center justify-center gap-2 py-2 text-center">
+            <Medal size={16} className="text-amber-300" />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choisissez un GIG</p>
+            </div>
+        ) : (
+          <div className="relative z-10 flex items-baseline justify-between gap-2 py-1">
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">Vos gains · période</p>
+              <p className="text-xl font-black tracking-tight text-slate-900 leading-none">
+                {fmtMoney(earningsPipeline.earnedInPeriod)} €
+              </p>
+            </div>
+            <p className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">{displayName}</p>
+        </div>
+        )}
+      </div>
+      </div>
+      </div>
+
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
       <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
@@ -1975,149 +2118,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
           </div>
         )}
-      </div>
-
-      {/* Réservations + Classement côte à côte sur grand écran */}
-      <div className="grid gap-1.5 xl:grid-cols-5">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-3">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
-        {/* Header */}
-        <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-              <CalendarCheck size={15} />
-            </div>
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h2>
-            </div>
-          </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-            {t('dashboard.home.reservations.count', {
-              count: reservationStats.total,
-              period: selectedPeriod === 'all'
-                ? t('dashboard.home.reservations.countPeriodAll')
-                : selectedPeriodLabel,
-            })}
-          </span>
-        </div>
-
-        {/* Métriques compactes */}
-        <div className="relative z-10 flex flex-wrap gap-1.5">
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
-            <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
-            <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
-            <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
-            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow + reservationStats.cancelled}</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
-            <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
-          </div>
-          <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
-            <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
-          </div>
-          <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <Ban size={11} className="text-slate-500" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-              <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
-                {cancelRate == null ? '—' : `${cancelRate}%`}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-0.5">
-              {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setCancelStatsPeriod(key)}
-                  className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                    cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
-                  }`}
-                >
-                  {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* CTA réservation */}
-        <div className="relative z-10 mt-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              const gigId = selectedGigId !== 'all' ? selectedGigId : '';
-              navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
-            }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
-          >
-            <CalendarCheck size={12} />
-            {t('dashboard.home.reservations.book')}
-            <ChevronRight size={12} />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5 xl:col-span-2">
-          <button
-            type="button"
-        onClick={() => navigate('/calls')}
-        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50"
-      >
-        <span className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-            <Phone size={14} />
-          </span>
-          <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
-        </span>
-        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600" />
-          </button>
-
-      {/* Classement des gains du GIG */}
-      <div className="relative flex-1 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
-        <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
-        <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-              <Medal size={15} />
-              </div>
-              <div>
-              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h2>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
-              </p>
-              </div>
-            </div>
-            </div>
-        {selectedGigId === 'all' ? (
-          <div className="relative z-10 flex items-center justify-center gap-2 py-2 text-center">
-            <Medal size={16} className="text-amber-300" />
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choisissez un GIG</p>
-            </div>
-        ) : (
-          <div className="relative z-10 flex items-baseline justify-between gap-2 py-1">
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">Vos gains · période</p>
-              <p className="text-xl font-black tracking-tight text-slate-900 leading-none">
-                {fmtMoney(earningsPipeline.earnedInPeriod)} €
-              </p>
-            </div>
-            <p className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">{displayName}</p>
-        </div>
-        )}
-      </div>
-      </div>
       </div>
 
     </div>
