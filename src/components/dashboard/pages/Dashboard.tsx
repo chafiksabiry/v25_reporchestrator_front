@@ -16,6 +16,12 @@ import { getGigsApiBase } from '../../../utils/gigsApiBase';
 import { isCallCenterStaff } from '../../../utils/callCenterStaff';
 import { CallCenterAgentHome } from './CallCenterAgentHome';
 import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
+import {
+  isDateInPeriod,
+  resolveIanaZone,
+  zonedWallTimeToUtc,
+  type StatsPeriod,
+} from '../../../utils/planningMetrics';
 
 interface DashboardProps {
   profile?: any;
@@ -258,6 +264,52 @@ const getPeriodStart = (period: PeriodKey): number => {
       return 0;
   }
 };
+
+/** Local calendar day yyyy-MM-dd for a reservation. */
+function reservationYmd(r: { reservationDate?: string; date?: string }): string {
+  return String(r.reservationDate || r.date || '').slice(0, 10);
+}
+
+/** Duration in hours from API, else derived from start/end, else 1h. */
+function reservationDurationHours(r: {
+  duration?: number;
+  startTime?: string;
+  endTime?: string;
+}): number {
+  const dur = Number(r.duration);
+  if (Number.isFinite(dur) && dur > 0) return dur;
+  const start = String(r.startTime || '').slice(0, 5);
+  const end = String(r.endTime || '').slice(0, 5);
+  if (/^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const hours = (eh * 60 + em - (sh * 60 + sm)) / 60;
+    if (Number.isFinite(hours) && hours > 0) return hours;
+  }
+  return 1;
+}
+
+/** End of slot as local ms (for upcoming vs past). */
+function reservationEndMs(r: {
+  reservationDate?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+}): number {
+  const ymd = reservationYmd(r);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return 0;
+  const end = String(r.endTime || r.startTime || '23:59').slice(0, 5);
+  const d = new Date(`${ymd}T${end}:00`);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function toLocalYmd(ts: number): string {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export function Dashboard({ profile }: DashboardProps) {
   const { t, i18n } = useTranslation();
@@ -525,18 +577,17 @@ export function Dashboard({ profile }: DashboardProps) {
     });
   }, [callsData, selectedGigId, periodStartTs]);
 
-  // Reservations filtered by gig + period (period applies to reservation date)
+  // Reservations filtered by gig + period (period applies to reservation calendar day)
   const filteredReservations = useMemo(() => {
+    const periodYmd = periodStartTs > 0 ? toLocalYmd(periodStartTs) : '';
     return reservationsData.filter((r: any) => {
       if (selectedGigId !== 'all') {
         const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-        if (rGigId !== selectedGigId) return false;
+        if (String(rGigId || '') !== String(selectedGigId)) return false;
       }
-      if (periodStartTs > 0) {
-        const dateStr = r.reservationDate || r.date;
-        if (!dateStr) return false;
-        const ts = new Date(dateStr).getTime();
-        if (!ts || ts < periodStartTs) return false;
+      if (periodYmd) {
+        const ymd = reservationYmd(r);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || ymd < periodYmd) return false;
       }
       return true;
     });
@@ -670,7 +721,7 @@ export function Dashboard({ profile }: DashboardProps) {
     dateLocale,
   ]);
 
-  // Reservation statistics (work the rep has booked)
+  // Reservation statistics from real matching API rows (filtered by gig + dashboard period)
   const reservationStats = useMemo(() => {
     const nowTs = Date.now();
     let total = 0;
@@ -683,32 +734,32 @@ export function Dashboard({ profile }: DashboardProps) {
 
     filteredReservations.forEach((r: any) => {
       total += 1;
-      const dateStr = r.reservationDate || r.date;
-      const ts = dateStr ? new Date(dateStr).getTime() : 0;
-      const duration = Number(r.duration || 0);
+      const duration = reservationDurationHours(r);
       scheduledHours += duration;
 
-      if (r.status === 'cancelled') {
+      const status = String(r.status || '').toLowerCase();
+      if (status === 'cancelled') {
         cancelled += 1;
         return;
       }
 
-      if (ts && ts > nowTs) {
+      const endTs = reservationEndMs(r);
+      const isFuture = endTs > 0 ? endTs > nowTs : false;
+
+      if (isFuture) {
         upcoming += 1;
         return;
       }
 
-      // Past reservation
-      if (r.attended === true) {
-        completed += 1;
-        workedHours += duration;
-      } else if (r.attended === false) {
+      // Past reserved slot
+      if (r.attended === false) {
         noShow += 1;
-      } else {
-        // No explicit attendance flag — assume completed
-        completed += 1;
-        workedHours += duration;
+        return;
       }
+
+      // attended === true OR attendance not tracked yet → counted as effectuée
+      completed += 1;
+      workedHours += duration;
     });
 
     const pastCount = completed + noShow;
@@ -978,10 +1029,45 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [filteredCalls]);
 
+  // Last-minute cancel rate for Sem./Mois/Trim./Année chips (≤ 2h before slot start)
   const cancelRate = useMemo(() => {
-    if (reservationStats.total === 0) return null;
-    return Math.round((reservationStats.cancelled / reservationStats.total) * 100);
-  }, [reservationStats]);
+    const period = cancelStatsPeriod as StatsPeriod;
+    const gigTz =
+      selectedGigId !== 'all'
+        ? resolveIanaZone(gigsData.find((g) => g._id === selectedGigId)?.availability?.time_zone)
+        : null;
+
+    const relevant = reservationsData.filter((r: any) => {
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
+        if (String(rGigId || '') !== String(selectedGigId)) return false;
+      }
+      const ymd = reservationYmd(r);
+      return isDateInPeriod(ymd, period);
+    });
+
+    if (relevant.length === 0) return null;
+
+    const lastMinute = relevant.filter((r: any) => {
+      if (String(r.status || '').toLowerCase() !== 'cancelled') return false;
+      const ymd = reservationYmd(r);
+      const start = String(r.startTime || '00:00').slice(0, 5);
+      const cancelledRaw = r.cancelledAt || r.canceledAt || r.updatedAt;
+      if (!cancelledRaw) return false;
+      const cancelledAt = new Date(cancelledRaw);
+      if (Number.isNaN(cancelledAt.getTime())) return false;
+
+      let slotStart: Date | null = null;
+      if (gigTz) slotStart = zonedWallTimeToUtc(ymd, start, gigTz);
+      if (!slotStart) slotStart = new Date(`${ymd}T${start}:00`);
+      if (!slotStart || Number.isNaN(slotStart.getTime())) return false;
+
+      const diffMs = slotStart.getTime() - cancelledAt.getTime();
+      return diffMs >= 0 && diffMs <= 2 * 60 * 60 * 1000;
+    }).length;
+
+    return Math.round((lastMinute / relevant.length) * 100);
+  }, [reservationsData, selectedGigId, gigsData, cancelStatsPeriod]);
 
   const goalsPeriodLabels: Record<GoalsPeriod, string> = {
     today: t('dashboard.home.goals.periodDay'),
@@ -1596,7 +1682,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
           <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
             <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
-            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow + reservationStats.cancelled}</span>
+            <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
           </div>
           <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
             <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
