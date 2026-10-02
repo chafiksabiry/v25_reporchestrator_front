@@ -66,7 +66,7 @@ type NotificationsContextValue = {
   loading: boolean;
   refreshNotifications: () => Promise<void>;
   upsertNotification: (input: UpsertNotificationInput) => void;
-  addEnrollmentNotification: (status: string, gigId?: string) => void;
+  addEnrollmentNotification: (status: string, gigId?: string, gigTitle?: string) => void;
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
   markAllRead: () => void;
@@ -134,12 +134,28 @@ function mapApiRow(row: ApiNotification): RepNotification {
   };
 }
 
-function buildEnrollmentMessage(status: string): { title: string; message: string } {
+function buildEnrollmentMessage(status: string, gigTitle?: string): { title: string; message: string } {
   const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+  const suffix = gigTitle ? ` (${gigTitle})` : '';
+  if (status === 'invited') {
+    return isFr
+      ? {
+          title: 'Nouvelle invitation',
+          message: gigTitle
+            ? `Une entreprise vous invite sur « ${gigTitle} ».`
+            : 'Une entreprise vous invite à rejoindre un gig.',
+        }
+      : {
+          title: 'New invitation',
+          message: gigTitle
+            ? `A company invited you to “${gigTitle}”.`
+            : 'A company invited you to join a gig.',
+        };
+  }
   if (status === 'enrolled') {
     return isFr
-      ? { title: 'Candidature approuvée', message: 'Votre candidature a été approuvée — vous êtes inscrit !' }
-      : { title: 'Application approved', message: 'Your application was approved — you are enrolled!' };
+      ? { title: 'Candidature approuvée', message: `Votre candidature a été approuvée — vous êtes inscrit !${suffix}` }
+      : { title: 'Application approved', message: `Your application was approved — you are enrolled!${suffix}` };
   }
   if (status === 'rejected') {
     return isFr
@@ -216,8 +232,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [refreshNotifications]);
 
   const addEnrollmentNotification = useCallback(
-    (status: string, gigId?: string) => {
-      const { title, message } = buildEnrollmentMessage(status);
+    (status: string, gigId?: string, gigTitle?: string) => {
+      const { title, message } = buildEnrollmentMessage(status, gigTitle);
       const key = `enrollment-${gigId || 'general'}-${status}`;
       upsertNotification({
         id: key,
@@ -226,7 +242,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         title,
         message,
         gigId,
-        actionPath: gigId ? `/gig/${gigId}` : '/marketplace',
+        actionPath:
+          status === 'invited'
+            ? '/marketplace?tab=invited'
+            : gigId
+              ? `/gig/${gigId}`
+              : '/marketplace',
         playSound: true,
       });
     },
@@ -323,8 +344,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const dispose = connectRepEnrollmentSocket(
       (data) => {
         const status = String(data?.status || '');
-        if (status === 'enrolled' || status === 'rejected') {
-          addEnrollmentNotification(status, data?.gigId ? String(data.gigId) : undefined);
+        if (status === 'enrolled' || status === 'rejected' || status === 'invited') {
+          addEnrollmentNotification(
+            status,
+            data?.gigId ? String(data.gigId) : undefined,
+            data?.gigTitle ? String(data.gigTitle) : undefined
+          );
         }
         // Always refresh from DB after WS events (server may have persisted already)
         void refreshNotifications();
