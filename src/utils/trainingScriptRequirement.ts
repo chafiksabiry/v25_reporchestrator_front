@@ -340,6 +340,9 @@ export async function fetchInvitedGigsForAgent(
       status?: string;
       invitationDate?: string;
       updatedAt?: string;
+      gigAgentId?: unknown;
+      id?: unknown;
+      _id?: unknown;
     };
     const status = String(g.status || 'invited').toLowerCase();
     if (status && status !== 'invited') continue;
@@ -353,7 +356,11 @@ export async function fetchInvitedGigsForAgent(
         })
       : null;
     const enrollmentId = normalizeMongoId(
-      agentRow?.gigAgentId?.$oid || agentRow?.gigAgentId || (item as any)?._id || (item as any)?.id
+      g.gigAgentId ||
+        g.id ||
+        g._id ||
+        agentRow?.gigAgentId?.$oid ||
+        agentRow?.gigAgentId
     );
     const invitationSentAt = String(
       g.invitationDate || g.updatedAt || agentRow?.invitationDate || ''
