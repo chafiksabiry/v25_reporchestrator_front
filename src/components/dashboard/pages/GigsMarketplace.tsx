@@ -558,12 +558,34 @@ export function GigsMarketplace() {
       setActiveTab('requested');
     } else if (tab === 'favorite' || tab === 'favoris') {
       setActiveTab('favorite');
+    } else if (tab === 'available' || tab === 'disponibles') {
+      setActiveTab('available');
     } else {
       const hasEnrolled = enrolledGigIds.length > 0 || enrolledGigs.length > 0;
       setActiveTab(hasEnrolled ? 'enrolled' : 'available');
     }
     setInitialTabResolved(true);
   }, [loading, enrolledGigIds, enrolledGigs, initialTabResolved, searchParams]);
+
+  // Keep tab in sync when clicking a notification deep-link (?tab=invited) while already on marketplace.
+  useEffect(() => {
+    const tab = (searchParams.get('tab') || '').toLowerCase();
+    if (!tab) return;
+    if (tab === 'invited' || tab === 'invitations') setActiveTab('invited');
+    else if (tab === 'enrolled' || tab === 'inscrites') setActiveTab('enrolled');
+    else if (tab === 'requested' || tab === 'pending' || tab === 'attente') setActiveTab('requested');
+    else if (tab === 'favorite' || tab === 'favoris') setActiveTab('favorite');
+    else if (tab === 'available' || tab === 'disponibles') setActiveTab('available');
+  }, [searchParams]);
+
+  useEffect(() => {
+    const onTab = (e: Event) => {
+      const tab = String((e as CustomEvent<{ tab?: string }>).detail?.tab || '').toLowerCase();
+      if (tab === 'invited') setActiveTab('invited');
+    };
+    window.addEventListener('harx:marketplace-tab', onTab);
+    return () => window.removeEventListener('harx:marketplace-tab', onTab);
+  }, []);
 
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
@@ -1983,7 +2005,10 @@ export function GigsMarketplace() {
           {activeTab === 'favorite' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
-          onClick={() => setActiveTab('invited')}
+          onClick={() => {
+            setActiveTab('invited');
+            navigate('/marketplace?tab=invited', { replace: true });
+          }}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'invited'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
