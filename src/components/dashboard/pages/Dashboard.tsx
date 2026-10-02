@@ -1316,20 +1316,20 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-4 xl:pb-5 2xl:gap-5 2xl:pb-6">
+    <div className="dashboard-density flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-3 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-5 2xl:gap-5 2xl:pb-6 3xl:gap-6 3xl:pb-8 4xl:gap-8">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-4 xl:gap-3 xl:px-5 xl:py-3.5 2xl:px-6 2xl:py-4">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:gap-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 xl:gap-x-4">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:gap-x-4">
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-black uppercase tracking-tight text-slate-800 sm:text-xl xl:text-2xl 2xl:text-3xl">
+            <h1 className="break-words text-base font-black uppercase tracking-tight text-slate-800 sm:truncate sm:text-xl lg:text-2xl xl:text-2xl 2xl:text-3xl 3xl:text-4xl">
               {t('dashboard.home.greeting', { name: displayName })}
             </h1>
           </div>
           <button
             type="button"
             onClick={goToProduction}
-            className="harx-go-live group inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
+            className="harx-go-live group inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 sm:w-auto sm:self-start xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
           >
             <Rocket size={13} className="transition-transform group-hover:rotate-12 xl:h-4 xl:w-4 2xl:h-[18px] 2xl:w-[18px]" />
             {t('dashboard.home.goLive.title')}
@@ -1337,8 +1337,8 @@ export function Dashboard({ profile }: DashboardProps) {
           </button>
         </div>
 
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1 sm:justify-end xl:gap-x-3">
-            <div className="relative flex min-w-0 flex-1 items-center gap-1.5 sm:flex-initial sm:max-w-[260px] xl:max-w-[300px] 2xl:max-w-[340px]">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:ml-auto sm:w-auto sm:min-w-[280px] sm:max-w-[420px] sm:grid-cols-2 sm:gap-x-2 xl:max-w-[560px]">
+            <div className="relative flex min-w-0 items-center gap-1.5 sm:max-w-none xl:max-w-[300px] 2xl:max-w-[340px]">
               <Briefcase size={14} className="shrink-0 text-slate-500 xl:h-4 xl:w-4" />
               <div className="relative w-full min-w-0">
                 <button
@@ -1428,7 +1428,7 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
 
-            <div className="relative flex min-w-0 flex-1 items-center gap-1.5 sm:flex-initial sm:max-w-[200px] xl:max-w-[240px] 2xl:max-w-[280px]">
+            <div className="relative flex min-w-0 items-center gap-1.5 sm:max-w-none xl:max-w-[240px] 2xl:max-w-[280px]">
               <CalendarDays size={14} className="shrink-0 text-blue-600 xl:h-4 xl:w-4" />
               <div className="relative w-full min-w-0">
                 <button
@@ -1497,185 +1497,186 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* 1 · À faire aujourd'hui — pleine largeur */}
-      <div className="flex w-full flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:px-4 lg:flex-row lg:flex-wrap lg:items-center xl:gap-3 xl:px-5 xl:py-3.5 2xl:gap-4 2xl:px-6 2xl:py-4">
-        <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:w-auto xl:gap-2.5">
+      <div className="flex w-full min-w-0 flex-col gap-2.5 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:px-4 xl:flex-row xl:flex-wrap xl:items-center xl:gap-3 xl:px-5 xl:py-3.5 2xl:gap-4 2xl:px-6 2xl:py-4">
+        <div className="flex min-w-0 w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:flex-1 xl:gap-2.5">
           <div className="flex shrink-0 items-center gap-1.5 xl:gap-2">
             <ListChecks size={14} className="text-violet-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
-            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap xl:text-xs 2xl:text-sm">À faire aujourd'hui</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">À faire aujourd'hui</h3>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
-            <GraduationCap size={11} className="shrink-0 text-violet-600 xl:h-3.5 xl:w-3.5" />
-            Formations
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
-            <BookOpen size={11} className="shrink-0 text-blue-600 xl:h-3.5 xl:w-3.5" />
-            Scripts
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
-            <FileText size={11} className="shrink-0 text-emerald-600 xl:h-3.5 xl:w-3.5" />
-            KB
-          </span>
-          <button
-            type="button"
-            onClick={() => navigate('/academy')}
-            className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
-          >
-            <GraduationCap size={11} className="xl:h-3.5 xl:w-3.5" />
-            Academy
-            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
-          </button>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <GraduationCap size={11} className="shrink-0 text-violet-600 xl:h-3.5 xl:w-3.5" />
+              Formations
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <BookOpen size={11} className="shrink-0 text-blue-600 xl:h-3.5 xl:w-3.5" />
+              Scripts
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <FileText size={11} className="shrink-0 text-emerald-600 xl:h-3.5 xl:w-3.5" />
+              KB
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/academy')}
+              className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <GraduationCap size={11} className="xl:h-3.5 xl:w-3.5" />
+              Academy
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+          </div>
         </div>
 
-        <div className="hidden h-6 w-px shrink-0 bg-slate-200 lg:block xl:h-8" />
-        <div className="h-px w-full bg-slate-100 lg:hidden" />
+        <div className="hidden h-6 w-px shrink-0 bg-slate-200 xl:block xl:h-8" />
+        <div className="h-px w-full bg-slate-100 xl:hidden" />
 
-        <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:w-auto xl:gap-2.5">
-          <div className="flex shrink-0 items-center gap-1.5 xl:gap-2">
-            <PhoneCall size={14} className="text-amber-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
-            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap xl:text-xs 2xl:text-sm">Rappels</h3>
+        <div className="flex min-w-0 w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:flex-1 xl:gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
+            <PhoneCall size={14} className="shrink-0 text-amber-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
+            <h3 className="shrink-0 text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">Rappels</h3>
+            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">Aucun rappel pour le moment</p>
           </div>
-          <p className="min-w-0 flex-1 basis-full truncate text-[11px] font-semibold text-slate-500 sm:basis-auto xl:text-sm 2xl:text-base">Aucun rappel pour le moment</p>
-          <button
-            type="button"
-            onClick={() => navigate('/workspace')}
-            className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
-          >
-            <PhoneCall size={11} className="xl:h-3.5 xl:w-3.5" />
-            Prospects
-            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/workspace?tab=calls')}
-            className="harx-flash harx-flash--slate group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
-          >
-            <History size={11} className="xl:h-3.5 xl:w-3.5" />
-            {t('dashboard.home.sections.callHistory', 'Historique')}
-            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
-          </button>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <button
+              type="button"
+              onClick={() => navigate('/workspace')}
+              className="harx-flash harx-flash--amber group inline-flex w-full items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 sm:w-auto xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <PhoneCall size={11} className="xl:h-3.5 xl:w-3.5" />
+              Prospects
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/workspace?tab=calls')}
+              className="harx-flash harx-flash--slate group inline-flex w-full items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <History size={11} className="xl:h-3.5 xl:w-3.5" />
+              {t('dashboard.home.sections.callHistory', 'Historique')}
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 2 · Finance — grille responsive */}
+      {/* 2 · Finance — grille responsive (titres toujours lisibles) */}
       <section className="w-full min-w-0" aria-label={t('dashboard.home.sections.finance', 'Finance')}>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8 xl:gap-2.5 2xl:gap-3">
-          <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[11px] 2xl:text-xs">
-                {earningsPipeline.periodStartTitle}
-              </p>
-              <CalendarDays size={12} className="shrink-0 text-slate-400 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 truncate text-base font-black tracking-tight text-slate-800 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              {fmtMoney(earningsPipeline.periodStartBalance)} €
-            </p>
-            {earningsPipeline.periodStartDateLabel && (
-              <p className="mt-0.5 truncate text-[9px] text-slate-400 xl:mt-1 xl:text-[11px]">{earningsPipeline.periodStartDateLabel}</p>
-            )}
-          </div>
-
-          <div className="flex min-w-0 flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[11px] 2xl:text-xs">
-                {t('dashboard.home.pipeline.availableBalance')}
-              </p>
-              <WalletIcon size={12} className="shrink-0 text-emerald-500 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 truncate text-base font-black tracking-tight text-slate-800 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              {fmtMoney(earningsPipeline.availableBalance)} €
-            </p>
-            <p className="mt-0.5 truncate text-[9px] font-semibold text-emerald-600 xl:mt-1 xl:text-[11px]">
-              {t('dashboard.home.pipeline.readyToWithdraw')}
-            </p>
-          </div>
-
-          <div className="flex min-w-0 flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight xl:text-[11px] 2xl:text-xs">
-                {t('dashboard.home.pipeline.validatedEarnings')}
-              </p>
-              <ShieldCheck size={12} className="shrink-0 text-emerald-500 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 truncate text-base font-black tracking-tight text-emerald-700 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              +{fmtMoney(earningsPipeline.validatedInPeriod)} €
-            </p>
-            <p className="mt-0.5 truncate text-[9px] text-emerald-600/80 xl:mt-1 xl:text-[11px]">
-              {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })}
-              {' · '}
-              {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}
-            </p>
-          </div>
-
-          <div className="flex min-w-0 flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight xl:text-[11px] 2xl:text-xs">
-                {t('dashboard.home.pipeline.retraction')}
-              </p>
-              <RotateCcw size={12} className="shrink-0 text-orange-500 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 truncate text-base font-black tracking-tight text-orange-700 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
-            </p>
-            <p className="mt-0.5 truncate text-[9px] text-orange-600/80 xl:mt-1 xl:text-[11px]">
-              {earningsPipeline.retractionCount > 0
+        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-4 2xl:grid-cols-8 2xl:gap-3 3xl:gap-4">
+          {([
+            {
+              key: 'periodStart',
+              title: earningsPipeline.periodStartTitle,
+              icon: <CalendarDays size={14} className="text-slate-400" />,
+              value: `${fmtMoney(earningsPipeline.periodStartBalance)} €`,
+              valueClass: 'text-slate-800',
+              hint: earningsPipeline.periodStartDateLabel || '',
+              hintClass: 'text-slate-400',
+              cardClass: 'border-slate-200 bg-white',
+            },
+            {
+              key: 'available',
+              title: t('dashboard.home.pipeline.availableBalance'),
+              icon: <WalletIcon size={14} className="text-emerald-500" />,
+              value: `${fmtMoney(earningsPipeline.availableBalance)} €`,
+              valueClass: 'text-slate-800',
+              hint: t('dashboard.home.pipeline.readyToWithdraw'),
+              hintClass: 'font-semibold text-emerald-600',
+              cardClass: 'border-emerald-100 bg-white',
+            },
+            {
+              key: 'validated',
+              title: t('dashboard.home.pipeline.validatedEarnings'),
+              icon: <ShieldCheck size={14} className="text-emerald-500" />,
+              value: `+${fmtMoney(earningsPipeline.validatedInPeriod)} €`,
+              valueClass: 'text-emerald-700',
+              hint: `${t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })} · ${t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}`,
+              hintClass: 'text-emerald-600/80',
+              cardClass: 'border-emerald-100 bg-white',
+            },
+            {
+              key: 'retraction',
+              title: t('dashboard.home.pipeline.retraction'),
+              icon: <RotateCcw size={14} className="text-orange-500" />,
+              value: `${earningsPipeline.retractionAmount > 0 ? '+' : ''}${fmtMoney(earningsPipeline.retractionAmount)} €`,
+              valueClass: 'text-orange-700',
+              hint: earningsPipeline.retractionCount > 0
                 ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
-                : t('dashboard.home.pipeline.noSales')}
-            </p>
-          </div>
-
-          <div className="flex min-w-0 flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight xl:text-[11px] 2xl:text-xs">
-                {t('dashboard.home.pipeline.clientValidation')}
-              </p>
-              <Building2 size={12} className="shrink-0 text-amber-500 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 truncate text-base font-black tracking-tight text-amber-700 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              +{fmtMoney(earningsPipeline.clientValidationAmount)} €
-            </p>
-            <p className="mt-0.5 truncate text-[9px] text-amber-600/80 xl:mt-1 xl:text-[11px]">
-              {earningsPipeline.clientValidationCount > 0
+                : t('dashboard.home.pipeline.noSales'),
+              hintClass: 'text-orange-600/80',
+              cardClass: 'border-orange-100 bg-white',
+            },
+            {
+              key: 'clientValidation',
+              title: t('dashboard.home.pipeline.clientValidation'),
+              icon: <Building2 size={14} className="text-amber-500" />,
+              value: `+${fmtMoney(earningsPipeline.clientValidationAmount)} €`,
+              valueClass: 'text-amber-700',
+              hint: earningsPipeline.clientValidationCount > 0
                 ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
-                : t('dashboard.home.pipeline.nothingPending')}
-            </p>
-          </div>
-
-          <div className={`flex min-w-0 flex-col rounded-xl border px-2.5 py-2 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5 ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
-            <div className="flex items-center justify-between gap-1">
-              <p className={`truncate text-[9px] font-bold uppercase tracking-wider leading-tight xl:text-[11px] 2xl:text-xs ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
-              <ShieldAlert size={12} className={`shrink-0 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
-            </div>
-            <p className={`mt-0.5 text-base font-black tracking-tight leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
-              {qualityAlerts.fraud}
-            </p>
-          </div>
-          <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[11px] 2xl:text-xs">Score qualité</p>
-              <Award size={12} className="shrink-0 text-indigo-500 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
-            </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
-            </p>
-          </div>
-
-          <div className="relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm xl:rounded-2xl xl:px-3.5 xl:py-3 2xl:px-4 2xl:py-3.5">
-            <div className="relative z-10 flex items-center justify-between gap-1">
-              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight xl:text-[11px] 2xl:text-xs">
-                {t('dashboard.home.pipeline.periodTotal')}
+                : t('dashboard.home.pipeline.nothingPending'),
+              hintClass: 'text-amber-600/80',
+              cardClass: 'border-amber-100 bg-white',
+            },
+            {
+              key: 'fraud',
+              title: 'Fraude',
+              icon: <ShieldAlert size={14} className={qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'} />,
+              value: String(qualityAlerts.fraud),
+              valueClass: qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600',
+              hint: '',
+              hintClass: '',
+              cardClass: qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white',
+            },
+            {
+              key: 'quality',
+              title: 'Score qualité',
+              icon: <Award size={14} className="text-indigo-500" />,
+              value: qualityAlerts.quality == null ? '—' : String(qualityAlerts.quality),
+              valueClass: 'text-indigo-600',
+              hint: '',
+              hintClass: '',
+              cardClass: 'border-slate-200 bg-white',
+            },
+            {
+              key: 'periodTotal',
+              title: t('dashboard.home.pipeline.periodTotal'),
+              icon: <Trophy size={14} className="text-amber-300" />,
+              value: `${fmtMoney(earningsPipeline.totalGains)} €`,
+              valueClass: 'text-white',
+              hint: '',
+              hintClass: '',
+              cardClass: 'border-slate-700 bg-slate-800',
+            },
+          ] as const).map((card) => (
+            <div
+              key={card.key}
+              className={`relative flex min-w-0 flex-col rounded-xl border p-2.5 shadow-sm sm:p-3 xl:rounded-2xl xl:p-3.5 2xl:p-4 ${card.cardClass}`}
+            >
+              <div className="mb-1.5 flex items-start gap-2 pr-1">
+                <p className={`min-w-0 flex-1 whitespace-normal break-words text-[10px] font-bold uppercase leading-tight tracking-wide sm:text-[11px] xl:text-xs 2xl:text-sm ${
+                  card.key === 'periodTotal' ? 'text-slate-300' : card.key === 'validated' ? 'text-emerald-700' : card.key === 'retraction' ? 'text-orange-700' : card.key === 'clientValidation' ? 'text-amber-700' : card.key === 'fraud' && qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'
+                }`}>
+                  {card.title}
+                </p>
+                <span className="mt-0.5 shrink-0 opacity-90">{card.icon}</span>
+              </div>
+              <p className={`whitespace-normal break-words text-base font-black tracking-tight leading-none sm:text-lg xl:text-xl 2xl:text-2xl 3xl:text-3xl ${card.valueClass}`}>
+                {card.value}
               </p>
-              <Trophy size={12} className="shrink-0 text-amber-300 xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
+              {card.hint ? (
+                <p className={`mt-1 whitespace-normal break-words text-[9px] leading-snug sm:text-[10px] xl:text-[11px] ${card.hintClass}`}>
+                  {card.hint}
+                </p>
+              ) : null}
             </div>
-            <p className="relative z-10 mt-0.5 truncate text-base font-black tracking-tight text-white leading-none xl:mt-1.5 xl:text-xl 2xl:text-2xl">
-              {fmtMoney(earningsPipeline.totalGains)} €
-            </p>
-          </div>
+          ))}
         </div>
       </section>
 
       {/* 3 · Réservations 2/3 + Classement 1/3 */}
-      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-2 xl:grid-cols-3 xl:gap-4 2xl:gap-5">
-        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-2 xl:p-4 2xl:p-5">
+      <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-2 xl:grid-cols-3 xl:gap-4 2xl:gap-5 3xl:gap-6 xl:min-h-[min(36vh,420px)] 2xl:min-h-[min(40vh,500px)] 3xl:min-h-[min(44vh,580px)]">
+        <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-2 xl:p-4 2xl:p-5 3xl:p-6">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
           <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2 xl:mb-3">
             <div className="flex min-w-0 items-center gap-2 xl:gap-3">
@@ -1696,7 +1697,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </span>
           </div>
 
-          <div className="relative z-10 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:gap-2.5 2xl:gap-3">
+          <div className="relative z-10 mt-auto grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:gap-2.5 2xl:gap-3 3xl:gap-4">
             <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
               <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.total')}</span>
               <span className="text-lg font-black tracking-tighter text-slate-900 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.total}</span>
@@ -1762,28 +1763,28 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-1 xl:p-4 2xl:p-5">
+        <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-1 xl:p-4 2xl:p-5 3xl:p-6">
           <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
           <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2 xl:mb-3">
             <div className="flex items-center gap-2 xl:gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 xl:h-10 xl:w-10 2xl:h-11 2xl:w-11">
-                <Medal size={15} className="xl:h-[18px] xl:w-[18px] 2xl:h-5 2xl:w-5" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 xl:h-10 xl:w-10 2xl:h-11 2xl:w-11 3xl:h-12 3xl:w-12">
+                <Medal size={15} className="xl:h-[18px] xl:w-[18px] 2xl:h-5 2xl:w-5 3xl:h-6 3xl:w-6" />
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800 xl:text-base 2xl:text-lg">Classement des gains</h3>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 xl:text-[11px] 2xl:text-xs">
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800 xl:text-base 2xl:text-lg 3xl:text-xl">Classement des gains</h3>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 xl:text-[11px] 2xl:text-xs 3xl:text-sm">
                   {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
                 </p>
               </div>
             </div>
           </div>
-          <div className="relative z-10 min-h-[2.5rem] xl:min-h-[4rem] 2xl:min-h-[5rem]" aria-hidden={true} />
+          <div className="relative z-10 min-h-[2.5rem] flex-1 xl:min-h-[4rem] 2xl:min-h-[5rem] 3xl:min-h-[6rem]" aria-hidden={true} />
         </div>
       </div>
 
       {/* 4 · Objectifs — pleine largeur */}
 
-      <div ref={goalsCardRef} className="relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-4 2xl:p-5">
+      <div ref={goalsCardRef} className="relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-4 2xl:p-5 3xl:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
