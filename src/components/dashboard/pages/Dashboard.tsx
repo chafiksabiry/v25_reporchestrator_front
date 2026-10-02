@@ -1497,190 +1497,91 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Ops + Finance : 2 colonnes sur grand écran, hauteur = contenu (pas de stretch vide) */}
-      <div className="grid w-full grid-cols-1 items-start gap-2 xl:grid-cols-2 xl:gap-3">
-
-      {/* ── Opérations ── */}
-      <section className="flex flex-col gap-2 xl:gap-2.5" aria-labelledby="dashboard-ops-heading">
-        <h2 id="dashboard-ops-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
-          {t('dashboard.home.sections.operations', 'Opérations')}
-        </h2>
-
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm xl:px-4">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <div className="flex shrink-0 items-center gap-1.5">
-              <ListChecks size={14} className="text-violet-600" />
-              <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <GraduationCap size={11} className="shrink-0 text-violet-600" />
-              Formations
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <BookOpen size={11} className="shrink-0 text-blue-600" />
-              Scripts
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <FileText size={11} className="shrink-0 text-emerald-600" />
-              KB
-            </span>
-            <button
-              type="button"
-              onClick={() => navigate('/academy')}
-              className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-            >
-              <GraduationCap size={11} />
-              Academy
-              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
+      {/* 1 · À faire aujourd'hui — pleine largeur */}
+      <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm xl:px-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ListChecks size={14} className="text-violet-600" />
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
           </div>
-
-          <div className="hidden h-6 w-px bg-slate-200 sm:block" />
-
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <div className="flex shrink-0 items-center gap-1.5">
-              <PhoneCall size={14} className="text-amber-600" />
-              <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
-            </div>
-            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
-            <button
-              type="button"
-              onClick={() => navigate('/workspace')}
-              className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
-            >
-              <PhoneCall size={11} />
-              Prospects
-              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/workspace?tab=calls')}
-              className="harx-flash harx-flash--slate group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              <History size={11} />
-              {t('dashboard.home.sections.callHistory', 'Historique')}
-              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-          </div>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <GraduationCap size={11} className="shrink-0 text-violet-600" />
+            Formations
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <BookOpen size={11} className="shrink-0 text-blue-600" />
+            Scripts
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <FileText size={11} className="shrink-0 text-emerald-600" />
+            KB
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate('/academy')}
+            className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+          >
+            <GraduationCap size={11} />
+            Academy
+            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
-          <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-                <CalendarCheck size={15} />
-              </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h3>
-              </div>
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              {t('dashboard.home.reservations.count', {
-                count: reservationStats.total,
-                period: selectedPeriod === 'all'
-                  ? t('dashboard.home.reservations.countPeriodAll')
-                  : selectedPeriodLabel,
-              })}
-            </span>
-          </div>
+        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
 
-          <div className="relative z-10 flex flex-wrap gap-1.5">
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
-              <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
-            </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
-              <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
-            </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
-              <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
-            </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
-              <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
-            </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
-              <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
-            </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
-              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
-            </div>
-            <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-              <div className="flex items-center gap-1.5">
-                <Ban size={11} className="text-slate-500" />
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-                <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
-                  {cancelRate == null ? '—' : `${cancelRate}%`}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-0.5">
-                {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setCancelStatsPeriod(key)}
-                    className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                      cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
-                    }`}
-                  >
-                    {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <PhoneCall size={14} className="text-amber-600" />
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
           </div>
-
-          <div className="relative z-10 mt-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const gigId = selectedGigId !== 'all' ? selectedGigId : '';
-                navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
-              }}
-              className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
-            >
-              <CalendarCheck size={12} />
-              {t('dashboard.home.reservations.book')}
-              <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-          </div>
+          <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
+          <button
+            type="button"
+            onClick={() => navigate('/workspace')}
+            className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
+          >
+            <PhoneCall size={11} />
+            Prospects
+            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/workspace?tab=calls')}
+            className="harx-flash harx-flash--slate group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          >
+            <History size={11} />
+            {t('dashboard.home.sections.callHistory', 'Historique')}
+            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
         </div>
-      </section>
+      </div>
 
-      {/* ── Finance ── */}
-      <section className="flex flex-col gap-2 xl:gap-2.5" aria-labelledby="dashboard-finance-heading">
+      {/* 2 · Finance — pleine largeur, une seule ligne */}
+      <section className="w-full space-y-1.5" aria-labelledby="dashboard-finance-heading">
         <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
           {t('dashboard.home.sections.finance', 'Finance')}
         </h2>
-
-        <div className="grid grid-cols-2 gap-1.5 xl:gap-2">
-          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5 ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
+          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
             <div className="flex items-center justify-between gap-1">
-              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight xl:text-[10px] ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
               <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
             </div>
-            <p className={`mt-0.5 text-base font-black tracking-tight leading-none xl:text-lg ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+            <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
               {qualityAlerts.fraud}
             </p>
           </div>
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[10px]">Score qualité</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
               <Award size={12} className="shrink-0 text-indigo-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none xl:text-lg">
+            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
               {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
             </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3">
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
             <div className="flex items-center justify-between gap-1">
               <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
                 {earningsPipeline.periodStartTitle}
@@ -1773,8 +1674,98 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
           </div>
         </div>
+      </section>
 
-        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
+      {/* 3 · Réservations 2/3 + Classement 1/3 */}
+      <div className="grid w-full grid-cols-1 items-start gap-2 lg:grid-cols-3 lg:gap-3">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3 lg:col-span-2">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
+          <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <CalendarCheck size={15} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h3>
+              </div>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              {t('dashboard.home.reservations.count', {
+                count: reservationStats.total,
+                period: selectedPeriod === 'all'
+                  ? t('dashboard.home.reservations.countPeriodAll')
+                  : selectedPeriodLabel,
+              })}
+            </span>
+          </div>
+
+          <div className="relative z-10 flex flex-wrap gap-1.5">
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
+              <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
+              <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
+              <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
+              <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
+            </div>
+            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
+            </div>
+            <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <Ban size={11} className="text-slate-500" />
+                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+                <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
+                  {cancelRate == null ? '—' : `${cancelRate}%`}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-0.5">
+                {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setCancelStatsPeriod(key)}
+                    className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
+                      cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+                navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
+              }}
+              className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+            >
+              <CalendarCheck size={12} />
+              {t('dashboard.home.reservations.book')}
+              <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 lg:col-span-1">
           <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
           <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1791,10 +1782,10 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
           <div className="relative z-10 min-h-[2.5rem]" aria-hidden={true} />
         </div>
-      </section>
       </div>
 
-      {/* Objectifs — pleine largeur (hors grille Ops/Finance) */}
+      {/* 4 · Objectifs — pleine largeur */}
+
       <div ref={goalsCardRef} className="relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
