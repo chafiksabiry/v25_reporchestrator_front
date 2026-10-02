@@ -1792,7 +1792,7 @@ export function GigsMarketplace() {
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-6 w-24" variant="rounded" />)}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
               <div className="flex gap-4">
@@ -1846,7 +1846,7 @@ export function GigsMarketplace() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       {/* Toast de notification (accept / reject invitation) */}
       {toast && (
         <div className="fixed top-6 right-6 z-[200] animate-fade-in">
@@ -1866,10 +1866,10 @@ export function GigsMarketplace() {
         </div>
       )}
 
-      <div className="space-y-4">
-        <div>
+      <div className="w-full space-y-4">
+        <div className="w-full">
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
-          <p className="mt-2 text-gray-500 max-w-2xl text-sm leading-relaxed font-medium">
+          <p className="mt-2 text-gray-500 w-full max-w-4xl text-sm leading-relaxed font-medium">
             {t('gigsMarketplace.subtitle1')}
             <br />
             {t('gigsMarketplace.subtitle2')}
@@ -1897,7 +1897,7 @@ export function GigsMarketplace() {
         </div>
       )}
 
-      <div className="flex space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
+      <div className="flex w-full space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => setActiveTab('available')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'available'
@@ -1978,8 +1978,8 @@ export function GigsMarketplace() {
 
       {activeTab === 'available' ? (
         currentGigs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
+          <div className="flex w-full min-h-[55vh] flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="bg-harx-50/50 rounded-3xl p-12 max-w-lg w-full border border-harx-100/50 backdrop-blur-sm">
               <div className="text-4xl mb-4">🔍</div>
               <h3 className="text-xl font-black text-gray-900 mb-2">
                 No Gigs Available
@@ -1990,7 +1990,7 @@ export function GigsMarketplace() {
             </div>
           </div>
         ) : (
-          <div id="rep-gig-grid" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div id="rep-gig-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             {(currentGigs as PopulatedGig[]).map((gig) => {
               const gigStatus = getGigStatus(gig._id);
               const gigStyle = getCardStyleForStatus(gigStatus);
@@ -2261,7 +2261,7 @@ export function GigsMarketplace() {
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as PopulatedGig[]).map((gig) => {
                   const gigStatus = getGigStatus(gig._id);
                   const gigStyle = getCardStyleForStatus(gigStatus);
@@ -2471,7 +2471,7 @@ export function GigsMarketplace() {
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as InvitedEnrollment[]).map((enrollment) => {
                   const gigStyle = getCardStyleForStatus('invited');
                   return (
@@ -2702,7 +2702,7 @@ export function GigsMarketplace() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
               {(currentGigs as RequestedGig[]).map((requestedGig) => {
                 const gigStyle = getCardStyleForStatus('pending');
                 return (
@@ -2798,7 +2798,7 @@ export function GigsMarketplace() {
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as EnrolledGig[]).map((enrolledGig) => {
                   const gigStyle = getCardStyleForStatus('enrolled');
                   return (
