@@ -1789,31 +1789,17 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <Medal size={15} />
-              </div>
-              <div>
+            </div>
+            <div>
               <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Classement des gains</h2>
               <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
                 {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
               </p>
-              </div>
             </div>
-            </div>
-        {selectedGigId === 'all' ? (
-          <div className="relative z-10 flex items-center justify-center gap-2 py-2 text-center">
-            <Medal size={16} className="text-amber-300" />
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choisissez un GIG</p>
-            </div>
-        ) : (
-          <div className="relative z-10 flex items-baseline justify-between gap-2 py-1">
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">Vos gains · période</p>
-              <p className="text-xl font-black tracking-tight text-slate-900 leading-none">
-                {fmtMoney(earningsPipeline.earnedInPeriod)} €
-              </p>
-            </div>
-            <p className="truncate text-[10px] font-bold text-slate-500 max-w-[120px]">{displayName}</p>
+          </div>
         </div>
-        )}
+        {/* Classement vide tant qu'aucune donnée de ranking n'est branchée */}
+        <div className="relative z-10 min-h-[2.5rem]" aria-hidden={true} />
       </div>
       </div>
       </div>
