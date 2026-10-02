@@ -379,7 +379,8 @@ export function Dashboard({ profile }: DashboardProps) {
   const [, setLoading] = useState(true);
   const [selectedGigId, setSelectedGigId] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
-  const [goalsPeriod, setGoalsPeriod] = useState<GoalsPeriod>('week');
+  /** Goals keys exclude "all" — fall back to month when the shared filter is "all". */
+  const goalsPeriod: GoalsPeriod = selectedPeriod === 'all' ? 'month' : selectedPeriod;
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   const gigTriggerRef = useRef<HTMLButtonElement>(null);
   const [gigDropdownPos, setGigDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -406,8 +407,6 @@ export function Dashboard({ profile }: DashboardProps) {
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
-  // Reservations cancellation stats period
-  const [cancelStatsPeriod, setCancelStatsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
 
   useEffect(() => {
     if (!goalsOpen) return;
@@ -1060,13 +1059,13 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [filteredCalls]);
 
-  // Last-minute cancel rate for Sem./Mois/Trim./Année chips (≤ 2h before slot start)
+  // Last-minute cancel rate — same period as the shared dashboard filter
   const cancelRate = useMemo(() => {
-    const period = cancelStatsPeriod as StatsPeriod;
     const gigTz =
       selectedGigId !== 'all'
         ? resolveIanaZone(gigsData.find((g) => g._id === selectedGigId)?.availability?.time_zone)
         : null;
+    const todayYmd = toLocalYmd(Date.now());
 
     const relevant = reservationsData.filter((r: any) => {
       if (selectedGigId !== 'all') {
@@ -1074,7 +1073,9 @@ export function Dashboard({ profile }: DashboardProps) {
         if (String(rGigId || '') !== String(selectedGigId)) return false;
       }
       const ymd = reservationYmd(r);
-      return isDateInPeriod(ymd, period);
+      if (selectedPeriod === 'all') return true;
+      if (selectedPeriod === 'today') return ymd === todayYmd;
+      return isDateInPeriod(ymd, selectedPeriod as StatsPeriod);
     });
 
     if (relevant.length === 0) return null;
@@ -1098,7 +1099,7 @@ export function Dashboard({ profile }: DashboardProps) {
     }).length;
 
     return Math.round((lastMinute / relevant.length) * 100);
-  }, [reservationsData, selectedGigId, gigsData, cancelStatsPeriod]);
+  }, [reservationsData, selectedGigId, gigsData, selectedPeriod]);
 
   const goalsPeriodLabels: Record<GoalsPeriod, string> = {
     today: t('dashboard.home.goals.periodDay'),
@@ -1154,10 +1155,6 @@ export function Dashboard({ profile }: DashboardProps) {
       current[selectedGigId] ? current : { ...current, [selectedGigId]: { calls: '', transactions: '' } }
     ));
   }, [selectedGigId]);
-
-  useEffect(() => {
-    if (selectedPeriod !== 'all') setGoalsPeriod(selectedPeriod);
-  }, [selectedPeriod]);
 
   // Objectifs appels/transactions → alimentent automatiquement le simulateur
   useEffect(() => {
@@ -1319,9 +1316,10 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-3">
       {/* Dynamic Filter Header */}
-      <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:px-4 xl:py-2.5">
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-4 xl:py-2.5">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-black uppercase tracking-tight text-slate-800 sm:text-xl">
@@ -1339,10 +1337,10 @@ export function Dashboard({ profile }: DashboardProps) {
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <div className="relative flex items-center gap-1.5">
-              <Briefcase size={14} className="text-slate-500" />
-              <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[260px]">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:flex-1 sm:justify-end">
+            <div className="relative flex min-w-0 flex-1 items-center gap-1.5 sm:flex-initial sm:max-w-[260px]">
+              <Briefcase size={14} className="shrink-0 text-slate-500" />
+              <div className="relative w-full min-w-0">
                 <button
                   ref={gigTriggerRef}
                   type="button"
@@ -1430,9 +1428,9 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
 
-            <div className="relative flex items-center gap-1.5">
-              <CalendarDays size={14} className="text-blue-600" />
-              <div className="relative w-full min-w-0 sm:min-w-[140px] sm:max-w-[200px]">
+            <div className="relative flex min-w-0 flex-1 items-center gap-1.5 sm:flex-initial sm:max-w-[200px]">
+              <CalendarDays size={14} className="shrink-0 text-blue-600" />
+              <div className="relative w-full min-w-0">
                 <button
                   ref={periodTriggerRef}
                   type="button"
@@ -1495,11 +1493,12 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* 1 · À faire aujourd'hui — pleine largeur */}
-      <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm xl:px-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <div className="flex w-full flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:px-4 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:w-auto">
           <div className="flex shrink-0 items-center gap-1.5">
             <ListChecks size={14} className="text-violet-600" />
             <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
@@ -1527,14 +1526,15 @@ export function Dashboard({ profile }: DashboardProps) {
           </button>
         </div>
 
-        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+        <div className="hidden h-6 w-px shrink-0 bg-slate-200 lg:block" />
+        <div className="h-px w-full bg-slate-100 lg:hidden" />
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:w-auto">
           <div className="flex shrink-0 items-center gap-1.5">
             <PhoneCall size={14} className="text-amber-600" />
             <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
           </div>
-          <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
+          <p className="min-w-0 flex-1 basis-full truncate text-[11px] font-semibold text-slate-500 sm:basis-auto">Aucun rappel pour le moment</p>
           <button
             type="button"
             onClick={() => navigate('/workspace')}
@@ -1556,36 +1556,17 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* 2 · Finance — pleine largeur, une seule ligne */}
-      <section className="w-full" aria-label={t('dashboard.home.sections.finance', 'Finance')}>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
-          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+      {/* 2 · Finance — grille responsive */}
+      <section className="w-full min-w-0" aria-label={t('dashboard.home.sections.finance', 'Finance')}>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
+          <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
-              <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
-            </div>
-            <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
-              {qualityAlerts.fraud}
-            </p>
-          </div>
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
-              <Award size={12} className="shrink-0 text-indigo-500" />
-            </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
-              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
-            </p>
-          </div>
-
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
                 {earningsPipeline.periodStartTitle}
               </p>
               <CalendarDays size={12} className="shrink-0 text-slate-400" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
+            <p className="mt-0.5 truncate text-base font-black tracking-tight text-slate-800 leading-none">
               {fmtMoney(earningsPipeline.periodStartBalance)} €
             </p>
             {earningsPipeline.periodStartDateLabel && (
@@ -1593,29 +1574,29 @@ export function Dashboard({ profile }: DashboardProps) {
             )}
           </div>
 
-          <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex min-w-0 flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
                 {t('dashboard.home.pipeline.availableBalance')}
               </p>
               <WalletIcon size={12} className="shrink-0 text-emerald-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-slate-800 leading-none">
+            <p className="mt-0.5 truncate text-base font-black tracking-tight text-slate-800 leading-none">
               {fmtMoney(earningsPipeline.availableBalance)} €
             </p>
-            <p className="mt-0.5 text-[9px] font-semibold text-emerald-600">
+            <p className="mt-0.5 truncate text-[9px] font-semibold text-emerald-600">
               {t('dashboard.home.pipeline.readyToWithdraw')}
             </p>
           </div>
 
-          <div className="flex flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex min-w-0 flex-col rounded-xl border border-emerald-100 bg-white px-2.5 py-1.5 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
                 {t('dashboard.home.pipeline.validatedEarnings')}
               </p>
               <ShieldCheck size={12} className="shrink-0 text-emerald-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-emerald-700 leading-none">
+            <p className="mt-0.5 truncate text-base font-black tracking-tight text-emerald-700 leading-none">
               +{fmtMoney(earningsPipeline.validatedInPeriod)} €
             </p>
             <p className="mt-0.5 truncate text-[9px] text-emerald-600/80">
@@ -1625,48 +1606,67 @@ export function Dashboard({ profile }: DashboardProps) {
             </p>
           </div>
 
-          <div className="flex flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex min-w-0 flex-col rounded-xl border border-orange-100 bg-white px-2.5 py-1.5 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
                 {t('dashboard.home.pipeline.retraction')}
               </p>
               <RotateCcw size={12} className="shrink-0 text-orange-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-orange-700 leading-none">
+            <p className="mt-0.5 truncate text-base font-black tracking-tight text-orange-700 leading-none">
               {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
             </p>
-            <p className="mt-0.5 text-[9px] text-orange-600/80">
+            <p className="mt-0.5 truncate text-[9px] text-orange-600/80">
               {earningsPipeline.retractionCount > 0
                 ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
                 : t('dashboard.home.pipeline.noSales')}
             </p>
           </div>
 
-          <div className="flex flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex min-w-0 flex-col rounded-xl border border-amber-100 bg-white px-2.5 py-1.5 shadow-sm">
             <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
                 {t('dashboard.home.pipeline.clientValidation')}
               </p>
               <Building2 size={12} className="shrink-0 text-amber-500" />
             </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
+            <p className="mt-0.5 truncate text-base font-black tracking-tight text-amber-700 leading-none">
               +{fmtMoney(earningsPipeline.clientValidationAmount)} €
             </p>
-            <p className="mt-0.5 text-[9px] text-amber-600/80">
+            <p className="mt-0.5 truncate text-[9px] text-amber-600/80">
               {earningsPipeline.clientValidationCount > 0
                 ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
                 : t('dashboard.home.pipeline.nothingPending')}
             </p>
           </div>
 
-          <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
+          <div className={`flex min-w-0 flex-col rounded-xl border px-2.5 py-2 shadow-sm ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-center justify-between gap-1">
+              <p className={`truncate text-[9px] font-bold uppercase tracking-wider leading-tight ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+              <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
+            </div>
+            <p className={`mt-0.5 text-base font-black tracking-tight leading-none ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+              {qualityAlerts.fraud}
+            </p>
+          </div>
+          <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+            <div className="flex items-center justify-between gap-1">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Score qualité</p>
+              <Award size={12} className="shrink-0 text-indigo-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none">
+              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
+            </p>
+          </div>
+
+          <div className="relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 shadow-sm">
             <div className="relative z-10 flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-300 leading-tight">
                 {t('dashboard.home.pipeline.periodTotal')}
               </p>
               <Trophy size={12} className="shrink-0 text-amber-300" />
             </div>
-            <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
+            <p className="relative z-10 mt-0.5 truncate text-base font-black tracking-tight text-white leading-none">
               {fmtMoney(earningsPipeline.totalGains)} €
             </p>
           </div>
@@ -1674,16 +1674,16 @@ export function Dashboard({ profile }: DashboardProps) {
       </section>
 
       {/* 3 · Réservations 2/3 + Classement 1/3 */}
-      <div className="grid w-full grid-cols-1 items-start gap-2 lg:grid-cols-3 lg:gap-3">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3 lg:col-span-2">
+      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-2 xl:grid-cols-3 xl:gap-3">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-2 xl:p-3">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
           <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
                 <CalendarCheck size={15} />
               </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h3>
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.reservations.title')}</h3>
               </div>
             </div>
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
@@ -1696,36 +1696,36 @@ export function Dashboard({ profile }: DashboardProps) {
             </span>
           </div>
 
-          <div className="relative z-10 flex flex-wrap gap-1.5">
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
+          <div className="relative z-10 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
+            <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.total')}</span>
               <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">{reservationStats.total}</span>
             </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
+            <div className="flex min-w-0 flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-blue-500/80">{t('dashboard.home.reservations.upcoming')}</span>
               <span className="text-lg font-black tracking-tighter text-blue-600 leading-none">{reservationStats.upcoming}</span>
             </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
+            <div className="flex min-w-0 flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-emerald-600/80">{t('dashboard.home.reservations.completed')}</span>
               <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none">{reservationStats.completed}</span>
             </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
+            <div className="flex min-w-0 flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-rose-500/80">{t('dashboard.home.reservations.missed')}</span>
               <span className="text-lg font-black tracking-tighter text-rose-600 leading-none">{reservationStats.noShow}</span>
             </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
+            <div className="flex min-w-0 flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-amber-600/80">{t('dashboard.home.reservations.hoursWorked')}</span>
               <span className="text-lg font-black tracking-tighter text-amber-600 leading-none">{reservationStats.workedHours}h</span>
             </div>
-            <div className="flex min-w-[72px] flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
+            <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400">{t('dashboard.home.reservations.attendance')}</span>
               <span className="text-lg font-black tracking-tighter text-slate-800 leading-none">{reservationStats.attendanceRate}%</span>
             </div>
-            <div className="flex min-w-[120px] flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <div className="col-span-2 flex min-w-0 flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:col-span-3 md:col-span-2">
               <div className="flex items-center gap-1.5">
-                <Ban size={11} className="text-slate-500" />
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
-                <p className="ml-auto text-sm font-black tracking-tight text-slate-800 leading-none">
+                <Ban size={11} className="shrink-0 text-slate-500" />
+                <p className="min-w-0 truncate text-[8px] font-black uppercase tracking-widest text-slate-400">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+                <p className="ml-auto shrink-0 text-sm font-black tracking-tight text-slate-800 leading-none">
                   {cancelRate == null ? '—' : `${cancelRate}%`}
                 </p>
               </div>
@@ -1734,9 +1734,9 @@ export function Dashboard({ profile }: DashboardProps) {
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setCancelStatsPeriod(key)}
+                    onClick={() => setSelectedPeriod(key)}
                     className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition ${
-                      cancelStatsPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+                      selectedPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
                     }`}
                   >
                     {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
@@ -1762,7 +1762,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 lg:col-span-1">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-1">
           <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
           <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1841,13 +1841,9 @@ export function Dashboard({ profile }: DashboardProps) {
               <button
                 key={key}
                 type="button"
-                onClick={() => {
-                  setGoalsPeriod(key);
-                  setSelectedPeriod(key);
-                  setEditingGoal(null);
-                }}
+                onClick={() => setSelectedPeriod(key)}
                 className={`rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-wider transition ${
-                  goalsPeriod === key ? tone.on : tone.off
+                  selectedPeriod === key ? tone.on : tone.off
                 }`}
               >
                 {goalsPeriodLabels[key]}
@@ -2001,7 +1997,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </>
           )}
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 xl:items-start">
           {/* Colonne Objectifs */}
           <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
           <div>
