@@ -1528,7 +1528,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
             onClick={() => navigate('/academy')}
-            className="group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+            className="harx-go-live group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
           >
             <GraduationCap size={11} />
             Academy
@@ -1547,7 +1547,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
             onClick={() => navigate('/workspace')}
-            className="group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+            className="harx-go-live group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
           >
             <PhoneCall size={11} />
             Prospects
@@ -1639,11 +1639,11 @@ export function Dashboard({ profile }: DashboardProps) {
               const gigId = selectedGigId !== 'all' ? selectedGigId : '';
               navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
             }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+            className="harx-go-live group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
           >
             <CalendarCheck size={12} />
             {t('dashboard.home.reservations.book')}
-            <ChevronRight size={12} />
+            <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
           </button>
         </div>
       </div>
