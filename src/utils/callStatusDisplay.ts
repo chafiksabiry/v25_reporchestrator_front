@@ -738,8 +738,20 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
   }
 
   const outcomeRaw = String(call.callOutcome || '').toLowerCase();
-  if (outcomeRaw === 'too_short' || isCallTooShortForAnalysis(call)) {
-    return resolveTwilioOrPostAnalysisBadge(call);
+  // Call disposition ≠ transaction status — show « Non validé » on TRANSACTION.
+  if (
+    isCallTooShortForAnalysis(call) ||
+    outcomeRaw === 'too_short' ||
+    outcomeRaw === 'connected_no_sale' ||
+    outcomeRaw === 'busy' ||
+    outcomeRaw === 'no_answer' ||
+    outcomeRaw === 'wrong_number'
+  ) {
+    return {
+      label: 'Non validé',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+      title: 'Transaction non validée',
+    };
   }
 
   if (isCallFraudDetected(call)) {
