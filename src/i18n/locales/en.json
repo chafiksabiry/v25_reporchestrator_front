@@ -177,7 +177,8 @@
         "hoursScheduled": "/ {{hours}}h scheduled",
         "attendance": "Attendance",
         "attendanceRate": "Attendance rate",
-        "upcomingSessions": "Upcoming slots"
+        "upcomingSessions": "Upcoming slots",
+        "book": "Book"
       },
       "goals": {
         "title": "My Goals",

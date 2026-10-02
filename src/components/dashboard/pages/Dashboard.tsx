@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { repApiUrl } from '../../../utils/repApiUrl';
@@ -724,24 +724,6 @@ export function Dashboard({ profile }: DashboardProps) {
       workedHours: Math.round(workedHours * 10) / 10,
       attendanceRate,
     };
-  }, [filteredReservations]);
-
-  // Next 3 upcoming reservations (sorted ascending)
-  const upcomingReservations = useMemo(() => {
-    const nowTs = Date.now();
-    return [...filteredReservations]
-      .filter((r: any) => {
-        if (r.status === 'cancelled') return false;
-        const dateStr = r.reservationDate || r.date;
-        const ts = dateStr ? new Date(dateStr).getTime() : 0;
-        return ts > nowTs;
-      })
-      .sort((a: any, b: any) => {
-        const ta = new Date(a.reservationDate || a.date).getTime();
-        const tb = new Date(b.reservationDate || b.date).getTime();
-        return ta - tb;
-      })
-      .slice(0, 3);
   }, [filteredReservations]);
 
   const goals = useMemo(() => {
@@ -2015,35 +1997,21 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        {/* Prochaines réservations (max 2) */}
-        {upcomingReservations.length > 0 && (
-          <div className="relative z-10 mt-1.5">
-            <div className="flex flex-wrap gap-1.5">
-              {upcomingReservations.slice(0, 2).map((r: any) => {
-                const dateStr = r.reservationDate || r.date;
-                const d = new Date(dateStr);
-                const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || t('dashboard.home.gigFallback')) : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || t('dashboard.home.gigFallback'));
-                return (
-                  <button
-                    key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}
-                    type="button"
-                    onClick={() => { const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId; if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`); }}
-                    className="group flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 text-left transition hover:bg-violet-50 hover:border-violet-200"
-                  >
-                    <CalendarClock size={12} className="shrink-0 text-violet-500" />
-                    <div>
-                      <p className="max-w-[120px] truncate text-[9px] font-black text-slate-800">{gigTitle}</p>
-                      <p className="text-[8px] font-bold text-slate-400">
-                        {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
-                      </p>
-                    </div>
-                    <span className="rounded-md bg-white px-1 py-0.5 text-[8px] font-black text-slate-500 border border-slate-200">{r.duration}h</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* CTA réservation */}
+        <div className="relative z-10 mt-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+              navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+          >
+            <CalendarCheck size={12} />
+            {t('dashboard.home.reservations.book')}
+            <ChevronRight size={12} />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5 xl:col-span-2">
@@ -2097,63 +2065,55 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
       </div>
 
-      {/* À faire du jour + Rappels — deux lignes, action à droite */}
-      <div className="overflow-hidden divide-y divide-slate-200/70 rounded-2xl border border-slate-200/70 bg-white/60 shadow-md shadow-slate-200/20 backdrop-blur-xl">
-        <div className="flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:px-3 sm:py-1.5">
-          <div className="flex shrink-0 items-center gap-2 sm:w-44">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
-              <ListChecks size={14} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-800">À faire aujourd'hui</h3>
+      {/* À faire + Rappels — une seule ligne */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ListChecks size={14} className="text-violet-600" />
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">À faire aujourd'hui</h3>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <GraduationCap size={11} className="shrink-0 text-violet-600" />
+            Formations
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <BookOpen size={11} className="shrink-0 text-blue-600" />
+            Scripts
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
+            <FileText size={11} className="shrink-0 text-emerald-600" />
+            KB
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate('/academy')}
+            className="group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+          >
+            <GraduationCap size={11} />
+            Academy
+            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+
+        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <PhoneCall size={14} className="text-amber-600" />
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 whitespace-nowrap">Rappels</h3>
+          </div>
+          <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
+          <button
+            type="button"
+            onClick={() => navigate('/workspace')}
+            className="group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-slate-700"
+          >
+            <PhoneCall size={11} />
+            Prospects
+            <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
         </div>
       </div>
-          <div className="flex flex-1 flex-wrap gap-1">
-            <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <GraduationCap size={11} className="shrink-0 text-violet-600" />
-              Formations
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <BookOpen size={11} className="shrink-0 text-blue-600" />
-              Scripts
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700">
-              <FileText size={11} className="shrink-0 text-emerald-600" />
-              KB
-            </span>
-                </div>
-                <button
-                  type="button"
-            onClick={() => navigate('/academy')}
-            className="group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-violet-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-violet-700"
-                >
-            <GraduationCap size={12} />
-            Academy
-            <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-                </button>
-              </div>
-
-        <div className="flex flex-col gap-2 p-2 sm:flex-row sm:items-center sm:px-3 sm:py-1.5">
-          <div className="flex shrink-0 items-center gap-2 sm:w-44">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-              <PhoneCall size={14} />
-                </div>
-            <div className="min-w-0">
-              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-800">Rappels à effectuer</h3>
-                </div>
-                </div>
-          <p className="flex-1 text-[11px] font-semibold text-slate-500">Aucun rappel pour le moment</p>
-                <button
-                  type="button"
-            onClick={() => navigate('/workspace')}
-            className="group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-amber-600"
-                >
-            <PhoneCall size={12} />
-            Prospects
-            <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-                </button>
-              </div>
-            </div>
 
     </div>
   );
