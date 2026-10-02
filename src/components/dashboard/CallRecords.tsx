@@ -282,23 +282,26 @@ function isAnalysisStale(record: CallRecord): boolean {
 const HISTORY_STATUS_FILTERS: Array<{ id: string; label: string; group?: 'line' }> = [
   { id: 'all', label: 'Tous statuts' },
   { id: 'completed', label: 'Terminé' },
-  { id: 'voicemail', label: 'Répondeur' },
   { id: 'too_short', label: 'Trop court' },
-  { id: 'busy', label: 'Occupé' },
-  { id: 'no-answer', label: 'Pas de réponse' },
-  { id: 'canceled', label: 'Annulé' },
-  { id: 'failed', label: 'Échec' },
   { id: 'in-progress', label: 'En cours' },
   { id: 'line', label: '', group: 'line' },
+  // HARX ladder (Twilio AMD→Répondeur, Busy/No-Answer→Injoignable, Failed→Numéro non attribué)
   { id: 'to_call', label: 'À appeler' },
   { id: 'called_unreachable', label: 'Appelé – Injoignable' },
   { id: 'called_voicemail', label: 'Appelé – Répondeur' },
   { id: 'called_wrong_number', label: 'Appelé – Numéro non attribué' },
   { id: 'called_callback', label: 'Appelé – Souhaite être rappelé' },
   { id: 'called_rdv', label: 'Appelé – RDV pris pour rappel' },
-  { id: 'argued_rdv', label: 'Appel argumenté – RDV pris' },
+  { id: 'argued_rdv', label: 'Appel argumenté – RDV pris / délai de réflexion' },
   { id: 'argued_declined', label: 'Appel argumenté – Transaction déclinée' },
   { id: 'argued_done', label: 'Appel argumenté – Transaction aboutie' },
+  // Raw Twilio aliases still filterable for ops
+  { id: 'line', label: '', group: 'line' },
+  { id: 'busy', label: 'Twilio Busy → Injoignable' },
+  { id: 'no-answer', label: 'Twilio No-Answer → Injoignable' },
+  { id: 'voicemail', label: 'Twilio AMD → Répondeur' },
+  { id: 'failed', label: 'Twilio Failed → Numéro non attribué' },
+  { id: 'canceled', label: 'Twilio Canceled → Injoignable' },
 ];
 
 function callFallsInDateRange(record: { startTime?: string | Date; createdAt?: string | Date }, from: string, to: string): boolean {
@@ -1390,11 +1393,9 @@ export function CallRecords({
                               >
                                 <X className="w-3 h-3" />
                                 {isUnansweredStatus
-                                  ? status === 'busy'
-                                    ? 'Occupé'
-                                    : status === 'no-answer' || status === 'noanswer'
-                                      ? 'Non décroché'
-                                      : 'Annulé'
+                                  ? status === 'failed'
+                                    ? 'Appelé – Numéro non attribué'
+                                    : 'Appelé – Injoignable'
                                   : 'Refusé'}
                               </span>
                             );
