@@ -922,13 +922,9 @@ export function GigsMarketplace() {
       console.log('✅ Invitation rejected successfully:', result);
       showToast('Invitation refusée.', 'success');
 
-      // Garder dans l'historique avec statut refusé (MAJ optimiste, sans refresh page)
+      // Retirer de l'onglet Invitations (plus d'action en attente)
       setInvitedEnrollments((prev: InvitedEnrollment[]) =>
-        prev.map((enrollment) =>
-          enrollment.id === enrollmentId
-            ? { ...enrollment, enrollmentStatus: 'rejected', canEnroll: false, matchStatus: 'rejected' }
-            : enrollment
-        )
+        prev.filter((enrollment) => enrollment.id !== enrollmentId)
       );
       setPendingRequests((prev) =>
         prev.filter((id) => id !== invitedEnrollments.find((e) => e.id === enrollmentId)?.gig?._id)
@@ -1306,7 +1302,7 @@ export function GigsMarketplace() {
     }
   };
 
-  // Fonction pour récupérer les enrollments invités (+ refusés, historique) avec données complètes
+  // Pending invitations only (refused ones leave this tab — no badge noise)
   const fetchInvitedEnrollments = async () => {
     const agentId = getAgentId();
     const token = getAuthToken();
@@ -1348,45 +1344,30 @@ export function GigsMarketplace() {
             matchScore: 0,
             matchStatus: status,
           };
-        });
+        })
+        .filter((row) => row.enrollmentStatus === 'invited');
 
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [invitedRes, rejectedRes] = await Promise.all([
-        fetch(
-          `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=invited`,
-          { headers }
-        ),
-        fetch(
-          `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=rejected`,
-          { headers }
-        ),
-      ]);
+      const invitedRes = await fetch(
+        `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=invited`,
+        { headers }
+      );
 
       if (!invitedRes.ok) {
         throw new Error('Failed to fetch invited enrollments');
       }
 
       const invitedData = await invitedRes.json();
-      const rejectedData = rejectedRes.ok ? await rejectedRes.json() : { gigs: [] };
-
       const invitedRows = transformRows(invitedData.gigs || [], 'invited');
-      const rejectedRows = transformRows(rejectedData.gigs || [], 'rejected');
 
-      // Invited first, then rejected history; de-dupe by gig id (invited wins).
-      const byGigId = new Map<string, InvitedEnrollment>();
-      [...rejectedRows, ...invitedRows].forEach((row) => {
-        if (row.gig?._id) byGigId.set(row.gig._id, row);
-      });
+      invitedRows.sort(
+        (a, b) =>
+          new Date(b.invitationSentAt).getTime() - new Date(a.invitationSentAt).getTime()
+      );
 
-      const merged = Array.from(byGigId.values()).sort((a, b) => {
-        if (a.enrollmentStatus === 'invited' && b.enrollmentStatus !== 'invited') return -1;
-        if (b.enrollmentStatus === 'invited' && a.enrollmentStatus !== 'invited') return 1;
-        return new Date(b.invitationSentAt).getTime() - new Date(a.invitationSentAt).getTime();
-      });
-
-      console.log('✅ Invited + rejected history:', merged.length);
-      setInvitedEnrollments(merged);
+      console.log('✅ Pending invitations:', invitedRows.length);
+      setInvitedEnrollments(invitedRows);
     } catch (error) {
       console.error('Error fetching invited enrollments:', error);
       setInvitedEnrollments([]);
@@ -1616,11 +1597,7 @@ export function GigsMarketplace() {
           setEnrolledGigIds((prev) => prev.filter((id) => id !== gigId));
           if (data?.status === 'invitation_rejected') {
             setInvitedEnrollments((prev) =>
-              prev.map((enrollment) =>
-                enrollment.gig._id === gigId
-                  ? { ...enrollment, enrollmentStatus: 'rejected', canEnroll: false, matchStatus: 'rejected' }
-                  : enrollment
-              )
+              prev.filter((enrollment) => enrollment.gig._id !== gigId)
             );
           }
         }
@@ -1974,9 +1951,12 @@ export function GigsMarketplace() {
             }`}
         >
           {t('gigsMarketplace.tabs.invited')}
-          {invitedEnrollments.length > 0 && (
+          {invitedEnrollments.filter((e) => e.enrollmentStatus === 'invited').length > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-md animate-pulse">
-              {invitedEnrollments.length > 99 ? '99+' : invitedEnrollments.length}
+              {(() => {
+                const n = invitedEnrollments.filter((e) => e.enrollmentStatus === 'invited').length;
+                return n > 99 ? '99+' : n;
+              })()}
             </span>
           )}
           {activeTab === 'invited' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
