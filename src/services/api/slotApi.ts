@@ -30,6 +30,8 @@ export interface Reservation {
     duration: number;
     status: 'reserved' | 'cancelled';
     notes?: string;
+    /** Present when attendance was explicitly tracked for the slot. */
+    attended?: boolean;
     cancelledAt?: string;
     canceledAt?: string;
     updatedAt?: string;
