@@ -1447,7 +1447,15 @@ export function GigsMarketplace() {
       for (const row of invitedRows) {
         const gigId = row.gig?._id ? String(row.gig._id) : '';
         if (!gigId) continue;
-        addEnrollmentNotification('invited', gigId, row.gig?.title ? String(row.gig.title) : undefined);
+        addEnrollmentNotification(
+          'invited',
+          gigId,
+          row.gig?.title ? String(row.gig.title) : undefined,
+          {
+            enrollmentId: row.id ? String(row.id) : undefined,
+            invitationSentAt: row.invitationSentAt || undefined,
+          }
+        );
       }
     } catch (error) {
       console.error('Error fetching invited enrollments:', error);
