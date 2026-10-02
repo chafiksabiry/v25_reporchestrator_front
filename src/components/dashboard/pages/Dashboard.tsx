@@ -1401,6 +1401,18 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-8">
+        <div className="flex flex-col rounded-xl border border-slate-200/70 bg-white px-2.5 py-1.5 shadow-sm">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
+              {earningsPipeline.periodStartTitle}
+            </p>
+            <CalendarDays size={12} className="shrink-0 text-slate-500" />
+          </div>
+          <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
+            {fmtMoney(earningsPipeline.periodStartBalance)} €
+          </p>
+        </div>
+
         <div className="flex flex-col rounded-xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
@@ -1425,31 +1437,6 @@ export function Dashboard({ profile }: DashboardProps) {
           </p>
         </div>
 
-        <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-1.5 shadow-sm">
-          <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
-          <div className="relative z-10 flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/50 leading-tight">
-              {t('dashboard.home.pipeline.periodTotal')}
-            </p>
-            <Trophy size={12} className="shrink-0 text-white" />
-          </div>
-          <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
-            {fmtMoney(earningsPipeline.totalGains)} €
-          </p>
-        </div>
-
-        <div className="flex flex-col rounded-xl border border-slate-200/70 bg-white px-2.5 py-1.5 shadow-sm">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {earningsPipeline.periodStartTitle}
-            </p>
-            <CalendarDays size={12} className="shrink-0 text-slate-500" />
-          </div>
-          <p className="mt-0.5 text-base font-black tracking-tight text-slate-900 leading-none">
-            {fmtMoney(earningsPipeline.periodStartBalance)} €
-          </p>
-        </div>
-
         <div className="flex flex-col rounded-xl border border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 px-2.5 py-1.5 shadow-sm">
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
@@ -1471,6 +1458,19 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
           <p className="mt-0.5 text-base font-black tracking-tight text-amber-700 leading-none">
             +{fmtMoney(earningsPipeline.clientValidationAmount)} €
+          </p>
+        </div>
+
+        <div className="relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-1.5 shadow-sm">
+          <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between gap-1">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-white/50 leading-tight">
+              {t('dashboard.home.pipeline.periodTotal')}
+            </p>
+            <Trophy size={12} className="shrink-0 text-white" />
+          </div>
+          <p className="relative z-10 mt-0.5 text-base font-black tracking-tight text-white leading-none">
+            {fmtMoney(earningsPipeline.totalGains)} €
           </p>
         </div>
 
