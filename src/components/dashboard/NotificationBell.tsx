@@ -99,10 +99,13 @@ export function NotificationBell() {
   const handleOpenNotification = (n: RepNotification) => {
     if (!n.read) markAsRead(n.id);
     const path = resolveRepNotificationPath(n);
-    if (path) {
-      navigate(path);
-      setOpen(false);
+    if (!path) return;
+    // Force navigation even when already on /marketplace (so ?tab=invited re-applies).
+    navigate(path, { replace: false });
+    if (path.includes('tab=invited')) {
+      window.dispatchEvent(new CustomEvent('harx:marketplace-tab', { detail: { tab: 'invited' } }));
     }
+    setOpen(false);
   };
 
   return (
