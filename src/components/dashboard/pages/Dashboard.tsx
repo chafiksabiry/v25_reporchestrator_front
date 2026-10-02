@@ -1564,27 +1564,6 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 xl:gap-2">
-          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5 ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
-            <div className="flex items-center justify-between gap-1">
-              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight xl:text-[10px] ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
-              <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
-            </div>
-            <p className={`mt-0.5 text-base font-black tracking-tight leading-none xl:text-lg ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
-              {qualityAlerts.fraud}
-            </p>
-          </div>
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
-            <div className="flex items-center justify-between gap-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[10px]">Score qualité</p>
-              <Award size={12} className="shrink-0 text-indigo-500" />
-            </div>
-            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none xl:text-lg">
-              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
-            </p>
-          </div>
-        </div>
-
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
           <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
@@ -1678,6 +1657,27 @@ export function Dashboard({ profile }: DashboardProps) {
         <h2 id="dashboard-finance-heading" className="px-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 xl:text-[11px]">
           {t('dashboard.home.sections.finance', 'Finance')}
         </h2>
+
+        <div className="grid grid-cols-2 gap-1.5 xl:gap-2">
+          <div className={`flex flex-col rounded-xl border px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5 ${qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-center justify-between gap-1">
+              <p className={`text-[9px] font-bold uppercase tracking-wider leading-tight xl:text-[10px] ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'}`}>Fraude</p>
+              <ShieldAlert size={12} className={`shrink-0 ${qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'}`} />
+            </div>
+            <p className={`mt-0.5 text-base font-black tracking-tight leading-none xl:text-lg ${qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+              {qualityAlerts.fraud}
+            </p>
+          </div>
+          <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-tight xl:text-[10px]">Score qualité</p>
+              <Award size={12} className="shrink-0 text-indigo-500" />
+            </div>
+            <p className="mt-0.5 text-base font-black tracking-tight text-indigo-600 leading-none xl:text-lg">
+              {qualityAlerts.quality == null ? '—' : qualityAlerts.quality}
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3">
           <div className="flex flex-col rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm xl:px-3 xl:py-2.5">
