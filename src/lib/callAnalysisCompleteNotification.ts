@@ -40,7 +40,12 @@ export function resolveRepNotificationPath(n: {
     n.kind === 'enrollment' ||
     n.status === 'enrolled' ||
     n.status === 'rejected' ||
+    n.status === 'invited' ||
     String(n.notificationKey || '').startsWith('enrollment-');
+
+  if (n.status === 'invited' || String(n.notificationKey || '').includes('-invited')) {
+    return '/marketplace?tab=invited';
+  }
 
   if (isEnrollment && gigId) {
     return `/gig/${encodeURIComponent(gigId)}`;
