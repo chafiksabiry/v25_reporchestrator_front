@@ -1768,20 +1768,6 @@ export function Dashboard({ profile }: DashboardProps) {
       </div>
 
       <div className="flex flex-col gap-1.5 xl:col-span-2">
-          <button
-            type="button"
-        onClick={() => navigate('/calls')}
-        className="group flex w-full items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50"
-      >
-        <span className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-            <Phone size={14} />
-          </span>
-          <span className="text-[11px] font-black uppercase tracking-tight">{t('dashboard.home.historyButton')}</span>
-        </span>
-        <ChevronRight size={14} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600" />
-          </button>
-
       {/* Classement des gains du GIG */}
       <div className="relative flex-1 overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5">
         <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
