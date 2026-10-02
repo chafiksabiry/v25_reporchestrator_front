@@ -1829,27 +1829,51 @@ export function Dashboard({ profile }: DashboardProps) {
             onClick={() => setGoalsOpen((open) => !open)}
             className="flex min-w-0 items-center gap-2 text-left"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-sm shadow-violet-300/50">
               <Target size={15} />
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">{t('dashboard.home.goals.title')}</h2>
-              <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-400">
+              <p className="truncate text-[9px] font-bold uppercase tracking-widest text-violet-500">
                 {goals.label}
               </p>
             </div>
             <span className="relative inline-flex h-7 w-7 shrink-0 items-center justify-center">
               {!goalsOpen && (
-                <span className="absolute inset-0 rounded-full bg-slate-300/70 motion-reduce:hidden animate-ping" />
+                <span className="absolute inset-0 rounded-full bg-violet-400/60 motion-reduce:hidden animate-ping" />
               )}
-              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-white ring-2 ring-slate-200">
+              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white ring-2 ring-violet-100">
                 <ChevronDown size={14} className={`transition-transform duration-300 ${goalsOpen ? 'rotate-180' : ''}`} />
               </span>
             </span>
           </button>
           {/* Sélecteur période */}
           <div className="flex shrink-0 flex-wrap gap-0.5">
-            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => (
+            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => {
+              const periodTone: Record<GoalsPeriod, { on: string; off: string }> = {
+                today: {
+                  on: 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm shadow-sky-300/60',
+                  off: 'bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-100',
+                },
+                week: {
+                  on: 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm shadow-violet-300/60',
+                  off: 'bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-100',
+                },
+                month: {
+                  on: 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-300/60',
+                  off: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100',
+                },
+                quarter: {
+                  on: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm shadow-amber-300/60',
+                  off: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100',
+                },
+                year: {
+                  on: 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-sm shadow-rose-300/60',
+                  off: 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100',
+                },
+              };
+              const tone = periodTone[key];
+              return (
               <button
                 key={key}
                 type="button"
@@ -1858,15 +1882,14 @@ export function Dashboard({ profile }: DashboardProps) {
                   setSelectedPeriod(key);
                   setEditingGoal(null);
                 }}
-                className={`rounded px-2 py-0.5 text-[8px] font-black uppercase tracking-wider transition ${
-                  goalsPeriod === key
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                className={`rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-wider transition ${
+                  goalsPeriod === key ? tone.on : tone.off
                 }`}
               >
                 {goalsPeriodLabels[key]}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
