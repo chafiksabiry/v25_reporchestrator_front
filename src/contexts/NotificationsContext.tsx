@@ -66,7 +66,12 @@ type NotificationsContextValue = {
   loading: boolean;
   refreshNotifications: () => Promise<void>;
   upsertNotification: (input: UpsertNotificationInput) => void;
-  addEnrollmentNotification: (status: string, gigId?: string, gigTitle?: string) => void;
+  addEnrollmentNotification: (
+    status: string,
+    gigId?: string,
+    gigTitle?: string,
+    meta?: { enrollmentId?: string; invitationSentAt?: string | number }
+  ) => void;
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
   markAllRead: () => void;
@@ -286,9 +291,24 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [refreshNotifications]);
 
   const addEnrollmentNotification = useCallback(
-    (status: string, gigId?: string, gigTitle?: string) => {
+    (
+      status: string,
+      gigId?: string,
+      gigTitle?: string,
+      meta?: { enrollmentId?: string; invitationSentAt?: string | number }
+    ) => {
       const { title, message } = buildEnrollmentMessage(status, gigTitle);
-      const key = `enrollment-${gigId || 'general'}-${status}`;
+      // Invites: unique key per invite wave (re-invite after reject → new bell row).
+      let key: string;
+      if (status === 'invited') {
+        const inviteMs =
+          meta?.invitationSentAt != null ? new Date(meta.invitationSentAt).getTime() : NaN;
+        key = Number.isFinite(inviteMs)
+          ? `enrollment-${gigId || 'general'}-invited-${meta?.enrollmentId || 'x'}-${inviteMs}`
+          : `enrollment-${gigId || 'general'}-invited-${meta?.enrollmentId || gigId || 'x'}-${Date.now()}`;
+      } else {
+        key = `enrollment-${gigId || 'general'}-${status}`;
+      }
       if (knownKeysRef.current.has(key)) {
         // Already shown — avoid duplicate sound / re-insert.
         return;
@@ -350,7 +370,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           wrote = true;
         }
         for (const gig of invited) {
-          const key = `enrollment-${gig.gigId}-invited`;
+          const inviteMs = gig.invitationSentAt
+            ? new Date(gig.invitationSentAt).getTime()
+            : NaN;
+          const key = Number.isFinite(inviteMs)
+            ? `enrollment-${gig.gigId}-invited-${gig.enrollmentId || 'x'}-${inviteMs}`
+            : `enrollment-${gig.gigId}-invited-${gig.enrollmentId || gig.gigId}`;
           if (keys.has(key)) continue;
           const { title, message } = buildEnrollmentMessage('invited', gig.title);
           upserts.push(
@@ -436,7 +461,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           addEnrollmentNotification(
             status,
             data?.gigId ? String(data.gigId) : undefined,
-            data?.gigTitle ? String(data.gigTitle) : undefined
+            data?.gigTitle ? String(data.gigTitle) : undefined,
+            {
+              enrollmentId: data?.enrollmentId ? String(data.enrollmentId) : undefined,
+              invitationSentAt:
+                data?.invitationSentAt != null
+                  ? (data.invitationSentAt as string | number)
+                  : undefined,
+            }
           );
         } else {
           void refreshNotifications();

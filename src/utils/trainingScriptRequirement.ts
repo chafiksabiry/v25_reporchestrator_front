@@ -316,7 +316,7 @@ export async function fetchEnrolledGigsForAgent(
 export async function fetchInvitedGigsForAgent(
   agentId: string,
   token: string
-): Promise<{ gigId: string; title: string }[]> {
+): Promise<{ gigId: string; title: string; enrollmentId?: string; invitationSentAt?: string }[]> {
   const base = String(import.meta.env.VITE_MATCHING_API_URL || '').replace(/\/$/, '');
   if (!base) return [];
 
@@ -328,18 +328,43 @@ export async function fetchInvitedGigsForAgent(
 
   const data = (await res.json()) as { gigs?: unknown[] };
   const gigs = Array.isArray(data.gigs) ? data.gigs : [];
-  const out: { gigId: string; title: string }[] = [];
+  const out: {
+    gigId: string;
+    title: string;
+    enrollmentId?: string;
+    invitationSentAt?: string;
+  }[] = [];
   for (const item of gigs) {
-    const g = item as { gig?: { _id?: unknown; title?: string }; status?: string };
+    const g = item as {
+      gig?: { _id?: unknown; title?: string; agents?: any[] };
+      status?: string;
+      invitationDate?: string;
+      updatedAt?: string;
+    };
     const status = String(g.status || 'invited').toLowerCase();
     if (status && status !== 'invited') continue;
     const gigId = normalizeMongoId(g.gig?._id);
-    if (gigId) {
-      out.push({
-        gigId,
-        title: String(g.gig?.title || 'Gig').trim() || 'Gig',
-      });
-    }
+    if (!gigId) continue;
+
+    const agentRow = Array.isArray(g.gig?.agents)
+      ? g.gig!.agents!.find((a: any) => {
+          const id = a?.agentId?.$oid || a?.agentId;
+          return String(id) === String(agentId);
+        })
+      : null;
+    const enrollmentId = normalizeMongoId(
+      agentRow?.gigAgentId?.$oid || agentRow?.gigAgentId || (item as any)?._id || (item as any)?.id
+    );
+    const invitationSentAt = String(
+      g.invitationDate || g.updatedAt || agentRow?.invitationDate || ''
+    ).trim();
+
+    out.push({
+      gigId,
+      title: String(g.gig?.title || 'Gig').trim() || 'Gig',
+      ...(enrollmentId ? { enrollmentId } : {}),
+      ...(invitationSentAt ? { invitationSentAt } : {}),
+    });
   }
   return out;
 }
