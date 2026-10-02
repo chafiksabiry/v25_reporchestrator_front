@@ -350,7 +350,10 @@
     "dispFilterNone": "Sans statut",
     "dispositionTitle": "Statut d'appel",
     "changeDisposition": "Modifier",
-    "dispositionExclNote": "À partir de « Appelé – RDV pris », ce prospect vous sera affecté exclusivement.",
+    "dispositionExclNote": "À partir de « RDV pour rappel », ce prospect vous est affecté exclusivement.",
+    "dispGroupStart": "Démarrer",
+    "dispGroupCalled": "Appelé",
+    "dispGroupArgued": "Appel argumenté",
     "profileAddedOn": "Ajouté le",
     "addedOnLabel": "Ajouté :",
     "newThisWeek": "Nouveau",
@@ -372,6 +375,17 @@
       "argued_rdv": "Appel argumenté – RDV pris / délai de réflexion",
       "argued_declined": "Appel argumenté – Transaction déclinée",
       "argued_done": "Appel argumenté – Transaction aboutie"
+    },
+    "dispShort": {
+      "to_call": "À appeler",
+      "called_unreachable": "Injoignable",
+      "called_voicemail": "Répondeur",
+      "called_wrong_number": "Numéro non attribué",
+      "called_callback": "Souhaite être rappelé",
+      "called_rdv": "RDV pour rappel",
+      "argued_rdv": "RDV / délai de réflexion",
+      "argued_declined": "Transaction déclinée",
+      "argued_done": "Transaction aboutie"
     }
   },
   "sessionPlanning": {
