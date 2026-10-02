@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Pencil, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText, History } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText, History } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
 import { repApiUrl } from '../../../utils/repApiUrl';
@@ -406,8 +406,6 @@ export function Dashboard({ profile }: DashboardProps) {
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
-  const [editingGoal, setEditingGoal] = useState<null | 'earnings' | 'calls' | 'transactions'>(null);
-  const [goalInput, setGoalInput] = useState('0');
   // Reservations cancellation stats period
   const [cancelStatsPeriod, setCancelStatsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
 
@@ -1204,7 +1202,6 @@ export function Dashboard({ profile }: DashboardProps) {
       localStorage.setItem('harx_earnings_goals', JSON.stringify(next));
       return next;
     });
-    setEditingGoal(null);
   };
 
   const toggleSimGig = (id: string) => {
@@ -1253,7 +1250,6 @@ export function Dashboard({ profile }: DashboardProps) {
     } else {
       setTransactionGoals((current) => apply(current, 'harx_transaction_goals', value));
     }
-    setEditingGoal(null);
   };
 
   const goToProduction = () => {
@@ -2056,53 +2052,35 @@ export function Dashboard({ profile }: DashboardProps) {
           ]).map((item) => (
             <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   {item.icon}
                   <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{item.title}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {editingGoal === item.kind ? (
-                    <>
-                      <input
-                        type="number"
-                        min={0}
-                        max={item.kind === 'transactions' ? repCallGoal : undefined}
-                        value={goalInput}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (item.kind !== 'transactions' || raw.trim() === '') {
-                            setGoalInput(raw);
-                            return;
-                          }
-                          const capped = Math.min(Math.max(0, Math.round(Number(raw) || 0)), repCallGoal);
-                          setGoalInput(String(capped));
-                        }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveCountGoal(item.kind, goalInput); }}
-                        className="w-16 bg-white border border-cyan-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        autoFocus
-                      />
-                      <button type="button" onClick={() => saveCountGoal(item.kind, goalInput)} className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200" aria-label="Enregistrer">
-                        <Check size={12} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                  <span className="text-slate-900 font-black tracking-tighter">
-                        {item.current}<span className="text-slate-400 font-bold text-sm">{item.target > 0 ? `/${item.target}` : ''}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-900 font-black tracking-tighter tabular-nums">
+                    {item.current}<span className="text-slate-400 font-bold text-sm">/</span>
                   </span>
-                      <span className={`text-[10px] font-black text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-300' : 'text-cyan-200'}`}>
-                        {item.target > 0 ? `${item.progress}%` : 'à définir'}
+                  <input
+                    type="number"
+                    min={0}
+                    max={item.kind === 'transactions' ? repCallGoal : undefined}
+                    value={item.target > 0 ? String(item.target) : ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (item.kind === 'transactions' && raw.trim() !== '') {
+                        const capped = Math.min(Math.max(0, Math.round(Number(raw) || 0)), repCallGoal);
+                        saveCountGoal(item.kind, String(capped));
+                        return;
+                      }
+                      saveCountGoal(item.kind, raw);
+                    }}
+                    className="w-16 bg-white border border-cyan-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    aria-label={`Objectif ${item.title}`}
+                  />
+                  <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-500' : 'text-cyan-600'}`}>
+                    {item.target > 0 ? `${item.progress}%` : '—'}
                   </span>
-                      <button
-                        type="button"
-                        onClick={() => { setGoalInput(String(item.target || '')); setEditingGoal(item.kind); }}
-                        className="p-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition ring-1 ring-cyan-200"
-                        aria-label={`Modifier l'objectif ${item.title}`}
-                      >
-                        <Pencil size={12} />
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
               <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
@@ -2113,45 +2091,27 @@ export function Dashboard({ profile }: DashboardProps) {
 
           <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Trophy size={13} className="text-amber-500" />
                 <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')}</span>
               </div>
-              <div className="flex items-center gap-2">
-                {editingGoal === 'earnings' ? (
-                  <>
-                    <input
-                      type="number"
-                      min={0}
-                      value={goalInput}
-                      onChange={(e) => setGoalInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveEarningsGoal(goalInput); }}
-                      className="w-20 bg-white border border-amber-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      autoFocus
-                    />
-                    <button type="button" onClick={() => saveEarningsGoal(goalInput)} className="p-1.5 rounded-lg bg-emerald-500/40 text-emerald-200" aria-label="Enregistrer l'objectif de gains">
-                      <Check size={12} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-slate-900 font-black tracking-tighter">
-                      {fmtMoney(goals.earned)}€
-                      <span className="text-slate-400 font-bold text-sm">{repEarningsGoal > 0 ? `/${fmtMoney(repEarningsGoal)}€` : ''}</span>
-                    </span>
-                    <span className={`text-[10px] font-black text-right ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'text-emerald-300' : 'text-amber-500'}`}>
-                      {repEarningsGoal > 0 ? `${earningsGoalProgress}%` : 'à définir'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => { setGoalInput(String(repEarningsGoal || '')); setEditingGoal('earnings'); }}
-                      className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition ring-1 ring-amber-200"
-                      aria-label="Modifier l'objectif de gains"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                  </>
-                )}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-slate-900 font-black tracking-tighter tabular-nums">
+                  {fmtMoney(goals.earned)}€<span className="text-slate-400 font-bold text-sm">/</span>
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={repEarningsGoal > 0 ? String(repEarningsGoal) : ''}
+                  placeholder="0"
+                  onChange={(e) => saveEarningsGoal(e.target.value)}
+                  className="w-20 bg-white border border-amber-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-label="Objectif de gains"
+                />
+                <span className="text-[10px] font-black text-amber-600">€</span>
+                <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'text-emerald-500' : 'text-amber-600'}`}>
+                  {repEarningsGoal > 0 ? `${earningsGoalProgress}%` : '—'}
+                </span>
               </div>
             </div>
             <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
