@@ -12,7 +12,6 @@ import { fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
-import { NOTIFICATIONS_REFRESH_EVENT } from '../../../contexts/NotificationsContext';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
