@@ -1323,7 +1323,7 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-3">
+    <div className="flex w-full flex-col gap-2 pb-3 animate-in fade-in duration-500 xl:gap-3">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:px-4 xl:py-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
@@ -1501,8 +1501,8 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
       </div>
 
-      {/* Ops + Finance : 2 colonnes sur grand écran pour remplir la hauteur */}
-      <div className="grid flex-1 grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-3 xl:items-stretch">
+      {/* Ops + Finance : 2 colonnes sur grand écran, hauteur = contenu (pas de stretch vide) */}
+      <div className="grid w-full grid-cols-1 items-start gap-2 xl:grid-cols-2 xl:gap-3">
 
       {/* ── Opérations ── */}
       <section className="flex flex-col gap-2 xl:gap-2.5" aria-labelledby="dashboard-ops-heading">
@@ -1589,7 +1589,7 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
         </div>
 
-        <div className="relative flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
           <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
           <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1660,7 +1660,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
 
-          <div className="relative z-10 mt-auto pt-2">
+          <div className="relative z-10 mt-1.5">
             <button
               type="button"
               onClick={() => {
@@ -1797,7 +1797,7 @@ export function Dashboard({ profile }: DashboardProps) {
         </div>
 
       {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative flex flex-1 flex-col scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
+      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
