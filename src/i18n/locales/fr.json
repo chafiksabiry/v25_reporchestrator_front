@@ -68,6 +68,11 @@
       "gigFallback": "Gig",
       "filterByGig": "Filtrer par gig",
       "filterByPeriod": "Filtrer par période",
+      "sections": {
+        "operations": "Opérations",
+        "finance": "Finance",
+        "callHistory": "Historique"
+      },
       "goLive": {
         "eyebrow": "C'est le moment",
         "title": "Passer en production",
