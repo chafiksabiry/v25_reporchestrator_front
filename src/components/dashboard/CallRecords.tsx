@@ -339,7 +339,7 @@ function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
 
 /** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy'>,
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy' | 'status'>,
   ledgerTxStatus?: string | null
 ): { label: string; tone: string } | null {
   if (isCallVoicemail(record)) {
@@ -348,12 +348,26 @@ function dispositionBadge(
   if (isCallFraudDetected(record)) {
     return callOutcomeBadge('fraud');
   }
-  if (isCallTooShortForAnalysis(record)) {
-    return resolveCallDispositionStatus(record, ledgerTxStatus);
+  const outcome = String(record.callOutcome || '').toLowerCase();
+  // « Sans suite » is a callOutcome, not a validation label — show Non validé instead.
+  if (
+    isCallTooShortForAnalysis(record) ||
+    outcome === 'too_short' ||
+    outcome === 'connected_no_sale'
+  ) {
+    return {
+      label: 'Non validé',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+    };
   }
   if (isCallRejectedByAI(record)) return null;
   const status = resolveCallDispositionStatus(record, ledgerTxStatus);
-  if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
+  if (['À confirmer', 'En attente', 'Pas de vente IA', 'Sans suite'].includes(status.label)) {
+    return {
+      label: 'Non validé',
+      tone: 'bg-slate-50 text-slate-600 border-slate-200',
+    };
+  }
   return status;
 }
 
@@ -1395,7 +1409,7 @@ export function CallRecords({
                             }
                             return (
                               <span
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-slate-50 text-slate-600 border border-slate-200"
                                 title={record.ai_refusal_reason || undefined}
                               >
                                 <X className="w-3 h-3" />
@@ -1403,7 +1417,7 @@ export function CallRecords({
                                   ? status === 'failed'
                                     ? 'Appelé – Numéro non attribué'
                                     : 'Appelé – Injoignable'
-                                  : 'Refusé'}
+                                  : 'Non validé'}
                               </span>
                             );
                           })()
