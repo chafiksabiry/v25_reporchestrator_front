@@ -1316,7 +1316,7 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="dashboard-density flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-3 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-5 2xl:gap-5 2xl:pb-6 3xl:gap-6 3xl:pb-8 4xl:gap-8">
+    <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-8 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-10 2xl:gap-5 2xl:pb-12 3xl:gap-6 3xl:pb-14 4xl:gap-8 4xl:pb-16">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-4 xl:gap-3 xl:px-5 xl:py-3.5 2xl:px-6 2xl:py-4">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:gap-4">
