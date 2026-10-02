@@ -204,7 +204,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           message: input.message,
           gigId: input.gigId,
           journeyId: input.journeyId,
-          actionPath: input.actionPath || (input.kind === 'enrollment' ? '/gigs' : undefined),
+                        actionPath: input.actionPath || (input.kind === 'enrollment' && input.gigId ? `/gig/${input.gigId}` : input.kind === 'enrollment' ? '/marketplace' : undefined),
           status: input.status,
         });
         if (created && input.playSound !== false) playNotificationSound();
@@ -226,7 +226,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         title,
         message,
         gigId,
-        actionPath: '/gigs',
+        actionPath: gigId ? `/gig/${gigId}` : '/marketplace',
         playSound: true,
       });
     },
@@ -260,7 +260,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             title,
             message: `${message}${gig.title ? ` (${gig.title})` : ''}`,
             gigId: gig.gigId,
-            actionPath: '/gigs',
+            actionPath: `/gig/${gig.gigId}`,
           });
           keys.add(key);
         }
