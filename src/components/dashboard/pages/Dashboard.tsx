@@ -1528,7 +1528,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
             onClick={() => navigate('/academy')}
-            className="harx-go-live group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+            className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
           >
             <GraduationCap size={11} />
             Academy
@@ -1547,7 +1547,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <button
             type="button"
             onClick={() => navigate('/workspace')}
-            className="harx-go-live group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+            className="harx-flash harx-flash--amber group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200"
           >
             <PhoneCall size={11} />
             Prospects
@@ -1639,7 +1639,7 @@ export function Dashboard({ profile }: DashboardProps) {
               const gigId = selectedGigId !== 'all' ? selectedGigId : '';
               navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
             }}
-            className="harx-go-live group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+            className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
           >
             <CalendarCheck size={12} />
             {t('dashboard.home.reservations.book')}
