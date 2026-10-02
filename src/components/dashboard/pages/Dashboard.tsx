@@ -1795,9 +1795,11 @@ export function Dashboard({ profile }: DashboardProps) {
           </div>
           <div className="relative z-10 min-h-[2.5rem]" aria-hidden={true} />
         </div>
+      </section>
+      </div>
 
-      {/* Objectifs — pavé unique consolidé avec objectifs company + objectif REP + simulateur */}
-      <div ref={goalsCardRef} className="relative scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
+      {/* Objectifs — pleine largeur (hors grille Ops/Finance) */}
+      <div ref={goalsCardRef} className="relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-3">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
@@ -2005,8 +2007,9 @@ export function Dashboard({ profile }: DashboardProps) {
 
           <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] pt-1">
             {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
-          </p>y
+          </p>
 
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {([
             {
               kind: 'calls' as const,
@@ -2085,6 +2088,7 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
           ))}
+          </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -2238,8 +2242,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
           </div>
         )}
-      </div>
-      </section>
       </div>
 
     </div>
