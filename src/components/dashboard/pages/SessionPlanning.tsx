@@ -15,6 +15,7 @@ import {
     type StatsPeriod,
     zonedWallTimeToUtc,
     resolveIanaZone,
+    computeAttendanceScore,
 } from '../../../utils/planningMetrics';
 import { CompanyView } from '../scheduler/CompanyView';
 import { WalletFilterSelect } from '../ui/WalletFilterSelect';
@@ -30,6 +31,7 @@ import { slotApi } from '../../../services/api/slotApi';
 import { AvailableSlotsGrid } from '../scheduler/AvailableSlotsGrid';
 import { Skeleton } from '../ui/Skeleton';
 import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { callsApi } from '../../../utils/client';
 
 // Define ExternalGig type locally for API response mapping
 interface ExternalGig {
@@ -274,6 +276,7 @@ export function SessionPlanning() {
     const [loadingGigs, setLoadingGigs] = useState<boolean>(true);
     const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('week');
     const [allReservations, setAllReservations] = useState<any[]>([]);
+    const [agentCalls, setAgentCalls] = useState<any[]>([]);
     const [showAttendancePanel] = useState<boolean>(false);
     const [showAIPanel] = useState<boolean>(true);
     const refreshSeqRef = React.useRef(0);
@@ -304,16 +307,23 @@ export function SessionPlanning() {
 
         try {
             if (userRole === 'rep') {
-                const [timeSlots, availableSlots, reservations] = await Promise.all([
+                const [timeSlots, availableSlots, reservations, callsRes] = await Promise.all([
                     schedulerApi.getTimeSlots(selectedRepId),
                     selectedGigId ? slotApi.getSlots(selectedGigId) : slotApi.getSlots(),
-                    selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId)
+                    selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId),
+                    callsApi.getByAgentId(selectedRepId).catch(() => null),
                 ]);
 
                 // Ignore stale responses when gig/date changes rapidly (week navigation).
                 if (seq !== refreshSeqRef.current) return;
 
                 setAllReservations(Array.isArray(reservations) ? reservations : []);
+                const callsList = Array.isArray((callsRes as any)?.data)
+                    ? (callsRes as any).data
+                    : Array.isArray(callsRes)
+                      ? callsRes
+                      : [];
+                setAgentCalls(callsList);
 
                 const mappedTimeSlots = Array.isArray(timeSlots) ? timeSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
                 const mappedAvailableSlots = Array.isArray(availableSlots) ? availableSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
@@ -611,19 +621,16 @@ export function SessionPlanning() {
     }, [allReservations, selectedGig, selectedGigId, selectedRepId]);
 
     const attendanceScore = useMemo(() => {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const pastReserved = slots.filter(
-            (s) =>
-                s.status === 'reserved' &&
-                s.date &&
-                s.date < todayStr &&
-                (s.repId === selectedRepId || s.isMember) &&
-                (!selectedGigId || s.gigId === selectedGigId)
-        );
-        if (pastReserved.length === 0) return null;
-        const attended = pastReserved.filter((s) => s.attended !== false).length;
-        return Math.round((attended / pastReserved.length) * 100);
-    }, [slots, selectedRepId, selectedGigId]);
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const { score } = computeAttendanceScore({
+            reservations: allReservations,
+            calls: agentCalls,
+            gigId: selectedGigId,
+            gigTz,
+            agentId: selectedRepId,
+        });
+        return score;
+    }, [allReservations, agentCalls, selectedGigId, selectedGig, selectedRepId]);
 
     const lastMinuteCancelRate = useMemo(() => {
         const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
