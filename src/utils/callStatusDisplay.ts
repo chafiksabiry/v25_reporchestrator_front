@@ -1,47 +1,95 @@
 export interface StatusBadge {
+  /** Ladder key when this badge maps to HARX_LADDER. */
+  id?: string;
+  /** French label (default). */
   label: string;
+  /** English label. */
+  labelEn?: string;
   tone: string;
   title?: string;
 }
 
-/** Official HARX disposition ladder (only labels allowed as call status). */
+/** Pick FR/EN label from a status badge. */
+export function localizeStatusBadge(
+  badge: StatusBadge | null | undefined,
+  language: string = 'fr'
+): StatusBadge | null {
+  if (!badge) return null;
+  const isEn = String(language || '').toLowerCase().startsWith('en');
+  return {
+    ...badge,
+    label: isEn && badge.labelEn ? badge.labelEn : badge.label,
+  };
+}
+
+/**
+ * Official HARX disposition ladder.
+ * Twilio: AMD → Voicemail ; Busy → Unreachable.
+ * Answered >30s: AI → Not argumented | Argumented declined | Argumented completed.
+ */
 export const HARX_LADDER: Record<string, StatusBadge> = {
   to_call: {
+    id: 'to_call',
     label: 'À appeler',
+    labelEn: 'To call',
     tone: 'bg-slate-50 text-slate-600 border-slate-200',
   },
   called_unreachable: {
+    id: 'called_unreachable',
     label: 'Appelé – Injoignable',
+    labelEn: 'Called – Unreachable',
     tone: 'bg-amber-50 text-amber-700 border-amber-200',
+    title: 'Twilio Busy / No-Answer → Called – Unreachable',
   },
   called_voicemail: {
+    id: 'called_voicemail',
     label: 'Appelé – Répondeur',
+    labelEn: 'Called – Voicemail',
     tone: 'bg-orange-50 text-orange-700 border-orange-200',
-    title: 'Twilio/Telnyx AMD → Appelé – Répondeur',
+    title: 'Twilio/Telnyx AMD → Called – Voicemail',
   },
   called_wrong_number: {
+    id: 'called_wrong_number',
     label: 'Appelé – Numéro non attribué',
+    labelEn: 'Called – Wrong number',
     tone: 'bg-rose-50 text-rose-700 border-rose-200',
-    title: 'Twilio/Telnyx Failed → Appelé – Numéro non attribué',
+    title: 'Twilio/Telnyx Failed → Called – Wrong number',
   },
   called_callback: {
+    id: 'called_callback',
     label: 'Appelé – Souhaite être rappelé',
+    labelEn: 'Called – Requested callback',
     tone: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   called_rdv: {
+    id: 'called_rdv',
     label: 'Appelé – RDV pris pour rappel',
+    labelEn: 'Called – Callback appointment',
     tone: 'bg-violet-50 text-violet-700 border-violet-200',
   },
+  not_argumented: {
+    id: 'not_argumented',
+    label: 'Non argumenté',
+    labelEn: 'Not argumented',
+    tone: 'bg-slate-100 text-slate-700 border-slate-300',
+    title: 'Call answered but not argumented — invalid (no commission)',
+  },
   argued_rdv: {
+    id: 'argued_rdv',
     label: 'Appel argumenté – RDV pris / délai de réflexion',
+    labelEn: 'Argumented Call – Appointment / thinking time',
     tone: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   },
   argued_declined: {
+    id: 'argued_declined',
     label: 'Appel argumenté – Transaction déclinée',
+    labelEn: 'Argumented Call – Transaction Declined',
     tone: 'bg-rose-50 text-rose-700 border-rose-200',
   },
   argued_done: {
+    id: 'argued_done',
     label: 'Appel argumenté – Transaction aboutie',
+    labelEn: 'Argumented Call – Transaction Completed',
     tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
 };
@@ -61,42 +109,53 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
     refusal: { ...HARX_LADDER.argued_declined },
     not_interested: { ...HARX_LADDER.argued_declined },
     already_equipped: { ...HARX_LADDER.argued_declined },
-    fraud: { label: 'Fraude', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
+    not_argumented: { ...HARX_LADDER.not_argumented },
+    fraud: { label: 'Fraude', labelEn: 'Fraud', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
     // Legacy too_short / connected_no_sale: never map here to Injoignable
     // (resolved in resolveHarxLadderStatusBadge with hasCallConnection).
   };
   return map[outcome] || null;
 }
 
-const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string; legacyKeys?: string[] }> = [
-  { key: 'called_unreachable', label: HARX_LADDER.called_unreachable.label, tone: HARX_LADDER.called_unreachable.tone },
-  { key: 'called_voicemail', label: HARX_LADDER.called_voicemail.label, tone: HARX_LADDER.called_voicemail.tone },
+const PROSPECT_RUBRICS: Array<{ key: string; label: string; labelEn?: string; tone: string; legacyKeys?: string[] }> = [
+  { key: 'called_unreachable', label: HARX_LADDER.called_unreachable.label, labelEn: HARX_LADDER.called_unreachable.labelEn, tone: HARX_LADDER.called_unreachable.tone },
+  { key: 'called_voicemail', label: HARX_LADDER.called_voicemail.label, labelEn: HARX_LADDER.called_voicemail.labelEn, tone: HARX_LADDER.called_voicemail.tone },
   {
     key: 'called_wrong_number',
     label: HARX_LADDER.called_wrong_number.label,
+    labelEn: HARX_LADDER.called_wrong_number.labelEn,
     tone: HARX_LADDER.called_wrong_number.tone,
     legacyKeys: ['PAS AU COURANT'],
   },
   {
     key: 'called_callback',
     label: HARX_LADDER.called_callback.label,
+    labelEn: HARX_LADDER.called_callback.labelEn,
     tone: HARX_LADDER.called_callback.tone,
     legacyKeys: ['A plus tard'],
   },
-  { key: 'called_rdv', label: HARX_LADDER.called_rdv.label, tone: HARX_LADDER.called_rdv.tone },
+  { key: 'called_rdv', label: HARX_LADDER.called_rdv.label, labelEn: HARX_LADDER.called_rdv.labelEn, tone: HARX_LADDER.called_rdv.tone },
+  {
+    key: 'not_argumented',
+    label: HARX_LADDER.not_argumented.label,
+    labelEn: HARX_LADDER.not_argumented.labelEn,
+    tone: HARX_LADDER.not_argumented.tone,
+  },
   {
     key: 'argued_rdv',
     label: HARX_LADDER.argued_rdv.label,
+    labelEn: HARX_LADDER.argued_rdv.labelEn,
     tone: HARX_LADDER.argued_rdv.tone,
     legacyKeys: ['RDV'],
   },
   {
     key: 'argued_declined',
     label: HARX_LADDER.argued_declined.label,
+    labelEn: HARX_LADDER.argued_declined.labelEn,
     tone: HARX_LADDER.argued_declined.tone,
     legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'],
   },
-  { key: 'argued_done', label: HARX_LADDER.argued_done.label, tone: HARX_LADDER.argued_done.tone },
+  { key: 'argued_done', label: HARX_LADDER.argued_done.label, labelEn: HARX_LADDER.argued_done.labelEn, tone: HARX_LADDER.argued_done.tone },
 ];
 
 export function getProspectStatusBadge(
@@ -124,7 +183,13 @@ export function getProspectStatusBadge(
   }
 
   if (!best) return null;
-  return { label: best.rubric.label, tone: best.rubric.tone, title: best.rubric.key };
+  return {
+    id: best.rubric.key,
+    label: best.rubric.label,
+    labelEn: best.rubric.labelEn,
+    tone: best.rubric.tone,
+    title: best.rubric.key,
+  };
 }
 
 const PRIORITY_CALLOUTCOMES = new Set([
@@ -337,6 +402,11 @@ export function resolveHarxLadderStatusBadge(
   if (['refusal', 'not_interested', 'already_equipped'].includes(outcome)) {
     return { ...HARX_LADDER.argued_declined };
   }
+  if (outcome === 'not_argumented') return { ...HARX_LADDER.not_argumented };
+  // After AI scoring, connected_no_sale = answered but not argumented.
+  if (outcome === 'connected_no_sale' && call.ai_call_status === 'scored') {
+    return { ...HARX_LADDER.not_argumented };
+  }
   if (outcome === 'callback_requested') return { ...HARX_LADDER.called_callback };
   if (outcome === 'appointment') return { ...HARX_LADDER.called_rdv };
   if (outcome === 'wrong_number') return { ...HARX_LADDER.called_wrong_number };
@@ -390,14 +460,14 @@ export function isNonEvaluableCall(call: CallLike): boolean {
   return isCallVoicemail(call) || isCallFraudDetected(call);
 }
 
-/** Minimum billable duration (seconds) before AI analysis is allowed. */
+/** AI analysis runs only when duration is strictly greater than 30 seconds. */
 export const MIN_CALL_ANALYSIS_SECONDS = 30;
 
-/** True when the call is too short for a reliable commercial AI audit. */
+/** True when the call is ≤30s — no AI analysis (argumented / not argumented). */
 export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_call_status'>): boolean {
   if (call.ai_call_status === 'too_short') return true;
   const duration = Number((call as any).duration);
-  return Number.isFinite(duration) && duration > 0 && duration < MIN_CALL_ANALYSIS_SECONDS;
+  return Number.isFinite(duration) && duration > 0 && duration <= MIN_CALL_ANALYSIS_SECONDS;
 }
 
 /** HARX ladder value for a stored call, used by the history status filter. */
@@ -431,6 +501,8 @@ export function historyDisposition(call: CallLike): string | null {
   ) {
     return 'called_unreachable';
   }
+  if (outcome === 'not_argumented') return 'not_argumented';
+  if (outcome === 'connected_no_sale' && call.ai_call_status === 'scored') return 'not_argumented';
   if (outcome === 'callback_requested') return 'called_callback';
   if (outcome === 'appointment') return 'called_rdv';
   if (outcome === 'argued_interested') return 'argued_rdv';
@@ -506,8 +578,8 @@ export function getTooShortAnalysisNotice(language: string = 'fr', durationSec?:
       ? ` (${Math.round(durationSec)}s)`
       : '';
   return language.toLowerCase().startsWith('en')
-    ? `Call too short${d} — the transcript is kept. QA analysis only runs for calls over ${MIN_CALL_ANALYSIS_SECONDS} seconds.`
-    : `Appel trop court${d} — la retranscription est conservée. L’analyse QA ne se lance qu’au-delà de ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
+    ? `Call ≤ ${MIN_CALL_ANALYSIS_SECONDS}s${d} — transcript kept. AI analysis (argumented / not argumented) runs only when duration is greater than ${MIN_CALL_ANALYSIS_SECONDS} seconds.`
+    : `Appel ≤ ${MIN_CALL_ANALYSIS_SECONDS}s${d} — retranscription conservée. L’analyse IA (argumenté / non argumenté) ne se lance que si la durée est supérieure à ${MIN_CALL_ANALYSIS_SECONDS} secondes.`;
 }
 
 const UNSCORED_OUTCOMES = new Set([
@@ -771,27 +843,32 @@ export function formatRetractionEndsLabel(
 }
 
 /**
- * Connected call without a commercial « Appel argumenté » outcome.
- * Not Injoignable, not a scored AI reject — no commission yet.
+ * Answered call classified as Not argumented (invalid), or ≤30s with no AI yet.
  */
 export function isNonArguedConnectedCall(call: CallLike): boolean {
   if (isCallVoicemail(call) || isCallFraudDetected(call)) return false;
   if (!hasCallConnection(call)) return false;
   const outcome = String(call.callOutcome || '').toLowerCase();
+  if (outcome === 'not_argumented') return true;
+  if (outcome === 'connected_no_sale' && call.ai_call_status === 'scored') return true;
   if (['transaction', 'argued_interested', 'refusal', 'not_interested', 'already_equipped'].includes(outcome)) {
     return false;
   }
-  if (call.ai_call_status === 'too_short') return true;
-  if (outcome === 'connected_no_sale' || outcome === 'too_short') return true;
-  // completed + audio, no HARX disposition yet → not argued
-  return !historyDisposition(call) && !String(call.lead?.repDisposition || '').trim();
+  // ≤30s: no AI analysis yet — connected but not classified as argumented.
+  if (call.ai_call_status === 'too_short' || outcome === 'too_short') return true;
+  if (outcome === 'connected_no_sale' && call.ai_call_status !== 'scored') return true;
+  return false;
 }
 
 export function isCallRejectedByAI(call: CallLike): boolean {
   if (isCallFraudDetected(call)) return true;
-  // Short / non-argued connected calls are not « refusés » — no QA score yet.
-  if (isNonArguedConnectedCall(call)) return false;
+  // Not argumented (after AI) is invalid — show as rejected for commission.
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (outcome === 'not_argumented') return true;
+  if (outcome === 'connected_no_sale' && call.ai_call_status === 'scored') return true;
+  // ≤30s: no analysis yet — not a reject badge.
   if (call.ai_call_status === 'too_short') return false;
+  if (isCallTooShortForAnalysis(call)) return false;
   if (call.validByAI === false || call.valid === false) return true;
   if (call.ai_call_status === 'auto_refused') return true;
   return false;

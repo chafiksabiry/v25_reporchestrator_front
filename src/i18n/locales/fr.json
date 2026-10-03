@@ -388,6 +388,7 @@
       "called_wrong_number": "Appelé – Numéro non attribué",
       "called_callback": "Appelé – Souhaite être rappelé",
       "called_rdv": "Appelé – RDV pris pour rappel",
+      "not_argumented": "Non argumenté",
       "argued_rdv": "Appel argumenté – RDV pris / délai de réflexion",
       "argued_declined": "Appel argumenté – Transaction déclinée",
       "argued_done": "Appel argumenté – Transaction aboutie"
@@ -399,6 +400,7 @@
       "called_wrong_number": "Numéro non attribué",
       "called_callback": "Souhaite être rappelé",
       "called_rdv": "RDV pour rappel",
+      "not_argumented": "Non argumenté",
       "argued_rdv": "RDV / délai de réflexion",
       "argued_declined": "Transaction déclinée",
       "argued_done": "Transaction aboutie"
