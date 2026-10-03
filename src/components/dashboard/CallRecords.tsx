@@ -44,7 +44,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -1368,6 +1368,13 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
+                        ) : isNonArguedConnectedCall(record) ? (
+                          <span
+                            className="text-slate-300 font-bold text-sm"
+                            title="Appel connecté — non argumenté (pas de commission)"
+                          >
+                            —
+                          </span>
                         ) : isCallRejectedByAI(record) ? (
                           (() => {
                             const disp = dispositionBadge(record, ledgerStatus);
@@ -1530,20 +1537,23 @@ export function CallRecords({
                   </div>
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                     isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
-                    selectedCall.validByAI === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                    selectedCall.validByAI === false ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
+                    isCallApprovedByAI(selectedCall) ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                    isNonArguedConnectedCall(selectedCall) ? 'bg-slate-50 text-slate-400 border-slate-200' :
+                    isCallRejectedByAI(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : isNonArguedConnectedCall(selectedCall) ? 'Appel connecté — non argumenté' : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
                     {isCallFraudDetected(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : isCallVoicemail(selectedCall) ? (
                       <X className="w-3 h-3" />
-                    ) : selectedCall.validByAI === true ? (
+                    ) : isCallApprovedByAI(selectedCall) ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         +{resolveCallRepCommission(selectedCall).toFixed(2)}€
                       </div>
-                    ) : selectedCall.validByAI === false ? (
+                    ) : isNonArguedConnectedCall(selectedCall) ? (
+                      <span className="normal-case tracking-normal font-bold text-slate-400">—</span>
+                    ) : isCallRejectedByAI(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : (
                       <Clock className="w-3 h-3 animate-pulse" />
