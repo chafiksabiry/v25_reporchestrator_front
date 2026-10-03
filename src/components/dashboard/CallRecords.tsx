@@ -44,7 +44,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, localizeStatusBadge, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -143,6 +143,7 @@ export interface CallRecord {
     | 'fraud'
     | 'too_short'
     | 'connected_no_sale'
+    | 'not_argumented'
     | null;
   callOutcomeSource?: 'ai' | 'rep' | 'system' | null;
   /** Denormalised flags. `flags.fraud` is the canonical fraud signal now. */
@@ -287,18 +288,19 @@ function isAnalysisStale(record: CallRecord): boolean {
 }
 
 /** Filter = official HARX ladder only (no Terminé / Non validé / Twilio raw labels). */
-const HISTORY_STATUS_FILTERS: Array<{ id: string; label: string; group?: 'line' }> = [
-  { id: 'all', label: 'Tous statuts' },
-  { id: 'to_call', label: HARX_LADDER.to_call.label },
-  { id: 'called_unreachable', label: HARX_LADDER.called_unreachable.label },
-  { id: 'called_voicemail', label: HARX_LADDER.called_voicemail.label },
-  { id: 'called_wrong_number', label: HARX_LADDER.called_wrong_number.label },
-  { id: 'called_callback', label: HARX_LADDER.called_callback.label },
-  { id: 'called_rdv', label: HARX_LADDER.called_rdv.label },
-  { id: 'argued_rdv', label: HARX_LADDER.argued_rdv.label },
-  { id: 'argued_declined', label: HARX_LADDER.argued_declined.label },
-  { id: 'argued_done', label: HARX_LADDER.argued_done.label },
-];
+const HISTORY_STATUS_FILTER_IDS = [
+  'all',
+  'to_call',
+  'called_unreachable',
+  'called_voicemail',
+  'called_wrong_number',
+  'called_callback',
+  'called_rdv',
+  'not_argumented',
+  'argued_rdv',
+  'argued_declined',
+  'argued_done',
+] as const;
 
 function callFallsInDateRange(record: { startTime?: string | Date; createdAt?: string | Date }, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -1115,7 +1117,9 @@ export function CallRecords({
             }`}
           >
             <span>
-              {HISTORY_STATUS_FILTERS.find((item) => item.id === historyStatusFilter)?.label || 'Tous statuts'}
+              {historyStatusFilter === 'all'
+                ? t('workspace.allStatuses', 'Tous statuts')
+                : t(`prospects.disp.${historyStatusFilter}`, HARX_LADDER[historyStatusFilter]?.label || historyStatusFilter)}
             </span>
             <ChevronDown className={`w-3 h-3 transition-transform ${historyStatusOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -1123,24 +1127,25 @@ export function CallRecords({
             <>
               <div className="fixed inset-0 z-40" onClick={() => setHistoryStatusOpen(false)} />
               <div className="absolute top-full left-0 mt-1.5 w-80 max-h-80 overflow-y-auto bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-50">
-                {HISTORY_STATUS_FILTERS.map((item) => {
-                  if (item.group === 'line') {
-                    return <div key={item.id} className="h-px bg-slate-100 mx-4 my-1" />;
-                  }
-                  const active = historyStatusFilter === item.id;
+                {HISTORY_STATUS_FILTER_IDS.map((id) => {
+                  const active = historyStatusFilter === id;
+                  const label =
+                    id === 'all'
+                      ? t('workspace.allStatuses', 'Tous statuts')
+                      : t(`prospects.disp.${id}`, HARX_LADDER[id]?.label || id);
                   return (
                     <button
-                      key={item.id}
+                      key={id}
                       type="button"
                       onClick={() => {
-                        setHistoryStatusFilter(item.id);
+                        setHistoryStatusFilter(id);
                         setHistoryStatusOpen(false);
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-left hover:bg-slate-50 ${
                         active ? 'text-harx-700 bg-harx-50/60' : 'text-slate-600'
                       }`}
                     >
-                      <span className="flex-1">{item.label}</span>
+                      <span className="flex-1">{label}</span>
                       {active && <CheckCircle2 className="w-3 h-3 text-harx-500 shrink-0" />}
                     </button>
                   );
@@ -1232,7 +1237,7 @@ export function CallRecords({
             const showValidationSection =
               status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
             const ledgerStatus = getLedgerTxStatus(record);
-            const outcomeBadge = dispositionBadge(record, ledgerStatus);
+            const outcomeBadge = localizeStatusBadge(dispositionBadge(record, ledgerStatus), i18n.language);
 
             return (
               <div
@@ -1368,16 +1373,25 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : isNonArguedConnectedCall(record) ? (
+                        ) : isNonArguedConnectedCall(record) &&
+                          String(record.callOutcome || '') !== 'not_argumented' &&
+                          !(record.callOutcome === 'connected_no_sale' && record.ai_call_status === 'scored') ? (
                           <span
                             className="text-slate-300 font-bold text-sm"
-                            title="Appel connecté — non argumenté (pas de commission)"
+                            title={
+                              i18n.language?.startsWith('en')
+                                ? 'Connected call ≤30s — no AI analysis yet'
+                                : 'Appel connecté ≤30s — pas encore d’analyse IA'
+                            }
                           >
                             —
                           </span>
-                        ) : isCallRejectedByAI(record) ? (
+                        ) : isCallRejectedByAI(record) || isNonArguedConnectedCall(record) ? (
                           (() => {
-                            const disp = dispositionBadge(record, ledgerStatus);
+                            const disp = localizeStatusBadge(
+                              dispositionBadge(record, ledgerStatus),
+                              i18n.language
+                            );
                             if (!disp) {
                               return <span className="text-slate-300 font-bold text-sm">—</span>;
                             }
@@ -1538,10 +1552,13 @@ export function CallRecords({
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                     isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
                     isCallApprovedByAI(selectedCall) ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                    isNonArguedConnectedCall(selectedCall) ? 'bg-slate-50 text-slate-400 border-slate-200' :
+                    (selectedCall.callOutcome === 'not_argumented' ||
+                      (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored'))
+                      ? 'bg-slate-100 text-slate-700 border-slate-300'
+                    : isNonArguedConnectedCall(selectedCall) ? 'bg-slate-50 text-slate-400 border-slate-200' :
                     isCallRejectedByAI(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : isNonArguedConnectedCall(selectedCall) ? 'Appel connecté — non argumenté' : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : (selectedCall.callOutcome === 'not_argumented' || (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored')) ? (i18n.language?.startsWith('en') ? 'Not argumented — invalid' : 'Non argumenté — invalide') : isNonArguedConnectedCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'Connected ≤30s — no AI analysis' : 'Connecté ≤30s — pas d’analyse IA') : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
                     {isCallFraudDetected(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : isCallVoicemail(selectedCall) ? (
@@ -1551,6 +1568,11 @@ export function CallRecords({
                         <Check className="w-3 h-3" />
                         +{resolveCallRepCommission(selectedCall).toFixed(2)}€
                       </div>
+                    ) : selectedCall.callOutcome === 'not_argumented' ||
+                      (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored') ? (
+                      <span className="normal-case tracking-normal font-bold">
+                        {t('prospects.disp.not_argumented', 'Non argumenté')}
+                      </span>
                     ) : isNonArguedConnectedCall(selectedCall) ? (
                       <span className="normal-case tracking-normal font-bold text-slate-400">—</span>
                     ) : isCallRejectedByAI(selectedCall) ? (
@@ -1667,7 +1689,10 @@ export function CallRecords({
                   {selectedCallTooShort ? (
                     <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
                       {(() => {
-                        const disposition = resolveHarxLadderStatusBadge(selectedCall);
+                        const disposition = localizeStatusBadge(
+                          resolveHarxLadderStatusBadge(selectedCall),
+                          i18n.language
+                        );
                         if (!disposition) return null;
                         return (
                           <span
