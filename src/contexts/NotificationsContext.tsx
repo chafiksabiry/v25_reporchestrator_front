@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { connectRepEnrollmentSocket } from '../lib/enrollmentSocket';
+import { connectRepNotificationSocket } from '../lib/notificationSocket';
 import { getAgentId, getAuthToken } from '../utils/authUtils';
 import i18n from '../i18n';
 import {
@@ -474,6 +475,54 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     );
     return dispose;
   }, [addEnrollmentNotification, refreshNotifications]);
+
+  // Realtime activity notifications from dash_rep_back (matching, teammate, training, KB, …).
+  useEffect(() => {
+    const dispose = connectRepNotificationSocket(
+      (data) => {
+        const n = data.notification;
+        if (!n) return;
+        const key = String(n.notificationKey || n.id || '').trim();
+        if (!key) {
+          void refreshNotifications();
+          return;
+        }
+        if (knownKeysRef.current.has(key)) {
+          return;
+        }
+        const kind = (n.kind || 'general') as RepNotificationKind;
+        const row: RepNotification = {
+          id: String(n.id || key),
+          notificationKey: key,
+          kind,
+          status: n.status,
+          title: String(n.title || 'Notification'),
+          message: String(n.message || ''),
+          gigId: n.gigId ? String(n.gigId) : undefined,
+          journeyId: n.journeyId ? String(n.journeyId) : undefined,
+          actionPath: n.actionPath ? String(n.actionPath) : undefined,
+          createdAt: typeof n.createdAt === 'number' ? n.createdAt : Date.now(),
+          read: !!n.read,
+        };
+        knownKeysRef.current.add(key);
+        setNotifications((prev) => {
+          const without = prev.filter(
+            (x) => x.notificationKey !== key && x.id !== row.id && x.id !== key
+          );
+          return [row, ...without];
+        });
+        if (data.created !== false && !row.read) {
+          playNotificationSound();
+        }
+      },
+      {
+        onConnect: () => {
+          void refreshNotifications();
+        },
+      }
+    );
+    return dispose;
+  }, [refreshNotifications]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({
