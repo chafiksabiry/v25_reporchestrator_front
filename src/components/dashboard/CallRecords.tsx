@@ -328,9 +328,24 @@ function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
 
 /** Disposition pill — official HARX ladder only (AMD→Répondeur, Busy→Injoignable). */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy' | 'status' | 'lead'>,
+  record: Pick<
+    CallRecord,
+    | 'callOutcome'
+    | 'ai_call_score'
+    | 'transaction'
+    | 'validByAI'
+    | 'valid'
+    | 'ai_call_status'
+    | 'flags'
+    | 'duration'
+    | 'answeredBy'
+    | 'status'
+    | 'lead'
+    | 'recording_url'
+    | 'recording_url_cloudinary'
+  >,
   ledgerTxStatus?: string | null
-): { label: string; tone: string; title?: string } {
+): { label: string; tone: string; title?: string } | null {
   return resolveHarxLadderStatusBadge(record, ledgerTxStatus);
 }
 
@@ -480,6 +495,9 @@ export function CallRecords({
 
     if (isCallRejectedByAI(record) || isCallApprovedByAI(record)) {
       const txStatus = resolveUnvalidatedTransactionStatus(record);
+      if (!txStatus) {
+        return <span className="text-slate-300 font-bold text-sm">—</span>;
+      }
       return (
         <span className={`${pillClass} ${txStatus.tone}`} title={txStatus.title}>
           {isCallRejectedByAI(record) ? (
@@ -1273,12 +1291,14 @@ export function CallRecords({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider border ${outcomeBadge.tone}`}
-                          title={outcomeBadge.title}
-                        >
-                          {outcomeBadge.label}
-                        </span>
+                        {outcomeBadge ? (
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider border ${outcomeBadge.tone}`}
+                            title={outcomeBadge.title}
+                          >
+                            {outcomeBadge.label}
+                          </span>
+                        ) : null}
                         {isTransactionInRetraction(record, ledgerStatus) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-200">
                             <RotateCcw className="w-2.5 h-2.5" />
@@ -1351,6 +1371,9 @@ export function CallRecords({
                         ) : isCallRejectedByAI(record) ? (
                           (() => {
                             const disp = dispositionBadge(record, ledgerStatus);
+                            if (!disp) {
+                              return <span className="text-slate-300 font-bold text-sm">—</span>;
+                            }
                             return (
                               <span
                                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border ${disp.tone}`}
@@ -1635,6 +1658,7 @@ export function CallRecords({
                     <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
                       {(() => {
                         const disposition = resolveHarxLadderStatusBadge(selectedCall);
+                        if (!disposition) return null;
                         return (
                           <span
                             className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] font-black tracking-wider border ${disposition.tone}`}
