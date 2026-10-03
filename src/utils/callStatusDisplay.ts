@@ -4,75 +4,100 @@ export interface StatusBadge {
   title?: string;
 }
 
+/** Official HARX disposition ladder (only labels allowed as call status). */
+export const HARX_LADDER: Record<string, StatusBadge> = {
+  to_call: {
+    label: 'À appeler',
+    tone: 'bg-slate-50 text-slate-600 border-slate-200',
+  },
+  called_unreachable: {
+    label: 'Appelé – Injoignable',
+    tone: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  called_voicemail: {
+    label: 'Appelé – Répondeur',
+    tone: 'bg-orange-50 text-orange-700 border-orange-200',
+    title: 'Twilio/Telnyx AMD → Appelé – Répondeur',
+  },
+  called_wrong_number: {
+    label: 'Appelé – Numéro non attribué',
+    tone: 'bg-rose-50 text-rose-700 border-rose-200',
+    title: 'Twilio/Telnyx Failed → Appelé – Numéro non attribué',
+  },
+  called_callback: {
+    label: 'Appelé – Souhaite être rappelé',
+    tone: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  called_rdv: {
+    label: 'Appelé – RDV pris pour rappel',
+    tone: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  argued_rdv: {
+    label: 'Appel argumenté – RDV pris / délai de réflexion',
+    tone: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  argued_declined: {
+    label: 'Appel argumenté – Transaction déclinée',
+    tone: 'bg-rose-50 text-rose-700 border-rose-200',
+  },
+  argued_done: {
+    label: 'Appel argumenté – Transaction aboutie',
+    tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+};
+
 export function callOutcomeBadge(outcome: string | null | undefined): StatusBadge | null {
   if (!outcome) return null;
   const map: Record<string, StatusBadge> = {
-    // Twilio telephony → HARX ladder
-    voicemail: {
-      label: 'Appelé – Répondeur',
-      tone: 'bg-orange-50 text-orange-700 border-orange-200',
-      title: 'Twilio AMD / répondeur',
-    },
-    busy: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio Busy',
-    },
-    no_answer: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio No-Answer',
-    },
-    wrong_number: {
-      label: 'Appelé – Numéro non attribué',
-      tone: 'bg-rose-50 text-rose-700 border-rose-200',
-      title: 'Twilio Failed',
-    },
-    callback_requested: {
-      label: 'Appelé – Souhaite être rappelé',
-      tone: 'bg-amber-50 text-amber-700 border-amber-200',
-    },
-    appointment: {
-      label: 'Appelé – RDV pris pour rappel',
-      tone: 'bg-violet-50 text-violet-700 border-violet-200',
-    },
-    transaction: {
-      label: 'Appel argumenté – Transaction aboutie',
-      tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    },
-    argued_interested: {
-      label: 'Appel argumenté – RDV pris / délai de réflexion',
-      tone: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    },
-    refusal: {
-      label: 'Appel argumenté – Transaction déclinée',
-      tone: 'bg-rose-50 text-rose-700 border-rose-200',
-    },
-    not_interested: {
-      label: 'Appel argumenté – Transaction déclinée',
-      tone: 'bg-rose-50 text-rose-700 border-rose-200',
-    },
-    already_equipped: {
-      label: 'Appel argumenté – Transaction déclinée',
-      tone: 'bg-blue-50 text-blue-700 border-blue-200',
-    },
+    // Twilio / Telnyx telephony → HARX ladder
+    voicemail: { ...HARX_LADDER.called_voicemail, title: 'Twilio/Telnyx AMD / répondeur' },
+    busy: { ...HARX_LADDER.called_unreachable, title: 'Twilio/Telnyx Busy' },
+    no_answer: { ...HARX_LADDER.called_unreachable, title: 'Twilio/Telnyx No-Answer' },
+    wrong_number: { ...HARX_LADDER.called_wrong_number, title: 'Twilio/Telnyx Failed' },
+    callback_requested: { ...HARX_LADDER.called_callback },
+    appointment: { ...HARX_LADDER.called_rdv },
+    transaction: { ...HARX_LADDER.argued_done },
+    argued_interested: { ...HARX_LADDER.argued_rdv },
+    refusal: { ...HARX_LADDER.argued_declined },
+    not_interested: { ...HARX_LADDER.argued_declined },
+    already_equipped: { ...HARX_LADDER.argued_declined },
     fraud: { label: 'Fraude', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
-    // Legacy too_short → never show « Trop court » to the user.
-    too_short: { label: 'Sans suite', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
-    connected_no_sale: { label: 'Sans suite', tone: 'bg-slate-50 text-slate-600 border-slate-200' },
+    // Legacy too_short → ladder only (never « Trop court » / « Sans suite » / « Non validé »)
+    too_short: { ...HARX_LADDER.called_unreachable },
+    connected_no_sale: { ...HARX_LADDER.called_unreachable },
   };
-  return map[outcome] || { label: outcome.replace(/_/g, ' '), tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+  return map[outcome] || HARX_LADDER.called_unreachable;
 }
 
 const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string; legacyKeys?: string[] }> = [
-  { key: 'called_unreachable', label: 'Appelé – Injoignable', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'called_voicemail', label: 'Appelé – Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' },
-  { key: 'called_wrong_number', label: 'Appelé – Numéro non attribué', tone: 'bg-rose-50 text-rose-700 border-rose-200', legacyKeys: ['PAS AU COURANT'] },
-  { key: 'called_callback', label: 'Appelé – Souhaite être rappelé', tone: 'bg-amber-50 text-amber-700 border-amber-200', legacyKeys: ['A plus tard'] },
-  { key: 'called_rdv', label: 'Appelé – RDV pris pour rappel', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-  { key: 'argued_rdv', label: 'Appel argumenté – RDV / délai', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', legacyKeys: ['RDV'] },
-  { key: 'argued_declined', label: 'Appel argumenté – Transaction déclinée', tone: 'bg-rose-50 text-rose-700 border-rose-200', legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'] },
-  { key: 'argued_done', label: 'Appel argumenté – Transaction aboutie', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { key: 'called_unreachable', label: HARX_LADDER.called_unreachable.label, tone: HARX_LADDER.called_unreachable.tone },
+  { key: 'called_voicemail', label: HARX_LADDER.called_voicemail.label, tone: HARX_LADDER.called_voicemail.tone },
+  {
+    key: 'called_wrong_number',
+    label: HARX_LADDER.called_wrong_number.label,
+    tone: HARX_LADDER.called_wrong_number.tone,
+    legacyKeys: ['PAS AU COURANT'],
+  },
+  {
+    key: 'called_callback',
+    label: HARX_LADDER.called_callback.label,
+    tone: HARX_LADDER.called_callback.tone,
+    legacyKeys: ['A plus tard'],
+  },
+  { key: 'called_rdv', label: HARX_LADDER.called_rdv.label, tone: HARX_LADDER.called_rdv.tone },
+  {
+    key: 'argued_rdv',
+    label: HARX_LADDER.argued_rdv.label,
+    tone: HARX_LADDER.argued_rdv.tone,
+    legacyKeys: ['RDV'],
+  },
+  {
+    key: 'argued_declined',
+    label: HARX_LADDER.argued_declined.label,
+    tone: HARX_LADDER.argued_declined.tone,
+    legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'],
+  },
+  { key: 'argued_done', label: HARX_LADDER.argued_done.label, tone: HARX_LADDER.argued_done.tone },
 ];
 
 export function getProspectStatusBadge(
@@ -140,10 +165,10 @@ export function resolveTwilioOrPostAnalysisBadge(call: CallLike): StatusBadge {
     if (badge) return { ...badge, title: `Résultat appel : ${outcome}` };
   }
 
+  // Never surface « Terminé / Sans suite / Non validé » — stick to the ladder.
   return {
-    label: 'Sans suite',
-    tone: 'bg-slate-50 text-slate-600 border-slate-200',
-    title: 'Appel connecté sans suite commerciale',
+    ...HARX_LADDER.called_unreachable,
+    title: 'Aucun échange commercial exploitable → Appelé – Injoignable',
   };
 }
 
@@ -175,54 +200,99 @@ const VOICEMAIL_REGEX =
 
 function isMachineAnswer(call: CallLike): boolean {
   const answeredBy = String(call.answeredBy || '').toLowerCase();
-  return answeredBy.startsWith('machine') || answeredBy === 'fax';
+  if (answeredBy.startsWith('machine') || answeredBy === 'fax' || answeredBy.includes('amd')) {
+    return true;
+  }
+  // Telnyx AMD / answering machine hints on status or outcome
+  const status = String(call.status || '').toLowerCase();
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  return (
+    status.includes('machine') ||
+    status.includes('amd') ||
+    outcome.includes('machine') ||
+    outcome === 'answering_machine' ||
+    outcome === 'amd'
+  );
 }
 
-/** Twilio Call status → HARX ladder labels where applicable. */
+/**
+ * Twilio / Telnyx lifecycle → HARX ladder only.
+ * Never returns « Terminé », « Non validé », « Trop court », etc.
+ */
 export function twilioCallStatusBadge(status?: string | null): StatusBadge {
   const key = String(status || '').toLowerCase();
-  const table: Record<string, StatusBadge> = {
-    queued: { label: 'En file', tone: 'bg-slate-50 text-slate-600 border-slate-200', title: 'Twilio a reçu la demande d’appel.' },
-    initiated: { label: 'Composé', tone: 'bg-sky-50 text-sky-700 border-sky-100', title: 'Twilio a composé le numéro.' },
-    ringing: { label: 'Sonnerie', tone: 'bg-sky-50 text-sky-700 border-sky-100', title: 'Le numéro destinataire sonne.' },
-    'in-progress': { label: 'En cours', tone: 'bg-emerald-50 text-emerald-700 border-emerald-100', title: 'L’appel est connecté.' },
-    completed: {
-      label: 'Terminé',
-      tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      title: 'Connexion établie puis raccrochée. Une personne, un serveur vocal ou un répondeur.',
-    },
-    busy: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio Busy → Appelé – Injoignable',
-    },
-    'no-answer': {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio No-Answer → Appelé – Injoignable',
-    },
-    noanswer: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio No-Answer → Appelé – Injoignable',
-    },
-    canceled: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio Canceled → Appelé – Injoignable',
-    },
-    cancelled: {
-      label: 'Appelé – Injoignable',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Twilio Cancelled → Appelé – Injoignable',
-    },
-    failed: {
-      label: 'Appelé – Numéro non attribué',
-      tone: 'bg-rose-50 text-rose-700 border-rose-100',
-      title: 'Twilio Failed → Appelé – Numéro non attribué',
-    },
-  };
-  return table[key] || { label: status || '—', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+  if (['queued', 'initiated', 'ringing', 'in-progress', 'active', 'bridging'].includes(key)) {
+    return { ...HARX_LADDER.to_call, title: `Twilio/Telnyx ${key} → À appeler` };
+  }
+  if (key === 'busy' || key === 'no-answer' || key === 'noanswer' || key === 'canceled' || key === 'cancelled') {
+    return {
+      ...HARX_LADDER.called_unreachable,
+      title: `Twilio/Telnyx ${key} → Appelé – Injoignable`,
+    };
+  }
+  if (key === 'failed') {
+    return {
+      ...HARX_LADDER.called_wrong_number,
+      title: 'Twilio/Telnyx Failed → Appelé – Numéro non attribué',
+    };
+  }
+  if (key === 'completed' || key === 'hangup') {
+    // Completed alone is not a commercial status — never show « Terminé ».
+    return {
+      ...HARX_LADDER.called_unreachable,
+      title: 'Appel terminé côté opérateur — statut commercial à préciser',
+    };
+  }
+  return { ...HARX_LADDER.called_unreachable, title: status || undefined };
+}
+
+/**
+ * Single user-facing call status: always one of the 9 HARX ladder labels.
+ * Maps Twilio/Telnyx AMD → Appelé – Répondeur, Busy/No-Answer → Appelé – Injoignable.
+ */
+export function resolveHarxLadderStatusBadge(
+  call: CallLike,
+  ledgerTxStatus?: string | null
+): StatusBadge {
+  if (isCallVoicemail(call)) {
+    return {
+      ...HARX_LADDER.called_voicemail,
+      title: 'AMD / répondeur — aucun échange avec le prospect',
+    };
+  }
+
+  const stored = String(call.lead?.repDisposition || '').trim();
+  if (stored && HARX_LADDER[stored]) {
+    return { ...HARX_LADDER[stored], title: `Disposition : ${stored}` };
+  }
+
+  const hist = historyDisposition(call);
+  if (hist && HARX_LADDER[hist]) {
+    return { ...HARX_LADDER[hist] };
+  }
+
+  if (hasBookedSaleCommission(call, ledgerTxStatus)) {
+    return { ...HARX_LADDER.argued_done };
+  }
+
+  const prospect = getProspectStatusBadge(call.ai_call_score);
+  if (prospect) return prospect;
+
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (outcome === 'transaction') return { ...HARX_LADDER.argued_done };
+  if (outcome === 'argued_interested') return { ...HARX_LADDER.argued_rdv };
+  if (['refusal', 'not_interested', 'already_equipped'].includes(outcome)) {
+    return { ...HARX_LADDER.argued_declined };
+  }
+  if (outcome === 'callback_requested') return { ...HARX_LADDER.called_callback };
+  if (outcome === 'appointment') return { ...HARX_LADDER.called_rdv };
+  if (outcome === 'wrong_number') return { ...HARX_LADDER.called_wrong_number };
+  if (outcome === 'voicemail') return { ...HARX_LADDER.called_voicemail };
+  if (outcome === 'busy' || outcome === 'no_answer' || outcome === 'too_short' || outcome === 'connected_no_sale') {
+    return { ...HARX_LADDER.called_unreachable };
+  }
+
+  return resolveTwilioOrPostAnalysisBadge(call);
 }
 
 export function isCallVoicemail(call: CallLike): boolean {
@@ -275,10 +345,21 @@ export function historyDisposition(call: CallLike): string | null {
   if (isCallVoicemail(call)) return 'called_voicemail';
   const outcome = String(call.callOutcome || '').toLowerCase();
   const status = String(call.status || '').toLowerCase();
+  if (
+    outcome === 'voicemail' ||
+    outcome === 'amd' ||
+    outcome === 'answering_machine' ||
+    status.includes('amd') ||
+    status.includes('machine')
+  ) {
+    return 'called_voicemail';
+  }
   if (outcome === 'wrong_number' || status === 'failed') return 'called_wrong_number';
   if (
     outcome === 'no_answer' ||
     outcome === 'busy' ||
+    outcome === 'too_short' ||
+    outcome === 'connected_no_sale' ||
     ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled'].includes(status)
   ) {
     return 'called_unreachable';
@@ -289,30 +370,20 @@ export function historyDisposition(call: CallLike): string | null {
   if (outcome === 'transaction') return 'argued_done';
   if (['refusal', 'not_interested', 'already_equipped'].includes(outcome)) return 'argued_declined';
   const stored = String(call.lead?.repDisposition || '').trim();
-  if (stored) return stored;
+  if (stored && HARX_LADDER[stored]) return stored;
   return null;
 }
 
-/** History status dropdown. Twilio chip first, then the same prospect ladder. */
+/** History status dropdown — ladder ids only. */
 export function callMatchesHistoryStatus(call: CallLike, filter: string): boolean {
   if (!filter || filter === 'all') return true;
-  if (filter === 'voicemail') return isCallVoicemail(call);
-  if (filter === 'too_short') return !isCallVoicemail(call) && isCallTooShortForAnalysis(call);
-  if (filter === 'completed') {
-    return String(call.status || '').toLowerCase() === 'completed' && !isCallVoicemail(call);
-  }
-  if (filter === 'no-answer') {
-    const s = String(call.status || '').toLowerCase();
-    return s === 'no-answer' || s === 'noanswer';
-  }
-  if (filter === 'canceled') {
-    const s = String(call.status || '').toLowerCase();
-    return s === 'canceled' || s === 'cancelled';
-  }
-  if (['busy', 'failed', 'queued', 'initiated', 'ringing', 'in-progress'].includes(filter)) {
-    return String(call.status || '').toLowerCase() === filter;
-  }
-  return historyDisposition(call) === filter;
+  if (filter === 'called_voicemail' || filter === 'voicemail') return isCallVoicemail(call);
+  const hist = historyDisposition(call);
+  if (hist === filter) return true;
+  // Fallback: compare resolved ladder badge key by label
+  const badge = resolveHarxLadderStatusBadge(call);
+  const entry = Object.entries(HARX_LADDER).find(([, v]) => v.label === badge.label);
+  return entry?.[0] === filter;
 }
 
 const SCORE_RUBRIC_KEYS = [
@@ -670,90 +741,11 @@ export function resolveCallDispositionStatus(
   call: CallLike,
   ledgerTxStatus?: string | null
 ): StatusBadge {
-  if (isCallVoicemail(call)) {
-    const badge = callOutcomeBadge('voicemail');
-    if (badge) return { ...badge, title: 'Répondeur — aucun échange avec le prospect' };
-  }
-
-  const outcomeRaw = String(call.callOutcome || '').toLowerCase();
-  if (outcomeRaw === 'too_short' || (!outcomeRaw && isCallTooShortForAnalysis(call))) {
-    return resolveTwilioOrPostAnalysisBadge(call);
-  }
-
-  if (isCallFraudDetected(call)) {
-    const badge = callOutcomeBadge('fraud');
-    if (badge) {
-      return { ...badge, title: 'Fraude détectée — appel et transaction non validés' };
-    }
-  }
-
-  if (hasBookedSaleCommission(call, ledgerTxStatus)) {
-    const badge = callOutcomeBadge('transaction');
-    if (badge) {
-      return {
-        ...badge,
-        title: isTransactionInRetraction(call, ledgerTxStatus)
-          ? 'Vente validée — en rétractation 14j'
-          : 'Vente validée — commission transaction',
-      };
-    }
-  }
-
-  const outcome = call.callOutcome;
-
-  if (outcome && PRIORITY_CALLOUTCOMES.has(outcome)) {
-    const badge = callOutcomeBadge(outcome);
-    if (badge) return { ...badge, title: `Résultat appel : ${outcome}` };
-  }
-
-  const prospect = getProspectStatusBadge(call.ai_call_score);
-  if (prospect) return prospect;
-
-  const outcomeBadge = callOutcomeBadge(outcome);
-  if (outcomeBadge) {
-    return { ...outcomeBadge, title: `Résultat appel : ${outcome}` };
-  }
-
-  if (call.transaction?.validByAI === false) {
-    return {
-      label: 'Pas de vente IA',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'L\'IA n\'a pas détecté de transaction',
-    };
-  }
-
-  return {
-    label: 'En attente',
-    tone: 'bg-blue-50 text-blue-600 border-blue-200',
-    title: 'En attente validation entreprise',
-  };
+  // Always the official HARX ladder — never Terminé / Non validé / Trop court / En attente.
+  return resolveHarxLadderStatusBadge(call, ledgerTxStatus);
 }
 
 export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
-  if (isCallVoicemail(call)) {
-    const badge = callOutcomeBadge('voicemail');
-    return badge
-      ? { ...badge, title: 'Répondeur — aucune commission due' }
-      : { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Répondeur — aucune commission due' };
-  }
-
-  const outcomeRaw = String(call.callOutcome || '').toLowerCase();
-  // Call disposition ≠ transaction status — show « Non validé » on TRANSACTION.
-  if (
-    isCallTooShortForAnalysis(call) ||
-    outcomeRaw === 'too_short' ||
-    outcomeRaw === 'connected_no_sale' ||
-    outcomeRaw === 'busy' ||
-    outcomeRaw === 'no_answer' ||
-    outcomeRaw === 'wrong_number'
-  ) {
-    return {
-      label: 'Non validé',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-      title: 'Transaction non validée',
-    };
-  }
-
   if (isCallFraudDetected(call)) {
     return {
       label: 'Fraude',
@@ -772,15 +764,11 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
 
   if (call.transaction?.validByCompany === false && !staleAiAutoReject) {
     return {
-      label: 'Call refused',
-      tone: 'bg-rose-50 text-rose-700 border-rose-200',
-      title: 'Décision entreprise : refusé',
+      ...HARX_LADDER.argued_declined,
+      title: 'Décision entreprise : transaction déclinée',
     };
   }
 
-  if (isCallRejectedByAI(call)) {
-    return CALL_REJECTED_BADGE;
-  }
-
-  return resolveCallDispositionStatus(call);
+  // Never « Non validé » — show the same HARX ladder status as the call.
+  return resolveHarxLadderStatusBadge(call);
 }

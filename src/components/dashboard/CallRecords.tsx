@@ -44,7 +44,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus, shouldHideCallScoring, twilioCallStatusBadge } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -286,29 +286,18 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
+/** Filter = official HARX ladder only (no Terminé / Non validé / Twilio raw labels). */
 const HISTORY_STATUS_FILTERS: Array<{ id: string; label: string; group?: 'line' }> = [
   { id: 'all', label: 'Tous statuts' },
-  { id: 'completed', label: 'Terminé' },
-  { id: 'too_short', label: 'Sans suite (<30s)' },
-  { id: 'in-progress', label: 'En cours' },
-  { id: 'line', label: '', group: 'line' },
-  // HARX ladder (Twilio AMD→Répondeur, Busy/No-Answer→Injoignable, Failed→Numéro non attribué)
-  { id: 'to_call', label: 'À appeler' },
-  { id: 'called_unreachable', label: 'Appelé – Injoignable' },
-  { id: 'called_voicemail', label: 'Appelé – Répondeur' },
-  { id: 'called_wrong_number', label: 'Appelé – Numéro non attribué' },
-  { id: 'called_callback', label: 'Appelé – Souhaite être rappelé' },
-  { id: 'called_rdv', label: 'Appelé – RDV pris pour rappel' },
-  { id: 'argued_rdv', label: 'Appel argumenté – RDV pris / délai de réflexion' },
-  { id: 'argued_declined', label: 'Appel argumenté – Transaction déclinée' },
-  { id: 'argued_done', label: 'Appel argumenté – Transaction aboutie' },
-  // Raw Twilio aliases still filterable for ops
-  { id: 'line', label: '', group: 'line' },
-  { id: 'busy', label: 'Twilio Busy → Injoignable' },
-  { id: 'no-answer', label: 'Twilio No-Answer → Injoignable' },
-  { id: 'voicemail', label: 'Twilio AMD → Répondeur' },
-  { id: 'failed', label: 'Twilio Failed → Numéro non attribué' },
-  { id: 'canceled', label: 'Twilio Canceled → Injoignable' },
+  { id: 'to_call', label: HARX_LADDER.to_call.label },
+  { id: 'called_unreachable', label: HARX_LADDER.called_unreachable.label },
+  { id: 'called_voicemail', label: HARX_LADDER.called_voicemail.label },
+  { id: 'called_wrong_number', label: HARX_LADDER.called_wrong_number.label },
+  { id: 'called_callback', label: HARX_LADDER.called_callback.label },
+  { id: 'called_rdv', label: HARX_LADDER.called_rdv.label },
+  { id: 'argued_rdv', label: HARX_LADDER.argued_rdv.label },
+  { id: 'argued_declined', label: HARX_LADDER.argued_declined.label },
+  { id: 'argued_done', label: HARX_LADDER.argued_done.label },
 ];
 
 function callFallsInDateRange(record: { startTime?: string | Date; createdAt?: string | Date }, from: string, to: string): boolean {
@@ -337,38 +326,12 @@ function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
   return isAnalysisStale(record);
 }
 
-/** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
+/** Disposition pill — official HARX ladder only (AMD→Répondeur, Busy→Injoignable). */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy' | 'status'>,
+  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags' | 'duration' | 'answeredBy' | 'status' | 'lead'>,
   ledgerTxStatus?: string | null
-): { label: string; tone: string } | null {
-  if (isCallVoicemail(record)) {
-    return callOutcomeBadge('voicemail');
-  }
-  if (isCallFraudDetected(record)) {
-    return callOutcomeBadge('fraud');
-  }
-  const outcome = String(record.callOutcome || '').toLowerCase();
-  // « Sans suite » is a callOutcome, not a validation label — show Non validé instead.
-  if (
-    isCallTooShortForAnalysis(record) ||
-    outcome === 'too_short' ||
-    outcome === 'connected_no_sale'
-  ) {
-    return {
-      label: 'Non validé',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-    };
-  }
-  if (isCallRejectedByAI(record)) return null;
-  const status = resolveCallDispositionStatus(record, ledgerTxStatus);
-  if (['À confirmer', 'En attente', 'Pas de vente IA', 'Sans suite'].includes(status.label)) {
-    return {
-      label: 'Non validé',
-      tone: 'bg-slate-50 text-slate-600 border-slate-200',
-    };
-  }
-  return status;
+): { label: string; tone: string; title?: string } {
+  return resolveHarxLadderStatusBadge(record, ledgerTxStatus);
 }
 
 export function CallRecords({
@@ -483,8 +446,8 @@ export function CallRecords({
     const amount = resolveTransactionRepCommission(record).toFixed(2);
     const endsLabel = getRetractionEndsLabel(record);
     const pillClass = compact
-      ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border'
-      : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border';
+      ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black tracking-tight border'
+      : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border';
 
     if (isTransactionInRetraction(record, ledgerStatus)) {
       return (
@@ -1252,10 +1215,6 @@ export function CallRecords({
               status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
             const ledgerStatus = getLedgerTxStatus(record);
             const outcomeBadge = dispositionBadge(record, ledgerStatus);
-            const voicemail = isCallVoicemail(record);
-            const telephonyBadge = voicemail
-              ? { label: 'Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200', title: 'Répondeur. Twilio reste sur completed dès qu’un audio est transféré.' }
-              : twilioCallStatusBadge(record.status);
 
             return (
               <div
@@ -1314,11 +1273,12 @@ export function CallRecords({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {outcomeBadge && (
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${outcomeBadge.tone}`}>
-                            {outcomeBadge.label}
-                          </span>
-                        )}
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider border ${outcomeBadge.tone}`}
+                          title={outcomeBadge.title}
+                        >
+                          {outcomeBadge.label}
+                        </span>
                         {isTransactionInRetraction(record, ledgerStatus) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-200">
                             <RotateCcw className="w-2.5 h-2.5" />
@@ -1337,12 +1297,6 @@ export function CallRecords({
                             Entreprise alertée
                           </span>
                         )}
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${telephonyBadge.tone}`}
-                          title={telephonyBadge.title}
-                        >
-                          {telephonyBadge.label}
-                        </span>
                         <span
                           className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
                             record.direction === 'inbound'
@@ -1397,27 +1351,12 @@ export function CallRecords({
                         ) : isCallRejectedByAI(record) ? (
                           (() => {
                             const disp = dispositionBadge(record, ledgerStatus);
-                            if (disp) {
-                              return (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${disp.tone}`}
-                                  title={record.ai_refusal_reason || record.callOutcome || undefined}
-                                >
-                                  {disp.label}
-                                </span>
-                              );
-                            }
                             return (
                               <span
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-slate-50 text-slate-600 border border-slate-200"
-                                title={record.ai_refusal_reason || undefined}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border ${disp.tone}`}
+                                title={disp.title || record.ai_refusal_reason || record.callOutcome || undefined}
                               >
-                                <X className="w-3 h-3" />
-                                {isUnansweredStatus
-                                  ? status === 'failed'
-                                    ? 'Appelé – Numéro non attribué'
-                                    : 'Appelé – Injoignable'
-                                  : 'Non validé'}
+                                {disp.label}
                               </span>
                             );
                           })()
@@ -1695,10 +1634,10 @@ export function CallRecords({
                   {selectedCallTooShort ? (
                     <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
                       {(() => {
-                        const disposition = resolveCallDispositionStatus(selectedCall);
+                        const disposition = resolveHarxLadderStatusBadge(selectedCall);
                         return (
                           <span
-                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest border ${disposition.tone}`}
+                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] font-black tracking-wider border ${disposition.tone}`}
                             title={disposition.title}
                           >
                             {disposition.label}
