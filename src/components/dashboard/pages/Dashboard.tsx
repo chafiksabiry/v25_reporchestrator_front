@@ -20,6 +20,9 @@ import {
   isDateInPeriod,
   resolveIanaZone,
   zonedWallTimeToUtc,
+  computeAttendanceScore,
+  reservationSlotWindowMs,
+  callActivityWindowMs,
   type StatsPeriod,
 } from '../../../utils/planningMetrics';
 
@@ -762,6 +765,15 @@ export function Dashboard({ profile }: DashboardProps) {
     let scheduledHours = 0;
     let workedHours = 0;
 
+    const selectedGig = selectedGigId === 'all'
+      ? null
+      : gigsData.find((g) => g._id === selectedGigId);
+    const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+
+    const callWindows = callsData
+      .map((c) => callActivityWindowMs(c))
+      .filter((w): w is { start: number; end: number } => !!w);
+
     filteredReservations.forEach((r: any) => {
       total += 1;
       const duration = reservationDurationHours(r);
@@ -773,7 +785,8 @@ export function Dashboard({ profile }: DashboardProps) {
         return;
       }
 
-      const endTs = reservationEndMs(r);
+      const win = reservationSlotWindowMs(r, gigTz);
+      const endTs = win?.end || reservationEndMs(r);
       const isFuture = endTs > 0 ? endTs > nowTs : false;
 
       if (isFuture) {
@@ -781,19 +794,28 @@ export function Dashboard({ profile }: DashboardProps) {
         return;
       }
 
-      // Past reserved slot
-      if (r.attended === false) {
+      // Past reserved slot: real telephony overlap = attended
+      const hasActivity =
+        !!win &&
+        callWindows.some((c) => c.start < win.end && win.start < c.end);
+
+      if (!hasActivity) {
         noShow += 1;
         return;
       }
 
-      // attended === true OR attendance not tracked yet → counted as effectuée
       completed += 1;
       workedHours += duration;
     });
 
-    const pastCount = completed + noShow;
-    const attendanceRate = pastCount > 0 ? Math.round((completed / pastCount) * 100) : 0;
+    const attendance = computeAttendanceScore({
+      reservations: filteredReservations,
+      calls: callsData,
+      nowMs: nowTs,
+      gigId: selectedGigId === 'all' ? null : selectedGigId,
+      gigTz,
+    });
+    const attendanceRate = attendance.score ?? 0;
 
     return {
       total,
@@ -805,7 +827,7 @@ export function Dashboard({ profile }: DashboardProps) {
       workedHours: Math.round(workedHours * 10) / 10,
       attendanceRate,
     };
-  }, [filteredReservations]);
+  }, [filteredReservations, callsData, selectedGigId, gigsData]);
 
   const goals = useMemo(() => {
     const startTs = getPeriodStart(goalsPeriod);

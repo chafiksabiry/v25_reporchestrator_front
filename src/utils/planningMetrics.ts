@@ -245,3 +245,141 @@ export function isDateInPeriod(dateStr: string, period: StatsPeriod, now = new D
   const ymd = dateStr.slice(0, 10);
   return ymd >= toLocalYmd(periodStart(period, now)) && ymd <= toLocalYmd(periodEnd(period, now));
 }
+
+function nid(raw: unknown): string {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object') {
+    const o = raw as { _id?: unknown; $oid?: unknown; id?: unknown };
+    if (o.$oid) return String(o.$oid).trim();
+    if (o._id) return nid(o._id);
+    if (o.id) return String(o.id).trim();
+  }
+  return String(raw).trim();
+}
+
+/** Call activity window in UTC ms (start → end). */
+export function callActivityWindowMs(call: {
+  startTime?: unknown;
+  endTime?: unknown;
+  createdAt?: unknown;
+  timestamp?: unknown;
+  duration?: unknown;
+}): { start: number; end: number } | null {
+  const startRaw = call?.startTime ?? call?.createdAt ?? call?.timestamp;
+  const start = new Date(startRaw as string | number | Date).getTime();
+  if (!Number.isFinite(start) || start <= 0) return null;
+  const durationSec = Number(call?.duration);
+  let end = call?.endTime != null ? new Date(call.endTime as string | number | Date).getTime() : NaN;
+  if (!Number.isFinite(end) || end < start) {
+    end =
+      Number.isFinite(durationSec) && durationSec > 0
+        ? start + durationSec * 1000
+        : start + 1000;
+  }
+  return { start, end };
+}
+
+/** Reserved slot window in UTC ms, using gig TZ when available. */
+export function reservationSlotWindowMs(
+  r: {
+    reservationDate?: string;
+    date?: string;
+    startTime?: string;
+    endTime?: string;
+  },
+  gigTz?: string | null
+): { start: number; end: number } | null {
+  const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
+  const startT = String(r.startTime || '00:00').slice(0, 5);
+  const endT = String(r.endTime || r.startTime || '23:59').slice(0, 5);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+
+  let start: Date | null = null;
+  let end: Date | null = null;
+  if (gigTz) {
+    start = zonedWallTimeToUtc(ymd, startT, gigTz);
+    end = zonedWallTimeToUtc(ymd, endT, gigTz);
+  }
+  if (!start || Number.isNaN(start.getTime())) start = new Date(`${ymd}T${startT}:00`);
+  if (!end || Number.isNaN(end.getTime())) end = new Date(`${ymd}T${endT}:00`);
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+
+  let startMs = start.getTime();
+  let endMs = end.getTime();
+  if (endMs <= startMs) endMs = startMs + 60 * 60 * 1000;
+  return { start: startMs, end: endMs };
+}
+
+function intervalsOverlap(
+  a: { start: number; end: number },
+  b: { start: number; end: number }
+): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+/**
+ * Attendance = slots with real telephony activity during the slot /
+ *              past reserved slots.
+ *
+ * A slot counts as "with activity" when at least one call overlaps the
+ * reservation window (REP attempting to reach leads during that slot).
+ */
+export function computeAttendanceScore(opts: {
+  reservations: unknown[];
+  calls: unknown[];
+  nowMs?: number;
+  gigId?: string | null;
+  gigTz?: string | null;
+  agentId?: string | null;
+}): { score: number | null; reservedPast: number; withActivity: number } {
+  const now = opts.nowMs ?? Date.now();
+  const gigId = opts.gigId ? String(opts.gigId) : '';
+  const agentId = opts.agentId ? String(opts.agentId) : '';
+
+  const callWindows = (Array.isArray(opts.calls) ? opts.calls : [])
+    .filter((raw) => {
+      const c = raw as Record<string, unknown>;
+      if (gigId) {
+        const cg = nid((c.gigId as { _id?: unknown })?._id ?? c.gigId);
+        if (cg && cg !== gigId) return false;
+      }
+      return true;
+    })
+    .map((raw) => callActivityWindowMs(raw as Parameters<typeof callActivityWindowMs>[0]))
+    .filter((w): w is { start: number; end: number } => !!w);
+
+  const pastReserved = (Array.isArray(opts.reservations) ? opts.reservations : []).filter((raw) => {
+    const r = raw as Record<string, any>;
+    const status = String(r.status || 'reserved').toLowerCase();
+    if (status !== 'reserved') return false;
+    if (gigId) {
+      const rg = nid(r.gigId?._id || r.gigId);
+      if (rg && rg !== gigId) return false;
+    }
+    if (agentId) {
+      const ra = nid(r.agentId?._id || r.agentId || r.repId);
+      if (ra && ra !== agentId) return false;
+    }
+    const win = reservationSlotWindowMs(r, opts.gigTz);
+    if (!win) return false;
+    return win.end <= now;
+  });
+
+  if (pastReserved.length === 0) {
+    return { score: null, reservedPast: 0, withActivity: 0 };
+  }
+
+  let withActivity = 0;
+  for (const raw of pastReserved) {
+    const win = reservationSlotWindowMs(raw as any, opts.gigTz);
+    if (!win) continue;
+    if (callWindows.some((c) => intervalsOverlap(win, c))) withActivity += 1;
+  }
+
+  return {
+    score: Math.round((withActivity / pastReserved.length) * 100),
+    reservedPast: pastReserved.length,
+    withActivity,
+  };
+}
