@@ -216,19 +216,24 @@ export type CallLike = {
 };
 
 /**
- * True when a media path existed (Twilio `completed` + duration/recording, or AnsweredBy=human).
- * This is NOT “Injoignable” — the line connected (human or machine).
+ * True when the line connected (human/machine), NOT mere ring time.
+ * Twilio `no-answer`/`busy` often keep a ring duration — that is still Injoignable.
  */
 export function hasCallConnection(call: CallLike): boolean {
+  const status = String(call.status || '').toLowerCase();
+  if (['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status)) {
+    return false;
+  }
   const answeredBy = String(call.answeredBy || '').toLowerCase();
   if (answeredBy === 'human') return true;
-  const status = String(call.status || '').toLowerCase();
   const duration = Number(call.duration) || 0;
   const hasRecording = Boolean(call.recording_url || call.recording_url_cloudinary);
-  if (['completed', 'hangup', 'in-progress'].includes(status) && (duration > 0 || hasRecording)) {
+  // Recording is the strongest proof of a media path, even if status is odd.
+  if (hasRecording) return true;
+  if (['completed', 'hangup', 'in-progress'].includes(status) && duration > 0) {
     return true;
   }
-  return duration > 0 || hasRecording;
+  return false;
 }
 
 const VOICEMAIL_REGEX =
@@ -296,13 +301,20 @@ export function resolveHarxLadderStatusBadge(
     };
   }
 
+  const connected = hasCallConnection(call);
+
   const stored = String(call.lead?.repDisposition || '').trim();
-  if (stored && HARX_LADDER[stored]) {
+  // Stale « Injoignable » on a connected call (audio/duration) must not win.
+  if (
+    stored &&
+    HARX_LADDER[stored] &&
+    !(stored === 'called_unreachable' && connected)
+  ) {
     return { ...HARX_LADDER[stored], title: `Disposition : ${stored}` };
   }
 
   const hist = historyDisposition(call);
-  if (hist && HARX_LADDER[hist]) {
+  if (hist && HARX_LADDER[hist] && !(hist === 'called_unreachable' && connected)) {
     return { ...HARX_LADDER[hist] };
   }
 
@@ -314,10 +326,7 @@ export function resolveHarxLadderStatusBadge(
   // AI « Injoignable » is invalid when a connection/audio already exists.
   if (
     prospect &&
-    !(
-      prospect.label === HARX_LADDER.called_unreachable.label &&
-      hasCallConnection(call)
-    )
+    !(prospect.label === HARX_LADDER.called_unreachable.label && connected)
   ) {
     return prospect;
   }
@@ -332,13 +341,13 @@ export function resolveHarxLadderStatusBadge(
   if (outcome === 'appointment') return { ...HARX_LADDER.called_rdv };
   if (outcome === 'wrong_number') return { ...HARX_LADDER.called_wrong_number };
   if (outcome === 'voicemail') return { ...HARX_LADDER.called_voicemail };
-  // busy / no_answer only → Injoignable. too_short / connected_no_sale with audio ≠ Injoignable.
-  if (outcome === 'busy' || outcome === 'no_answer') {
+  // busy / no_answer → Injoignable ONLY when the line never connected.
+  if ((outcome === 'busy' || outcome === 'no_answer') && !connected) {
     return { ...HARX_LADDER.called_unreachable };
   }
   if (
     (outcome === 'too_short' || outcome === 'connected_no_sale') &&
-    !hasCallConnection(call)
+    !connected
   ) {
     return { ...HARX_LADDER.called_unreachable };
   }
@@ -406,17 +415,19 @@ export function historyDisposition(call: CallLike): string | null {
     return 'called_voicemail';
   }
   if (outcome === 'wrong_number' || status === 'failed') return 'called_wrong_number';
-  // Injoignable = true unreachable only. Never map completed / connected_no_sale / too_short+audio.
+  const connected = hasCallConnection(call);
+  // Injoignable = true unreachable only. Never map completed / audio / wrong stored no_answer.
   if (
-    outcome === 'no_answer' ||
-    outcome === 'busy' ||
-    ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled'].includes(status)
+    !connected &&
+    (outcome === 'no_answer' ||
+      outcome === 'busy' ||
+      ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled'].includes(status))
   ) {
     return 'called_unreachable';
   }
   if (
     (outcome === 'too_short' || outcome === 'connected_no_sale') &&
-    !hasCallConnection(call)
+    !connected
   ) {
     return 'called_unreachable';
   }
