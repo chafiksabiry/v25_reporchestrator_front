@@ -44,7 +44,7 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, localizeStatusBadge, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNoAnalysisTelephonyCall, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, localizeStatusBadge, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
@@ -465,6 +465,11 @@ export function CallRecords({
     const pillClass = compact
       ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black tracking-tight border'
       : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border';
+
+    // Busy / Injoignable / AMD — settled, never « pending analyse ».
+    if (isNoAnalysisTelephonyCall(record) || isCallVoicemail(record)) {
+      return <span className="text-slate-300 font-bold text-sm">—</span>;
+    }
 
     if (isTransactionInRetraction(record, ledgerStatus)) {
       return (
@@ -1373,6 +1378,21 @@ export function CallRecords({
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
+                        ) : isNoAnalysisTelephonyCall(record) ? (
+                          (() => {
+                            const disp = localizeStatusBadge(
+                              dispositionBadge(record, ledgerStatus) || HARX_LADDER.called_unreachable,
+                              i18n.language
+                            );
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border ${disp!.tone}`}
+                                title={disp!.title || 'Pas d’analyse IA'}
+                              >
+                                {disp!.label}
+                              </span>
+                            );
+                          })()
                         ) : isNonArguedConnectedCall(record) &&
                           String(record.callOutcome || '') !== 'not_argumented' &&
                           !(record.callOutcome === 'connected_no_sale' && record.ai_call_status === 'scored') ? (
@@ -1551,6 +1571,7 @@ export function CallRecords({
                   </div>
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                     isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
+                    isNoAnalysisTelephonyCall(selectedCall) ? 'bg-amber-50 text-amber-700 border-amber-200' :
                     isCallApprovedByAI(selectedCall) ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                     (selectedCall.callOutcome === 'not_argumented' ||
                       (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored'))
@@ -1558,11 +1579,13 @@ export function CallRecords({
                     : isNonArguedConnectedCall(selectedCall) ? 'bg-slate-50 text-slate-400 border-slate-200' :
                     isCallRejectedByAI(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : (selectedCall.callOutcome === 'not_argumented' || (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored')) ? (i18n.language?.startsWith('en') ? 'Not argumented — invalid' : 'Non argumenté — invalide') : isNonArguedConnectedCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'Connected ≤30s — no AI analysis' : 'Connecté ≤30s — pas d’analyse IA') : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isNoAnalysisTelephonyCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'No AI analysis — busy / unreachable / AMD' : 'Pas d’analyse IA — busy / injoignable / AMD') : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : (selectedCall.callOutcome === 'not_argumented' || (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored')) ? (i18n.language?.startsWith('en') ? 'Not argumented — invalid' : 'Non argumenté — invalide') : isNonArguedConnectedCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'Connected ≤30s — no AI analysis' : 'Connecté ≤30s — pas d’analyse IA') : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
                     {isCallFraudDetected(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : isCallVoicemail(selectedCall) ? (
                       <X className="w-3 h-3" />
+                    ) : isNoAnalysisTelephonyCall(selectedCall) ? (
+                      <span className="normal-case tracking-normal font-bold text-slate-400">—</span>
                     ) : isCallApprovedByAI(selectedCall) ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
@@ -1588,8 +1611,9 @@ export function CallRecords({
                     <CreditCard className="w-4 h-4" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
                   </div>
-                  {(selectedCall.validByAI === null || selectedCall.validByAI === undefined) &&
-                  !isCallFraudDetected(selectedCall) ? (
+                  {isNoAnalysisTelephonyCall(selectedCall) || isCallVoicemail(selectedCall) || isCallFraudDetected(selectedCall) ? (
+                    <span className="text-slate-300 font-bold text-sm" title="Pas de commission">—</span>
+                  ) : (selectedCall.validByAI === null || selectedCall.validByAI === undefined) ? (
                     <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="En attente">
                       <Clock className="w-3 h-3" />
                     </span>
@@ -1603,6 +1627,9 @@ export function CallRecords({
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   {(() => {
+                    if (isNoAnalysisTelephonyCall(selectedCall) || isCallVoicemail(selectedCall) || isCallFraudDetected(selectedCall)) {
+                      return <span className="text-slate-300 font-bold text-sm">—</span>;
+                    }
                     const inRetraction = isTransactionInRetraction(selectedCall, getLedgerTxStatus(selectedCall));
                     if (selectedCall.transaction?.validByReps === true) {
                       return inRetraction ? (

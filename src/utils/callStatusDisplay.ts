@@ -468,8 +468,26 @@ export function isNonEvaluableCall(call: CallLike): boolean {
 /** AI analysis runs only when duration is strictly greater than 30 seconds. */
 export const MIN_CALL_ANALYSIS_SECONDS = 30;
 
-/** True when the call is ≤30s — no AI analysis (argumented / not argumented). */
-export function isCallTooShortForAnalysis(call: Pick<CallLike, 'duration' | 'ai_call_status'>): boolean {
+/**
+ * Busy / Injoignable / AMD / failed — settled immediately.
+ * Never wait for AI analysis or show a pending clock.
+ */
+export function isNoAnalysisTelephonyCall(call: CallLike): boolean {
+  if (isCallVoicemail(call)) return true;
+  if (call.ai_call_status === 'auto_refused') return true;
+  const status = String(call.status || '').toLowerCase();
+  if (['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status)) {
+    return true;
+  }
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (['no_answer', 'busy', 'wrong_number', 'voicemail'].includes(outcome)) return true;
+  const answeredBy = String(call.answeredBy || '').toLowerCase();
+  return answeredBy.startsWith('machine') || answeredBy === 'fax';
+}
+
+/** True when a human-answered call is ≤30s — no argumented/not-argumented AI yet. */
+export function isCallTooShortForAnalysis(call: CallLike): boolean {
+  if (isNoAnalysisTelephonyCall(call)) return false;
   if (call.ai_call_status === 'too_short') return true;
   const duration = Number((call as any).duration);
   return Number.isFinite(duration) && duration > 0 && duration <= MIN_CALL_ANALYSIS_SECONDS;
@@ -867,15 +885,16 @@ export function isNonArguedConnectedCall(call: CallLike): boolean {
 
 export function isCallRejectedByAI(call: CallLike): boolean {
   if (isCallFraudDetected(call)) return true;
+  // Busy / Injoignable / AMD — settled, no commission (not « pending analyse »).
+  if (isNoAnalysisTelephonyCall(call)) return true;
   // Not argumented (after AI) is invalid — show as rejected for commission.
   const outcome = String(call.callOutcome || '').toLowerCase();
   if (outcome === 'not_argumented') return true;
   if (outcome === 'connected_no_sale' && call.ai_call_status === 'scored') return true;
-  // ≤30s: no analysis yet — not a reject badge.
+  // Human-answered ≤30s: no analysis yet — not a reject badge.
   if (call.ai_call_status === 'too_short') return false;
   if (isCallTooShortForAnalysis(call)) return false;
   if (call.validByAI === false || call.valid === false) return true;
-  if (call.ai_call_status === 'auto_refused') return true;
   return false;
 }
 
