@@ -1678,7 +1678,20 @@ export function CallRecords({
                       );
                     })
                   ) : (
-                    renderRepAnalysisWaitState('Transcript not available')
+                    renderRepAnalysisWaitState(
+                      ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(
+                        String(selectedCall.status || '').toLowerCase()
+                      ) ||
+                        ['no_answer', 'busy', 'wrong_number'].includes(
+                          String(selectedCall.callOutcome || '').toLowerCase()
+                        )
+                        ? (i18n.language?.startsWith('en')
+                            ? 'No transcript — call was busy or unreachable'
+                            : 'Pas de transcription — appel occupé ou injoignable')
+                        : (i18n.language?.startsWith('en')
+                            ? 'Transcript not available yet'
+                            : 'Transcription non disponible pour le moment')
+                    )
                   )}
                       </>
                     );
