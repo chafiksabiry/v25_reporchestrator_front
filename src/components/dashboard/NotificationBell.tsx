@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -9,6 +9,13 @@ import {
   X,
   Mail,
   MailOpen,
+  Users,
+  Target,
+  GraduationCap,
+  ClipboardList,
+  FileText,
+  ScrollText,
+  Ban,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNotifications, type RepNotification } from '../../contexts/NotificationsContext';
@@ -26,47 +33,46 @@ function timeAgo(ts: number, isFr: boolean): string {
   return isFr ? `Il y a ${d} j` : `${d} d ago`;
 }
 
-function notificationIcon(n: RepNotification) {
-  if (n.kind === 'script_required') {
-    return (
-      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-amber-500/30 text-amber-100">
-        <MessageSquare className="h-4 w-4" />
-      </div>
-    );
-  }
-  if (n.status === 'invited') {
-    return (
-      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-indigo-500/35 text-indigo-100">
-        <Mail className="h-4 w-4" />
-      </div>
-    );
-  }
-  if (n.status === 'enrolled') {
-    return (
-      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-emerald-500/30 text-emerald-200">
-        <CheckCheck className="h-4 w-4" />
-      </div>
-    );
-  }
-  if (n.status === 'rejected') {
-    return (
-      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-rose-500/30 text-rose-200">
-        <Check className="h-4 w-4" />
-      </div>
-    );
-  }
-  if (n.kind === 'enrollment') {
-    return (
-      <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-emerald-500/30 text-emerald-200">
-        <CheckCheck className="h-4 w-4" />
-      </div>
-    );
-  }
+function iconWrap(bg: string, fg: string, child: ReactNode) {
   return (
-    <div className="mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center bg-white/20 text-white">
-      <Bell className="h-4 w-4" />
+    <div className={`mt-0.5 shrink-0 h-7 w-7 rounded-lg flex items-center justify-center ${bg} ${fg}`}>
+      {child}
     </div>
   );
+}
+
+function notificationIcon(n: RepNotification) {
+  if (n.kind === 'matching') {
+    return iconWrap('bg-cyan-500/30', 'text-cyan-100', <Target className="h-4 w-4" />);
+  }
+  if (n.kind === 'teammate') {
+    return iconWrap('bg-violet-500/30', 'text-violet-100', <Users className="h-4 w-4" />);
+  }
+  if (n.kind === 'training_added') {
+    return iconWrap('bg-fuchsia-500/30', 'text-fuchsia-100', <GraduationCap className="h-4 w-4" />);
+  }
+  if (n.kind === 'action_assigned') {
+    return iconWrap('bg-sky-500/30', 'text-sky-100', <ClipboardList className="h-4 w-4" />);
+  }
+  if (n.kind === 'kb_document') {
+    return iconWrap('bg-teal-500/30', 'text-teal-100', <FileText className="h-4 w-4" />);
+  }
+  if (n.kind === 'script_added' || n.kind === 'script_required') {
+    return iconWrap('bg-amber-500/30', 'text-amber-100', n.kind === 'script_added' ? <ScrollText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />);
+  }
+  if (n.kind === 'deactivated') {
+    return iconWrap('bg-slate-500/35', 'text-slate-100', <Ban className="h-4 w-4" />);
+  }
+  if (n.status === 'invited') {
+    return iconWrap('bg-indigo-500/35', 'text-indigo-100', <Mail className="h-4 w-4" />);
+  }
+  if (n.status === 'enrolled' || n.kind === 'enrollment') {
+    return iconWrap('bg-emerald-500/30', 'text-emerald-200', <CheckCheck className="h-4 w-4" />);
+  }
+  if (n.status === 'rejected') {
+    return iconWrap('bg-rose-500/30', 'text-rose-200', <Check className="h-4 w-4" />);
+  }
+  return iconWrap('bg-white/20', 'text-white', <Bell className="h-4 w-4" />);
 }
 
 export function NotificationBell() {

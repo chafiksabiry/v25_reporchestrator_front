@@ -10,7 +10,8 @@ import { getGigsApiBase } from '../../utils/gigsApiBase';
 import { repApiUrl } from '../../utils/repApiUrl';
 
 const SEEN_PREFIX = 'harx_gig_activity_seen_v2_';
-const POLL_MS = 3 * 60 * 1000;
+/** Catch-up only — realtime delivery is via dash_rep_back WebSocket. */
+const POLL_MS = 12 * 60 * 1000;
 
 type SeenState = {
   initialized: boolean;
@@ -143,10 +144,10 @@ export function GigActivityNotificationsSync() {
         const enrolled = await fetchEnrolledGigsForAgent(repId, token).catch(() => []);
         const enrolledIds = new Set(enrolled.map((g) => g.gigId));
 
-        // 1) Matching auto ≥ 50 % — POST /matches/agent/:id (le GET /matches n'existe pas)
+        // 1) Matching auto ≥ 50 % — POST /matches/rep/:id (catch-up; primary = WS)
         try {
           const res = await axios.post(
-            `${matchingApi()}/matches/agent/${encodeURIComponent(repId)}`,
+            `${matchingApi()}/matches/rep/${encodeURIComponent(repId)}`,
             {
               weights: {
                 experience: 0.15,
