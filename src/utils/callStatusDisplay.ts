@@ -366,6 +366,11 @@ export function resolveHarxLadderStatusBadge(
     };
   }
 
+  // ≤30s: no AI commercial status — ignore stale « Transaction aboutie » etc.
+  if (isCallTooShortForAnalysis(call)) {
+    return null;
+  }
+
   const connected = hasCallConnection(call);
 
   const stored = String(call.lead?.repDisposition || '').trim();
