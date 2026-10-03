@@ -770,8 +770,28 @@ export function formatRetractionEndsLabel(
   return new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/**
+ * Connected call without a commercial « Appel argumenté » outcome.
+ * Not Injoignable, not a scored AI reject — no commission yet.
+ */
+export function isNonArguedConnectedCall(call: CallLike): boolean {
+  if (isCallVoicemail(call) || isCallFraudDetected(call)) return false;
+  if (!hasCallConnection(call)) return false;
+  const outcome = String(call.callOutcome || '').toLowerCase();
+  if (['transaction', 'argued_interested', 'refusal', 'not_interested', 'already_equipped'].includes(outcome)) {
+    return false;
+  }
+  if (call.ai_call_status === 'too_short') return true;
+  if (outcome === 'connected_no_sale' || outcome === 'too_short') return true;
+  // completed + audio, no HARX disposition yet → not argued
+  return !historyDisposition(call) && !String(call.lead?.repDisposition || '').trim();
+}
+
 export function isCallRejectedByAI(call: CallLike): boolean {
   if (isCallFraudDetected(call)) return true;
+  // Short / non-argued connected calls are not « refusés » — no QA score yet.
+  if (isNonArguedConnectedCall(call)) return false;
+  if (call.ai_call_status === 'too_short') return false;
   if (call.validByAI === false || call.valid === false) return true;
   if (call.ai_call_status === 'auto_refused') return true;
   return false;
@@ -779,6 +799,7 @@ export function isCallRejectedByAI(call: CallLike): boolean {
 
 export function isCallApprovedByAI(call: CallLike): boolean {
   if (isCallFraudDetected(call)) return false;
+  if (isNonArguedConnectedCall(call)) return false;
   return call.validByAI === true || call.valid === true;
 }
 
