@@ -1679,18 +1679,30 @@ export function CallRecords({
                     })
                   ) : (
                     renderRepAnalysisWaitState(
-                      ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(
-                        String(selectedCall.status || '').toLowerCase()
-                      ) ||
-                        ['no_answer', 'busy', 'wrong_number'].includes(
-                          String(selectedCall.callOutcome || '').toLowerCase()
-                        )
-                        ? (i18n.language?.startsWith('en')
+                      (() => {
+                        const st = String(selectedCall.status || '').toLowerCase();
+                        const out = String(selectedCall.callOutcome || '').toLowerCase();
+                        const amd = String(selectedCall.answeredBy || '').toLowerCase();
+                        const noTranscript =
+                          ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(st) ||
+                          ['no_answer', 'busy', 'wrong_number', 'voicemail'].includes(out) ||
+                          amd.startsWith('machine') ||
+                          amd === 'fax' ||
+                          isCallVoicemail(selectedCall);
+                        if (noTranscript) {
+                          if (out === 'voicemail' || amd.startsWith('machine') || amd === 'fax' || isCallVoicemail(selectedCall)) {
+                            return i18n.language?.startsWith('en')
+                              ? 'No transcript — voicemail / AMD'
+                              : 'Pas de transcription — répondeur / AMD';
+                          }
+                          return i18n.language?.startsWith('en')
                             ? 'No transcript — call was busy or unreachable'
-                            : 'Pas de transcription — appel occupé ou injoignable')
-                        : (i18n.language?.startsWith('en')
-                            ? 'Transcript not available yet'
-                            : 'Transcription non disponible pour le moment')
+                            : 'Pas de transcription — appel occupé ou injoignable';
+                        }
+                        return i18n.language?.startsWith('en')
+                          ? 'Transcript not available yet'
+                          : 'Transcription non disponible pour le moment';
+                      })()
                     )
                   )}
                       </>
