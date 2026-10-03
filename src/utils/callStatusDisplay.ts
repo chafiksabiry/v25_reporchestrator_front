@@ -62,11 +62,10 @@ export function callOutcomeBadge(outcome: string | null | undefined): StatusBadg
     not_interested: { ...HARX_LADDER.argued_declined },
     already_equipped: { ...HARX_LADDER.argued_declined },
     fraud: { label: 'Fraude', tone: 'bg-rose-100 text-rose-800 border-rose-300' },
-    // Legacy too_short → ladder only (never « Trop court » / « Sans suite » / « Non validé »)
-    too_short: { ...HARX_LADDER.called_unreachable },
-    connected_no_sale: { ...HARX_LADDER.called_unreachable },
+    // Legacy too_short / connected_no_sale: never map here to Injoignable
+    // (resolved in resolveHarxLadderStatusBadge with hasCallConnection).
   };
-  return map[outcome] || HARX_LADDER.called_unreachable;
+  return map[outcome] || null;
 }
 
 const PROSPECT_RUBRICS: Array<{ key: string; label: string; tone: string; legacyKeys?: string[] }> = [
@@ -139,36 +138,55 @@ const PRIORITY_CALLOUTCOMES = new Set([
   'connected_no_sale',
 ]);
 
-/** Twilio / post-analysis badge when callOutcome is missing or legacy `too_short`. */
-export function resolveTwilioOrPostAnalysisBadge(call: CallLike): StatusBadge {
+/**
+ * Twilio / post-analysis badge when callOutcome is missing or legacy `too_short`.
+ * Returns null when the call connected (audio/completed) but has no HARX disposition yet
+ * — never invent « Injoignable » / « Terminé » / « À qualifier ».
+ */
+export function resolveTwilioOrPostAnalysisBadge(call: CallLike): StatusBadge | null {
   if (isCallVoicemail(call)) {
     const badge = callOutcomeBadge('voicemail');
     return badge
       ? { ...badge, title: 'Répondeur — aucun échange avec le prospect' }
-      : { label: 'Appelé – Répondeur', tone: 'bg-orange-50 text-orange-700 border-orange-200' };
+      : { ...HARX_LADDER.called_voicemail };
   }
 
   const status = String(call.status || '').toLowerCase();
+  // Injoignable = telephony unreachable ONLY (never Twilio `completed` with audio).
   if (status === 'busy') {
-    return callOutcomeBadge('busy') || { label: 'Appelé – Injoignable', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+    return { ...HARX_LADDER.called_unreachable, title: 'Twilio Busy → Appelé – Injoignable' };
   }
   if (['no-answer', 'noanswer', 'canceled', 'cancelled'].includes(status)) {
-    return callOutcomeBadge('no_answer') || { label: 'Appelé – Injoignable', tone: 'bg-slate-50 text-slate-600 border-slate-200' };
+    return { ...HARX_LADDER.called_unreachable, title: `Twilio ${status} → Appelé – Injoignable` };
   }
   if (status === 'failed') {
-    return callOutcomeBadge('wrong_number') || { label: 'Appelé – Numéro non attribué', tone: 'bg-rose-50 text-rose-700 border-rose-200' };
+    return { ...HARX_LADDER.called_wrong_number, title: 'Twilio Failed → Appelé – Numéro non attribué' };
   }
 
   const outcome = String(call.callOutcome || '').toLowerCase();
-  if (outcome && outcome !== 'too_short') {
+  if (outcome && outcome !== 'too_short' && outcome !== 'connected_no_sale') {
     const badge = callOutcomeBadge(outcome);
     if (badge) return { ...badge, title: `Résultat appel : ${outcome}` };
   }
 
-  // Never surface « Terminé / Sans suite / Non validé » — stick to the ladder.
+  const prospect = getProspectStatusBadge(call.ai_call_score);
+  if (
+    prospect &&
+    !(
+      prospect.label === HARX_LADDER.called_unreachable.label &&
+      hasCallConnection(call)
+    )
+  ) {
+    return prospect;
+  }
+
+  // completed + audio = connexion établie → NEVER Injoignable.
+  // No commercial disposition yet → no invented status from the 9.
+  if (hasCallConnection(call)) return null;
+
   return {
     ...HARX_LADDER.called_unreachable,
-    title: 'Aucun échange commercial exploitable → Appelé – Injoignable',
+    title: 'Aucun contact établi → Appelé – Injoignable',
   };
 }
 
@@ -187,6 +205,8 @@ export type CallLike = {
   lead?: { Stage?: string; status?: string; nextAction?: string; repDisposition?: string | null } | null;
   /** Twilio AMD: human | machine_start | machine_end_beep | fax | unknown */
   answeredBy?: string | null;
+  recording_url?: string | null;
+  recording_url_cloudinary?: string | null;
   transaction?: {
     validByCompany?: boolean | null;
     validByAI?: boolean | null;
@@ -194,6 +214,22 @@ export type CallLike = {
     retractionEndsAt?: string | Date | null;
   } | null;
 };
+
+/**
+ * True when a media path existed (Twilio `completed` + duration/recording, or AnsweredBy=human).
+ * This is NOT “Injoignable” — the line connected (human or machine).
+ */
+export function hasCallConnection(call: CallLike): boolean {
+  const answeredBy = String(call.answeredBy || '').toLowerCase();
+  if (answeredBy === 'human') return true;
+  const status = String(call.status || '').toLowerCase();
+  const duration = Number(call.duration) || 0;
+  const hasRecording = Boolean(call.recording_url || call.recording_url_cloudinary);
+  if (['completed', 'hangup', 'in-progress'].includes(status) && (duration > 0 || hasRecording)) {
+    return true;
+  }
+  return duration > 0 || hasRecording;
+}
 
 const VOICEMAIL_REGEX =
   /messagerie|messagerie\s+(vocale|automatique)|r[ée]pondeur|laissez\s+(votre|un)\s+message|bo[îi]te\s+vocale|voicemail|answering\s+machine|leave\s+(a|your)\s+message|after\s+(the\s+)?(tone|beep)|appel\s+non\s+productif|non\s+productif|aucun(?:e)?\s+(?:interaction|[ée]change)|aucun\s+(?:él|el)[ée]ment\s+exploitable|n['']?est\s+pas\s+disponible|votre\s+correspondant|tombe?\s+(?:imm[ée]diatement\s+)?sur\s+la?\s?messagerie|redirig[ée]\s+vers\s+la?\s?messagerie/i;
@@ -218,8 +254,9 @@ function isMachineAnswer(call: CallLike): boolean {
 /**
  * Twilio / Telnyx lifecycle → HARX ladder only.
  * Never returns « Terminé », « Non validé », « Trop court », etc.
+ * `completed` alone is not a commercial status → null (needs disposition / AMD / AI).
  */
-export function twilioCallStatusBadge(status?: string | null): StatusBadge {
+export function twilioCallStatusBadge(status?: string | null): StatusBadge | null {
   const key = String(status || '').toLowerCase();
   if (['queued', 'initiated', 'ringing', 'in-progress', 'active', 'bridging'].includes(key)) {
     return { ...HARX_LADDER.to_call, title: `Twilio/Telnyx ${key} → À appeler` };
@@ -237,23 +274,21 @@ export function twilioCallStatusBadge(status?: string | null): StatusBadge {
     };
   }
   if (key === 'completed' || key === 'hangup') {
-    // Completed alone is not a commercial status — never show « Terminé ».
-    return {
-      ...HARX_LADDER.called_unreachable,
-      title: 'Appel terminé côté opérateur — statut commercial à préciser',
-    };
+    // Not a HARX status — never « Terminé », never auto « Injoignable ».
+    return null;
   }
-  return { ...HARX_LADDER.called_unreachable, title: status || undefined };
+  return null;
 }
 
 /**
- * Single user-facing call status: always one of the 9 HARX ladder labels.
- * Maps Twilio/Telnyx AMD → Appelé – Répondeur, Busy/No-Answer → Appelé – Injoignable.
+ * User-facing call status: one of the 9 HARX ladder labels, or null when
+ * the call connected but has no commercial disposition yet.
+ * AMD → Répondeur ; Busy/No-Answer → Injoignable ; completed+audio ≠ Injoignable.
  */
 export function resolveHarxLadderStatusBadge(
   call: CallLike,
   ledgerTxStatus?: string | null
-): StatusBadge {
+): StatusBadge | null {
   if (isCallVoicemail(call)) {
     return {
       ...HARX_LADDER.called_voicemail,
@@ -276,7 +311,16 @@ export function resolveHarxLadderStatusBadge(
   }
 
   const prospect = getProspectStatusBadge(call.ai_call_score);
-  if (prospect) return prospect;
+  // AI « Injoignable » is invalid when a connection/audio already exists.
+  if (
+    prospect &&
+    !(
+      prospect.label === HARX_LADDER.called_unreachable.label &&
+      hasCallConnection(call)
+    )
+  ) {
+    return prospect;
+  }
 
   const outcome = String(call.callOutcome || '').toLowerCase();
   if (outcome === 'transaction') return { ...HARX_LADDER.argued_done };
@@ -288,7 +332,14 @@ export function resolveHarxLadderStatusBadge(
   if (outcome === 'appointment') return { ...HARX_LADDER.called_rdv };
   if (outcome === 'wrong_number') return { ...HARX_LADDER.called_wrong_number };
   if (outcome === 'voicemail') return { ...HARX_LADDER.called_voicemail };
-  if (outcome === 'busy' || outcome === 'no_answer' || outcome === 'too_short' || outcome === 'connected_no_sale') {
+  // busy / no_answer only → Injoignable. too_short / connected_no_sale with audio ≠ Injoignable.
+  if (outcome === 'busy' || outcome === 'no_answer') {
+    return { ...HARX_LADDER.called_unreachable };
+  }
+  if (
+    (outcome === 'too_short' || outcome === 'connected_no_sale') &&
+    !hasCallConnection(call)
+  ) {
     return { ...HARX_LADDER.called_unreachable };
   }
 
@@ -355,12 +406,17 @@ export function historyDisposition(call: CallLike): string | null {
     return 'called_voicemail';
   }
   if (outcome === 'wrong_number' || status === 'failed') return 'called_wrong_number';
+  // Injoignable = true unreachable only. Never map completed / connected_no_sale / too_short+audio.
   if (
     outcome === 'no_answer' ||
     outcome === 'busy' ||
-    outcome === 'too_short' ||
-    outcome === 'connected_no_sale' ||
     ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled'].includes(status)
+  ) {
+    return 'called_unreachable';
+  }
+  if (
+    (outcome === 'too_short' || outcome === 'connected_no_sale') &&
+    !hasCallConnection(call)
   ) {
     return 'called_unreachable';
   }
@@ -382,6 +438,7 @@ export function callMatchesHistoryStatus(call: CallLike, filter: string): boolea
   if (hist === filter) return true;
   // Fallback: compare resolved ladder badge key by label
   const badge = resolveHarxLadderStatusBadge(call);
+  if (!badge) return false;
   const entry = Object.entries(HARX_LADDER).find(([, v]) => v.label === badge.label);
   return entry?.[0] === filter;
 }
@@ -740,12 +797,12 @@ export function hasBookedSaleCommission(
 export function resolveCallDispositionStatus(
   call: CallLike,
   ledgerTxStatus?: string | null
-): StatusBadge {
-  // Always the official HARX ladder — never Terminé / Non validé / Trop court / En attente.
+): StatusBadge | null {
+  // Official HARX ladder only — null when connected but disposition not set yet.
   return resolveHarxLadderStatusBadge(call, ledgerTxStatus);
 }
 
-export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge {
+export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge | null {
   if (isCallFraudDetected(call)) {
     return {
       label: 'Fraude',
@@ -769,6 +826,6 @@ export function resolveUnvalidatedTransactionStatus(call: CallLike): StatusBadge
     };
   }
 
-  // Never « Non validé » — show the same HARX ladder status as the call.
+  // Same HARX ladder as the call — null if no disposition yet (never invent Injoignable).
   return resolveHarxLadderStatusBadge(call);
 }
