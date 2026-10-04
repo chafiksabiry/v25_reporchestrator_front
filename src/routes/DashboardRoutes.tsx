@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
@@ -134,6 +134,16 @@ function DashboardAppContent() {
 function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
   const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    if (loading) return;
+    const path = location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/' || path === '/dashboard' || path.endsWith('/dashboard')) {
+      if (mainRef.current) mainRef.current.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+  }, [loading, location.pathname]);
 
   useEffect(() => {
     const onAnalysisOpen = (e: Event) => {
@@ -208,7 +218,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
             setIsSidebarOpen={setIsSidebarOpen}
           />
         )}
-        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isCallCenterStaff() ? 'bg-slate-50' : 'bg-white'}`}>
+        <main ref={mainRef} className={`flex-1 overflow-y-auto overflow-x-hidden ${isCallCenterStaff() ? 'bg-slate-50' : 'bg-white'}`}>
           <PageContainer variant={resolvePageContainerVariant(location.pathname)}>
           {loading ? (
             <div className="flex justify-center items-center min-h-[50vh]">

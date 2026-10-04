@@ -406,30 +406,24 @@ export function Dashboard({ profile }: DashboardProps) {
   const [hoursGigId, setHoursGigId] = useState<string | null>(null);
   const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(true);
-  const goalsCardRef = useRef<HTMLDivElement>(null);
+  const dashboardTopRef = useRef<HTMLDivElement>(null);
   const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
 
-  // Open the goals block in place. Do not scroll on first paint — the dashboard
-  // must land on the greeting / today's work, not jump to "Mes objectifs".
-  const skipGoalsAutoScroll = useRef(true);
-  useEffect(() => {
-    const scroller = goalsCardRef.current?.closest('main');
-    if (scroller) scroller.scrollTop = 0;
-    window.scrollTo(0, 0);
-  }, []);
-  useEffect(() => {
-    if (!goalsOpen) return;
-    if (skipGoalsAutoScroll.current) {
-      skipGoalsAutoScroll.current = false;
-      return;
+  useLayoutEffect(() => {
+    if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
     }
-    const frame = requestAnimationFrame(() => {
-      goalsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    const pinTop = () => {
+      const main = dashboardTopRef.current?.closest('main');
+      if (main) main.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    pinTop();
+    const frame = requestAnimationFrame(pinTop);
     return () => cancelAnimationFrame(frame);
-  }, [goalsOpen]);
+  }, []);
 
   useEffect(() => {
     const agentId = profile?._id || localStorage.getItem('agentId') || localStorage.getItem('userId');
@@ -1350,7 +1344,7 @@ export function Dashboard({ profile }: DashboardProps) {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-8 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-10 2xl:gap-5 2xl:pb-12 3xl:gap-6 3xl:pb-14 4xl:gap-8 4xl:pb-16">
+    <div ref={dashboardTopRef} className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-8 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-10 2xl:gap-5 2xl:pb-12 3xl:gap-6 3xl:pb-14 4xl:gap-8 4xl:pb-16">
       {/* Dynamic Filter Header */}
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-4 xl:gap-3 xl:px-5 xl:py-3.5 2xl:px-6 2xl:py-4">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:gap-4">
@@ -1818,7 +1812,7 @@ export function Dashboard({ profile }: DashboardProps) {
 
       {/* 4 · Objectifs — pleine largeur */}
 
-      <div ref={goalsCardRef} className="relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-4 2xl:p-5 3xl:p-6">
+      <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-4 2xl:p-5 3xl:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
         {/* Header */}
