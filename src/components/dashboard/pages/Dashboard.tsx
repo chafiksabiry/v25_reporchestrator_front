@@ -411,8 +411,20 @@ export function Dashboard({ profile }: DashboardProps) {
   const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
   const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
 
+  // Open the goals block in place. Do not scroll on first paint — the dashboard
+  // must land on the greeting / today's work, not jump to "Mes objectifs".
+  const skipGoalsAutoScroll = useRef(true);
+  useEffect(() => {
+    const scroller = goalsCardRef.current?.closest('main');
+    if (scroller) scroller.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, []);
   useEffect(() => {
     if (!goalsOpen) return;
+    if (skipGoalsAutoScroll.current) {
+      skipGoalsAutoScroll.current = false;
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       goalsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
