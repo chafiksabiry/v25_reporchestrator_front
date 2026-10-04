@@ -821,7 +821,7 @@ export function Dashboard({ profile }: DashboardProps) {
       gigId: selectedGigId === 'all' ? null : selectedGigId,
       gigTz,
     });
-    const attendanceRate = attendance.score ?? 0;
+    const attendanceRate = attendance.score;
 
     return {
       total,
@@ -1748,7 +1748,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
             <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
               <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.attendance')}</span>
-              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.attendanceRate}%</span>
+              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.attendanceRate == null ? '—' : `${reservationStats.attendanceRate}%`}</span>
             </div>
             <div className="col-span-2 flex min-w-0 flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:col-span-3 md:col-span-2 xl:gap-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
               <div className="flex items-center gap-1.5">

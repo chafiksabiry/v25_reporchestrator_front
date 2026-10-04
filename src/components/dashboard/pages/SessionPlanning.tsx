@@ -4,7 +4,7 @@ import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav'
 import { useTranslation } from 'react-i18next';
 import { HorizontalCalendar } from '../scheduler/HorizontalCalendar';
 import { TimeSlot, Gig, WeeklyStats, Rep, UserRole, Company } from '../../../types/scheduler';
-import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles, UserCheck, Ban } from 'lucide-react';
+import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles, UserCheck, Ban, LogOut } from 'lucide-react';
 import {
     engagementTone,
     ENGAGEMENT_TONE_CLASS,
@@ -620,17 +620,17 @@ export function SessionPlanning() {
         };
     }, [allReservations, selectedGig, selectedGigId, selectedRepId]);
 
-    const attendanceScore = useMemo(() => {
+    const attendanceBreakdown = useMemo(() => {
         const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
-        const { score } = computeAttendanceScore({
+        return computeAttendanceScore({
             reservations: allReservations,
             calls: agentCalls,
             gigId: selectedGigId,
             gigTz,
             agentId: selectedRepId,
         });
-        return score;
     }, [allReservations, agentCalls, selectedGigId, selectedGig, selectedRepId]);
+    const attendanceScore = attendanceBreakdown.score;
 
     const lastMinuteCancelRate = useMemo(() => {
         const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
@@ -909,6 +909,28 @@ export function SessionPlanning() {
                                     <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
                                     <p className="text-xl font-black text-white tracking-tight">
                                         {attendanceScore == null ? '—' : `${attendanceScore}%`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20">
+                                    <Clock className="h-4 w-4 text-amber-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lateAttendance')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {attendanceBreakdown.lateRate == null ? '—' : `${attendanceBreakdown.lateRate}%`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500/20">
+                                    <LogOut className="h-4 w-4 text-orange-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.earlyCheckOut')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {attendanceBreakdown.earlyCheckoutRate == null ? '—' : `${attendanceBreakdown.earlyCheckoutRate}%`}
                                     </p>
                                 </div>
                             </div>

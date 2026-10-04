@@ -318,12 +318,30 @@ function intervalsOverlap(
   return a.start < b.end && b.start < a.end;
 }
 
+function slotGraceMs(durationMs: number): number {
+  return Math.min(10 * 60 * 1000, Math.max(2 * 60 * 1000, durationMs * 0.15));
+}
+
+export type AttendanceBreakdown = {
+  /** Slots worked on time through the end / past reserved slots. */
+  score: number | null;
+  lateRate: number | null;
+  earlyCheckoutRate: number | null;
+  reservedPast: number;
+  withActivity: number;
+  attended: number;
+  late: number;
+  earlyCheckout: number;
+  noShow: number;
+};
+
 /**
- * Attendance = slots with real telephony activity during the slot /
- *              past reserved slots.
+ * Attendance = slots where the REP actually worked the reserved hours
+ * (telephony attempts from start through end) / past reserved slots.
  *
- * A slot counts as "with activity" when at least one call overlaps the
- * reservation window (REP attempting to reach leads during that slot).
+ * Late attendance = first call after the start grace.
+ * Early check-out = last call before the end grace.
+ * A single overlapping call is activity, not full attendance.
  */
 export function computeAttendanceScore(opts: {
   reservations: unknown[];
@@ -332,7 +350,18 @@ export function computeAttendanceScore(opts: {
   gigId?: string | null;
   gigTz?: string | null;
   agentId?: string | null;
-}): { score: number | null; reservedPast: number; withActivity: number } {
+}): AttendanceBreakdown {
+  const empty: AttendanceBreakdown = {
+    score: null,
+    lateRate: null,
+    earlyCheckoutRate: null,
+    reservedPast: 0,
+    withActivity: 0,
+    attended: 0,
+    late: 0,
+    earlyCheckout: 0,
+    noShow: 0,
+  };
   const now = opts.nowMs ?? Date.now();
   const gigId = opts.gigId ? String(opts.gigId) : '';
   const agentId = opts.agentId ? String(opts.agentId) : '';
@@ -366,20 +395,44 @@ export function computeAttendanceScore(opts: {
     return win.end <= now;
   });
 
-  if (pastReserved.length === 0) {
-    return { score: null, reservedPast: 0, withActivity: 0 };
-  }
+  if (pastReserved.length === 0) return empty;
 
   let withActivity = 0;
+  let attended = 0;
+  let late = 0;
+  let earlyCheckout = 0;
+  let noShow = 0;
+
   for (const raw of pastReserved) {
     const win = reservationSlotWindowMs(raw as any, opts.gigTz);
     if (!win) continue;
-    if (callWindows.some((c) => intervalsOverlap(win, c))) withActivity += 1;
+    const overlapping = callWindows.filter((c) => intervalsOverlap(win, c));
+    if (overlapping.length === 0) {
+      noShow += 1;
+      continue;
+    }
+    withActivity += 1;
+    const firstStart = Math.min(...overlapping.map((c) => c.start));
+    const lastEnd = Math.max(...overlapping.map((c) => c.end));
+    const grace = slotGraceMs(win.end - win.start);
+    const isLate = firstStart > win.start + grace;
+    const isEarlyOut = lastEnd < win.end - grace;
+    if (isLate) late += 1;
+    if (isEarlyOut) earlyCheckout += 1;
+    if (!isLate && !isEarlyOut) attended += 1;
   }
 
+  const denom = pastReserved.length;
+  const pct = (n: number) => Math.round((n / denom) * 100);
   return {
-    score: Math.round((withActivity / pastReserved.length) * 100),
-    reservedPast: pastReserved.length,
+    score: pct(attended),
+    lateRate: pct(late),
+    earlyCheckoutRate: pct(earlyCheckout),
+    reservedPast: denom,
     withActivity,
+    attended,
+    late,
+    earlyCheckout,
+    noShow,
   };
 }
