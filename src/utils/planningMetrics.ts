@@ -323,10 +323,17 @@ function slotGraceMs(durationMs: number): number {
 }
 
 export type AttendanceBreakdown = {
-  /** Slots worked on time through the end / past reserved slots. */
+  /**
+   * Main score: slots with real telephony activity during the window /
+   * past reserved slots (Somme activité réelle / Somme slots réservés).
+   */
   score: number | null;
+  /** Subset: first call after the start grace. */
   lateRate: number | null;
+  /** Subset: last call before the end grace. */
   earlyCheckoutRate: number | null;
+  /** Slots with activity that were on time through the end (diagnostic). */
+  fullSlotRate: number | null;
   reservedPast: number;
   withActivity: number;
   attended: number;
@@ -336,12 +343,11 @@ export type AttendanceBreakdown = {
 };
 
 /**
- * Attendance = slots where the REP actually worked the reserved hours
- * (telephony attempts from start through end) / past reserved slots.
+ * Attendance (main) = slots with real telephony activity during the slot /
+ *                     past reserved slots.
  *
- * Late attendance = first call after the start grace.
- * Early check-out = last call before the end grace.
- * A single overlapping call is activity, not full attendance.
+ * Late attendance / Early check-out are breakdowns among those slots
+ * (and no-shows count against attendance).
  */
 export function computeAttendanceScore(opts: {
   reservations: unknown[];
@@ -355,6 +361,7 @@ export function computeAttendanceScore(opts: {
     score: null,
     lateRate: null,
     earlyCheckoutRate: null,
+    fullSlotRate: null,
     reservedPast: 0,
     withActivity: 0,
     attended: 0,
@@ -425,9 +432,11 @@ export function computeAttendanceScore(opts: {
   const denom = pastReserved.length;
   const pct = (n: number) => Math.round((n / denom) * 100);
   return {
-    score: pct(attended),
+    // Main KPI: any real telephony overlap during the reserved window.
+    score: pct(withActivity),
     lateRate: pct(late),
     earlyCheckoutRate: pct(earlyCheckout),
+    fullSlotRate: pct(attended),
     reservedPast: denom,
     withActivity,
     attended,

@@ -25,6 +25,7 @@ import {
 import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
 import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
 import { anonymizeBirthDate, anonymizeEmail, anonymizePhone, anonymizeStreet } from '../../../utils/callStatusDisplay';
+import { useNotifications } from '../../../contexts/NotificationsContext';
 
 interface Lead {
   _id?: string;
@@ -65,6 +66,10 @@ interface Lead {
   pendingDisposition?: string | null;
   pendingDispositionAt?: string | null;
   assignedRepId?: string | null;
+  nextFollowUpAt?: string | Date | null;
+  nextFollowUpType?: 'appointment' | 'callback' | null;
+  nextFollowUpSource?: 'rep' | 'ai' | null;
+  nextFollowUpNotifiedAt?: string | Date | null;
 }
 
 // ── HARX Disposition Ladder ─────────────────────────────────────────────────
@@ -141,12 +146,64 @@ interface APIResponse {
 
 function isLeadRdvByMe(lead: Lead): boolean {
   if (lead.isRdvByMe === true) return true;
+  if (lead.nextFollowUpType === 'appointment') return true;
+  const disp = String(lead.repDisposition || '');
+  if (disp === 'called_rdv' || disp === 'argued_rdv') return true;
   return lead.lastCallOutcome === 'appointment';
 }
 
 function leadHasRecordedCall(lead: Lead): boolean {
   if (lead.isCalledByMe || lead.isSignedByMe || isLeadRdvByMe(lead) || lead.lastCallOutcome) return true;
   return Boolean(lead.repDisposition && lead.repDisposition !== 'to_call');
+}
+
+const FOLLOW_UP_DISPOSITIONS = new Set(['called_rdv', 'called_callback', 'argued_rdv']);
+
+function leadFollowUpMs(lead: Lead): number | null {
+  if (!lead.nextFollowUpAt) return null;
+  const ms = new Date(lead.nextFollowUpAt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isLeadFollowUpDue(lead: Lead, nowMs = Date.now()): boolean {
+  const at = leadFollowUpMs(lead);
+  if (at == null || at > nowMs) return false;
+  const disp = String(lead.repDisposition || '');
+  if (disp && !FOLLOW_UP_DISPOSITIONS.has(disp) && lead.nextFollowUpType == null) return false;
+  return true;
+}
+
+function formatFollowUpAt(value: string | Date | null | undefined, locale: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(locale.startsWith('fr') ? 'fr-FR' : 'en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const FOLLOW_UP_NOTIFIED_KEY = 'harx_followup_notified_v1';
+
+function readFollowUpNotifiedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FOLLOW_UP_NOTIFIED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markFollowUpNotified(leadId: string) {
+  const set = readFollowUpNotifiedIds();
+  set.add(String(leadId));
+  // Keep last 200 ids
+  const arr = Array.from(set).slice(-200);
+  localStorage.setItem(FOLLOW_UP_NOTIFIED_KEY, JSON.stringify(arr));
 }
 
 type CopilotGuardState = {
@@ -199,9 +256,10 @@ function isTodayReservation(rawDate: unknown, now: Date): boolean {
 
 export function WorkspaceContent() {
   useAgent();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const { upsertNotification } = useNotifications();
   const searchParams = new URLSearchParams(location.search);
   const urlTab = searchParams.get('tab');
   const urlLeadId = searchParams.get('leadId') || sessionStorage.getItem('activeLeadId') || '';
@@ -305,7 +363,9 @@ export function WorkspaceContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [dispositionFilter, setDispositionFilter] = useState<string>('all');
+  const [followUpFilter, setFollowUpFilter] = useState<'all' | 'due'>('all');
   const [isDispositionDropdownOpen, setIsDispositionDropdownOpen] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [prospectProfileLead, setProspectProfileLead] = useState<Lead | null>(null);
@@ -330,6 +390,62 @@ export function WorkspaceContent() {
     () => (selectedGigId && enrolledGigs.some((g) => g._id === selectedGigId) ? selectedGigId : ''),
     [selectedGigId, enrolledGigs]
   );
+
+  // Refresh "due now" every 60s for pin + notifications.
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const dueLeads = useMemo(
+    () => leads.filter((l) => isLeadFollowUpDue(l, nowTick)),
+    [leads, nowTick]
+  );
+
+  const displayedLeads = useMemo(() => {
+    const base = followUpFilter === 'due' ? dueLeads : [...leads];
+    return base.sort((a, b) => {
+      const aDue = isLeadFollowUpDue(a, nowTick) ? 0 : 1;
+      const bDue = isLeadFollowUpDue(b, nowTick) ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
+      const aAt = leadFollowUpMs(a) ?? Number.POSITIVE_INFINITY;
+      const bAt = leadFollowUpMs(b) ?? Number.POSITIVE_INFINITY;
+      if (aAt !== bAt) return aAt - bAt;
+      return 0;
+    });
+  }, [leads, dueLeads, followUpFilter, nowTick]);
+
+  // Notify once per due lead (localStorage anti-spam).
+  useEffect(() => {
+    if (!dueLeads.length) return;
+    const notified = readFollowUpNotifiedIds();
+    const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+    for (const lead of dueLeads) {
+      const id = String(lead._id || lead.id || '');
+      if (!id || notified.has(id)) continue;
+      const when = formatFollowUpAt(lead.nextFollowUpAt, i18n.language || 'fr');
+      const name = lead.Deal_Name || lead.First_Name || (isFr ? 'Prospect' : 'Lead');
+      const isAppt = lead.nextFollowUpType === 'appointment' || String(lead.repDisposition || '').includes('rdv');
+      upsertNotification({
+        id: `followup-due-${id}`,
+        kind: 'general',
+        title: isFr
+          ? isAppt
+            ? 'RDV à rappeler maintenant'
+            : 'Rappel à faire maintenant'
+          : isAppt
+            ? 'Appointment due now'
+            : 'Callback due now',
+        message: isFr
+          ? `${name}${when ? ` · prévu ${when}` : ''}`
+          : `${name}${when ? ` · scheduled ${when}` : ''}`,
+        actionPath: `/workspace?tab=copilot&leadId=${encodeURIComponent(id)}`,
+        gigId: activeEnrolledGigId || undefined,
+        playSound: true,
+      });
+      markFollowUpNotified(id);
+    }
+  }, [dueLeads, upsertNotification, i18n.language, activeEnrolledGigId]);
 
   // Only persist enrolled gigs after the list is known — never wipe a valid
   // starting gig while enrolledGigs is still loading.
@@ -425,6 +541,7 @@ export function WorkspaceContent() {
 
   useEffect(() => {
     setDispositionFilter('all');
+    setFollowUpFilter('all');
     setDateFrom('');
     setDateTo('');
     setCurrentPage(1);
@@ -436,6 +553,16 @@ export function WorkspaceContent() {
   useEffect(() => {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage, searchQuery);
+    }
+    // Deep-link / notification → COCKPIT: load leads so we can reconstitute selectedLead.
+    if (
+      activeTab === 'copilot' &&
+      enrolledGigsLoaded &&
+      activeEnrolledGigId &&
+      leads.length === 0 &&
+      (urlLeadId || sessionStorage.getItem('activeLeadId'))
+    ) {
+      fetchLeads(1, '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, dispositionFilter, dateFrom, dateTo]);
@@ -1118,17 +1245,60 @@ export function WorkspaceContent() {
                           className="text-[10px] font-black border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
                           title={t('workspace.dateTo', 'Au')}
                         />
-                        {(dateFrom || dateTo || dispositionFilter !== 'all') && (
+                        {(dateFrom || dateTo || dispositionFilter !== 'all' || followUpFilter !== 'all') && (
                           <button
                             type="button"
-                            onClick={() => { setDateFrom(''); setDateTo(''); setDispositionFilter('all'); setCurrentPage(1); }}
+                            onClick={() => { setDateFrom(''); setDateTo(''); setDispositionFilter('all'); setFollowUpFilter('all'); setCurrentPage(1); }}
                             className="px-2 py-1.5 rounded-xl border border-gray-100 text-gray-400 hover:text-rose-500 hover:border-rose-200 transition-all"
                             title={t('workspace.clearFilters', 'Effacer filtres')}
                           >
                             <X className="w-3 h-3" />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => { setFollowUpFilter((f) => (f === 'due' ? 'all' : 'due')); setCurrentPage(1); }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                            followUpFilter === 'due'
+                              ? 'bg-violet-50 text-violet-700 border-violet-200'
+                              : dueLeads.length > 0
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                : 'border-gray-100 text-gray-500 hover:border-violet-200'
+                          }`}
+                          title={t('workspace.filterDue', 'À rappeler maintenant')}
+                        >
+                          <Clock className="w-3 h-3" />
+                          {t('workspace.filterDue', 'À rappeler')}
+                          {dueLeads.length > 0 ? (
+                            <span className="ml-0.5 rounded-md bg-violet-600 text-white px-1.5 py-0.5 text-[9px] tabular-nums">
+                              {dueLeads.length}
+                            </span>
+                          ) : null}
+                        </button>
                       </div>
+                      {dueLeads.length > 0 && followUpFilter !== 'due' && (
+                        <button
+                          type="button"
+                          onClick={() => setFollowUpFilter('due')}
+                          className="w-full text-left rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 flex items-center gap-3 hover:border-violet-300 transition-all"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white">
+                            <CalendarCheck className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">
+                              {t('workspace.dueNow', 'À rappeler maintenant')}
+                            </p>
+                            <p className="text-xs font-semibold text-violet-900/80 truncate">
+                              {t('workspace.dueNowHint', {
+                                count: dueLeads.length,
+                                defaultValue: `${dueLeads.length} prospect(s) avec RDV ou rappel échu`,
+                              })}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-violet-500 shrink-0" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1150,12 +1320,12 @@ export function WorkspaceContent() {
                       </div>
                     ))}
                   </div>
-                ) : leads.length === 0 ? (
+                ) : displayedLeads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
                         {searchQuery.trim()
                         ? t('workspaceGuard.noSearchResults', 'No leads match your search.')
-                        : (dispositionFilter !== 'all' || dateFrom || dateTo)
+                        : (dispositionFilter !== 'all' || dateFrom || dateTo || followUpFilter !== 'all')
                         ? t('workspaceGuard.noLeadsForFilter', 'Aucun prospect pour ce filtre.')
                         : enrolledGigs.length === 0
                         ? t(
@@ -1170,15 +1340,21 @@ export function WorkspaceContent() {
                 ) : (
                   <>
                     <div className="space-y-4">
-                      {leads.map((lead) => {
+                      {displayedLeads.map((lead) => {
                         const leadLockedByOther = isLeadCockpitLockedByOther(lead, myAgentId);
                         const isSignedByMe = Boolean(lead.isSignedByMe);
                         const isRdvByMe = isLeadRdvByMe(lead) && !isSignedByMe;
                         const isCalledByMe = Boolean(lead.isCalledByMe) && !isSignedByMe && !isRdvByMe;
+                        const followUpDue = isLeadFollowUpDue(lead, nowTick);
+                        const followUpLabel = formatFollowUpAt(lead.nextFollowUpAt, i18n.language || 'fr');
                         return (
                         <div
                           key={`${lead._id || lead.id}-${lead.Email_1}-${lead.Created_Time}`}
-                          className={`border border-gray-100 rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5 ${isSignedByMe ? 'cursor-pointer' : ''}`}
+                          className={`border rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5 ${
+                            followUpDue
+                              ? 'border-violet-300 bg-violet-50/40 ring-1 ring-violet-200'
+                              : 'border-gray-100'
+                          } ${isSignedByMe ? 'cursor-pointer' : ''}`}
                           onClick={isSignedByMe ? () => handleViewSignedLeadDetails(lead) : undefined}
                           onKeyDown={isSignedByMe ? (e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
@@ -1261,6 +1437,21 @@ export function WorkspaceContent() {
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-violet-50 text-violet-700 border border-violet-100 flex items-center gap-1.5">
                                   <Calendar className="w-3 h-3" />
                                   {t('workspace.filterRdv')}
+                                </span>
+                              )}
+                              {followUpLabel && (
+                                <span
+                                  className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${
+                                    followUpDue
+                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                  }`}
+                                  title={t('workspace.followUpAt', 'Créneau RDV / rappel')}
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  {followUpDue
+                                    ? t('workspace.dueNow', 'À rappeler maintenant')
+                                    : followUpLabel}
                                 </span>
                               )}
                               {isCalledByMe && (
