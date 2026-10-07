@@ -16,6 +16,7 @@ import {
     zonedWallTimeToUtc,
     resolveIanaZone,
     computeAttendanceScore,
+    resolveReservationYmd,
 } from '../../../utils/planningMetrics';
 import { CompanyView } from '../scheduler/CompanyView';
 import { WalletFilterSelect } from '../ui/WalletFilterSelect';
@@ -575,11 +576,13 @@ export function SessionPlanning() {
             return true;
         });
 
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
         const hoursInRange = (fromYmd: string, toYmd: string) =>
             reservedRows.reduce((sum: number, r: any) => {
-                const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return sum;
-                if (ymd < fromYmd || ymd > toYmd) return sum;
+                const ymd =
+                    resolveReservationYmd(r.reservationDate, gigTz, now.getTime()) ||
+                    resolveReservationYmd(r.date, gigTz, now.getTime());
+                if (!ymd || ymd < fromYmd || ymd > toYmd) return sum;
                 const dur = Number(r.duration);
                 return sum + (Number.isFinite(dur) && dur > 0 ? dur : 1);
             }, 0);
@@ -590,7 +593,9 @@ export function SessionPlanning() {
         const reservedTotal = reservedRows.length;
 
         const hasReservedToday = reservedRows.some((r: any) => {
-            const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
+            const ymd =
+                resolveReservationYmd(r.reservationDate, gigTz, now.getTime()) ||
+                resolveReservationYmd(r.date, gigTz, now.getTime());
             return ymd === todayStr;
         });
 
@@ -622,15 +627,36 @@ export function SessionPlanning() {
 
     const attendanceBreakdown = useMemo(() => {
         const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const reservedUiSlots = (slots || [])
+            .filter((s) => String(s.status || '').toLowerCase() === 'reserved')
+            .map((s) => ({
+                status: 'reserved',
+                reservationDate: s.date,
+                date: s.date,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                gigId: s.gigId,
+                agentId: s.repId,
+                duration: s.duration,
+            }));
         return computeAttendanceScore({
             reservations: allReservations,
+            slots: reservedUiSlots,
             calls: agentCalls,
             gigId: selectedGigId,
             gigTz,
             agentId: selectedRepId,
         });
-    }, [allReservations, agentCalls, selectedGigId, selectedGig, selectedRepId]);
+    }, [allReservations, slots, agentCalls, selectedGigId, selectedGig, selectedRepId]);
     const attendanceScore = attendanceBreakdown.score;
+
+    const formatAttendanceValue = (rate: number | null) => {
+        if (rate != null) return `${rate}%`;
+        if (attendanceBreakdown.reservedUpcoming > 0) {
+            return t('sessionPlanning.attendancePending', 'En attente');
+        }
+        return '—';
+    };
 
     const lastMinuteCancelRate = useMemo(() => {
         const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
@@ -901,15 +927,29 @@ export function SessionPlanning() {
                                     <p className="text-xl font-black text-white tracking-tight">{gigs.length}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                            <div
+                                className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5"
+                                title={t(
+                                    'sessionPlanning.attendanceHint',
+                                    'Slots réservés passés vs activité téléphonie réelle pendant le créneau (appels / tentatives).'
+                                )}
+                            >
                                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/20">
                                     <UserCheck className="h-4 w-4 text-sky-300" />
                                 </div>
                                 <div>
                                     <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
                                     <p className="text-xl font-black text-white tracking-tight">
-                                        {attendanceScore == null ? '—' : `${attendanceScore}%`}
+                                        {formatAttendanceValue(attendanceScore)}
                                     </p>
+                                    {attendanceBreakdown.reservedPast > 0 && (
+                                        <p className="text-[9px] font-bold text-white/45 tabular-nums">
+                                            {attendanceBreakdown.withActivity}/{attendanceBreakdown.reservedPast}
+                                            {attendanceBreakdown.noShow > 0
+                                                ? ` · ${attendanceBreakdown.noShow} ${t('sessionPlanning.attendanceNoShow', 'absent(s)')}`
+                                                : ''}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
@@ -919,7 +959,7 @@ export function SessionPlanning() {
                                 <div>
                                     <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lateAttendance')}</p>
                                     <p className="text-xl font-black text-white tracking-tight">
-                                        {attendanceBreakdown.lateRate == null ? '—' : `${attendanceBreakdown.lateRate}%`}
+                                        {formatAttendanceValue(attendanceBreakdown.lateRate)}
                                     </p>
                                 </div>
                             </div>
@@ -930,7 +970,7 @@ export function SessionPlanning() {
                                 <div>
                                     <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.earlyCheckOut')}</p>
                                     <p className="text-xl font-black text-white tracking-tight">
-                                        {attendanceBreakdown.earlyCheckoutRate == null ? '—' : `${attendanceBreakdown.earlyCheckoutRate}%`}
+                                        {formatAttendanceValue(attendanceBreakdown.earlyCheckoutRate)}
                                     </p>
                                 </div>
                             </div>
