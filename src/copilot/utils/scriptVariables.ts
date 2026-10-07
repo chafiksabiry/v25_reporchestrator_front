@@ -99,6 +99,7 @@ const LABEL_TO_KEY: Record<string, string> = {
   'date_of_birth': 'Date_of_Birth',
   dob: 'Date_of_Birth',
   'votre nom': 'repName',
+  'votre nom (rep)': 'repName',
   'votre prénom': 'repName',
   'votre prenom': 'repName',
   'nom du rep': 'repName',
