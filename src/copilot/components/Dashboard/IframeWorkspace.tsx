@@ -6,6 +6,7 @@ import { useLead } from '../../hooks/useLead';
 import { useGigScript } from '../../hooks/useGigScript';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
 import { getAgentName } from '../../utils';
+import { renderScript } from '../../utils/scriptVariables';
 import { 
   Globe, 
   X, 
@@ -23,34 +24,6 @@ import {
   PhoneOff
 } from 'lucide-react';
 
-function applyScriptMerge(
-  text: string | undefined,
-  vars: { repName: string; companyName: string; prospectName: string }
-): string {
-  if (!text) return '';
-  const replacements: Array<[RegExp, string]> = [
-    [/\[\s*Votre\s*Nom\s*\]/gi, vars.repName],
-    [/\[\s*Prénom(?:\s+de\s+l['’]?agent)?\s*\]/gi, vars.repName],
-    [/\{\{\s*repName\s*\}\}/gi, vars.repName],
-    [/\{\{\s*rep\.name\s*\}\}/gi, vars.repName],
-    [/\[\s*Nom du (?:client\/)?prospect\s*\]/gi, vars.prospectName],
-    [/\[\s*Nom du client\s*\]/gi, vars.prospectName],
-    [/\[\s*Nom(?:\s+du)?\s+prospect\s*\]/gi, vars.prospectName],
-    [/\{\{\s*prospectName\s*\}\}/gi, vars.prospectName],
-    [/\[\s*Nom de la (?:société|societe|company|compagnie)\s*\]/gi, vars.companyName],
-    [/\[\s*Nom(?:\s+de)?\s+(?:l['’])?entreprise\s*\]/gi, vars.companyName],
-    [/\[\s*Société\s*\]/gi, vars.companyName],
-    [/\[\s*Entreprise\s*\]/gi, vars.companyName],
-    [/\{\{\s*companyName\s*\}\}/gi, vars.companyName],
-    [/\{\{\s*company\.name\s*\}\}/gi, vars.companyName],
-  ];
-  let out = text;
-  for (const [pattern, value] of replacements) {
-    if (value) out = out.replace(pattern, value);
-  }
-  return out;
-}
-
 export function IframeWorkspace() {
   const { state, dispatch } = useAgent();
   const activeContact = state.callState?.contact;
@@ -63,6 +36,42 @@ export function IframeWorkspace() {
   const { lead: apiLead } = useLead(leadId);
   const { profile: agentProfile } = useAgentProfile();
   const gig = apiLead?.gigId;
+
+  const [repVisibility, setRepVisibility] = useState<Record<string, boolean> | undefined>(undefined);
+
+  useEffect(() => {
+    const gigIdForVisibility =
+      urlGigId || (typeof gig === 'string' ? gig : gig?._id) || '';
+    if (!gigIdForVisibility) {
+      setRepVisibility(undefined);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const base = String(
+          import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
+            import.meta.env.VITE_DASHBOARD_API ||
+            'https://v25dashboardbackend-development.up.railway.app/api'
+        ).replace(/\/$/, '');
+        const res = await fetch(`${base}/file-processing/visibility/${gigIdForVisibility}`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const rep = json?.data?.visibility?.rep;
+        if (!cancelled && rep && typeof rep === 'object') {
+          setRepVisibility(rep as Record<string, boolean>);
+        }
+      } catch {
+        /* keep previous / undefined */
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [urlGigId, gig]);
 
   const mergeVars = useMemo(() => {
     const contact = activeContact as { name?: string; company?: string; First_Name?: string; Last_Name?: string } | undefined;
@@ -93,7 +102,12 @@ export function IframeWorkspace() {
     return { repName, companyName, prospectName };
   }, [agentProfile, gig, apiLead, activeContact]);
 
-  const fill = (text?: string) => applyScriptMerge(text, mergeVars);
+  const fill = (text?: string) =>
+    renderScript(text, apiLead || activeContact || null, {
+      ...mergeVars,
+      repVisibility,
+      emptyFallback: '—',
+    });
   
   const resolvedGigId = urlGigId || (typeof gig === 'string' ? gig : gig?._id);
   const { scripts, activeScript, loading: scriptLoading } = useGigScript(resolvedGigId);
