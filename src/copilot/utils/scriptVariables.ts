@@ -68,8 +68,57 @@ function customValue(lead: LeadLike | null | undefined, header: string): string 
   return String(v).trim();
 }
 
+/** French / informal labels people type or AI generates inside {{...}}. */
+const LABEL_TO_KEY: Record<string, string> = {
+  'nom du prospect': 'Deal_Name',
+  'nom complet': 'Deal_Name',
+  'deal_name': 'Deal_Name',
+  'deal name': 'Deal_Name',
+  prenom: 'First_Name',
+  'prénom': 'First_Name',
+  'first_name': 'First_Name',
+  'first name': 'First_Name',
+  nom: 'Last_Name',
+  'last_name': 'Last_Name',
+  'last name': 'Last_Name',
+  email: 'Email_1',
+  'e-mail': 'Email_1',
+  'email_1': 'Email_1',
+  telephone: 'Phone',
+  'téléphone': 'Phone',
+  tel: 'Phone',
+  phone: 'Phone',
+  adresse: 'Address',
+  address: 'Address',
+  'code postal': 'Postal_Code',
+  'postal_code': 'Postal_Code',
+  cp: 'Postal_Code',
+  ville: 'City',
+  city: 'City',
+  'date de naissance': 'Date_of_Birth',
+  'date_of_birth': 'Date_of_Birth',
+  dob: 'Date_of_Birth',
+  'votre nom': 'repName',
+  'votre prénom': 'repName',
+  'votre prenom': 'repName',
+  'nom du rep': 'repName',
+  "nom de l'entreprise": 'companyName',
+  'nom de l’entreprise': 'companyName',
+  "nom de l'entreprise (vendeur)": 'companyName',
+  'nom de l’entreprise (vendeur)': 'companyName',
+  'entreprise vendeur': 'companyName',
+  company: 'companyName',
+};
+
+function normalizeTokenKey(raw: string): string {
+  const k = String(raw || '').trim();
+  if (!k) return '';
+  const lower = k.toLowerCase().replace(/\s+/g, ' ');
+  return LABEL_TO_KEY[lower] || k;
+}
+
 function resolveTokenKey(key: string, lead: LeadLike | null | undefined, ctx: MergeContext): string {
-  const k = String(key || '').trim();
+  const k = normalizeTokenKey(key);
   if (!k) return '';
   if (k === 'repName' || k === 'rep.name') return String(ctx.repName || '').trim();
   if (k === 'companyName' || k === 'company.name') return String(ctx.companyName || '').trim();
