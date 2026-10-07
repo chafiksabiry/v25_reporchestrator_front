@@ -305,6 +305,37 @@ export function calendarPartsInZone(
   }
 }
 
+/**
+ * Resolve a reservation calendar day to yyyy-MM-dd.
+ * Accepts ISO dates or English weekday names (legacy weekly templates).
+ * For weekday-only values, picks the most recent occurrence on/before `now`
+ * in the gig timezone (lookback 28 days) so past slots still score attendance.
+ */
+export function resolveReservationYmd(
+  raw: unknown,
+  gigTz?: string | null,
+  nowMs: number = Date.now()
+): string | null {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+  const dayName = s.toLowerCase();
+  const zone =
+    resolveIanaZone(gigTz) ||
+    (typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : null) ||
+    'UTC';
+
+  for (let i = 0; i < 28; i++) {
+    const instant = new Date(nowMs - i * 24 * 60 * 60 * 1000);
+    const cal = calendarPartsInZone(instant, zone);
+    if (cal && cal.weekday === dayName) return cal.ymd;
+  }
+  return null;
+}
+
 /** Reserved slot window in UTC ms, using gig TZ when available. */
 export function reservationSlotWindowMs(
   r: {
@@ -313,12 +344,15 @@ export function reservationSlotWindowMs(
     startTime?: string;
     endTime?: string;
   },
-  gigTz?: string | null
+  gigTz?: string | null,
+  nowMs: number = Date.now()
 ): { start: number; end: number } | null {
-  const ymd = String(r.reservationDate || r.date || '').slice(0, 10);
+  const ymd =
+    resolveReservationYmd(r.reservationDate, gigTz, nowMs) ||
+    resolveReservationYmd(r.date, gigTz, nowMs);
   const startT = String(r.startTime || '00:00').slice(0, 5);
   const endT = String(r.endTime || r.startTime || '23:59').slice(0, 5);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
 
   let start: Date | null = null;
   let end: Date | null = null;
@@ -396,7 +430,8 @@ function slotGraceMs(durationMs: number): number {
 export type AttendanceBreakdown = {
   /**
    * Main score: slots with real telephony activity during the window /
-   * past reserved slots (Somme activité réelle / Somme slots réservés).
+   * past reserved slots (activité réelle / slots réservés passés).
+   * null only when there is not yet any ended reserved window to score.
    */
   score: number | null;
   /** Subset: first call after the start grace. */
@@ -406,6 +441,8 @@ export type AttendanceBreakdown = {
   /** Slots with activity that were on time through the end (diagnostic). */
   fullSlotRate: number | null;
   reservedPast: number;
+  /** Reserved slots that have not ended yet (still upcoming / in progress). */
+  reservedUpcoming: number;
   withActivity: number;
   attended: number;
   late: number;
@@ -413,15 +450,37 @@ export type AttendanceBreakdown = {
   noShow: number;
 };
 
+function normalizeReservationRow(raw: unknown): Record<string, any> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  const status = String(r.status || 'reserved').toLowerCase();
+  if (status === 'cancelled' || status === 'canceled') return null;
+  return {
+    ...r,
+    status: status || 'reserved',
+    startTime: r.startTime,
+    endTime: r.endTime,
+    reservationDate: r.reservationDate || r.date,
+    date: r.date || r.reservationDate,
+    gigId: r.gigId,
+    agentId: r.agentId || r.repId,
+  };
+}
+
 /**
  * Attendance (main) = slots with real telephony activity during the slot /
  *                     past reserved slots.
  *
- * Late attendance / Early check-out are breakdowns among those slots
- * (and no-shows count against attendance).
+ * A slot counts as "with activity" when at least one call attempt overlaps the
+ * reserved window (connection / dial attempts — duration 0 still counts).
+ * No-shows (reserved but no call during the window) pull the score down.
+ *
+ * Late attendance / Early check-out are breakdowns among those slots.
  */
 export function computeAttendanceScore(opts: {
   reservations: unknown[];
+  /** Optional UI slots (status=reserved) merged when API rows are sparse. */
+  slots?: unknown[];
   calls: unknown[];
   nowMs?: number;
   gigId?: string | null;
@@ -434,6 +493,7 @@ export function computeAttendanceScore(opts: {
     earlyCheckoutRate: null,
     fullSlotRate: null,
     reservedPast: 0,
+    reservedUpcoming: 0,
     withActivity: 0,
     attended: 0,
     late: 0,
@@ -456,24 +516,40 @@ export function computeAttendanceScore(opts: {
     .map((raw) => callActivityWindowMs(raw as Parameters<typeof callActivityWindowMs>[0]))
     .filter((w): w is { start: number; end: number } => !!w);
 
-  const pastReserved = (Array.isArray(opts.reservations) ? opts.reservations : []).filter((raw) => {
-    const r = raw as Record<string, any>;
-    const status = String(r.status || 'reserved').toLowerCase();
-    if (status !== 'reserved') return false;
+  const mergedRaw = [
+    ...(Array.isArray(opts.reservations) ? opts.reservations : []),
+    ...(Array.isArray(opts.slots) ? opts.slots : []),
+  ];
+
+  const seen = new Set<string>();
+  const candidates: { row: Record<string, any>; win: { start: number; end: number } }[] = [];
+
+  for (const raw of mergedRaw) {
+    const r = normalizeReservationRow(raw);
+    if (!r) continue;
+    if (String(r.status || 'reserved').toLowerCase() !== 'reserved') continue;
     if (gigId) {
       const rg = nid(r.gigId?._id || r.gigId);
-      if (rg && rg !== gigId) return false;
+      if (rg && rg !== gigId) continue;
     }
     if (agentId) {
       const ra = nid(r.agentId?._id || r.agentId || r.repId);
-      if (ra && ra !== agentId) return false;
+      if (ra && ra !== agentId) continue;
     }
-    const win = reservationSlotWindowMs(r, opts.gigTz);
-    if (!win) return false;
-    return win.end <= now;
-  });
+    const win = reservationSlotWindowMs(r, opts.gigTz, now);
+    if (!win) continue;
+    const key = `${nid(r.gigId?._id || r.gigId)}|${win.start}|${win.end}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ row: r, win });
+  }
 
-  if (pastReserved.length === 0) return empty;
+  const pastReserved = candidates.filter((c) => c.win.end <= now);
+  const reservedUpcoming = candidates.filter((c) => c.win.end > now).length;
+
+  if (pastReserved.length === 0) {
+    return { ...empty, reservedUpcoming };
+  }
 
   let withActivity = 0;
   let attended = 0;
@@ -481,9 +557,7 @@ export function computeAttendanceScore(opts: {
   let earlyCheckout = 0;
   let noShow = 0;
 
-  for (const raw of pastReserved) {
-    const win = reservationSlotWindowMs(raw as any, opts.gigTz);
-    if (!win) continue;
+  for (const { win } of pastReserved) {
     const overlapping = callWindows.filter((c) => intervalsOverlap(win, c));
     if (overlapping.length === 0) {
       noShow += 1;
@@ -503,12 +577,13 @@ export function computeAttendanceScore(opts: {
   const denom = pastReserved.length;
   const pct = (n: number) => Math.round((n / denom) * 100);
   return {
-    // Main KPI: any real telephony overlap during the reserved window.
+    // Main KPI: any real telephony overlap (incl. failed/short attempts) during the window.
     score: pct(withActivity),
     lateRate: pct(late),
     earlyCheckoutRate: pct(earlyCheckout),
     fullSlotRate: pct(attended),
     reservedPast: denom,
+    reservedUpcoming,
     withActivity,
     attended,
     late,
