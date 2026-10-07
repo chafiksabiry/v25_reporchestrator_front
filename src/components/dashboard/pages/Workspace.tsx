@@ -26,6 +26,8 @@ import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass
 import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
 import { anonymizeBirthDate, anonymizeEmail, anonymizePhone, anonymizeStreet } from '../../../utils/callStatusDisplay';
 import { useNotifications } from '../../../contexts/NotificationsContext';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { isReservationActiveNow, resolveIanaZone } from '../../../utils/planningMetrics';
 
 interface Lead {
   _id?: string;
@@ -215,20 +217,6 @@ type CopilotGuardState = {
   reason: string | null;
 };
 
-function weekdayEnglish(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
-function parseTimeToMinutes(time: string): number | null {
-  const m = String(time || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
-  return h * 60 + min;
-}
-
 function NewLeadFlash({ label, title }: { label: string; title?: string }) {
   return (
     <span
@@ -241,17 +229,6 @@ function NewLeadFlash({ label, title }: { label: string; title?: string }) {
       </span>
     </span>
   );
-}
-
-function isTodayReservation(rawDate: unknown, now: Date): boolean {
-  const v = String(rawDate || '').trim();
-  if (!v) return false;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    const todayIso = now.toISOString().slice(0, 10);
-    const localIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    return v === todayIso || v === localIso;
-  }
-  return v.toLowerCase() === weekdayEnglish(now).toLowerCase();
 }
 
 export function WorkspaceContent() {
@@ -369,6 +346,7 @@ export function WorkspaceContent() {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [prospectProfileLead, setProspectProfileLead] = useState<Lead | null>(null);
+  const [repFieldVisibility, setRepFieldVisibility] = useState<Record<string, boolean>>({});
   const [dispositionModalLead, setDispositionModalLead] = useState<Lead | null>(null);
   const [dispositionSaving, setDispositionSaving] = useState(false);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
@@ -390,6 +368,37 @@ export function WorkspaceContent() {
     () => (selectedGigId && enrolledGigs.some((g) => g._id === selectedGigId) ? selectedGigId : ''),
     [selectedGigId, enrolledGigs]
   );
+
+  const repCanSee = (field: string) => repFieldVisibility[field] !== false;
+
+  // Load company-configured field visibility for the selected gig (REP audience).
+  useEffect(() => {
+    if (!activeEnrolledGigId) {
+      setRepFieldVisibility({});
+      return;
+    }
+    let cancelled = false;
+    const baseUrl = (
+      import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
+      'https://v25dashboardbackend-development.up.railway.app/api'
+    ).replace(/\/$/, '');
+    (async () => {
+      try {
+        const res = await fetch(`${baseUrl}/file-processing/visibility/${activeEnrolledGigId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.success && data?.data?.visibility?.rep) {
+          setRepFieldVisibility(data.data.visibility.rep);
+        }
+      } catch {
+        // Keep defaults (all visible) if the endpoint is unavailable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeEnrolledGigId]);
 
   // Refresh "due now" every 60s for pin + notifications.
   useEffect(() => {
@@ -737,17 +746,30 @@ export function WorkspaceContent() {
           isTrainingComplete = trainingCount > 0 && overall >= 100;
         }
 
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        const activeReservation = (Array.isArray(reservations) ? reservations : []).find((r: any) => {
-          if (String(r?.status || '').toLowerCase() !== 'reserved') return false;
-          const reservationDay = r?.reservationDate || r?.date;
-          if (!isTodayReservation(reservationDay, now)) return false;
-          const start = parseTimeToMinutes(r?.startTime);
-          const end = parseTimeToMinutes(r?.endTime);
-          if (start == null || end == null || end <= start) return false;
-          // Check if current time matches the active slot strictly
-          return nowMinutes >= start && nowMinutes < end;
-        });
+        // Slot times are stored in gig (destination) TZ — e.g. Paris 12:00–13:00
+        // displays as Casablanca 10:00–11:00. Compare absolute UTC windows, not
+        // browser local HH:mm against Paris wall times.
+        let gigTz: string | null = 'Europe/Paris';
+        try {
+          const gigRes = await fetch(
+            `${getGigsApiBase()}/gigs/${encodeURIComponent(activeEnrolledGigId)}`,
+            { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          );
+          if (gigRes.ok) {
+            const gigPayload = await gigRes.json();
+            const gigDoc = gigPayload?.data || gigPayload?.gig || gigPayload;
+            gigTz =
+              resolveIanaZone(gigDoc?.availability?.time_zone) ||
+              resolveIanaZone(gigDoc?.availability?.timeZone) ||
+              'Europe/Paris';
+          }
+        } catch {
+          /* keep Europe/Paris default */
+        }
+
+        const activeReservation = (Array.isArray(reservations) ? reservations : []).find((r: any) =>
+          isReservationActiveNow(r, { gigTz, nowMs: now.getTime() })
+        );
 
         const hasActiveReservationNow = !!activeReservation;
         const reservationWindowLabel = hasActiveReservationNow
@@ -784,7 +806,8 @@ export function WorkspaceContent() {
     if (enrolledGigsLoaded) {
       evaluateCopilotGuard();
     }
-  }, [activeEnrolledGigId, enrolledGigsLoaded]);
+    // Re-check when the clock crosses into/out of a reserved hour (nowTick every 60s).
+  }, [activeEnrolledGigId, enrolledGigsLoaded, nowTick]);
 
   const fetchEnrolledGigs = async () => {
     const agentId = localStorage.getItem('agentId');
@@ -1390,20 +1413,30 @@ export function WorkspaceContent() {
                           })()}
                           <div className="flex justify-between items-center">
                             <div className="space-y-1">
-                              <h4 className="font-black text-gray-900 uppercase text-sm tracking-tight group-hover:text-harx-600 transition-colors">{lead.Deal_Name}</h4>
+                              <h4 className="font-black text-gray-900 uppercase text-sm tracking-tight group-hover:text-harx-600 transition-colors">
+                                {repCanSee('Deal_Name') || repCanSee('First_Name') || repCanSee('Last_Name')
+                                  ? lead.Deal_Name ||
+                                    `${lead.First_Name || ''} ${lead.Last_Name || ''}`.trim() ||
+                                    '—'
+                                  : '—'}
+                              </h4>
                               <div className="flex items-center gap-3 flex-wrap">
+                                {repCanSee('Phone') && (
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Phone className="w-3 h-3" />
                                   <p className="text-[10px] font-black uppercase tracking-widest">
                                     {anonymizePhone(lead.Telephony || lead.Phone) || t('workspace.noPhone')}
                                   </p>
                                 </div>
+                                )}
+                                {repCanSee('Email_1') && (
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Mail className="w-3 h-3" />
                                   <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">
                                     {anonymizeEmail(lead.Email_1) || t('workspace.noEmail')}
                                   </p>
                                 </div>
+                                )}
                                 {lead.Created_Time && (
                                   <div
                                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 text-white border border-slate-700 shadow-sm"
@@ -2176,36 +2209,35 @@ export function WorkspaceContent() {
               <div className="space-y-2.5">
                 <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileContact', 'Contact')}</h3>
                 <div className="grid grid-cols-2 gap-2">
+                  {repCanSee('Phone') && (
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePhone', 'Téléphone')}</p>
                     <p className="text-sm font-bold text-gray-800">{anonymizePhone(prospectProfileLead.Telephony || prospectProfileLead.Phone || prospectProfileLead.Mobile) || '—'}</p>
                   </div>
+                  )}
+                  {repCanSee('Email_1') && (
                   <div className="bg-gray-50 rounded-2xl p-3">
                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profileEmail', 'Email')}</p>
                     <p className="text-sm font-bold text-gray-800 break-all">{anonymizeEmail(prospectProfileLead.Email_1 || prospectProfileLead.Email || prospectProfileLead.email) || '—'}</p>
                   </div>
-                  {(prospectProfileLead.Address || prospectProfileLead.Postal_Code || prospectProfileLead.City) && (
+                  )}
+                  {(repCanSee('Address') || repCanSee('Postal_Code') || repCanSee('City')) &&
+                    (prospectProfileLead.Address || prospectProfileLead.Postal_Code || prospectProfileLead.City) && (
                     <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
                       <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {t('workspace.profileAddress', 'Adresse')}</p>
                       <p className="text-sm font-bold text-gray-800">
                         {[
-                          anonymizeStreet(prospectProfileLead.Address),
-                          prospectProfileLead.Postal_Code ? '••••' : '',
-                          prospectProfileLead.City,
+                          repCanSee('Address') ? anonymizeStreet(prospectProfileLead.Address) : '',
+                          repCanSee('Postal_Code') && prospectProfileLead.Postal_Code ? '••••' : '',
+                          repCanSee('City') ? prospectProfileLead.City : '',
                         ].filter(Boolean).join(', ')}
                       </p>
                     </div>
                   )}
-                  {prospectProfileLead.Date_of_Birth && (
+                  {repCanSee('Date_of_Birth') && prospectProfileLead.Date_of_Birth && (
                     <div className="bg-gray-50 rounded-2xl p-3">
                       <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><CreditCard className="w-2.5 h-2.5" /> {t('workspace.profileDob', 'Date de naissance')}</p>
                       <p className="text-sm font-bold text-gray-800">{anonymizeBirthDate(prospectProfileLead.Date_of_Birth)}</p>
-                    </div>
-                  )}
-                  {prospectProfileLead.Pipeline && (
-                    <div className="bg-gray-50 rounded-2xl p-3">
-                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePipeline', 'Pipeline')}</p>
-                      <p className="text-sm font-bold text-gray-800">{prospectProfileLead.Pipeline}</p>
                     </div>
                   )}
                 </div>
