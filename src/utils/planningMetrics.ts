@@ -280,6 +280,31 @@ export function callActivityWindowMs(call: {
   return { start, end };
 }
 
+/** Calendar yyyy-MM-dd + English weekday in an IANA zone. */
+export function calendarPartsInZone(
+  instant: Date,
+  timeZone: string
+): { ymd: string; weekday: string } | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      weekday: 'long',
+    }).formatToParts(instant);
+    const get = (type: string) => String(parts.find((p) => p.type === type)?.value || '');
+    const yyyy = get('year');
+    const mm = get('month');
+    const dd = get('day');
+    const weekday = get('weekday').toLowerCase();
+    if (!yyyy || !mm || !dd || !weekday) return null;
+    return { ymd: `${yyyy}-${mm}-${dd}`, weekday };
+  } catch {
+    return null;
+  }
+}
+
 /** Reserved slot window in UTC ms, using gig TZ when available. */
 export function reservationSlotWindowMs(
   r: {
@@ -297,9 +322,10 @@ export function reservationSlotWindowMs(
 
   let start: Date | null = null;
   let end: Date | null = null;
-  if (gigTz) {
-    start = zonedWallTimeToUtc(ymd, startT, gigTz);
-    end = zonedWallTimeToUtc(ymd, endT, gigTz);
+  const zone = resolveIanaZone(gigTz);
+  if (zone) {
+    start = zonedWallTimeToUtc(ymd, startT, zone);
+    end = zonedWallTimeToUtc(ymd, endT, zone);
   }
   if (!start || Number.isNaN(start.getTime())) start = new Date(`${ymd}T${startT}:00`);
   if (!end || Number.isNaN(end.getTime())) end = new Date(`${ymd}T${endT}:00`);
@@ -309,6 +335,51 @@ export function reservationSlotWindowMs(
   let endMs = end.getTime();
   if (endMs <= startMs) endMs = startMs + 60 * 60 * 1000;
   return { start: startMs, end: endMs };
+}
+
+/**
+ * True when `now` falls inside a reserved slot.
+ * Slot start/end are gig (destination) wall times — never compare them to the
+ * REP browser clock directly (Casablanca vs Paris would desync by 1–2h).
+ */
+export function isReservationActiveNow(
+  r: {
+    status?: string;
+    reservationDate?: string;
+    date?: string;
+    startTime?: string;
+    endTime?: string;
+  },
+  opts?: { gigTz?: string | null; nowMs?: number }
+): boolean {
+  const status = String(r?.status || 'reserved').toLowerCase();
+  if (status && status !== 'reserved') return false;
+
+  const nowMs = opts?.nowMs ?? Date.now();
+  const now = new Date(nowMs);
+  const gigTz = resolveIanaZone(opts?.gigTz) || 'Europe/Paris';
+
+  const rawDay = String(r.reservationDate || r.date || '').trim();
+  let ymd: string | null = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDay)) {
+    ymd = rawDay;
+  } else if (rawDay) {
+    const cal = calendarPartsInZone(now, gigTz);
+    if (cal && cal.weekday === rawDay.toLowerCase()) ymd = cal.ymd;
+  }
+  if (!ymd) return false;
+
+  const win = reservationSlotWindowMs(
+    {
+      reservationDate: ymd,
+      date: ymd,
+      startTime: r.startTime,
+      endTime: r.endTime,
+    },
+    gigTz
+  );
+  if (!win) return false;
+  return nowMs >= win.start && nowMs < win.end;
 }
 
 function intervalsOverlap(
