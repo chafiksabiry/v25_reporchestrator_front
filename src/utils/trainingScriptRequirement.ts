@@ -300,7 +300,9 @@ export async function fetchEnrolledGigsForAgent(
   const gigs = Array.isArray(data.gigs) ? data.gigs : [];
   const out: { gigId: string; title: string }[] = [];
   for (const item of gigs) {
-    const g = item as { gig?: { _id?: unknown; title?: string } };
+    const g = item as { gig?: { _id?: unknown; title?: string; status?: string } };
+    // Matching may still return inactive until BE deploy — harden here.
+    if (String(g.gig?.status || '').toLowerCase() !== 'active') continue;
     const gigId = normalizeMongoId(g.gig?._id);
     if (gigId) {
       out.push({

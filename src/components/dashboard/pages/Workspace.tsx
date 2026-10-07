@@ -821,7 +821,15 @@ export function WorkspaceContent() {
       if (response.ok) {
         const profileData = await response.json();
         const enrolled = (Array.isArray(profileData.gigs) ? profileData.gigs : [])
-          .filter((g: any) => g && g.status === 'enrolled')
+          .filter((g: any) => {
+            if (!g || g.status !== 'enrolled') return false;
+            const gigInfo = g.gigId;
+            // Profile path: only lifecycle-active company gigs for dropdown + leads.
+            if (gigInfo && typeof gigInfo === 'object') {
+              return String(gigInfo.status || '').toLowerCase() === 'active';
+            }
+            return false;
+          })
           .map((g: any) => {
             const gigInfo = g.gigId;
             // typeof null === 'object' in JS — must reject null before reading ._id

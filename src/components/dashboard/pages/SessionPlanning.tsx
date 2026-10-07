@@ -461,7 +461,11 @@ export function SessionPlanning() {
                     const enrolledOnly = response.data.filter((ga: EnrolledGig) => ga.status?.toLowerCase() === 'enrolled');
 
                     const mappedGigs: Gig[] = enrolledOnly
-                      .filter((gigAgent: EnrolledGig) => gigAgent?.gigId && typeof gigAgent.gigId === 'object')
+                      .filter((gigAgent: EnrolledGig) => {
+                        if (!gigAgent?.gigId || typeof gigAgent.gigId !== 'object') return false;
+                        // Only lifecycle-active company gigs in REP planning dropdown.
+                        return String((gigAgent.gigId as { status?: string }).status || '').toLowerCase() === 'active';
+                      })
                       .map((gigAgent: EnrolledGig) => ({
                         id: gigAgent.gigId._id,
                         name: gigAgent.gigId.title,

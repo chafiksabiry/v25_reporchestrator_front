@@ -442,9 +442,18 @@ export function Dashboard({ profile }: DashboardProps) {
           ...(realUserId ? { userId: String(realUserId) } : {}),
         });
 
+        const isLifecycleActiveEnrollment = (g: any) => {
+          if (!g || g.status !== 'enrolled') return false;
+          const gigInfo = g.gigId;
+          if (gigInfo && typeof gigInfo === 'object') {
+            return String(gigInfo.status || '').toLowerCase() === 'active';
+          }
+          return false;
+        };
+
         const profileGigsPromise = (async () => {
           const fromProp = Array.isArray(profile?.gigs)
-            ? profile.gigs.filter((g: any) => g.status === 'enrolled')
+            ? profile.gigs.filter(isLifecycleActiveEnrollment)
             : [];
           if (fromProp.length > 0) return fromProp;
           if (!token) return [];
@@ -455,7 +464,7 @@ export function Dashboard({ profile }: DashboardProps) {
             if (!profileRes.ok) return [];
             const profileData = await profileRes.json();
             return (Array.isArray(profileData.gigs) ? profileData.gigs : [])
-              .filter((g: any) => g.status === 'enrolled');
+              .filter(isLifecycleActiveEnrollment);
           } catch {
             return [];
           }
@@ -471,7 +480,14 @@ export function Dashboard({ profile }: DashboardProps) {
             );
             if (!res.ok) return [];
             const data = await res.json();
-            return Array.isArray(data.gigs) ? data.gigs.map((row: any) => row.gig).filter(Boolean) : [];
+            return Array.isArray(data.gigs)
+              ? data.gigs
+                  .map((row: any) => row.gig)
+                  .filter(
+                    (gig: any) =>
+                      gig && String(gig.status || '').toLowerCase() === 'active'
+                  )
+              : [];
           } catch {
             return [];
           }

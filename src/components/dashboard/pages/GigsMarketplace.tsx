@@ -1328,7 +1328,11 @@ export function GigsMarketplace() {
         const transformedEnrollments = enrollmentData.gigs
           .filter((gigEnrollment: any) => {
             console.log('🔍 Checking enrollment:', gigEnrollment.gig?._id);
-            return gigEnrollment.gig; // Filtrer les enrollments sans gig
+            // Enrolled tab: only lifecycle-active company gigs
+            return (
+              gigEnrollment.gig &&
+              String(gigEnrollment.gig.status || '').toLowerCase() === 'active'
+            );
           })
           .map((gigEnrollment: any) => {
             console.log('🔄 Transforming enrollment:', gigEnrollment.gig._id);
