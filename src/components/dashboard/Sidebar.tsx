@@ -1,12 +1,19 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Lock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock } from 'lucide-react';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
 import mascotte from '../../assets/mascotte2.png';
-import { HARX_SIDEBAR_BG, HARX_BAR_SHADOW } from '../../utils/harxBrand';
+import { getRepShellChrome } from '../../utils/harxBrand';
+import { isCallCenterStaff as readCallCenterStaff } from '../../utils/callCenterStaff';
+import { getAgentId, getAuthToken } from '../../utils/authUtils';
+import { fetchEnrolledGigsForAgent } from '../../utils/trainingScriptRequirement';
+import { persistActiveGigId, withActiveGig } from '../../utils/activeGigNav';
+import { getRepOnboardingStep } from '../../utils/repOnboardingNextStep';
+import { PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { useNotifications } from '../../contexts/NotificationsContext';
 
 // Declare qiankun global variables
 declare global {
@@ -85,6 +92,10 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { notifications } = useNotifications();
+  const inviteBadgeCount = notifications.filter(
+    (n) => !n.read && (n.status === 'invited' || String(n.notificationKey || '').includes('-invited'))
+  ).length;
 
   // While the profile is still loading, `phases` is undefined. Rather than
   // momentarily assuming onboarding is incomplete (which flashes the warning
@@ -121,10 +132,27 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   // Onboarding is considered complete (agent profile created) only when the
   // required phases 1-4 are all completed. While incomplete, we hide Dashboard,
   // Planning and Wallet and show an onboarding guide instead.
-  const isOnboardingComplete = (): boolean =>
-    isPhaseCompleted(1) && isPhaseCompleted(2) && isPhaseCompleted(3) && isPhaseCompleted(4);
-  // Published profile = onboarding funnel done (phases 1–4 + publish).
-  const onboardingComplete = isProfilePublishedInStorage() || isOnboardingComplete();
+  const isCallCenterStaff = readCallCenterStaff();
+  const chrome = getRepShellChrome(isCallCenterStaff);
+  const activeIconClass = isCallCenterStaff
+    ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg shadow-emerald-500/30'
+    : 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30';
+  const sectionLabelClass = isCallCenterStaff
+    ? 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-emerald-200 to-teal-100 bg-clip-text text-transparent select-none'
+    : 'px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none';  // Full nav unlocks only after publish - phases 1-4 alone must not open marketplace.
+  // Re-read on PROFILE_UPDATED so sidebar unlocks immediately after publish+avis
+  // without requiring a full page refresh.
+  const [profilePublished, setProfilePublished] = React.useState(() =>
+    isProfilePublishedInStorage()
+  );
+  useEffect(() => {
+    const sync = () => setProfilePublished(isProfilePublishedInStorage());
+    sync();
+    window.addEventListener(PROFILE_UPDATE_EVENT, sync);
+    return () => window.removeEventListener(PROFILE_UPDATE_EVENT, sync);
+  }, []);
+
+  const onboardingComplete = isCallCenterStaff || profilePublished;
 
   const isProfileCreationPage =
     location.pathname.includes('/profile-import') ||
@@ -132,13 +160,73 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(location.pathname.includes('/workspace'));
   const [isTrainingOpen, setIsTrainingOpen] = React.useState(location.pathname.includes('/training'));
-  const [showWarningModal, setShowWarningModal] = React.useState(false);
+  const [showCockpitGigModal, setShowCockpitGigModal] = React.useState(false);
+  const [cockpitGigOptions, setCockpitGigOptions] = React.useState<{ gigId: string; title: string }[]>([]);
+  const [cockpitGigLoading, setCockpitGigLoading] = React.useState(false);
+  const [selectedCockpitGigId, setSelectedCockpitGigId] = React.useState('');
+  const [isCockpitGigDropdownOpen, setIsCockpitGigDropdownOpen] = React.useState(false);
   const [openTrainingModuleIndexes, setOpenTrainingModuleIndexes] = React.useState<number[]>([]);
   const {
     trainingModules,
     activeTrainingModuleIndex,
     activeTrainingSlideIndex
   } = useRepTrainingNav();
+
+  const resolveSpecificGigId = React.useCallback((): string | null => {
+    const trainingFilter = String(sessionStorage.getItem('training_gig_filter') || '').trim();
+    if (trainingFilter && trainingFilter !== '__all__') return trainingFilter;
+    return null;
+  }, []);
+
+  const toWithGig = React.useCallback((path: string) => {
+    const base = path.split('?')[0];
+    if (base === '/workspace' || base === '/training' || base === '/session-planning') {
+      return withActiveGig(path);
+    }
+    return path;
+  }, []);
+
+  const openCockpitWithGig = React.useCallback(
+    (gigId?: string | null) => {
+      const id = String(gigId || '').trim();
+      // Opening COCKPIT from the sidebar is not a lead selection — clear any
+      // stale prospect so the phone number is only shown after picking from Prospects.
+      sessionStorage.removeItem('activeLeadId');
+      if (id) {
+        persistActiveGigId(id);
+        navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(id)}`, {
+          state: { gigId: id, clearLead: true },
+        });
+      } else {
+        navigate('/workspace?tab=copilot', { state: { clearLead: true } });
+      }
+      setShowCockpitGigModal(false);
+      setIsSidebarOpen(false);
+    },
+    [navigate, setIsSidebarOpen]
+  );
+
+  const openCockpitGigPicker = React.useCallback(async () => {
+    setShowCockpitGigModal(true);
+    setCockpitGigLoading(true);
+    setSelectedCockpitGigId('');
+    setCockpitGigOptions([]);
+    setIsCockpitGigDropdownOpen(false);
+    try {
+      const agentId = getAgentId();
+      const token = getAuthToken();
+      if (!agentId || !token) return;
+      const gigs = await fetchEnrolledGigsForAgent(agentId, token);
+      setCockpitGigOptions(gigs);
+      if (gigs.length === 1) {
+        setSelectedCockpitGigId(gigs[0].gigId);
+      }
+    } catch {
+      setCockpitGigOptions([]);
+    } finally {
+      setCockpitGigLoading(false);
+    }
+  }, []);
 
   // Ensure workspace is open if we navigate there externally
   useEffect(() => {
@@ -159,7 +247,9 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
   const navItems = [
     {
       icon: LayoutDashboard,
-      label: t('sidebar.dashboard'),
+      label: isCallCenterStaff
+        ? t('sidebar.ccHome', 'Home')
+        : t('sidebar.dashboard'),
       // Must be `/dashboard`: the exact `/` route renders the onboarding
       // orchestrator (OnboardingDashboard), the real dashboard lives under
       // the DashboardRoutes catch-all at `/dashboard`.
@@ -170,14 +260,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Briefcase,
       label: t('sidebar.marketplace'),
       path: '/marketplace',
-      isAccessible: () => onboardingComplete
+      isAccessible: () => onboardingComplete && !isCallCenterStaff
     },
 
     {
       icon: GraduationCap,
       label: t('sidebar.training'),
       path: '/training',
-      isAccessible: () => onboardingComplete,
+      isAccessible: () => onboardingComplete && !isCallCenterStaff,
       subItems: trainingModules.map((module, idx) => ({
         label: module.title,
         sections: module.sections,
@@ -200,13 +290,13 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       icon: Settings,
       label: t('sidebar.operations'),
       path: '/operations',
-      isAccessible: () => onboardingComplete && isPhaseCompleted(5)
+      isAccessible: () => onboardingComplete && !isCallCenterStaff && isPhaseCompleted(5)
     },
     {
       icon: Calendar,
       label: t('sidebar.sessionPlanning'),
       path: '/session-planning',
-      isAccessible: () => onboardingComplete
+      isAccessible: () => onboardingComplete && !isCallCenterStaff
     },
   ];
 
@@ -214,14 +304,18 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   // Until onboarding is fully done, keep the sidebar as orchestrator guidance only
   // (no Dashboard / Marketplace / Workspace / Training / Planning links).
-  const showOrchestratorOnly = !onboardingComplete || isProfileCreationPage;
+  const showOrchestratorOnly = !isCallCenterStaff && (!onboardingComplete || isProfileCreationPage);
   const group1 = showOrchestratorOnly
     ? []
-    : filteredNavItems.filter(i => ['/dashboard', '/marketplace', '/workspace'].includes(i.path));
-  const group2 = showOrchestratorOnly
+    : filteredNavItems.filter(i =>
+        isCallCenterStaff
+          ? ['/dashboard', '/workspace'].includes(i.path)
+          : ['/dashboard', '/marketplace', '/workspace'].includes(i.path)
+      );
+  const group2 = showOrchestratorOnly || isCallCenterStaff
     ? []
     : filteredNavItems.filter(i => ['/training'].includes(i.path));
-  const group3 = showOrchestratorOnly
+  const group3 = showOrchestratorOnly || isCallCenterStaff
     ? []
     : filteredNavItems.filter(i => ['/session-planning'].includes(i.path));
 
@@ -234,7 +328,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
   return (
     <div
-      style={{ backgroundImage: HARX_SIDEBAR_BG, boxShadow: HARX_BAR_SHADOW }}
+      style={{ backgroundImage: chrome.sidebarBg, boxShadow: chrome.barShadow }}
       className={`fixed inset-y-0 left-0 z-30 text-white transition-all duration-300 ease-in-out lg:relative flex flex-col overflow-hidden ${!isSidebarOpen
           ? '-translate-x-full lg:translate-x-0'
           : 'translate-x-0'
@@ -255,51 +349,71 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
           <X className="h-4 w-4 text-white" />
         </button>
       </div>
+      {isCallCenterStaff && !isCollapsed ? (
+        <div className="px-4 pb-2">
+          <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-200">
+            {t('sidebar.ccAgentBadge', 'Call center agent')}
+          </span>
+        </div>
+      ) : null}
 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
-        {/* ── Orchestrator consignes only while onboarding is incomplete ── */}
+        {/* ── Mascotte + onboarding CTA while incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
-          <div className="space-y-4">
-            <div className="group/guide relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded-lg shrink-0">
-                  <Lock className="h-4 w-4" />
-                </div>
-                <p className="text-[11px] font-black text-amber-300 uppercase tracking-wide leading-tight">
-                  {t('onboardingGuide.title', 'Finalisez votre onboarding')}
-                </p>
-              </div>
-              <p className="text-[11px] text-white/70 leading-relaxed mb-3">
-                {t(
-                  'onboardingGuide.description',
-                  'Le Dashboard, le Portefeuille et le Planning se débloquent une fois votre profil créé et votre onboarding terminé.'
-                )}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/orchestrator')}
-                className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] uppercase tracking-wider py-2 rounded-xl transition-colors active:scale-[0.98]"
-              >
-                {t('onboardingGuide.cta', "Continuer l'onboarding")}
-              </button>
-            </div>
-
-            {isProfileCreationPage && (
-              <div className="relative flex flex-col items-center text-center px-2 py-2">
-                <div className="pointer-events-none absolute inset-0 m-auto h-16 w-16 rounded-full bg-harx-500/20 blur-2xl" />
+          <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
+            <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-10 -right-6 h-20 w-20 rounded-full bg-fuchsia-500/30 blur-2xl" />
+            <div className="relative flex flex-col items-center text-center">
+              <div className="relative mb-3">
+                <div className="absolute inset-0 scale-110 rounded-full bg-gradient-to-br from-rose-400/50 to-fuchsia-500/40 blur-md" />
                 <img
                   src={mascotte}
                   alt=""
                   aria-hidden="true"
-                  className="relative w-24 h-auto drop-shadow-xl"
+                  className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
                 />
-                <p className="relative mt-2 text-[11px] leading-snug text-white/80">
-                  {t('cvGuide.mascotte')}
-                </p>
               </div>
-            )}
+              <div className="w-full rounded-2xl bg-[#E11D48] p-3.5 text-left shadow-inner">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-400/15">
+                    <Lock className="h-3.5 w-3.5 text-amber-300" strokeWidth={2.5} />
+                  </span>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-300 leading-tight">
+                    {t('onboardingGuide.title')}
+                  </h3>
+                </div>
+                <p className="text-[11px] font-medium leading-snug text-white/95">
+                  {t('onboardingGuide.description')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    let profile: any = null;
+                    try {
+                      const raw = localStorage.getItem('profileData');
+                      if (raw) profile = JSON.parse(raw);
+                    } catch {
+                      /* ignore */
+                    }
+                    let path = getRepOnboardingStep(profile).path || '/profile-import';
+                    // Already reviewing the profile → next step is subscription.
+                    if (
+                      (location.pathname === '/profile' || location.pathname.startsWith('/profile/')) &&
+                      path === '/profile'
+                    ) {
+                      path = '/subscription';
+                    }
+                    navigate(path);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="mt-3 w-full rounded-xl bg-amber-400 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-900 shadow-md transition hover:bg-amber-300 active:scale-[0.98]"
+                >
+                  {t('onboardingGuide.cta')}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -307,23 +421,23 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {!showOrchestratorOnly && group1.length > 0 && (
         <div className="space-y-1">
           {!isCollapsed && (
-            <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Main</p>
+            <p className={sectionLabelClass}>{t('sidebar.sectionMain')}</p>
           )}
           {group1.map((item) => (
             <div key={item.path} className="space-y-1">
-              {item.label === 'Training' && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
+              {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                 <>
                   <button
                     onClick={() => {
                       setIsTrainingOpen(!isTrainingOpen);
-                      if (!location.pathname.includes('/training')) navigate('/training');
+                      if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                     }}
                     className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                         ? 'bg-white/5 text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -392,7 +506,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                         key={`${sub.path}-slide-${slideIdx}`}
                                         type="button"
                                         onClick={() => {
-                                          if (!location.pathname.includes('/training')) navigate('/training');
+                                          if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                                           if (slide.globalIndex >= 0) {
                                             window.dispatchEvent(
                                               new CustomEvent('rep-training-goto-slide', {
@@ -434,7 +548,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }`}
                   >
-                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                    <div className={`p-2 rounded-xl transition-all shrink-0 ${isWorkspaceOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                       <item.icon className="h-5 w-5" />
                     </div>
                     <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -448,18 +562,28 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         return (
                           <NavLink
                             key={sub.path}
-                            to={sub.path}
+                            to={withActiveGig(sub.path)}
                             onClick={(e) => {
                               e.preventDefault();
-                              if (
-                                sub.path.includes('tab=copilot') &&
-                                location.pathname.includes('/training') &&
-                                (sessionStorage.getItem('training_gig_filter') === '__all__' || !sessionStorage.getItem('training_gig_filter'))
-                              ) {
-                                setShowWarningModal(true);
+                              if (sub.path.includes('tab=copilot')) {
+                                const specificGigId = resolveSpecificGigId();
+                                if (specificGigId) {
+                                  openCockpitWithGig(specificGigId);
+                                  return;
+                                }
+                                const trainingFilter = sessionStorage.getItem('training_gig_filter');
+                                const onTrainingWithoutGig =
+                                  location.pathname.includes('/training') &&
+                                  (trainingFilter === '__all__' || !trainingFilter);
+                                if (onTrainingWithoutGig) {
+                                  void openCockpitGigPicker();
+                                  return;
+                                }
+                                openCockpitWithGig(null);
                                 return;
                               }
-                              navigate(sub.path);
+                              navigate(withActiveGig(sub.path));
+                              setIsSidebarOpen(false);
                             }}
                             className={`flex w-full items-center rounded-xl transition-all duration-300 group relative space-x-3 py-2.5 px-4 ${isSubActive
                                 ? 'bg-white/20 text-white border-l-2 border-white shadow-sm shadow-black/10'
@@ -478,7 +602,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 </>
               ) : (
                 <NavLink
-                  to={item.path}
+                  to={toWithGig(item.path)}
                   className={({ isActive }) =>
                     `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                     } ${isActive
@@ -493,14 +617,48 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         <item.icon className="h-5 w-5" />
                       </div>
                       {!isCollapsed && (
-                        <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden">{item.label}</span>
+                        <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{item.label}</span>
+                          {item.path === '/marketplace' && inviteBadgeCount > 0 ? (
+                            <span className="shrink-0 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black leading-[1.1rem] text-center shadow-sm">
+                              {inviteBadgeCount > 9 ? '9+' : inviteBadgeCount}
+                            </span>
+                          ) : null}
+                          {item.path === '/marketplace' ? (
+                            <span
+                              className="relative shrink-0 group/gigsinfo"
+                              title={t('sidebar.gigsInfo')}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              role="img"
+                              aria-label={t('sidebar.gigsInfo')}
+                            >
+                              <Info className="h-3.5 w-3.5 text-white/50 transition-colors group-hover/gigsinfo:text-white" />
+                              <span className="pointer-events-none absolute left-1/2 top-full z-[60] mt-2 hidden w-52 -translate-x-1/2 rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-[10px] font-medium normal-case tracking-normal text-white shadow-xl group-hover/gigsinfo:block whitespace-normal leading-snug">
+                                {t('sidebar.gigsInfo')}
+                              </span>
+                            </span>
+                          ) : null}
+                        </span>
                       )}
-                      {isCollapsed && item.subItems && (
+                      {isCollapsed && item.path === '/marketplace' && inviteBadgeCount > 0 && (
+                        <div className="absolute top-0 right-0 min-w-[0.9rem] h-[0.9rem] px-0.5 rounded-full bg-rose-500 text-white text-[8px] font-black leading-[0.9rem] text-center border-2 border-slate-950 translate-x-1/2 -translate-y-1/2">
+                          {inviteBadgeCount > 9 ? '9+' : inviteBadgeCount}
+                        </div>
+                      )}
+                      {isCollapsed && item.subItems && !(item.path === '/marketplace' && inviteBadgeCount > 0) && (
                         <div className="absolute top-0 right-0 w-2 h-2 bg-harx-500 rounded-full border-2 border-slate-950 translate-x-1/2 -translate-y-1/2"></div>
                       )}
                       {isCollapsed && (
-                        <div className="absolute left-16 bg-slate-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+                        <div className="absolute left-16 bg-slate-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl border border-white/10 max-w-[14rem] whitespace-normal">
                           {item.label}
+                          {item.path === '/marketplace' ? (
+                            <span className="mt-1 block text-[10px] text-slate-300 font-medium">
+                              {t('sidebar.gigsInfo')}
+                            </span>
+                          ) : null}
                         </div>
                       )}
                     </>
@@ -521,7 +679,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group2.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Training</p>
+              <p className={sectionLabelClass}>{t('sidebar.sectionTraining')}</p>
             )}
             {group2.map((item) => (
               <div key={item.path} className="space-y-1">
@@ -530,14 +688,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     <button
                       onClick={() => {
                         setIsTrainingOpen(!isTrainingOpen);
-                        if (!location.pathname.includes('/training')) navigate('/training');
+                        if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                       }}
                       className={`flex w-full items-center rounded-2xl transition-all duration-300 group relative space-x-3 py-3 px-5 ${isTrainingOpen || window.location.pathname.includes(item.path)
                           ? 'bg-white/5 text-white'
                           : 'text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                     >
-                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? 'bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/10 group-hover:bg-white/20'}`}>
+                      <div className={`p-2 rounded-xl transition-all shrink-0 ${isTrainingOpen || window.location.pathname.includes(item.path) ? activeIconClass : 'bg-white/10 group-hover:bg-white/20'}`}>
                         <item.icon className="h-5 w-5" />
                       </div>
                       <span className="font-black text-sm tracking-tight whitespace-nowrap overflow-hidden flex-1 text-left">{item.label}</span>
@@ -577,7 +735,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                           key={`${sub.path}-slide-${slideIdx}`}
                                           type="button"
                                           onClick={() => {
-                                            if (!location.pathname.includes('/training')) navigate('/training');
+                                            if (!location.pathname.includes('/training')) navigate(withActiveGig('/training'));
                                             if (slide.globalIndex >= 0) {
                                               window.dispatchEvent(new CustomEvent('rep-training-goto-slide', { detail: { index: slide.globalIndex, ...(slide.slideId ? { slideId: slide.slideId } : {}) } }));
                                             }
@@ -600,7 +758,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                   </>
                 ) : (
                   <NavLink
-                    to={item.path}
+                    to={toWithGig(item.path)}
                     className={({ isActive }) =>
                       `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                       } ${isActive
@@ -633,12 +791,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
         {group3.length > 0 && (
           <div className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent select-none">Planning</p>
+              <p className={sectionLabelClass}>{t('sidebar.sectionPlanning')}</p>
             )}
             {group3.map((item) => (
               <NavLink
                 key={item.path}
-                to={item.path}
+                to={withActiveGig(item.path)}
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
                   } ${isActive
@@ -667,26 +825,26 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       </nav>
       </div>
 
-      {/* Warning Modal */}
-      {showWarningModal && createPortal(
+      {/* Cockpit project picker */}
+      {showCockpitGigModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl shadow-black/80 overflow-hidden animate-in zoom-in-95 duration-300 text-white">
-            {/* Close Button */}
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl shadow-black/80 animate-in zoom-in-95 duration-300 text-white">
             <button
-              onClick={() => setShowWarningModal(false)}
+              onClick={() => {
+                setIsCockpitGigDropdownOpen(false);
+                setShowCockpitGigModal(false);
+              }}
               className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-all duration-200 z-50"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {/* Glowing background light */}
             <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/10 blur-[60px] rounded-full pointer-events-none"></div>
             <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-orange-500/10 blur-[60px] rounded-full pointer-events-none"></div>
 
-            {/* Header with Warning icon */}
             <div className="flex flex-col items-center text-center mb-6 relative">
-              <div className="p-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-2xl mb-4 shadow-inner shadow-amber-500/5 animate-bounce">
+              <div className="p-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-2xl mb-4 shadow-inner shadow-amber-500/5">
                 <AlertTriangle className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-black tracking-wide uppercase">
@@ -694,20 +852,114 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               </h3>
             </div>
 
-            {/* Detailed Instructions */}
-            <div className="space-y-4 text-center mb-8 relative px-4">
-              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+            <div className="space-y-4 mb-6 relative px-1">
+              <p className="text-sm text-slate-300 leading-relaxed font-medium text-center">
                 {t('trainingAllGigsGuard.modalSubtitle')}
               </p>
+
+              {cockpitGigLoading ? (
+                <p className="text-center text-xs text-slate-400 font-medium py-3">
+                  {t('trainingAllGigsGuard.loadingGigs')}
+                </p>
+              ) : cockpitGigOptions.length === 0 ? (
+                <p className="text-center text-xs text-amber-300/90 font-medium py-3">
+                  {t('trainingAllGigsGuard.noGigs')}
+                </p>
+              ) : (
+                <div className="block space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/80 ml-1">
+                    {t('trainingAllGigsGuard.selectLabel')}
+                  </span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsCockpitGigDropdownOpen((open) => !open)}
+                      className={`w-full rounded-2xl border bg-slate-950/80 px-4 py-3.5 flex items-center justify-between gap-3 text-left outline-none transition-all duration-200 ${
+                        isCockpitGigDropdownOpen
+                          ? 'border-amber-400/60 ring-2 ring-amber-500/20 shadow-lg shadow-amber-500/10'
+                          : 'border-amber-500/30 hover:border-amber-400/50'
+                      }`}
+                      aria-haspopup="listbox"
+                      aria-expanded={isCockpitGigDropdownOpen}
+                    >
+                      <span
+                        className={`truncate text-sm font-semibold ${
+                          selectedCockpitGigId ? 'text-white' : 'text-slate-400'
+                        }`}
+                      >
+                        {selectedCockpitGigId
+                          ? cockpitGigOptions.find((g) => g.gigId === selectedCockpitGigId)?.title
+                          : t('trainingAllGigsGuard.selectPlaceholder')}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 shrink-0 transition-transform duration-300 ${
+                          isCockpitGigDropdownOpen ? 'rotate-180 text-amber-400' : 'text-amber-400/70'
+                        }`}
+                      />
+                    </button>
+
+                    {isCockpitGigDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[60]"
+                          onClick={() => setIsCockpitGigDropdownOpen(false)}
+                        />
+                        <div
+                          role="listbox"
+                          className="absolute left-0 right-0 top-full mt-2 z-[70] max-h-56 overflow-y-auto rounded-2xl border border-amber-500/25 bg-slate-950/95 backdrop-blur-xl py-1.5 shadow-2xl shadow-black/60 animate-in fade-in slide-in-from-top-2 duration-200"
+                        >
+                          {cockpitGigOptions.map((g) => {
+                            const isSelected = selectedCockpitGigId === g.gigId;
+                            return (
+                              <button
+                                key={g.gigId}
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  setSelectedCockpitGigId(g.gigId);
+                                  setIsCockpitGigDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-3 text-left text-sm font-semibold transition-all flex items-start gap-3 ${
+                                  isSelected
+                                    ? 'bg-amber-500/15 text-amber-200'
+                                    : 'text-slate-200 hover:bg-white/5 hover:text-white'
+                                }`}
+                              >
+                                <span
+                                  className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                                    isSelected
+                                      ? 'bg-amber-400 ring-4 ring-amber-400/20'
+                                      : 'bg-slate-600'
+                                  }`}
+                                />
+                                <span className="leading-snug">{g.title}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5 relative">
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/5 relative">
               <button
-                onClick={() => setShowWarningModal(false)}
-                className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold uppercase tracking-widest text-[11px] rounded-2xl shadow-lg shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                type="button"
+                disabled={!selectedCockpitGigId || cockpitGigLoading}
+                onClick={() => openCockpitWithGig(selectedCockpitGigId)}
+                className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-amber-500 disabled:hover:to-amber-600 text-white font-extrabold uppercase tracking-widest text-[11px] rounded-2xl shadow-lg shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
               >
-                {t('trainingAllGigsGuard.understandButton')}
+                {t('trainingAllGigsGuard.openCockpitButton')}
+              </button>
+              <button
+                type="button"
+                onClick={() => openCockpitWithGig(null)}
+                className="w-full py-2.5 text-slate-300 hover:text-white text-[11px] font-bold uppercase tracking-widest rounded-2xl hover:bg-white/5 transition-all"
+              >
+                {t('trainingAllGigsGuard.chooseInWorkspace')}
               </button>
             </div>
           </div>

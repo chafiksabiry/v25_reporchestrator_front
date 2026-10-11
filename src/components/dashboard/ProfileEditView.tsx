@@ -4,7 +4,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import {
   X, Save, RefreshCw, Trash2, ChevronLeft
 } from 'lucide-react';
-import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch, updateUserFullName } from '../../utils/profileUtils';
+import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch, updateUserFullName, recheckExperienceIdentity } from '../../utils/profileUtils';
 import config from '../../config';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
@@ -842,6 +842,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
     }
 
     setLoading(true);
+    let photoWasUpdated = false;
     try {
       // Handle photo deletion first if marked for deletion
       if (isPhotoMarkedForDeletion) {
@@ -874,6 +875,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
 
           const photoBlob = await base64ToBlob(imagePreview);
           const photoResult = await uploadPhoto(profile._id, photoBlob);
+          photoWasUpdated = true;
 
           console.log('✅ Photo uploaded successfully');
         } catch (error) {
@@ -1113,6 +1115,12 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
 
       if (updateTasks.length > 0) {
         await Promise.all(updateTasks);
+      }
+
+      // After experience saves, so a stale experience payload cannot overwrite
+      // the new fraud scores. Covers file upload and camera capture.
+      if (photoWasUpdated) {
+        await recheckExperienceIdentity(profile._id);
       }
 
       // After all updates are done, refresh the profile data

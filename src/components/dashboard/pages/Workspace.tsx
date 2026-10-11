@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Phone, Mail, User,
-  Paperclip, Image, MoreHorizontal, PhoneOutgoing, XCircle,
+  Paperclip, Image, PhoneOutgoing, XCircle,
   ChevronLeft, ChevronRight, ChevronDown, Filter, Layout,
-  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye
+  BookOpen, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Search, Calendar, Eye,
+  MapPin, CreditCard, Info, Tag, X, Loader2,
+  PhoneMissed, Voicemail, PhoneOff, Repeat2, CalendarCheck, Handshake, Ban, PartyPopper, ListFilter, Sparkles
 } from 'lucide-react';
 import { Skeleton } from '../ui/Skeleton';
 import { CallRecords } from '../CallRecords';
@@ -21,16 +23,32 @@ import {
   isLeadCockpitLockedByOther,
 } from '../../../services/api/leadCockpitApi';
 import { isTelephonyTestBypassEnabled } from '../../../utils/telephonyTestBypass';
+import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
+import { anonymizeBirthDate, anonymizeEmail, anonymizePhone, anonymizeStreet } from '../../../utils/callStatusDisplay';
+import { useNotifications } from '../../../contexts/NotificationsContext';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { isReservationActiveNow, resolveIanaZone } from '../../../utils/planningMetrics';
 
 interface Lead {
   _id?: string;
   id: string;
   Deal_Name: string;
   Telephony: string;
+  Phone?: string;
+  Mobile?: string;
   Email_1: string;
+  Email?: string;
+  email?: string;
   Stage: string;
-  Created_Time: string;
-  Owner: {
+  Pipeline?: string;
+  Created_Time?: string;
+  First_Name?: string;
+  Last_Name?: string;
+  Address?: string;
+  Postal_Code?: string;
+  City?: string;
+  Date_of_Birth?: string;
+  Owner?: {
     name: string;
     id: string;
     email: string;
@@ -42,8 +60,76 @@ interface Lead {
   signedAt?: string | null;
   isSignedByMe?: boolean;
   isCalledByMe?: boolean;
+  isAssignedToMe?: boolean;
   isRdvByMe?: boolean;
   lastCallOutcome?: string | null;
+  repDisposition?: string | null;
+  repDispositionAt?: string | null;
+  pendingDisposition?: string | null;
+  pendingDispositionAt?: string | null;
+  assignedRepId?: string | null;
+  nextFollowUpAt?: string | Date | null;
+  nextFollowUpType?: 'appointment' | 'callback' | null;
+  nextFollowUpSource?: 'rep' | 'ai' | null;
+  nextFollowUpNotifiedAt?: string | Date | null;
+}
+
+// ── HARX Disposition Ladder ─────────────────────────────────────────────────
+type LucideIcon = React.ComponentType<{ className?: string }>;
+
+interface DispConfig {
+  value: string;
+  labelKey: string;
+  shortKey: string;
+  group: 'start' | 'called' | 'argued';
+  color: string;
+  /** dot color class for the indicator */
+  dot: string;
+  Icon: LucideIcon;
+}
+
+const HARX_DISPOSITIONS: DispConfig[] = [
+  { value: 'to_call',             labelKey: 'workspace.disp.to_call',             shortKey: 'workspace.dispShort.to_call',             group: 'start',  color: 'gray',    dot: 'bg-gray-400',    Icon: Phone },
+  { value: 'called_unreachable',  labelKey: 'workspace.disp.called_unreachable',  shortKey: 'workspace.dispShort.called_unreachable',  group: 'called', color: 'orange',  dot: 'bg-orange-500',  Icon: PhoneMissed },
+  { value: 'called_voicemail',    labelKey: 'workspace.disp.called_voicemail',    shortKey: 'workspace.dispShort.called_voicemail',    group: 'called', color: 'orange',  dot: 'bg-orange-400',  Icon: Voicemail },
+  { value: 'called_wrong_number', labelKey: 'workspace.disp.called_wrong_number', shortKey: 'workspace.dispShort.called_wrong_number', group: 'called', color: 'red',     dot: 'bg-red-500',     Icon: PhoneOff },
+  { value: 'called_callback',     labelKey: 'workspace.disp.called_callback',     shortKey: 'workspace.dispShort.called_callback',     group: 'called', color: 'amber',   dot: 'bg-amber-500',   Icon: Repeat2 },
+  { value: 'called_rdv',          labelKey: 'workspace.disp.called_rdv',          shortKey: 'workspace.dispShort.called_rdv',          group: 'called', color: 'violet',  dot: 'bg-violet-500',  Icon: CalendarCheck },
+  { value: 'argued_rdv',          labelKey: 'workspace.disp.argued_rdv',          shortKey: 'workspace.dispShort.argued_rdv',          group: 'argued', color: 'indigo',  dot: 'bg-indigo-500',  Icon: Handshake },
+  { value: 'argued_declined',     labelKey: 'workspace.disp.argued_declined',     shortKey: 'workspace.dispShort.argued_declined',     group: 'argued', color: 'rose',    dot: 'bg-rose-500',    Icon: Ban },
+  { value: 'argued_done',         labelKey: 'workspace.disp.argued_done',         shortKey: 'workspace.dispShort.argued_done',         group: 'argued', color: 'emerald', dot: 'bg-emerald-500', Icon: PartyPopper },
+];
+
+const DISP_GROUPS: Array<{ id: DispConfig['group']; labelKey: string }> = [
+  { id: 'start', labelKey: 'workspace.dispGroupStart' },
+  { id: 'called', labelKey: 'workspace.dispGroupCalled' },
+  { id: 'argued', labelKey: 'workspace.dispGroupArgued' },
+];
+
+const DISP_COLOR_MAP: Record<string, string> = {
+  gray:    'bg-gray-50 text-gray-600 border-gray-200',
+  orange:  'bg-orange-50 text-orange-600 border-orange-200',
+  red:     'bg-red-50 text-red-600 border-red-200',
+  amber:   'bg-amber-50 text-amber-700 border-amber-200',
+  violet:  'bg-violet-50 text-violet-700 border-violet-200',
+  indigo:  'bg-indigo-50 text-indigo-700 border-indigo-200',
+  rose:    'bg-rose-50 text-rose-600 border-rose-200',
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+const DISP_ICON_BG: Record<string, string> = {
+  gray:    'bg-slate-100 text-slate-600',
+  orange:  'bg-orange-100 text-orange-600',
+  red:     'bg-red-100 text-red-600',
+  amber:   'bg-amber-100 text-amber-700',
+  violet:  'bg-violet-100 text-violet-700',
+  indigo:  'bg-indigo-100 text-indigo-700',
+  rose:    'bg-rose-100 text-rose-600',
+  emerald: 'bg-emerald-100 text-emerald-700',
+};
+
+function getDispConfig(value: string | null | undefined): DispConfig | null {
+  return HARX_DISPOSITIONS.find((d) => d.value === value) || null;
 }
 
 interface EnrolledGig {
@@ -60,11 +146,66 @@ interface APIResponse {
   data: Lead[];
 }
 
-type LeadStatusFilter = 'all' | 'called' | 'signed' | 'rdv';
-
 function isLeadRdvByMe(lead: Lead): boolean {
   if (lead.isRdvByMe === true) return true;
+  if (lead.nextFollowUpType === 'appointment') return true;
+  const disp = String(lead.repDisposition || '');
+  if (disp === 'called_rdv' || disp === 'argued_rdv') return true;
   return lead.lastCallOutcome === 'appointment';
+}
+
+function leadHasRecordedCall(lead: Lead): boolean {
+  if (lead.isCalledByMe || lead.isSignedByMe || isLeadRdvByMe(lead) || lead.lastCallOutcome) return true;
+  return Boolean(lead.repDisposition && lead.repDisposition !== 'to_call');
+}
+
+const FOLLOW_UP_DISPOSITIONS = new Set(['called_rdv', 'called_callback', 'argued_rdv']);
+
+function leadFollowUpMs(lead: Lead): number | null {
+  if (!lead.nextFollowUpAt) return null;
+  const ms = new Date(lead.nextFollowUpAt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isLeadFollowUpDue(lead: Lead, nowMs = Date.now()): boolean {
+  const at = leadFollowUpMs(lead);
+  if (at == null || at > nowMs) return false;
+  const disp = String(lead.repDisposition || '');
+  if (disp && !FOLLOW_UP_DISPOSITIONS.has(disp) && lead.nextFollowUpType == null) return false;
+  return true;
+}
+
+function formatFollowUpAt(value: string | Date | null | undefined, locale: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(locale.startsWith('fr') ? 'fr-FR' : 'en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const FOLLOW_UP_NOTIFIED_KEY = 'harx_followup_notified_v1';
+
+function readFollowUpNotifiedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FOLLOW_UP_NOTIFIED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markFollowUpNotified(leadId: string) {
+  const set = readFollowUpNotifiedIds();
+  set.add(String(leadId));
+  // Keep last 200 ids
+  const arr = Array.from(set).slice(-200);
+  localStorage.setItem(FOLLOW_UP_NOTIFIED_KEY, JSON.stringify(arr));
 }
 
 type CopilotGuardState = {
@@ -76,48 +217,39 @@ type CopilotGuardState = {
   reason: string | null;
 };
 
-function weekdayEnglish(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
-function parseTimeToMinutes(time: string): number | null {
-  const m = String(time || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
-  return h * 60 + min;
-}
-
-function isTodayReservation(rawDate: unknown, now: Date): boolean {
-  const v = String(rawDate || '').trim();
-  if (!v) return false;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    const todayIso = now.toISOString().slice(0, 10);
-    const localIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    return v === todayIso || v === localIso;
-  }
-  return v.toLowerCase() === weekdayEnglish(now).toLowerCase();
+function NewLeadFlash({ label, title }: { label: string; title?: string }) {
+  return (
+    <span
+      className="harx-new-flash gap-1 rounded-md px-2.5 py-1 text-white"
+      title={title}
+    >
+      <Sparkles className="relative z-10 h-3 w-3 shrink-0" />
+      <span className="relative z-10 text-[9px] font-black uppercase tracking-[0.2em]">
+        {label}
+      </span>
+    </span>
+  );
 }
 
 export function WorkspaceContent() {
   useAgent();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const { upsertNotification } = useNotifications();
   const searchParams = new URLSearchParams(location.search);
   const urlTab = searchParams.get('tab');
   const urlLeadId = searchParams.get('leadId') || sessionStorage.getItem('activeLeadId') || '';
-  const urlGigId = searchParams.get('gigId') || sessionStorage.getItem('activeGigId') || '';
-  const gigId = location.state?.gigId || urlGigId;
+  // Only URL / navigation state — never sessionStorage here. Falling back to
+  // sessionStorage raced with setSelectedGigId and reverted gig switches.
+  const gigIdFromNavigation = location.state?.gigId || searchParams.get('gigId') || '';
 
+  const urlCallId = searchParams.get('callId') || '';
   const [activeTab, setActiveTab] = useState(urlTab && ['voice', 'calls', 'copilot'].includes(urlTab) ? urlTab : 'voice');
   const [message, setMessage] = useState('');
-  // Twilio CallSid of the call that was just hung-up and persisted. When
-  // set, the Call History tab is auto-opened and `CallRecords` deep-links
-  // the matching call into its details modal.
-  const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(null);
+  // Twilio CallSid or Mongo call id to deep-link into the history modal
+  // (hang-up, or a notification click on a finished analysis).
+  const [pendingOpenCallSid, setPendingOpenCallSid] = useState<string | null>(urlCallId || null);
   const [signedLeadOverlayId, setSignedLeadOverlayId] = useState<string | null>(null);
 
   // Sync activeTab with URL
@@ -126,6 +258,25 @@ export function WorkspaceContent() {
       setActiveTab(urlTab);
     }
   }, [urlTab]);
+
+  // Notification deep-link: /workspace?tab=calls&callId=...
+  useEffect(() => {
+    if (!urlCallId) return;
+    setPendingOpenCallSid(urlCallId);
+    setActiveTab('calls');
+  }, [urlCallId]);
+
+  const handleAutoOpenHandled = useCallback(() => {
+    setPendingOpenCallSid(null);
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('callId')) return;
+    params.delete('callId');
+    const qs = params.toString();
+    navigate(
+      { pathname: '/workspace', search: qs ? `?${qs}` : '' },
+      { replace: true }
+    );
+  }, [navigate]);
 
   // ── Auto-open the Call History modal after a hangup ──────────────
   //  `ContactInfo` dispatches `harx:call-saved` once the just-finished
@@ -153,9 +304,26 @@ export function WorkspaceContent() {
         { replace: true }
       );
     };
+    const openHistory = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      const sid: string | undefined = detail.sid;
+      const callId: string | undefined = detail.callId;
+      if (!sid && !callId) return;
+      setPendingOpenCallSid(sid || callId);
+      setActiveTab('calls');
+      const params = new URLSearchParams(location.search);
+      params.set('tab', 'calls');
+      navigate(
+        { pathname: location.pathname, search: `?${params.toString()}` },
+        { replace: true }
+      );
+    };
     window.addEventListener('harx:call-saved', handler as EventListener);
-    return () =>
+    window.addEventListener('harx:open-call-history', openHistory as EventListener);
+    return () => {
       window.removeEventListener('harx:call-saved', handler as EventListener);
+      window.removeEventListener('harx:open-call-history', openHistory as EventListener);
+    };
     // We intentionally read `location.pathname` / `.search` inside the
     // handler so we don't need them as deps (they'd cause re-registration
     // on every URL change, which is undesirable for a one-shot listener).
@@ -169,9 +337,18 @@ export function WorkspaceContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('1');
-  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [leadsTotal, setLeadsTotal] = useState(0);
+  const [dispositionFilter, setDispositionFilter] = useState<string>('all');
+  const [followUpFilter, setFollowUpFilter] = useState<'all' | 'due'>('all');
+  const [isDispositionDropdownOpen, setIsDispositionDropdownOpen] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [prospectProfileLead, setProspectProfileLead] = useState<Lead | null>(null);
+  const [repFieldVisibility, setRepFieldVisibility] = useState<Record<string, boolean>>({});
+  const [dispositionModalLead, setDispositionModalLead] = useState<Lead | null>(null);
+  const [dispositionSaving, setDispositionSaving] = useState(false);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [enrolledGigsLoaded, setEnrolledGigsLoaded] = useState(false);
   // Do not hydrate from sessionStorage on first paint — a stale activeGigId from
@@ -183,6 +360,7 @@ export function WorkspaceContent() {
   const [claimingCockpit, setClaimingCockpit] = useState(false);
   const prevTabRef = useRef(activeTab);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leadsFetchSeqRef = useRef(0);
 
   const myAgentId = getAgentId();
 
@@ -191,14 +369,99 @@ export function WorkspaceContent() {
     [selectedGigId, enrolledGigs]
   );
 
-  // Only persist enrolled gigs to sessionStorage (never a stale marketplace id).
+  const repCanSee = (field: string) => repFieldVisibility[field] !== false;
+
+  // Load company-configured field visibility for the selected gig (REP audience).
   useEffect(() => {
-    if (activeEnrolledGigId) {
-      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
-    } else {
-      sessionStorage.removeItem('activeGigId');
+    if (!activeEnrolledGigId) {
+      setRepFieldVisibility({});
+      return;
     }
+    let cancelled = false;
+    const baseUrl = (
+      import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
+      'https://v25dashboardbackend-development.up.railway.app/api'
+    ).replace(/\/$/, '');
+    (async () => {
+      try {
+        const res = await fetch(`${baseUrl}/file-processing/visibility/${activeEnrolledGigId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.success && data?.data?.visibility?.rep) {
+          setRepFieldVisibility(data.data.visibility.rep);
+        }
+      } catch {
+        // Keep defaults (all visible) if the endpoint is unavailable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeEnrolledGigId]);
+
+  // Refresh "due now" every 60s for pin + notifications.
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const dueLeads = useMemo(
+    () => leads.filter((l) => isLeadFollowUpDue(l, nowTick)),
+    [leads, nowTick]
+  );
+
+  const displayedLeads = useMemo(() => {
+    const base = followUpFilter === 'due' ? dueLeads : [...leads];
+    return base.sort((a, b) => {
+      const aDue = isLeadFollowUpDue(a, nowTick) ? 0 : 1;
+      const bDue = isLeadFollowUpDue(b, nowTick) ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
+      const aAt = leadFollowUpMs(a) ?? Number.POSITIVE_INFINITY;
+      const bAt = leadFollowUpMs(b) ?? Number.POSITIVE_INFINITY;
+      if (aAt !== bAt) return aAt - bAt;
+      return 0;
+    });
+  }, [leads, dueLeads, followUpFilter, nowTick]);
+
+  // Notify once per due lead (localStorage anti-spam).
+  useEffect(() => {
+    if (!dueLeads.length) return;
+    const notified = readFollowUpNotifiedIds();
+    const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+    for (const lead of dueLeads) {
+      const id = String(lead._id || lead.id || '');
+      if (!id || notified.has(id)) continue;
+      const when = formatFollowUpAt(lead.nextFollowUpAt, i18n.language || 'fr');
+      const name = lead.Deal_Name || lead.First_Name || (isFr ? 'Prospect' : 'Lead');
+      const isAppt = lead.nextFollowUpType === 'appointment' || String(lead.repDisposition || '').includes('rdv');
+      upsertNotification({
+        id: `followup-due-${id}`,
+        kind: 'general',
+        title: isFr
+          ? isAppt
+            ? 'RDV à rappeler maintenant'
+            : 'Rappel à faire maintenant'
+          : isAppt
+            ? 'Appointment due now'
+            : 'Callback due now',
+        message: isFr
+          ? `${name}${when ? ` · prévu ${when}` : ''}`
+          : `${name}${when ? ` · scheduled ${when}` : ''}`,
+        actionPath: `/workspace?tab=copilot&leadId=${encodeURIComponent(id)}`,
+        gigId: activeEnrolledGigId || undefined,
+        playSound: true,
+      });
+      markFollowUpNotified(id);
+    }
+  }, [dueLeads, upsertNotification, i18n.language, activeEnrolledGigId]);
+
+  // Only persist enrolled gigs after the list is known — never wipe a valid
+  // starting gig while enrolledGigs is still loading.
+  useEffect(() => {
+    if (!enrolledGigsLoaded) return;
+    persistActiveGigId(activeEnrolledGigId || null);
+  }, [activeEnrolledGigId, enrolledGigsLoaded]);
 
   // Sync and Clean URL parameters to protect sensitive IDs from leaking
   useEffect(() => {
@@ -208,7 +471,7 @@ export function WorkspaceContent() {
     if (params.has('gigId')) {
       const gId = params.get('gigId') || '';
       if (gId) {
-        sessionStorage.setItem('activeGigId', gId);
+        persistActiveGigId(gId);
         setSelectedGigId(gId);
       }
       params.delete('gigId');
@@ -255,24 +518,63 @@ export function WorkspaceContent() {
     fetchEnrolledGigs();
   }, []);
 
+  // Apply gig from navigation (?gigId= / location.state) once enrolled gigs are known.
+  // Do not read sessionStorage here — that caused selectedGigId to snap back.
   useEffect(() => {
     if (!enrolledGigsLoaded) return;
-    if (gigId && enrolledGigs.some((g) => g._id === gigId) && gigId !== selectedGigId) {
-      setSelectedGigId(gigId);
+    if (
+      gigIdFromNavigation &&
+      enrolledGigs.some((g) => g._id === gigIdFromNavigation) &&
+      gigIdFromNavigation !== selectedGigId
+    ) {
+      setSelectedGigId(gigIdFromNavigation);
     }
-  }, [gigId, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
+  }, [gigIdFromNavigation, selectedGigId, enrolledGigs, enrolledGigsLoaded]);
+
+  // Sidebar → COCKPIT must not reuse a previously claimed lead / phone number.
+  useEffect(() => {
+    if (!location.state?.clearLead) return;
+    setSelectedLead(null);
+    setCockpitClaimedLeadId(null);
+    setCockpitAccessDenied(null);
+    sessionStorage.removeItem('activeLeadId');
+    const { clearLead: _clearLead, ...restState } = location.state as {
+      clearLead?: boolean;
+      gigId?: string;
+    };
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: Object.keys(restState).length ? restState : null }
+    );
+  }, [location.state, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    setDispositionFilter('all');
+    setFollowUpFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setCurrentPage(1);
+    setSearchQuery('');
+    setLeads([]);
+    setLeadsTotal(0);
+  }, [activeEnrolledGigId]);
 
   useEffect(() => {
     if (activeTab === 'voice' && enrolledGigsLoaded) {
       fetchLeads(currentPage, searchQuery);
     }
-  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, leadStatusFilter]);
-
-  useEffect(() => {
-    setLeadStatusFilter('all');
-    setCurrentPage(1);
-    setSearchQuery('');
-  }, [activeEnrolledGigId]);
+    // Deep-link / notification → COCKPIT: load leads so we can reconstitute selectedLead.
+    if (
+      activeTab === 'copilot' &&
+      enrolledGigsLoaded &&
+      activeEnrolledGigId &&
+      leads.length === 0 &&
+      (urlLeadId || sessionStorage.getItem('activeLeadId'))
+    ) {
+      fetchLeads(1, '');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, activeEnrolledGigId, currentPage, enrolledGigsLoaded, dispositionFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     return () => {
@@ -444,17 +746,30 @@ export function WorkspaceContent() {
           isTrainingComplete = trainingCount > 0 && overall >= 100;
         }
 
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        const activeReservation = (Array.isArray(reservations) ? reservations : []).find((r: any) => {
-          if (String(r?.status || '').toLowerCase() !== 'reserved') return false;
-          const reservationDay = r?.reservationDate || r?.date;
-          if (!isTodayReservation(reservationDay, now)) return false;
-          const start = parseTimeToMinutes(r?.startTime);
-          const end = parseTimeToMinutes(r?.endTime);
-          if (start == null || end == null || end <= start) return false;
-          // Check if current time matches the active slot strictly
-          return nowMinutes >= start && nowMinutes < end;
-        });
+        // Slot times are stored in gig (destination) TZ — e.g. Paris 12:00–13:00
+        // displays as Casablanca 10:00–11:00. Compare absolute UTC windows, not
+        // browser local HH:mm against Paris wall times.
+        let gigTz: string | null = 'Europe/Paris';
+        try {
+          const gigRes = await fetch(
+            `${getGigsApiBase()}/gigs/${encodeURIComponent(activeEnrolledGigId)}`,
+            { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          );
+          if (gigRes.ok) {
+            const gigPayload = await gigRes.json();
+            const gigDoc = gigPayload?.data || gigPayload?.gig || gigPayload;
+            gigTz =
+              resolveIanaZone(gigDoc?.availability?.time_zone) ||
+              resolveIanaZone(gigDoc?.availability?.timeZone) ||
+              'Europe/Paris';
+          }
+        } catch {
+          /* keep Europe/Paris default */
+        }
+
+        const activeReservation = (Array.isArray(reservations) ? reservations : []).find((r: any) =>
+          isReservationActiveNow(r, { gigTz, nowMs: now.getTime() })
+        );
 
         const hasActiveReservationNow = !!activeReservation;
         const reservationWindowLabel = hasActiveReservationNow
@@ -491,7 +806,8 @@ export function WorkspaceContent() {
     if (enrolledGigsLoaded) {
       evaluateCopilotGuard();
     }
-  }, [activeEnrolledGigId, enrolledGigsLoaded]);
+    // Re-check when the clock crosses into/out of a reserved hour (nowTick every 60s).
+  }, [activeEnrolledGigId, enrolledGigsLoaded, nowTick]);
 
   const fetchEnrolledGigs = async () => {
     const agentId = localStorage.getItem('agentId');
@@ -505,22 +821,42 @@ export function WorkspaceContent() {
       if (response.ok) {
         const profileData = await response.json();
         const enrolled = (Array.isArray(profileData.gigs) ? profileData.gigs : [])
-          .filter((g: any) => g.status === 'enrolled')
+          .filter((g: any) => {
+            if (!g || g.status !== 'enrolled') return false;
+            const gigInfo = g.gigId;
+            // Profile path: only lifecycle-active company gigs for dropdown + leads.
+            if (gigInfo && typeof gigInfo === 'object') {
+              return String(gigInfo.status || '').toLowerCase() === 'active';
+            }
+            return false;
+          })
           .map((g: any) => {
             const gigInfo = g.gigId;
-            const id = typeof gigInfo === 'object' ? (gigInfo._id || gigInfo.$oid) : gigInfo;
-            const title = typeof gigInfo === 'object' && gigInfo.title ? gigInfo.title : (g.gigTitle || `Gig ${id}`);
-            return { _id: String(id), title };
-          });
+            // typeof null === 'object' in JS — must reject null before reading ._id
+            let id = '';
+            let titleFromGig = '';
+            if (gigInfo && typeof gigInfo === 'object') {
+              id = String(gigInfo._id || gigInfo.$oid || '').trim();
+              titleFromGig = gigInfo.title ? String(gigInfo.title) : '';
+            } else if (gigInfo != null && gigInfo !== '') {
+              id = String(gigInfo).trim();
+            }
+            if (!id) return null;
+            return {
+              _id: id,
+              title: titleFromGig || g.gigTitle || `Gig ${id}`,
+            };
+          })
+          .filter((g: { _id: string; title: string } | null): g is { _id: string; title: string } => Boolean(g));
 
         setEnrolledGigs(enrolled);
 
         const enrolledIds = new Set(enrolled.map((g) => g._id));
-        const persistedGigId = sessionStorage.getItem('activeGigId') || gigId || '';
+        const persistedGigId = sessionStorage.getItem('activeGigId') || gigIdFromNavigation || '';
 
         if (enrolled.length === 0) {
           setSelectedGigId('');
-          sessionStorage.removeItem('activeGigId');
+          persistActiveGigId(null);
         } else if (persistedGigId && enrolledIds.has(persistedGigId)) {
           setSelectedGigId(persistedGigId);
         } else {
@@ -534,40 +870,34 @@ export function WorkspaceContent() {
     }
   };
 
-  const applyLeadStatusFilter = (leadList: Lead[]) => {
-    if (leadStatusFilter === 'called') {
-      return leadList.filter((lead) => lead.isCalledByMe);
-    }
-    if (leadStatusFilter === 'signed') {
-      return leadList.filter((lead) => lead.isSignedByMe);
-    }
-    if (leadStatusFilter === 'rdv') {
-      return leadList.filter((lead) => isLeadRdvByMe(lead));
-    }
-    return leadList;
-  };
-
   const fetchLeads = async (page: number = 1, query: string = searchQuery) => {
     const activeGigId = activeEnrolledGigId;
+    const fetchSeq = ++leadsFetchSeqRef.current;
 
     // Leads are scoped to an enrolled gig only. Never call /leads/user/:id (demo data).
     if (!activeGigId) {
-      setLeads([]);
-      setTotalPages(1);
-      setIsLoadingLeads(false);
+      if (fetchSeq === leadsFetchSeqRef.current) {
+        setLeads([]);
+        setLeadsTotal(0);
+        setTotalPages(1);
+        setIsLoadingLeads(false);
+      }
       return;
     }
 
     console.log("🔍 Workspace: fetching leads", { activeGigId, page, query });
-    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-recette.up.railway.app/api').replace(/\/$/, '');
+    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-development.up.railway.app/api').replace(/\/$/, '');
     const limit = 50;
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
-    const statusParam = leadStatusFilter !== 'all' ? `&leadStatus=${leadStatusFilter}` : '';
+    const dispParam = dispositionFilter !== 'all' ? `&disposition=${encodeURIComponent(dispositionFilter)}` : '';
+    const dateFromParam = dateFrom ? `&createdFrom=${encodeURIComponent(dateFrom)}` : '';
+    const dateToParam = dateTo ? `&createdTo=${encodeURIComponent(dateTo)}` : '';
+    const extraParams = `${dispParam}${dateFromParam}${dateToParam}`;
     const trimmedQuery = query.trim();
     const url = trimmedQuery
-      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${statusParam}`
-      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${statusParam}`;
+      ? `${baseUrl}/leads/gig/${activeGigId}/search?search=${encodeURIComponent(trimmedQuery)}${extraParams}`
+      : `${baseUrl}/leads/gig/${activeGigId}?page=${page}&limit=${limit}${shuffleParams}${extraParams}`;
 
     try {
       setIsLoadingLeads(true);
@@ -578,10 +908,13 @@ export function WorkspaceContent() {
       console.log("📡 Fetch response status:", response.status, response.statusText);
 
       const responseData: APIResponse = await response.json();
+      // Ignore stale responses after a gig switch / newer request.
+      if (fetchSeq !== leadsFetchSeqRef.current) return;
+
       console.log("✅ Leads data received:", responseData);
 
       if (responseData.success && Array.isArray(responseData.data)) {
-        const leadResults = applyLeadStatusFilter(responseData.data);
+        const leadResults = responseData.data;
         setLeads(leadResults);
         setLeadsTotal(trimmedQuery ? leadResults.length : (responseData.total ?? leadResults.length));
         if (trimmedQuery) {
@@ -597,6 +930,7 @@ export function WorkspaceContent() {
         setLeadsTotal(0);
       }
     } catch (error: any) {
+      if (fetchSeq !== leadsFetchSeqRef.current) return;
       console.error('❌ Error fetching leads (detailed):', {
         message: error.message,
         name: error.name,
@@ -604,10 +938,40 @@ export function WorkspaceContent() {
         url
       });
       setLeads([]);
+      setLeadsTotal(0);
     } finally {
-      setIsLoadingLeads(false);
+      if (fetchSeq === leadsFetchSeqRef.current) {
+        setIsLoadingLeads(false);
+      }
     }
   };
+
+  const setLeadDisposition = useCallback(async (leadId: string, disposition: string) => {
+    const agentId = getAgentId();
+    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-development.up.railway.app/api').replace(/\/$/, '');
+    setDispositionSaving(true);
+    try {
+      const resp = await fetch(`${baseUrl}/leads/${leadId}/disposition`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, disposition }),
+      });
+      const data = await resp.json();
+      if (data.success && data.data) {
+        const updated = data.data as Lead;
+        setLeads((prev) => prev.map((l) => (l._id || l.id) === leadId ? { ...l, ...updated } : l));
+        if (prospectProfileLead && (prospectProfileLead._id || prospectProfileLead.id) === leadId) {
+          setProspectProfileLead((prev) => prev ? { ...prev, ...updated } : prev);
+        }
+        setDispositionModalLead((prev) => prev && (prev._id || prev.id) === leadId ? { ...prev, ...updated } : prev);
+        setDispositionModalLead(null);
+      }
+    } catch (err) {
+      console.error('Error saving disposition:', err);
+    } finally {
+      setDispositionSaving(false);
+    }
+  }, [prospectProfileLead]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -622,17 +986,25 @@ export function WorkspaceContent() {
     }, 500);
   };
 
-  const leadStatusFilters: { id: LeadStatusFilter; label: string }[] = [
-    { id: 'all', label: 'Tous' },
-    { id: 'called', label: 'Appelé' },
-    { id: 'rdv', label: 'RDV' },
-    { id: 'signed', label: 'Signé' },
-  ];
+  const formatCreatedDate = (raw?: string | null): string => {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const isAddedThisRollingWeek = (raw?: string | null): boolean => {
+    if (!raw) return false;
+    const added = new Date(raw).getTime();
+    if (Number.isNaN(added)) return false;
+    const age = Date.now() - added;
+    return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000;
+  };
 
   const workspaceTools = [
-    { id: 'voice', label: 'Leads', icon: User },
-    { id: 'calls', label: 'Call History', icon: PhoneOutgoing },
-    { id: 'copilot', label: 'COCKPIT', icon: Phone },
+    { id: 'voice', label: t('workspace.tabLeads'), icon: User },
+    { id: 'calls', label: t('workspace.tabCallHistory'), icon: PhoneOutgoing },
+    { id: 'copilot', label: t('workspace.tabCockpit'), icon: Phone },
   ];
 
   const renderWorkspace = () => {
@@ -642,7 +1014,7 @@ export function WorkspaceContent() {
           <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 flex flex-col shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <div className="flex flex-col">
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">Leads</h2>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">{t('workspace.leadsTitle')}</h2>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -725,7 +1097,7 @@ export function WorkspaceContent() {
                           </p>
                         </div>
                         <button
-                          onClick={() => navigate(`/training?gigId=${activeEnrolledGigId}`)}
+                          onClick={() => navigate(withActiveGig('/training', activeEnrolledGigId))}
                           className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-amber-600/10 shrink-0 flex items-center gap-1.5"
                         >
                           {t('workspaceGuard.trainingButton')} <ChevronRight className="w-3 h-3" />
@@ -746,7 +1118,12 @@ export function WorkspaceContent() {
                           </p>
                         </div>
                         <button
-                          onClick={() => navigate('/session-planning')}
+                          onClick={() => {
+                            persistActiveGigId(activeEnrolledGigId);
+                            navigate(withActiveGig('/session-planning', activeEnrolledGigId), {
+                              state: activeEnrolledGigId ? { gigId: activeEnrolledGigId } : undefined
+                            });
+                          }}
                           className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-rose-600/10 shrink-0 flex items-center gap-1.5"
                         >
                           {t('workspaceGuard.sessionButton')} <ChevronRight className="w-3 h-3" />
@@ -804,31 +1181,155 @@ export function WorkspaceContent() {
                     )}
                   </div>
                   {activeEnrolledGigId && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-1">Filtrer</span>
-                      {leadStatusFilters.map((filter) => (
+                    <div className="flex flex-col gap-2">
+                      {/* Disposition filter + Date range */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ListFilter className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                        {/* ── Custom disposition dropdown ── */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsDispositionDropdownOpen((o) => !o)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all bg-white hover:border-harx-200 hover:shadow-sm ${
+                              dispositionFilter !== 'all'
+                                ? (() => {
+                                    const cfg = getDispConfig(dispositionFilter);
+                                    return cfg ? DISP_COLOR_MAP[cfg.color] : 'border-gray-100 text-gray-600';
+                                  })()
+                                : 'border-gray-100 text-gray-500'
+                            }`}
+                          >
+                            {dispositionFilter === 'all' ? (
+                              <>
+                                <Tag className="w-3 h-3" />
+                                <span>{t('workspace.dispFilterAll', 'Tous statuts')}</span>
+                              </>
+                            ) : (() => {
+                              const cfg = getDispConfig(dispositionFilter);
+                              if (!cfg) return <span>{dispositionFilter}</span>;
+                              return (
+                                <>
+                                  <cfg.Icon className="w-3 h-3 shrink-0" />
+                                  <span>{t(cfg.labelKey, cfg.value)}</span>
+                                </>
+                              );
+                            })()}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${isDispositionDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isDispositionDropdownOpen && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setIsDispositionDropdownOpen(false)} />
+                              <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-200/60 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+                                {/* All */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setDispositionFilter('all'); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
+                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50 ${dispositionFilter === 'all' ? 'text-harx-600 bg-harx-50/60' : 'text-gray-500'}`}
+                                >
+                                  <div className="w-5 h-5 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                                    <Tag className="w-3 h-3 text-gray-500" />
+                                  </div>
+                                  {t('workspace.dispFilterAll', 'Tous statuts')}
+                                  {dispositionFilter === 'all' && <CheckCircle2 className="w-3 h-3 ml-auto text-harx-500" />}
+                                </button>
+
+                                <div className="h-px bg-gray-100 mx-4 my-1" />
+
+                                {HARX_DISPOSITIONS.map((d) => {
+                                  const cls = DISP_COLOR_MAP[d.color];
+                                  const isActive = dispositionFilter === d.value;
+                                  return (
+                                    <button
+                                      key={d.value}
+                                      type="button"
+                                      onClick={() => { setDispositionFilter(d.value); setCurrentPage(1); setIsDispositionDropdownOpen(false); }}
+                                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-gray-50/80 ${isActive ? 'bg-gray-50' : ''}`}
+                                    >
+                                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cls} border`}>
+                                        <d.Icon className="w-3 h-3" />
+                                      </div>
+                                      <span className={isActive ? 'text-gray-900' : 'text-gray-600'}>
+                                        {t(d.labelKey, d.value)}
+                                      </span>
+                                      {isActive && <CheckCircle2 className="w-3 h-3 ml-auto text-harx-500" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <Calendar className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                        <input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                          className="text-[10px] font-black border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
+                          title={t('workspace.dateFrom', 'Du')}
+                        />
+                        <span className="text-[9px] text-gray-400 font-black">→</span>
+                        <input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+                          className="text-[10px] font-black border border-gray-100 rounded-xl px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20 transition-all"
+                          title={t('workspace.dateTo', 'Au')}
+                        />
+                        {(dateFrom || dateTo || dispositionFilter !== 'all' || followUpFilter !== 'all') && (
+                          <button
+                            type="button"
+                            onClick={() => { setDateFrom(''); setDateTo(''); setDispositionFilter('all'); setFollowUpFilter('all'); setCurrentPage(1); }}
+                            className="px-2 py-1.5 rounded-xl border border-gray-100 text-gray-400 hover:text-rose-500 hover:border-rose-200 transition-all"
+                            title={t('workspace.clearFilters', 'Effacer filtres')}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
                         <button
-                          key={filter.id}
                           type="button"
-                          onClick={() => {
-                            setLeadStatusFilter(filter.id);
-                            setCurrentPage(1);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                            leadStatusFilter === filter.id
-                              ? filter.id === 'signed'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
-                                : filter.id === 'called'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                                  : filter.id === 'rdv'
-                                    ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
-                                    : 'bg-gradient-harx text-white border-transparent shadow-md shadow-harx-500/20'
-                              : 'bg-white text-gray-500 border-gray-100 hover:border-harx-200 hover:text-harx-600'
+                          onClick={() => { setFollowUpFilter((f) => (f === 'due' ? 'all' : 'due')); setCurrentPage(1); }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                            followUpFilter === 'due'
+                              ? 'bg-violet-50 text-violet-700 border-violet-200'
+                              : dueLeads.length > 0
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                : 'border-gray-100 text-gray-500 hover:border-violet-200'
                           }`}
+                          title={t('workspace.filterDue', 'À rappeler maintenant')}
                         >
-                          {filter.label}
+                          <Clock className="w-3 h-3" />
+                          {t('workspace.filterDue', 'À rappeler')}
+                          {dueLeads.length > 0 ? (
+                            <span className="ml-0.5 rounded-md bg-violet-600 text-white px-1.5 py-0.5 text-[9px] tabular-nums">
+                              {dueLeads.length}
+                            </span>
+                          ) : null}
                         </button>
-                      ))}
+                      </div>
+                      {dueLeads.length > 0 && followUpFilter !== 'due' && (
+                        <button
+                          type="button"
+                          onClick={() => setFollowUpFilter('due')}
+                          className="w-full text-left rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 flex items-center gap-3 hover:border-violet-300 transition-all"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white">
+                            <CalendarCheck className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">
+                              {t('workspace.dueNow', 'À rappeler maintenant')}
+                            </p>
+                            <p className="text-xs font-semibold text-violet-900/80 truncate">
+                              {t('workspace.dueNowHint', {
+                                count: dueLeads.length,
+                                defaultValue: `${dueLeads.length} prospect(s) avec RDV ou rappel échu`,
+                              })}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-violet-500 shrink-0" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -850,12 +1351,12 @@ export function WorkspaceContent() {
                       </div>
                     ))}
                   </div>
-                ) : leads.length === 0 ? (
+                ) : displayedLeads.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-gray-400 font-medium">
-                      {searchQuery.trim()
+                        {searchQuery.trim()
                         ? t('workspaceGuard.noSearchResults', 'No leads match your search.')
-                        : leadStatusFilter !== 'all'
+                        : (dispositionFilter !== 'all' || dateFrom || dateTo || followUpFilter !== 'all')
                         ? t('workspaceGuard.noLeadsForFilter', 'Aucun prospect pour ce filtre.')
                         : enrolledGigs.length === 0
                         ? t(
@@ -870,15 +1371,21 @@ export function WorkspaceContent() {
                 ) : (
                   <>
                     <div className="space-y-4">
-                      {leads.map((lead) => {
+                      {displayedLeads.map((lead) => {
                         const leadLockedByOther = isLeadCockpitLockedByOther(lead, myAgentId);
                         const isSignedByMe = Boolean(lead.isSignedByMe);
                         const isRdvByMe = isLeadRdvByMe(lead) && !isSignedByMe;
                         const isCalledByMe = Boolean(lead.isCalledByMe) && !isSignedByMe && !isRdvByMe;
+                        const followUpDue = isLeadFollowUpDue(lead, nowTick);
+                        const followUpLabel = formatFollowUpAt(lead.nextFollowUpAt, i18n.language || 'fr');
                         return (
                         <div
                           key={`${lead._id || lead.id}-${lead.Email_1}-${lead.Created_Time}`}
-                          className={`border border-gray-100 rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5 ${isSignedByMe ? 'cursor-pointer' : ''}`}
+                          className={`border rounded-2xl p-5 hover:bg-harx-50/30 hover:border-harx-100 transition-all group hover:shadow-lg hover:shadow-harx-500/5 ${
+                            followUpDue
+                              ? 'border-violet-300 bg-violet-50/40 ring-1 ring-violet-200'
+                              : 'border-gray-100'
+                          } ${isSignedByMe ? 'cursor-pointer' : ''}`}
                           onClick={isSignedByMe ? () => handleViewSignedLeadDetails(lead) : undefined}
                           onKeyDown={isSignedByMe ? (e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
@@ -889,43 +1396,115 @@ export function WorkspaceContent() {
                           role={isSignedByMe ? 'button' : undefined}
                           tabIndex={isSignedByMe ? 0 : undefined}
                         >
+                          {/* Disposition badge */}
+                          {(lead.repDisposition || lead.pendingDisposition) && (() => {
+                            const cfg = getDispConfig(lead.repDisposition || 'to_call');
+                            const pendingCfg = lead.pendingDisposition ? getDispConfig(lead.pendingDisposition) : null;
+                            if (!cfg && !pendingCfg) return null;
+                            const cls = cfg ? (DISP_COLOR_MAP[cfg.color] || DISP_COLOR_MAP['gray']) : DISP_COLOR_MAP['gray'];
+                            return (
+                              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                                {cfg && (
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border ${cls}`}>
+                                    <cfg.Icon className="w-2.5 h-2.5 shrink-0" />
+                                    {t(cfg.labelKey, cfg.value)}
+                                  </span>
+                                )}
+                                {pendingCfg && (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border border-amber-200 bg-amber-50 text-amber-700">
+                                    <Clock className="w-2.5 h-2.5 shrink-0" />
+                                    {t('workspace.dispositionPendingShort', 'En attente')}: {t(pendingCfg.shortKey, t(pendingCfg.labelKey, pendingCfg.value))}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div className="flex justify-between items-center">
                             <div className="space-y-1">
-                              <h4 className="font-black text-gray-900 uppercase text-sm tracking-tight group-hover:text-harx-600 transition-colors">{lead.Deal_Name}</h4>
-                              <div className="flex items-center gap-3">
+                              <h4 className="font-black text-gray-900 uppercase text-sm tracking-tight group-hover:text-harx-600 transition-colors">
+                                {repCanSee('Deal_Name') || repCanSee('First_Name') || repCanSee('Last_Name')
+                                  ? lead.Deal_Name ||
+                                    `${lead.First_Name || ''} ${lead.Last_Name || ''}`.trim() ||
+                                    '—'
+                                  : '—'}
+                              </h4>
+                              <div className="flex items-center gap-3 flex-wrap">
+                                {repCanSee('Phone') && (
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Phone className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest">{lead.Telephony || (lead as any).Phone || 'No phone'}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest">
+                                    {anonymizePhone(lead.Telephony || lead.Phone) || t('workspace.noPhone')}
+                                  </p>
                                 </div>
+                                )}
+                                {repCanSee('Email_1') && (
                                 <div className="flex items-center gap-1.5 text-gray-400">
                                   <Mail className="w-3 h-3" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">{lead.Email_1 || 'No email'}</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">
+                                    {anonymizeEmail(lead.Email_1) || t('workspace.noEmail')}
+                                  </p>
                                 </div>
+                                )}
+                                {lead.Created_Time && (
+                                  <div
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 text-white border border-slate-700 shadow-sm"
+                                    title={t('workspace.addedOnLabel')}
+                                  >
+                                    <Calendar className="w-3 h-3 text-rose-300 shrink-0" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-rose-200">
+                                      {t('workspace.addedOnLabel')}
+                                    </span>
+                                    <span className="text-[11px] font-black tabular-nums text-white">
+                                      {formatCreatedDate(lead.Created_Time)}
+                                    </span>
+                                  </div>
+                                )}
+                                {isAddedThisRollingWeek(lead.Created_Time) && (
+                                  <NewLeadFlash
+                                    label={t('workspace.newThisWeek')}
+                                    title={t('workspace.newThisWeekHint')}
+                                  />
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center flex-wrap justify-end gap-2">
                               {isSignedByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
                                   <CheckCircle2 className="w-3 h-3" />
-                                  Déjà signé
+                                  {t('workspace.alreadySigned')}
                                 </span>
                               )}
                               {isRdvByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-violet-50 text-violet-700 border border-violet-100 flex items-center gap-1.5">
                                   <Calendar className="w-3 h-3" />
-                                  RDV
+                                  {t('workspace.filterRdv')}
+                                </span>
+                              )}
+                              {followUpLabel && (
+                                <span
+                                  className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${
+                                    followUpDue
+                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                  }`}
+                                  title={t('workspace.followUpAt', 'Créneau RDV / rappel')}
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  {followUpDue
+                                    ? t('workspace.dueNow', 'À rappeler maintenant')
+                                    : followUpLabel}
                                 </span>
                               )}
                               {isCalledByMe && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5">
                                   <PhoneOutgoing className="w-3 h-3" />
-                                  Appelé
+                                  {t('workspace.filterCalled')}
                                 </span>
                               )}
                               {leadLockedByOther && (
                                 <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1.5">
                                   <Clock className="w-3 h-3" />
-                                  Occupé
+                                  {t('workspace.busy')}
                                 </span>
                               )}
                               {lead.Stage && lead.Stage !== 'New' && (
@@ -936,6 +1515,27 @@ export function WorkspaceContent() {
                                   {lead.Stage}
                                 </span>
                               )}
+                              {leadHasRecordedCall(lead) && (
+                                <button
+                                  type="button"
+                                  className="px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 border border-harx-200 bg-harx-50 text-harx-700 hover:bg-harx-100"
+                                  onClick={(e) => { e.stopPropagation(); openLeadCallPopup(lead); }}
+                                  title={t('workspace.viewCall', 'Voir l\'appel')}
+                                >
+                                  <PhoneOutgoing className="w-3.5 h-3.5" />
+                                  <span>{t('workspace.viewCall', 'Voir l\'appel')}</span>
+                                </button>
+                              )}
+                              {/* Fiche (profile) button */}
+                              <button
+                                type="button"
+                                className="px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 border border-gray-100 bg-white text-gray-500 hover:border-harx-200 hover:text-harx-600"
+                                onClick={(e) => { e.stopPropagation(); setProspectProfileLead(lead); }}
+                                title={t('workspace.viewProfile', 'Fiche prospect')}
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                                <span>{t('workspace.fiche', 'Fiche')}</span>
+                              </button>
                               <button
                                 type="button"
                                 className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 ${
@@ -956,9 +1556,9 @@ export function WorkspaceContent() {
                                 }}
                                 title={
                                   isSignedByMe
-                                    ? 'Voir les détails de la vente signée'
+                                    ? t('workspace.viewSignedDetails')
                                     : leadLockedByOther
-                                      ? 'Ce prospect est ouvert dans le cockpit d’un autre agent'
+                                      ? t('workspace.leadLockedByOther')
                                       : !canUseCopilot && copilotGuard.reason
                                         ? copilotGuard.reason
                                         : ''
@@ -970,7 +1570,7 @@ export function WorkspaceContent() {
                                   <Phone className="w-3.5 h-3.5" />
                                 )}
                                 <span>
-                                  {claimingCockpit ? '...' : isSignedByMe ? 'Détails' : 'Call'}
+                                  {claimingCockpit ? '...' : isSignedByMe ? t('workspace.details') : t('workspace.call')}
                                 </span>
                               </button>
                             </div>
@@ -1108,9 +1708,10 @@ export function WorkspaceContent() {
         return (
           <div className="min-h-[420px] lg:h-[600px] bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 overflow-y-auto shadow-sm border border-gray-100">
             <CallRecords
+              gigId={activeEnrolledGigId || undefined}
               leadId={searchParams.get('leadId') || undefined}
               autoOpenSid={pendingOpenCallSid || undefined}
-              onAutoOpenHandled={() => setPendingOpenCallSid(null)}
+              onAutoOpenHandled={handleAutoOpenHandled}
             />
           </div>
         );
@@ -1181,25 +1782,25 @@ export function WorkspaceContent() {
           <div className="w-full relative bg-white/80 backdrop-blur-md rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300" style={{ minHeight: '600px' }}>
             {copilotGuard.loading ? (
               <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400">
-                <p className="text-sm font-bold uppercase tracking-widest">Checking call permissions...</p>
+                <p className="text-sm font-bold uppercase tracking-widest">{t('workspace.checkingPermissions')}</p>
               </div>
             ) : !canUseCopilot ? (
               <div className="flex flex-col items-center justify-center h-full pt-24 text-center px-8">
                 <Phone className="w-12 h-12 mb-4 text-gray-300" />
-                <p className="text-sm font-black uppercase tracking-widest text-gray-700">COCKPIT Locked</p>
+                <p className="text-sm font-black uppercase tracking-widest text-gray-700">{t('workspace.cockpitLocked')}</p>
                 <p className="text-xs mt-2 text-gray-500 max-w-xl">
-                  {copilotGuard.reason || 'You cannot place calls right now.'}
+                  {copilotGuard.reason || t('workspace.cannotPlaceCalls')}
                 </p>
                 {copilotGuard.reservationWindowLabel && (
                   <p className="text-xs mt-2 text-emerald-600 font-bold">
-                    Active reserved window: {copilotGuard.reservationWindowLabel}
+                    {t('workspace.activeReservedWindow', { window: copilotGuard.reservationWindowLabel })}
                   </p>
                 )}
               </div>
             ) : cockpitAccessDenied ? (
               <div className="flex flex-col items-center justify-center h-full pt-24 text-center px-8">
                 <AlertTriangle className="w-12 h-12 mb-4 text-amber-500" />
-                <p className="text-sm font-black uppercase tracking-widest text-gray-700">Prospect occupé</p>
+                <p className="text-sm font-black uppercase tracking-widest text-gray-700">{t('workspace.prospectBusy')}</p>
                 <p className="text-xs mt-2 text-gray-500 max-w-xl">{cockpitAccessDenied}</p>
                 <button
                   type="button"
@@ -1212,16 +1813,32 @@ export function WorkspaceContent() {
                   }}
                   className="mt-6 px-6 py-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
                 >
-                  Retour aux leads
+                  {t('workspace.backToLeads')}
                 </button>
               </div>
-            ) : (selectedLead || urlLeadId) ? (
+            ) : selectedLead ? (
               <CopilotApp />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in">
+              <div className="flex flex-col items-center justify-center h-full pt-32 text-gray-400 animate-in fade-in text-center px-8">
                 <Phone className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-sm font-bold uppercase tracking-widest">No lead selected</p>
-                <p className="text-xs mt-2">Please select a lead from the Leads tab to start a call.</p>
+                <p className="text-sm font-bold uppercase tracking-widest">{t('workspace.noLeadSelected')}</p>
+                <p className="text-xs mt-2 max-w-md">{t('workspace.selectLeadHint')}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('voice');
+                    const params = new URLSearchParams(location.search);
+                    params.set('tab', 'voice');
+                    params.delete('leadId');
+                    navigate(
+                      { pathname: location.pathname, search: `?${params.toString()}` },
+                      { replace: true }
+                    );
+                  }}
+                  className="mt-6 px-6 py-2.5 bg-gradient-harx text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-harx-500/20 hover:-translate-y-0.5 transition-all"
+                >
+                  {t('workspace.backToLeads')}
+                </button>
               </div>
             )}
           </div>
@@ -1229,6 +1846,13 @@ export function WorkspaceContent() {
       default:
         return null;
     }
+  };
+
+  const openLeadCallPopup = (lead: Lead) => {
+    const leadIdString = String(lead._id || lead.id || '');
+    if (!leadIdString) return;
+    setProspectProfileLead(null);
+    setSignedLeadOverlayId(leadIdString);
   };
 
   const handleViewSignedLeadDetails = (lead: Lead) => {
@@ -1269,9 +1893,7 @@ export function WorkspaceContent() {
     setCockpitAccessDenied(null);
     setCockpitClaimedLeadId(leadIdString);
     sessionStorage.setItem('activeLeadId', leadIdString);
-    if (activeEnrolledGigId) {
-      sessionStorage.setItem('activeGigId', activeEnrolledGigId);
-    }
+    persistActiveGigId(activeEnrolledGigId || null);
 
     const params = new URLSearchParams(location.search);
     params.delete('leadId');
@@ -1295,7 +1917,7 @@ export function WorkspaceContent() {
           <div className="flex flex-col items-start space-y-1 relative">
             <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1 flex items-center gap-1.5">
               <Filter className="w-2.5 h-2.5" />
-              Active Gig
+              {t('workspace.activeGig')}
             </span>
 
             <div className="relative w-full md:w-[480px]">
@@ -1310,7 +1932,7 @@ export function WorkspaceContent() {
                   <span className="truncate text-left font-bold text-slate-700 text-xs">
                     {selectedGigId
                       ? enrolledGigs.find(g => g._id === selectedGigId)?.title
-                      : 'All My Gigs'}
+                      : t('workspace.allMyGigs')}
                   </span>
                 </div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-500 ${isGigDropdownOpen ? 'rotate-180 text-rose-500' : ''}`} />
@@ -1325,6 +1947,7 @@ export function WorkspaceContent() {
                   <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-100/90 rounded-xl shadow-2xl shadow-slate-200/80 py-1.5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                     <button
                       onClick={() => {
+                        persistActiveGigId(null);
                         setSelectedGigId('');
                         setCurrentPage(1);
                         setIsGigDropdownOpen(false);
@@ -1338,13 +1961,15 @@ export function WorkspaceContent() {
                       className={`w-full px-5 py-3 text-left text-xs font-black uppercase tracking-wider transition-all flex items-center gap-3 hover:bg-slate-50/80 ${!selectedGigId ? 'text-rose-600 bg-rose-50/30' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       <div className={`w-2 h-2 rounded-full ${!selectedGigId ? 'bg-rose-500 ring-4 ring-rose-500/20' : 'bg-slate-300'}`}></div>
-                      All My Gigs
+                      {t('workspace.allMyGigs')}
                     </button>
                     <div className="h-px bg-slate-100 mx-4 my-1 opacity-60"></div>
                     {enrolledGigs.map((g) => (
                       <button
                         key={g._id}
                         onClick={() => {
+                          // Persist immediately so no effect can snap back to the previous gig.
+                          persistActiveGigId(g._id);
                           setSelectedGigId(g._id);
                           setCurrentPage(1);
                           setIsGigDropdownOpen(false);
@@ -1520,9 +2145,13 @@ export function WorkspaceContent() {
                   if (!activeEnrolledGigId || !copilotGuard.isEnrolledInGig) {
                     navigate('/marketplace');
                   } else if (!copilotGuard.isTrainingComplete) {
-                    navigate(`/training?gigId=${activeEnrolledGigId}`);
+                    persistActiveGigId(activeEnrolledGigId);
+                    navigate(withActiveGig('/training', activeEnrolledGigId));
                   } else if (!copilotGuard.hasActiveReservationNow) {
-                    navigate(`/session-planning?gigId=${activeEnrolledGigId}`);
+                    persistActiveGigId(activeEnrolledGigId);
+                    navigate(withActiveGig('/session-planning', activeEnrolledGigId), {
+                      state: { gigId: activeEnrolledGigId }
+                    });
                   }
                 }}
                 className="w-full py-3 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 hover:from-rose-600 hover:to-pink-700 text-white font-extrabold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-rose-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
@@ -1538,6 +2167,264 @@ export function WorkspaceContent() {
           overlayOpenLeadId={signedLeadOverlayId}
           onOverlayClose={() => setSignedLeadOverlayId(null)}
         />
+      )}
+
+      {/* ── Prospect Profile Modal ─────────────────────────────────── */}
+      {prospectProfileLead && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setProspectProfileLead(null)}
+        >
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-harx px-6 py-5 flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white tracking-tight">{prospectProfileLead.Deal_Name}</h2>
+                  {prospectProfileLead.Created_Time && (
+                    <p className="text-[10px] text-white font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <Calendar className="w-3 h-3 text-white shrink-0" />
+                      <span className="uppercase tracking-widest text-white/90">
+                        {t('workspace.addedOnLabel')}
+                      </span>
+                      <span className="tabular-nums">{formatCreatedDate(prospectProfileLead.Created_Time)}</span>
+                      {isAddedThisRollingWeek(prospectProfileLead.Created_Time) && (
+                        <NewLeadFlash
+                          label={t('workspace.newThisWeek')}
+                          title={t('workspace.newThisWeekHint')}
+                        />
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setProspectProfileLead(null)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Contact info */}
+              <div className="space-y-2.5">
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileContact', 'Contact')}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {repCanSee('Phone') && (
+                  <div className="bg-gray-50 rounded-2xl p-3">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profilePhone', 'Téléphone')}</p>
+                    <p className="text-sm font-bold text-gray-800">{anonymizePhone(prospectProfileLead.Telephony || prospectProfileLead.Phone || prospectProfileLead.Mobile) || '—'}</p>
+                  </div>
+                  )}
+                  {repCanSee('Email_1') && (
+                  <div className="bg-gray-50 rounded-2xl p-3">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">{t('workspace.profileEmail', 'Email')}</p>
+                    <p className="text-sm font-bold text-gray-800 break-all">{anonymizeEmail(prospectProfileLead.Email_1 || prospectProfileLead.Email || prospectProfileLead.email) || '—'}</p>
+                  </div>
+                  )}
+                  {(repCanSee('Address') || repCanSee('Postal_Code') || repCanSee('City')) &&
+                    (prospectProfileLead.Address || prospectProfileLead.Postal_Code || prospectProfileLead.City) && (
+                    <div className="bg-gray-50 rounded-2xl p-3 col-span-2">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {t('workspace.profileAddress', 'Adresse')}</p>
+                      <p className="text-sm font-bold text-gray-800">
+                        {[
+                          repCanSee('Address') ? anonymizeStreet(prospectProfileLead.Address) : '',
+                          repCanSee('Postal_Code') && prospectProfileLead.Postal_Code ? '••••' : '',
+                          repCanSee('City') ? prospectProfileLead.City : '',
+                        ].filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  {repCanSee('Date_of_Birth') && prospectProfileLead.Date_of_Birth && (
+                    <div className="bg-gray-50 rounded-2xl p-3">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><CreditCard className="w-2.5 h-2.5" /> {t('workspace.profileDob', 'Date de naissance')}</p>
+                      <p className="text-sm font-bold text-gray-800">{anonymizeBirthDate(prospectProfileLead.Date_of_Birth)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Current disposition */}
+              <div className="space-y-2">
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('workspace.profileDisposition', 'Statut d\'appel')}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(() => {
+                    const disposition = prospectProfileLead.repDisposition || 'to_call';
+                    const cfg = getDispConfig(disposition);
+                    const cls = cfg ? DISP_COLOR_MAP[cfg.color] : DISP_COLOR_MAP['gray'];
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${cls}`}>
+                        {cfg ? <cfg.Icon className="w-3 h-3 shrink-0" /> : <Tag className="w-3 h-3" />}
+                        {cfg ? t(cfg.labelKey, cfg.value) : disposition}
+                      </span>
+                    );
+                  })()}
+                  {prospectProfileLead.pendingDisposition && (() => {
+                    const pendingCfg = getDispConfig(prospectProfileLead.pendingDisposition);
+                    if (!pendingCfg) return null;
+                    return (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-200 bg-amber-50 text-amber-700">
+                        <Clock className="w-3 h-3 shrink-0" />
+                        {t('workspace.dispositionPendingShort', 'En attente')}: {t(pendingCfg.shortKey, t(pendingCfg.labelKey, pendingCfg.value))}
+                      </span>
+                    );
+                  })()}
+                  {prospectProfileLead.repDispositionAt && !prospectProfileLead.pendingDisposition && (
+                    <span className="text-[9px] text-gray-400">{formatCreatedDate(prospectProfileLead.repDispositionAt)}</span>
+                  )}
+                  {leadHasRecordedCall(prospectProfileLead) && (
+                    <button
+                      type="button"
+                      onClick={() => setDispositionModalLead(prospectProfileLead)}
+                      className="ml-auto px-3 py-1.5 rounded-xl border border-harx-200 text-harx-600 text-[9px] font-black uppercase tracking-widest hover:bg-harx-50 transition-all flex items-center gap-1"
+                    >
+                      <Tag className="w-2.5 h-2.5" />
+                      {t('workspace.changeDisposition', 'Modifier')}
+                    </button>
+                  )}
+                </div>
+                {prospectProfileLead.pendingDisposition && (
+                  <p className="text-[10px] text-amber-600 font-medium">
+                    {t('workspace.dispositionPendingHint', 'En attente de confirmation de l’entreprise.')}
+                  </p>
+                )}
+              </div>
+
+              {leadHasRecordedCall(prospectProfileLead) && (
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2.5 bg-gray-50 hover:bg-harx-50 border border-gray-100 hover:border-harx-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-harx-700 transition-all flex items-center justify-center gap-2"
+                    onClick={() => openLeadCallPopup(prospectProfileLead)}
+                  >
+                    <PhoneOutgoing className="w-3.5 h-3.5" />
+                    {t('workspace.viewCall', 'Voir l\'appel')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disposition Setter Modal ───────────────────────────────── */}
+      {dispositionModalLead && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-[2px] animate-in fade-in duration-200"
+          onClick={() => !dispositionSaving && setDispositionModalLead(null)}
+        >
+          <div
+            className="relative w-full sm:max-w-md max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-harx-600 mb-1">
+                    {t('workspace.dispositionTitle', "Statut d'appel")}
+                  </p>
+                  <h3 className="text-base font-bold text-slate-900 truncate">
+                    {dispositionModalLead.Deal_Name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !dispositionSaving && setDispositionModalLead(null)}
+                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-3 py-3 overflow-y-auto flex-1 space-y-4">
+              {DISP_GROUPS.map((group) => {
+                const items = HARX_DISPOSITIONS.filter((d) => d.group === group.id);
+                if (items.length === 0) return null;
+                return (
+                  <div key={group.id}>
+                    <p className="px-2 mb-1.5 text-[11px] font-semibold text-slate-400">
+                      {t(group.labelKey)}
+                    </p>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 overflow-hidden divide-y divide-slate-100">
+                      {items.map((d) => {
+                        const iconBg = DISP_ICON_BG[d.color] || DISP_ICON_BG.gray;
+                        const isActive =
+                          dispositionModalLead.pendingDisposition === d.value ||
+                          (!dispositionModalLead.pendingDisposition &&
+                            (dispositionModalLead.repDisposition === d.value ||
+                              (!dispositionModalLead.repDisposition && d.value === 'to_call')));
+                        const isPendingChoice = dispositionModalLead.pendingDisposition === d.value;
+                        return (
+                          <button
+                            key={d.value}
+                            type="button"
+                            disabled={dispositionSaving}
+                            onClick={() =>
+                              void setLeadDisposition(
+                                dispositionModalLead._id || dispositionModalLead.id,
+                                d.value
+                              )
+                            }
+                            className={`w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors disabled:opacity-60 ${
+                              isActive
+                                ? 'bg-white ring-1 ring-inset ring-harx-400/70'
+                                : 'hover:bg-white/80'
+                            }`}
+                          >
+                            <span
+                              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+                            >
+                              {dispositionSaving && isActive ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <d.Icon className="w-3.5 h-3.5" />
+                              )}
+                            </span>
+                            <span className="flex-1 text-[13px] font-semibold text-slate-800 leading-snug">
+                              {t(d.shortKey, t(d.labelKey, d.value))}
+                              {isPendingChoice && (
+                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                                  {t('workspace.dispositionPendingShort', 'En attente')}
+                                </span>
+                              )}
+                            </span>
+                            {isActive ? (
+                              isPendingChoice ? (
+                                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4 text-harx-500 shrink-0" />
+                              )
+                            ) : (
+                              <span className="w-4 h-4 rounded-full border border-slate-200 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-100 bg-white shrink-0">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {t(
+                  'workspace.dispositionConfirmNote',
+                  'Votre choix est envoyé à l’entreprise pour confirmation. Le statut effectif ne change qu’après validation.'
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

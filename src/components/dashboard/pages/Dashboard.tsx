@@ -2,18 +2,29 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarClock, CalendarX, Timer, Filter as FilterIcon, Receipt, XCircle, Inbox, ChevronDown, ChevronRight, X, RotateCcw, Building2, ShieldCheck } from 'lucide-react';
+import { TrendingUp, DollarSign, Clock, Phone, Target, Award, Briefcase, CheckCircle2, Wallet as WalletIcon, Trophy, Flame, CalendarDays, CalendarCheck, CalendarX, Timer, Filter as FilterIcon, ChevronDown, ChevronRight, RotateCcw, Building2, ShieldCheck, ShieldAlert, Rocket, Calculator, Check, Medal, ListChecks, PhoneCall, BookOpen, GraduationCap, Ban, Zap, FileText, History } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../../utils/client';
 import { slotApi, type Reservation } from '../../../services/api/slotApi';
-import { billedMinutesFromSeconds } from '../../../utils/billingMinutes';
 import { repApiUrl } from '../../../utils/repApiUrl';
-import { CallRecords } from '../CallRecords';
 import {
   resolveClientValidationPendingAmount,
-  resolveTransactionRepCommission,
 } from '../../../utils/commissionUtils';
-import { isTransactionInRetraction } from '../../../utils/callStatusDisplay';
-import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, indexSaleLedgerByCallId, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { computeValidatedLedgerBreakdown, dedupeSaleLedgerRows, resolveLedgerPeriodDate } from '../../../utils/repLedgerBreakdown';
+import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
+import { getDisplayOverallScore, isCallFraudDetected } from '../../../utils/callStatusDisplay';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { isCallCenterStaff } from '../../../utils/callCenterStaff';
+import { CallCenterAgentHome } from './CallCenterAgentHome';
+import { persistActiveGigId, withActiveGig } from '../../../utils/activeGigNav';
+import {
+  isDateInPeriod,
+  resolveIanaZone,
+  zonedWallTimeToUtc,
+  computeAttendanceScore,
+  reservationSlotWindowMs,
+  callActivityWindowMs,
+  type StatsPeriod,
+} from '../../../utils/planningMetrics';
 
 interface DashboardProps {
   profile?: any;
@@ -24,7 +35,26 @@ type GigFilterOption = {
   title: string;
   commission?: any;
   rewardBonus?: number;
+  availability?: any; // minimumHours.daily/weekly/monthly
 };
+
+function isPlaceholderGigTitle(title: string | undefined | null, id: string): boolean {
+  if (!title || !String(title).trim()) return true;
+  const t = String(title).trim();
+  const shortId = id.slice(-6);
+  if (t === `Gig ${shortId}`) return true;
+  if (t === id || t === shortId) return true;
+  if (/^Gig\s+[a-f0-9]{4,12}$/i.test(t)) return true;
+  return false;
+}
+
+function firstRealGigTitle(id: string, ...candidates: unknown[]): string {
+  const strings = candidates
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v) => v.trim());
+  const real = strings.find((t) => !isPlaceholderGigTitle(t, id));
+  return real || strings[0] || `Gig ${id.slice(-6)}`;
+}
 
 function normalizeGigEntry(raw: any): GigFilterOption | null {
   if (!raw) return null;
@@ -35,26 +65,40 @@ function normalizeGigEntry(raw: any): GigFilterOption | null {
 
   if (raw.gigId || raw.gig) {
     const nested = raw.gigId || raw.gig;
-    if (typeof nested === 'object') {
+    if (typeof nested === 'object' && nested) {
       const id = String(nested._id || nested.id || nested.$oid || '');
       if (!id) return null;
       return {
         _id: id,
-        title: nested.title || raw.gigTitle || `Gig ${id.slice(-6)}`,
+        title: firstRealGigTitle(
+          id,
+          nested.title,
+          nested.name,
+          raw.gigTitle,
+          raw.gigName,
+          raw.title,
+          raw.name
+        ),
         commission: nested.commission || raw.commission,
         rewardBonus: nested.rewardBonus || raw.rewardBonus,
+        availability: nested.availability || raw.availability,
       };
     }
-    return { _id: String(nested), title: raw.gigTitle || `Gig ${String(nested).slice(-6)}` };
+    const id = String(nested);
+    return {
+      _id: id,
+      title: firstRealGigTitle(id, raw.gigTitle, raw.gigName, raw.title, raw.name),
+    };
   }
 
   const id = String(raw._id || raw.id || '');
   if (!id) return null;
   return {
     _id: id,
-    title: raw.title || `Gig ${id.slice(-6)}`,
+    title: firstRealGigTitle(id, raw.title, raw.name, raw.gigTitle, raw.gigName),
     commission: raw.commission,
     rewardBonus: raw.rewardBonus,
+    availability: raw.availability,
   };
 }
 
@@ -68,9 +112,11 @@ function mergeGigOptions(lists: any[][], locale = 'fr'): GigFilterOption[] {
       map.set(gig._id, {
         ...existing,
         ...gig,
-        title: gig.title || existing?.title || `Gig ${gig._id.slice(-6)}`,
+        // Never let a "Gig abc123" fallback overwrite a real title from another source.
+        title: firstRealGigTitle(gig._id, existing?.title, gig.title),
         commission: gig.commission ?? existing?.commission,
         rewardBonus: gig.rewardBonus ?? existing?.rewardBonus,
+        availability: gig.availability ?? existing?.availability,
       });
     }
   }
@@ -98,17 +144,94 @@ function normalizeRecordId(value: unknown): string | null {
   return String(value);
 }
 
-function resolveTransactionCallId(tx: RepTransactionRow): string | null {
-  return tx.callId || tx.call?._id || tx.call?.sid || null;
+type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+type GoalsPeriod = Exclude<PeriodKey, 'all'>;
+
+const GOALS_PERIODS: GoalsPeriod[] = ['today', 'week', 'month', 'quarter', 'year'];
+
+type EarningsGoals = Record<GoalsPeriod, number>;
+type CountGoals = Record<GoalsPeriod, number>;
+
+function emptyCountGoals(): CountGoals {
+  return { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
 }
 
-const clickableRowClass =
-  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-emerald-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 active:scale-[0.99]';
+function loadCountGoals(storageKey: string): CountGoals {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}') as Partial<CountGoals>;
+    const next = emptyCountGoals();
+    (Object.keys(next) as GoalsPeriod[]).forEach((key) => {
+      next[key] = Math.max(0, Number(parsed[key]) || 0);
+    });
+    return next;
+  } catch {
+    return emptyCountGoals();
+  }
+}
 
-const clickableCallRowClass =
-  'group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 border border-white/60 hover:border-indigo-200/80 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-[0.99]';
+function loadEarningsGoals(): EarningsGoals {
+  const empty: EarningsGoals = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
+  try {
+    const parsed = JSON.parse(localStorage.getItem('harx_earnings_goals') || '{}') as Partial<EarningsGoals>;
+    const legacy = Number(localStorage.getItem('harx_earnings_goal') || '0');
+    return {
+      today: Number(parsed.today) || 0,
+      week: Number(parsed.week) || legacy || 0,
+      month: Number(parsed.month) || 0,
+      quarter: Number(parsed.quarter) || 0,
+      year: Number(parsed.year) || 0,
+    };
+  } catch {
+    return empty;
+  }
+}
 
-type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+function hourMinimums(availability: any) {
+  const hours = availability?.minimumHours || {};
+  return {
+    daily: Number(hours.daily || 0),
+    weekly: Number(hours.weekly || 0),
+    monthly: Number(hours.monthly || 0),
+  };
+}
+
+function bonusPeriodKey(commission: any): GoalsPeriod {
+  const raw = String(commission?.minimumVolume?.period || commission?.bonusPeriod || commission?.bonusType || '').toLowerCase();
+  if (raw.includes('day') || raw.includes('jour') || raw === 'daily') return 'today';
+  if (raw.includes('week') || raw.includes('semaine')) return 'week';
+  if (raw.includes('quarter') || raw.includes('trimestre')) return 'quarter';
+  if (raw.includes('year') || raw.includes('ann')) return 'year';
+  return 'month';
+}
+
+function monthTransactions(commission: any): number {
+  return Number(commission?.minimumVolume?.amount || 0);
+}
+
+function agentTxAmount(commission: any): number {
+  const facing = getResolvedAgentFacing(commission);
+  const tx = facing?.transactionCommission;
+  if (typeof tx === 'number' && tx > 0) return tx;
+  if (tx && typeof tx === 'object') {
+    const type = String(tx.type || '').toLowerCase();
+    const amount = Number(String(tx.amount ?? '').replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    if (type === 'percentage' || type === 'percent' || type === '%') return 0;
+    return amount;
+  }
+  return 0;
+}
+
+function agentCallAmount(commission: any): number {
+  return Number(getResolvedAgentFacing(commission)?.commission_per_call || 0);
+}
+
+function agentBonusAmount(commission: any, rewardBonus?: number): number {
+  const amount = Number(getResolvedAgentFacing(commission)?.bonusAmount || 0);
+  if (amount > 0) return amount;
+  const gross = Number(rewardBonus || 0);
+  return gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0;
+}
 
 const getPeriodStart = (period: PeriodKey): number => {
   const now = new Date();
@@ -144,6 +267,83 @@ const getPeriodStart = (period: PeriodKey): number => {
       return 0;
   }
 };
+
+/** Inclusive end of period (local calendar day), or null for "all". */
+const getPeriodEndYmd = (period: PeriodKey): string | null => {
+  const now = new Date();
+  switch (period) {
+    case 'today': {
+      return toLocalYmd(getPeriodStart('today'));
+    }
+    case 'week': {
+      const start = new Date(getPeriodStart('week'));
+      start.setDate(start.getDate() + 6); // Sunday
+      return toLocalYmd(start.getTime());
+    }
+    case 'month': {
+      const d = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return toLocalYmd(d.getTime());
+    }
+    case 'quarter': {
+      const q = Math.floor(now.getMonth() / 3);
+      const d = new Date(now.getFullYear(), q * 3 + 3, 0);
+      return toLocalYmd(d.getTime());
+    }
+    case 'year': {
+      const d = new Date(now.getFullYear(), 11, 31);
+      return toLocalYmd(d.getTime());
+    }
+    case 'all':
+    default:
+      return null;
+  }
+};
+
+/** Local calendar day yyyy-MM-dd for a reservation. */
+function reservationYmd(r: { reservationDate?: string; date?: string }): string {
+  return String(r.reservationDate || r.date || '').slice(0, 10);
+}
+
+/** Duration in hours from API, else derived from start/end, else 1h. */
+function reservationDurationHours(r: {
+  duration?: number;
+  startTime?: string;
+  endTime?: string;
+}): number {
+  const dur = Number(r.duration);
+  if (Number.isFinite(dur) && dur > 0) return dur;
+  const start = String(r.startTime || '').slice(0, 5);
+  const end = String(r.endTime || '').slice(0, 5);
+  if (/^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const hours = (eh * 60 + em - (sh * 60 + sm)) / 60;
+    if (Number.isFinite(hours) && hours > 0) return hours;
+  }
+  return 1;
+}
+
+/** End of slot as local ms (for upcoming vs past). */
+function reservationEndMs(r: {
+  reservationDate?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+}): number {
+  const ymd = reservationYmd(r);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return 0;
+  const end = String(r.endTime || r.startTime || '23:59').slice(0, 5);
+  const d = new Date(`${ymd}T${end}:00`);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function toLocalYmd(ts: number): string {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export function Dashboard({ profile }: DashboardProps) {
   const { t, i18n } = useTranslation();
@@ -182,18 +382,14 @@ export function Dashboard({ profile }: DashboardProps) {
   const [, setLoading] = useState(true);
   const [selectedGigId, setSelectedGigId] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('month');
+  /** Goals keys exclude "all" — fall back to month when the shared filter is "all". */
+  const goalsPeriod: GoalsPeriod = selectedPeriod === 'all' ? 'month' : selectedPeriod;
   const [isGigDropdownOpen, setIsGigDropdownOpen] = useState(false);
   const gigTriggerRef = useRef<HTMLButtonElement>(null);
   const [gigDropdownPos, setGigDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
   const periodTriggerRef = useRef<HTMLButtonElement>(null);
   const [periodDropdownPos, setPeriodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  type TransactionFilter = 'all' | 'paid' | 'earned' | 'pending_retraction' | 'refused';
-  const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
-  type CallFilter = 'all' | 'valid' | 'invalid' | 'pending_client';
-  const [callFilter, setCallFilter] = useState<CallFilter>('all');
-  const callsSectionRef = useRef<HTMLDivElement>(null);
-  const transactionsSectionRef = useRef<HTMLDivElement>(null);
 
   // Earnings & objectifs (RepTransaction-backed)
   const [walletStats, setWalletStats] = useState<{
@@ -203,8 +399,31 @@ export function Dashboard({ profile }: DashboardProps) {
     lifetimeEarnings: number;
   }>({ availableBalance: 0, pendingCommissions: 0, pendingRetraction: 0, lifetimeEarnings: 0 });
   const [repLedger, setRepLedger] = useState<RepTransactionRow[]>([]);
-  const [overlayCallId, setOverlayCallId] = useState<string | null>(null);
-  const [selectedTransaction, setSelectedTransaction] = useState<RepTransactionRow | null>(null);
+
+  // Simulateur : chiffres saisis par GIG. Les commissions et le bonus viennent du GIG.
+  const [showCalculator, setShowCalculator] = useState(true);
+  const [simGigs, setSimGigs] = useState<Record<string, { calls: string; transactions: string }>>({});
+  const [hoursGigId, setHoursGigId] = useState<string | null>(null);
+  const [hoursMenuOpen, setHoursMenuOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(true);
+  const dashboardTopRef = useRef<HTMLDivElement>(null);
+  const [earningsGoals, setEarningsGoals] = useState<EarningsGoals>(loadEarningsGoals);
+  const [callGoals, setCallGoals] = useState<CountGoals>(() => loadCountGoals('harx_call_goals'));
+  const [transactionGoals, setTransactionGoals] = useState<CountGoals>(() => loadCountGoals('harx_transaction_goals'));
+
+  useLayoutEffect(() => {
+    if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    const pinTop = () => {
+      const main = dashboardTopRef.current?.closest('main');
+      if (main) main.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    pinTop();
+    const frame = requestAnimationFrame(pinTop);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const agentId = profile?._id || localStorage.getItem('agentId') || localStorage.getItem('userId');
@@ -217,15 +436,24 @@ export function Dashboard({ profile }: DashboardProps) {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token') || '';
-        const dashboardApi = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-recette.up.railway.app/api').replace(/\/$/, '');
+        const dashboardApi = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-production.up.railway.app/api').replace(/\/$/, '');
         const gigsQuery = new URLSearchParams({
           agentId: String(agentId),
           ...(realUserId ? { userId: String(realUserId) } : {}),
         });
 
+        const isLifecycleActiveEnrollment = (g: any) => {
+          if (!g || g.status !== 'enrolled') return false;
+          const gigInfo = g.gigId;
+          if (gigInfo && typeof gigInfo === 'object') {
+            return String(gigInfo.status || '').toLowerCase() === 'active';
+          }
+          return false;
+        };
+
         const profileGigsPromise = (async () => {
           const fromProp = Array.isArray(profile?.gigs)
-            ? profile.gigs.filter((g: any) => g.status === 'enrolled')
+            ? profile.gigs.filter(isLifecycleActiveEnrollment)
             : [];
           if (fromProp.length > 0) return fromProp;
           if (!token) return [];
@@ -236,7 +464,7 @@ export function Dashboard({ profile }: DashboardProps) {
             if (!profileRes.ok) return [];
             const profileData = await profileRes.json();
             return (Array.isArray(profileData.gigs) ? profileData.gigs : [])
-              .filter((g: any) => g.status === 'enrolled');
+              .filter(isLifecycleActiveEnrollment);
           } catch {
             return [];
           }
@@ -252,7 +480,14 @@ export function Dashboard({ profile }: DashboardProps) {
             );
             if (!res.ok) return [];
             const data = await res.json();
-            return Array.isArray(data.gigs) ? data.gigs.map((row: any) => row.gig).filter(Boolean) : [];
+            return Array.isArray(data.gigs)
+              ? data.gigs
+                  .map((row: any) => row.gig)
+                  .filter(
+                    (gig: any) =>
+                      gig && String(gig.status || '').toLowerCase() === 'active'
+                  )
+              : [];
           } catch {
             return [];
           }
@@ -272,18 +507,83 @@ export function Dashboard({ profile }: DashboardProps) {
         const callsList = Array.isArray(calls.data) ? calls.data : [];
         const ledgerList = ledgerRes?.success && Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
+        // Matching enrollments are the source of truth (same as Training / Cockpit).
+        // Profile.gigs often still lists deleted/orphan enrollments as "Gig abc123".
+        const fromMatching = mergeGigOptions([matchingGigs], i18n.language);
+        const fromProfile = mergeGigOptions([profileGigs], i18n.language);
+        const enrolledMerged =
+          fromMatching.length > 0 ? fromMatching : fromProfile;
+        const enrolledIds = new Set(enrolledMerged.map((g) => g._id));
+
+        // Only use calls / ledger / dashboard gigs to enrich titles of enrolled IDs —
+        // never to add extra filter rows.
+        const titleHints = mergeGigOptions(
+          [
+            Array.isArray(gigs.data) ? gigs.data : [],
+            callsList.map((call: any) => call.gigId).filter(Boolean),
+            ledgerList.map((tx: RepTransactionRow) => tx.gig).filter(Boolean),
+            ledgerList
+              .filter((tx: RepTransactionRow) => tx.gigId)
+              .map((tx: RepTransactionRow) => ({
+                _id: tx.gigId,
+                title: tx.gig?.title,
+              })),
+          ],
+          i18n.language
+        ).filter((g) => enrolledIds.has(g._id));
+
+        const mergedGigs = mergeGigOptions([enrolledMerged, titleHints], i18n.language);
+
+        // Resolve leftover "Gig abc123" labels + enrich commission/availability from the gigs API.
+        const gigsApi = getGigsApiBase();
+        // Fetch details for any GIG that still has a placeholder title OR is missing commission/availability
+        const needsDetails = mergedGigs.filter(
+          (g) => isPlaceholderGigTitle(g.title, g._id) || !g.commission || !g.availability
+        );
+        if (needsDetails.length > 0 && gigsApi) {
+          const detailsById = new Map<string, { title?: string; commission?: any; availability?: any }>();
+          await Promise.all(
+            needsDetails.map(async (g) => {
+              try {
+                const res = await fetch(`${gigsApi}/gigs/${encodeURIComponent(g._id)}/details`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const payload = data?.data || data?.gig || data;
+                const title = firstRealGigTitle(
+                  g._id,
+                  payload?.title,
+                  payload?.name,
+                  data?.title,
+                  data?.name
+                );
+                detailsById.set(g._id, {
+                  title: !isPlaceholderGigTitle(title, g._id) ? title : undefined,
+                  commission: payload?.commission || data?.commission,
+                  availability: payload?.availability || data?.availability,
+                });
+              } catch {
+                /* ignore per-gig failures */
+              }
+            })
+          );
+          if (detailsById.size > 0) {
+            for (const g of mergedGigs) {
+              const details = detailsById.get(g._id);
+              if (!details) continue;
+              if (details.title) g.title = details.title;
+              if (details.commission && !g.commission) g.commission = details.commission;
+              if (details.availability && !g.availability) g.availability = details.availability;
+            }
+          }
+        }
+
+        // Drop enrollments that no longer resolve to a real gig document.
+        const liveGigs = mergedGigs
+          .filter((g) => !isPlaceholderGigTitle(g.title, g._id))
+          .sort((a, b) => a.title.localeCompare(b.title, i18n.language));
+
         setCallsData(callsList);
-        setGigsData(mergeGigOptions([
-          Array.isArray(gigs.data) ? gigs.data : [],
-          profileGigs,
-          matchingGigs,
-          callsList.map((call: any) => call.gigId).filter(Boolean),
-          ledgerList.map((tx: RepTransactionRow) => tx.gig).filter(Boolean),
-          ledgerList.filter((tx: RepTransactionRow) => tx.gigId).map((tx: RepTransactionRow) => ({
-            _id: tx.gigId,
-            title: tx.gig?.title,
-          })),
-        ], i18n.language));
+        setGigsData(liveGigs);
         setReservationsData(Array.isArray(reservationsRes) ? reservationsRes : []);
 
         if (walletRes?.data?.success && walletRes.data.data) {
@@ -315,11 +615,6 @@ export function Dashboard({ profile }: DashboardProps) {
 
   const periodStartTs = useMemo(() => getPeriodStart(selectedPeriod), [selectedPeriod]);
 
-  const repSaleLedgerByCallId = useMemo(
-    () => indexSaleLedgerByCallId(repLedger),
-    [repLedger]
-  );
-
   // Dynamic filter logic — apply gig + period
   const filteredCalls = React.useMemo(() => {
     return callsData.filter(call => {
@@ -335,22 +630,23 @@ export function Dashboard({ profile }: DashboardProps) {
     });
   }, [callsData, selectedGigId, periodStartTs]);
 
-  // Reservations filtered by gig + period (period applies to reservation date)
+  // Reservations filtered by gig + period (inclusive calendar range for the selected period)
   const filteredReservations = useMemo(() => {
+    const startYmd = periodStartTs > 0 ? toLocalYmd(periodStartTs) : '';
+    const endYmd = getPeriodEndYmd(selectedPeriod);
     return reservationsData.filter((r: any) => {
       if (selectedGigId !== 'all') {
         const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-        if (rGigId !== selectedGigId) return false;
+        if (String(rGigId || '') !== String(selectedGigId)) return false;
       }
-      if (periodStartTs > 0) {
-        const dateStr = r.reservationDate || r.date;
-        if (!dateStr) return false;
-        const ts = new Date(dateStr).getTime();
-        if (!ts || ts < periodStartTs) return false;
+      if (startYmd && endYmd) {
+        const ymd = reservationYmd(r);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+        if (ymd < startYmd || ymd > endYmd) return false;
       }
       return true;
     });
-  }, [reservationsData, selectedGigId, periodStartTs]);
+  }, [reservationsData, selectedGigId, periodStartTs, selectedPeriod]);
 
   const callActivityDateById = useMemo(() => {
     const map = new Map<string, string>();
@@ -480,28 +776,7 @@ export function Dashboard({ profile }: DashboardProps) {
     dateLocale,
   ]);
 
-  const focusClientValidationPending = () => {
-    setCallFilter('pending_client');
-    window.setTimeout(() => {
-      callsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  const focusValidatedEarnings = () => {
-    setTransactionFilter('earned');
-    window.setTimeout(() => {
-      transactionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  const focusRetractionTransactions = () => {
-    setTransactionFilter('pending_retraction');
-    window.setTimeout(() => {
-      transactionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
-
-  // Reservation statistics (work the rep has booked)
+  // Reservation statistics from real matching API rows (filtered by gig + dashboard period)
   const reservationStats = useMemo(() => {
     const nowTs = Date.now();
     let total = 0;
@@ -512,38 +787,57 @@ export function Dashboard({ profile }: DashboardProps) {
     let scheduledHours = 0;
     let workedHours = 0;
 
+    const selectedGig = selectedGigId === 'all'
+      ? null
+      : gigsData.find((g) => g._id === selectedGigId);
+    const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+
+    const callWindows = callsData
+      .map((c) => callActivityWindowMs(c))
+      .filter((w): w is { start: number; end: number } => !!w);
+
     filteredReservations.forEach((r: any) => {
       total += 1;
-      const dateStr = r.reservationDate || r.date;
-      const ts = dateStr ? new Date(dateStr).getTime() : 0;
-      const duration = Number(r.duration || 0);
+      const duration = reservationDurationHours(r);
       scheduledHours += duration;
 
-      if (r.status === 'cancelled') {
+      const status = String(r.status || '').toLowerCase();
+      if (status === 'cancelled') {
         cancelled += 1;
         return;
       }
 
-      if (ts && ts > nowTs) {
+      const win = reservationSlotWindowMs(r, gigTz);
+      const endTs = win?.end || reservationEndMs(r);
+      const isFuture = endTs > 0 ? endTs > nowTs : false;
+
+      if (isFuture) {
         upcoming += 1;
         return;
       }
 
-      // Past reservation
-      if (r.attended === true) {
-        completed += 1;
-        workedHours += duration;
-      } else if (r.attended === false) {
+      // Past reserved slot: real telephony overlap = attended
+      const hasActivity =
+        !!win &&
+        callWindows.some((c) => c.start < win.end && win.start < c.end);
+
+      if (!hasActivity) {
         noShow += 1;
-      } else {
-        // No explicit attendance flag — assume completed
-        completed += 1;
-        workedHours += duration;
+        return;
       }
+
+      completed += 1;
+      workedHours += duration;
     });
 
-    const pastCount = completed + noShow;
-    const attendanceRate = pastCount > 0 ? Math.round((completed / pastCount) * 100) : 0;
+    const attendance = computeAttendanceScore({
+      reservations: filteredReservations,
+      calls: callsData,
+      nowMs: nowTs,
+      gigId: selectedGigId === 'all' ? null : selectedGigId,
+      gigTz,
+    });
+    const attendanceRate = attendance.score;
 
     return {
       total,
@@ -555,218 +849,309 @@ export function Dashboard({ profile }: DashboardProps) {
       workedHours: Math.round(workedHours * 10) / 10,
       attendanceRate,
     };
-  }, [filteredReservations]);
+  }, [filteredReservations, callsData, selectedGigId, gigsData]);
 
-  // Next 3 upcoming reservations (sorted ascending)
-  const upcomingReservations = useMemo(() => {
-    const nowTs = Date.now();
-    return [...filteredReservations]
-      .filter((r: any) => {
-        if (r.status === 'cancelled') return false;
-        const dateStr = r.reservationDate || r.date;
-        const ts = dateStr ? new Date(dateStr).getTime() : 0;
-        return ts > nowTs;
-      })
-      .sort((a: any, b: any) => {
-        const ta = new Date(a.reservationDate || a.date).getTime();
-        const tb = new Date(b.reservationDate || b.date).getTime();
-        return ta - tb;
-      })
-      .slice(0, 3);
-  }, [filteredReservations]);
+  const goals = useMemo(() => {
+    const startTs = getPeriodStart(goalsPeriod);
+    const scopedGigs = selectedGigId === 'all'
+      ? gigsData
+      : gigsData.filter((g) => g._id === selectedGigId);
+    const hourTargets = scopedGigs.reduce(
+      (sum, gig) => {
+        const mins = hourMinimums(gig.availability);
+        return {
+          daily: sum.daily + mins.daily,
+          weekly: sum.weekly + mins.weekly,
+          monthly: sum.monthly + mins.monthly,
+        };
+      },
+      { daily: 0, weekly: 0, monthly: 0 }
+    );
+    const bonusAmount = scopedGigs.reduce((sum, gig) => {
+      const facing = getResolvedAgentFacing(gig.commission as any);
+      const amount = Number(facing?.bonusAmount || 0);
+      if (amount > 0) return sum + amount;
+      const gross = Number(gig.rewardBonus || 0);
+      return sum + (gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0);
+    }, 0);
 
-  // Transactions filtered by gig + period
-  const filteredTransactions = useMemo(() => {
-    return dedupeSaleLedgerRows(repLedger).filter((row: any) => {
-      if (selectedGigId !== 'all') {
-        const rGigId = typeof row.gigId === 'object' ? (row.gigId?._id || row.gigId?.id) : row.gigId;
-        if (rGigId !== selectedGigId) return false;
-      }
-      if (periodStartTs > 0) {
-        const ts = new Date(row.createdAt).getTime();
-        if (!ts || ts < periodStartTs) return false;
-      }
-      return true;
-    });
-  }, [repLedger, selectedGigId, periodStartTs]);
-
-  // Transaction breakdown by status (counts + totals)
-  const transactionStats = useMemo(() => {
-    const acc = {
-      all: { count: 0, total: 0 },
-      paid: { count: 0, total: 0 },
-      earned: { count: 0, total: 0 },
-      pending_retraction: { count: 0, total: 0 },
-      refused: { count: 0, total: 0 },
+    const matchesGig = (gigId: any) => {
+      if (selectedGigId === 'all') return true;
+      const id = typeof gigId === 'object' ? (gigId?._id || gigId?.id) : gigId;
+      return id === selectedGigId;
     };
-    filteredTransactions.forEach((row: RepTransactionRow) => {
-      const share = row.repShare || 0;
-      acc.all.count += 1;
-      acc.all.total += share;
-      if (row.status === 'paid') {
-        acc.paid.count += 1;
-        acc.paid.total += share;
-      } else if (row.status === 'earned') {
-        acc.earned.count += 1;
-        acc.earned.total += share;
-      } else if (row.status === 'pending_retraction') {
-        acc.pending_retraction.count += 1;
-        acc.pending_retraction.total += share;
-      } else if (row.status === 'refused') {
-        acc.refused.count += 1;
-        acc.refused.total += share;
-      }
-    });
-    return acc;
-  }, [filteredTransactions]);
 
-  // Transactions list (filtered + sorted desc)
-  const visibleTransactions = useMemo(() => {
-    const list = filteredTransactions.filter((row: RepTransactionRow) => {
-      if (transactionFilter === 'all') return true;
-      return row.status === transactionFilter;
-    });
-    return [...list]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
-  }, [filteredTransactions, transactionFilter]);
+    const sales = dedupeSaleLedgerRows(repLedger);
+    const gigIdOf = (gigId: any) => (typeof gigId === 'object' ? (gigId?._id || gigId?.id) : gigId);
+    const isSuccessfulSale = (row: RepTransactionRow) =>
+      row.type === 'transaction' && (row.status === 'earned' || row.status === 'paid' || row.status === 'pending_retraction');
 
-  // Call validation breakdown + visible list
-  const callStats = useMemo(() => {
-    const acc = { all: 0, valid: 0, invalid: 0, pending_client: 0 };
-    filteredCalls.forEach((call: any) => {
-      acc.all += 1;
-      const isValid = call.valid === true || call.validByAI === true;
-      if (isValid) acc.valid += 1;
-      else acc.invalid += 1;
-      const callId = resolveCallRefId(call);
-      if (callId && earningsPipeline.pendingClientValidationCallIds.has(callId)) {
-        acc.pending_client += 1;
-      }
-    });
-    return acc;
-  }, [filteredCalls, earningsPipeline.pendingClientValidationCallIds]);
-
-  const visibleCalls = useMemo(() => {
-    const list = filteredCalls.filter((call: any) => {
-      if (callFilter === 'pending_client') {
-        const callId = resolveCallRefId(call);
-        return callId ? earningsPipeline.pendingClientValidationCallIds.has(callId) : false;
-      }
-      if (callFilter === 'all') return true;
-      const isValid = call.valid === true || call.validByAI === true;
-      return callFilter === 'valid' ? isValid : !isValid;
-    });
-    return [...list]
-      .sort((a: any, b: any) => {
-        const ta = new Date(a.createdAt || a.startTime || 0).getTime();
-        const tb = new Date(b.createdAt || b.startTime || 0).getTime();
-        return tb - ta;
-      })
-      .slice(0, callFilter === 'pending_client' ? 20 : 8);
-  }, [filteredCalls, callFilter, earningsPipeline.pendingClientValidationCallIds]);
-
-  // Multi-objectifs — daily / weekly / monthly call goals + reservation goal
-  const multiObjectifs = useMemo(() => {
-    const todayStart = getPeriodStart('today');
-    const weekStart = getPeriodStart('week');
-    const monthStart = getPeriodStart('month');
-
-    const callsByPeriod = (startTs: number) =>
-      callsData.filter((c: any) => {
-        if (selectedGigId !== 'all') {
-          const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
-          if (cGigId !== selectedGigId) return false;
-        }
-        const ts = new Date(c.createdAt || c.startTime || c.date || 0).getTime();
-        return ts >= startTs;
-      }).length;
-
-    const reservationsByPeriod = (startTs: number) =>
-      reservationsData.filter((r: any) => {
-        if (selectedGigId !== 'all') {
-          const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-          if (rGigId !== selectedGigId) return false;
-        }
-        if (r.status === 'cancelled') return false;
-        const ts = new Date(r.reservationDate || r.date || 0).getTime();
-        return ts >= startTs;
-      }).length;
-
-    const dailyTarget = 5;
-    const weeklyTarget = 25;
-    const reservationsWeekTarget = 5;
-
-    const dailyCurrent = callsByPeriod(todayStart);
-    const weeklyCurrent = callsByPeriod(weekStart);
-    const monthCalls = callsByPeriod(monthStart);
-    const reservationsThisWeek = reservationsByPeriod(weekStart);
-
-    return {
-      daily: {
-        current: dailyCurrent,
-        target: dailyTarget,
-        progressPct: Math.min(100, Math.round((dailyCurrent / dailyTarget) * 100)),
-      },
-      weekly: {
-        current: weeklyCurrent,
-        target: weeklyTarget,
-        progressPct: Math.min(100, Math.round((weeklyCurrent / weeklyTarget) * 100)),
-      },
-      monthCalls,
-      reservationsWeekly: {
-        current: reservationsThisWeek,
-        target: reservationsWeekTarget,
-        progressPct: Math.min(100, Math.round((reservationsThisWeek / reservationsWeekTarget) * 100)),
-      },
+    const countSales = (since: number, onlyGigId?: string) => {
+      let count = 0;
+      sales.forEach((row) => {
+        if (!isSuccessfulSale(row)) return;
+        const gid = gigIdOf(row.gigId);
+        if (onlyGigId) {
+          if (gid !== onlyGigId) return;
+        } else if (!matchesGig(row.gigId)) return;
+        const ts = new Date(row.createdAt || 0).getTime();
+        if (!ts || ts < since) return;
+        count += 1;
+      });
+      return count;
     };
-  }, [callsData, reservationsData, selectedGigId]);
 
-  // Objectif gig — uses the selected gig's bonus thresholds (volume + bonus amount).
-  // Counts only this month's calls of the matching gig.
-  const objectif = useMemo(() => {
-    if (selectedGigId === 'all') {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const monthCalls = callsData.filter((c) => {
-        const d = new Date(c.createdAt || c.startTime || 0).getTime();
-        return d >= monthStart.getTime();
-      }).length;
-      return {
-        label: t('dashboard.home.allGigs'),
-        current: monthCalls,
-        target: 0,
-        bonusAmount: 0,
-        progressPct: 0
-      };
-    }
+    const countSince = (since: number, kind: 'calls' | 'hours') => {
+      if (kind === 'calls') {
+        return callsData.filter((call: any) => {
+          if (!matchesGig(call.gigId)) return false;
+          const ts = new Date(call.createdAt || call.startTime || call.date || 0).getTime();
+          if (!ts || ts < since) return false;
+          return call.valid === true || call.validByAI === true;
+        }).length;
+      }
+      let hours = 0;
+      reservationsData.forEach((reservation: any) => {
+        if (!matchesGig(reservation.gigId)) return;
+        if (reservation.status === 'cancelled' || reservation.attended === false) return;
+        const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
+        if (!ts || ts < since || ts > Date.now()) return;
+        hours += Number(reservation.duration || 0);
+      });
+      return Math.round(hours * 10) / 10;
+    };
 
-    const gig = gigsData.find((g) => (g._id || g.id) === selectedGigId);
-    const target = gig?.commission?.minimumVolume || gig?.commission?.bonusMinimumCalls || 25;
-    const bonusGross = gig?.commission?.bonusAmount || gig?.rewardBonus || 120;
-    const bonusRepShare = Math.round(bonusGross * 0.7 * 100) / 100;
+    const validatedCalls = countSince(startTs, 'calls');
+    const hoursToday = countSince(getPeriodStart('today'), 'hours');
+    const hoursWeek = countSince(getPeriodStart('week'), 'hours');
+    const hoursMonth = countSince(getPeriodStart('month'), 'hours');
+    const validatedTransactions = countSales(startTs);
 
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    let earned = 0;
+    sales.forEach((row) => {
+      if (!matchesGig(row.gigId)) return;
+      const ts = new Date(row.createdAt || 0).getTime();
+      if (!ts || ts < startTs) return;
+      if (row.status === 'earned') earned += row.repShare || 0;
+    });
 
-    const current = callsData.filter((c) => {
-      const cGigId = typeof c.gigId === 'object' ? (c.gigId?._id || c.gigId?.id) : c.gigId;
-      if (cGigId !== selectedGigId) return false;
-      const d = new Date(c.createdAt || c.startTime || 0).getTime();
-      return d >= monthStart.getTime();
-    }).length;
+    let bonusCurrent = 0;
+    let bonusTarget = 0;
+    let gigsTriggered = 0;
+    let gigsWithTarget = 0;
+    let bonusWindow: GoalsPeriod = 'month';
+    scopedGigs.forEach((gig) => {
+      const target = monthTransactions(gig.commission);
+      if (target <= 0) return;
+      gigsWithTarget += 1;
+      const periodKey = bonusPeriodKey(gig.commission);
+      bonusWindow = periodKey;
+      const current = countSales(getPeriodStart(periodKey), gig._id);
+      bonusTarget += target;
+      bonusCurrent += current;
+      if (current >= target) gigsTriggered += 1;
+    });
+    const bonusTriggered = gigsWithTarget > 0 && gigsTriggered === gigsWithTarget;
 
-    const progressPct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-    return {
-      label: gig?.title || t('dashboard.home.gigFallback'),
+    const pct = (current: number, target: number) =>
+      target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+    const labelGig = selectedGigId === 'all'
+      ? t('dashboard.home.allGigs')
+      : (gigsData.find((g) => g._id === selectedGigId)?.title || t('dashboard.home.gigFallback'));
+
+    const bar = (current: number, target: number) => ({
       current,
       target,
-      bonusAmount: bonusRepShare,
-      progressPct
+      progressPct: pct(current, target),
+      reached: target > 0 && current >= target,
+    });
+
+    const hoursForGig = (gigId: string, since: number) => {
+      let hours = 0;
+      reservationsData.forEach((reservation: any) => {
+        if (gigIdOf(reservation.gigId) !== gigId) return;
+        if (reservation.status === 'cancelled' || reservation.attended === false) return;
+        const ts = new Date(reservation.reservationDate || reservation.date || 0).getTime();
+        if (!ts || ts < since || ts > Date.now()) return;
+        hours += Number(reservation.duration || 0);
+      });
+      return Math.round(hours * 10) / 10;
     };
-  }, [selectedGigId, gigsData, callsData, t]);
+
+    const perGig = scopedGigs.map((gig) => {
+      const mins = hourMinimums(gig.availability);
+      const target = monthTransactions(gig.commission);
+      const period = bonusPeriodKey(gig.commission);
+      const current = countSales(getPeriodStart(period), gig._id);
+      const facing = getResolvedAgentFacing(gig.commission as any);
+      const amount = Number(facing?.bonusAmount || 0);
+      const gross = Number(gig.rewardBonus || 0);
+    return {
+        id: gig._id,
+        title: gig.title || t('dashboard.home.gigFallback'),
+        hours: {
+          daily: bar(hoursForGig(gig._id, getPeriodStart('today')), mins.daily),
+          weekly: bar(hoursForGig(gig._id, getPeriodStart('week')), mins.weekly),
+          monthly: bar(hoursForGig(gig._id, getPeriodStart('month')), mins.monthly),
+        },
+        bonus: {
+          current,
+          target,
+          period,
+          bonusAmount: amount > 0 ? amount : (gross > 0 ? Math.round(gross * 0.7 * 100) / 100 : 0),
+          triggered: target > 0 && current >= target,
+        },
+      };
+    });
+
+    return {
+      label: labelGig,
+      hours: {
+        daily: bar(hoursToday, hourTargets.daily),
+        weekly: bar(hoursWeek, hourTargets.weekly),
+        monthly: bar(hoursMonth, hourTargets.monthly),
+      },
+      transactions: { current: validatedTransactions },
+      calls: { current: validatedCalls },
+      bonus: {
+        current: bonusCurrent,
+        target: bonusTarget,
+        bonusAmount: Math.round(bonusAmount * 100) / 100,
+        progressPct: pct(bonusCurrent, bonusTarget),
+        triggered: bonusTriggered,
+        period: bonusWindow,
+        gigsTriggered,
+        gigsWithTarget,
+      },
+      perGig,
+      earned,
+    };
+  }, [callsData, reservationsData, repLedger, selectedGigId, gigsData, goalsPeriod, t]);
+
+  const simRows = useMemo(() => {
+    return gigsData
+      .filter((gig) => simGigs[gig._id])
+      .map((gig) => {
+        const entry = simGigs[gig._id];
+        const calls = Math.max(0, Math.round(Number(entry.calls) || 0));
+        const transactions = Math.min(calls, Math.max(0, Math.round(Number(entry.transactions) || 0)));
+        const callRate = agentCallAmount(gig.commission);
+        const txRate = agentTxAmount(gig.commission);
+        const bonusAmount = agentBonusAmount(gig.commission, gig.rewardBonus);
+        const bonusTarget = monthTransactions(gig.commission);
+        const bonusPeriod = bonusPeriodKey(gig.commission);
+        const bonusIncluded = bonusAmount > 0 && (bonusTarget <= 0 || transactions >= bonusTarget);
+        const callEarnings = calls * callRate;
+        const transactionEarnings = transactions * txRate;
+        const bonusEarnings = bonusIncluded ? bonusAmount : 0;
+        return {
+          id: gig._id,
+          title: gig.title || t('dashboard.home.gigFallback'),
+          calls,
+          transactions,
+          callRate,
+          txRate,
+          bonusAmount,
+          bonusTarget,
+          bonusPeriod,
+          bonusIncluded,
+          callEarnings,
+          transactionEarnings,
+          bonusEarnings,
+          total: callEarnings + transactionEarnings + bonusEarnings,
+        };
+      });
+  }, [gigsData, simGigs, t]);
+
+  const simTotal = simRows.reduce((sum, row) => sum + row.total, 0);
+
+  const repEarningsGoal = earningsGoals[goalsPeriod] || 0;
+  const repCallGoal = callGoals[goalsPeriod] || 0;
+  const repTxGoal = Math.min(transactionGoals[goalsPeriod] || 0, repCallGoal);
+  const earningsGoalProgress = repEarningsGoal > 0
+    ? Math.min(100, Math.round((goals.earned / repEarningsGoal) * 100))
+    : 0;
+  const callGoalProgress = repCallGoal > 0
+    ? Math.min(100, Math.round((goals.calls.current / repCallGoal) * 100))
+    : 0;
+  const txGoalProgress = repTxGoal > 0
+    ? Math.min(100, Math.round((goals.transactions.current / repTxGoal) * 100))
+    : 0;
+  const bonusPeriodLabel: Record<GoalsPeriod, string> = {
+    today: "aujourd'hui",
+    week: 'cette semaine',
+    month: 'ce mois',
+    quarter: 'ce trimestre',
+    year: 'cette année',
+  };
+
+  const qualityAlerts = useMemo(() => {
+    let fraud = 0;
+    let scoreSum = 0;
+    let scored = 0;
+    filteredCalls.forEach((call) => {
+      if (isCallFraudDetected(call)) fraud += 1;
+      const score = getDisplayOverallScore(call);
+      if (score != null) {
+        scoreSum += score;
+        scored += 1;
+      }
+    });
+    return {
+      fraud,
+      quality: scored > 0 ? Math.round(scoreSum / scored) : null,
+    };
+  }, [filteredCalls]);
+
+  // Last-minute cancel rate — same period as the shared dashboard filter
+  const cancelRate = useMemo(() => {
+    const gigTz =
+      selectedGigId !== 'all'
+        ? resolveIanaZone(gigsData.find((g) => g._id === selectedGigId)?.availability?.time_zone)
+        : null;
+    const todayYmd = toLocalYmd(Date.now());
+
+    const relevant = reservationsData.filter((r: any) => {
+      if (selectedGigId !== 'all') {
+        const rGigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
+        if (String(rGigId || '') !== String(selectedGigId)) return false;
+      }
+      const ymd = reservationYmd(r);
+      if (selectedPeriod === 'all') return true;
+      if (selectedPeriod === 'today') return ymd === todayYmd;
+      return isDateInPeriod(ymd, selectedPeriod as StatsPeriod);
+    });
+
+    if (relevant.length === 0) return null;
+
+    const lastMinute = relevant.filter((r: any) => {
+      if (String(r.status || '').toLowerCase() !== 'cancelled') return false;
+      const ymd = reservationYmd(r);
+      const start = String(r.startTime || '00:00').slice(0, 5);
+      const cancelledRaw = r.cancelledAt || r.canceledAt || r.updatedAt;
+      if (!cancelledRaw) return false;
+      const cancelledAt = new Date(cancelledRaw);
+      if (Number.isNaN(cancelledAt.getTime())) return false;
+
+      let slotStart: Date | null = null;
+      if (gigTz) slotStart = zonedWallTimeToUtc(ymd, start, gigTz);
+      if (!slotStart) slotStart = new Date(`${ymd}T${start}:00`);
+      if (!slotStart || Number.isNaN(slotStart.getTime())) return false;
+
+      const diffMs = slotStart.getTime() - cancelledAt.getTime();
+      return diffMs >= 0 && diffMs <= 2 * 60 * 60 * 1000;
+    }).length;
+
+    return Math.round((lastMinute / relevant.length) * 100);
+  }, [reservationsData, selectedGigId, gigsData, selectedPeriod]);
+
+  const goalsPeriodLabels: Record<GoalsPeriod, string> = {
+    today: t('dashboard.home.goals.periodDay'),
+    week: t('dashboard.home.goals.periodWeek'),
+    month: t('dashboard.home.goals.periodMonth'),
+    quarter: t('dashboard.home.goals.periodQuarter'),
+    year: t('dashboard.home.goals.periodYear'),
+  };
 
   const displayName = profile?.personalInfo?.name ? profile.personalInfo.name.split(' ')[0] : t('dashboard.home.defaultUser');
 
@@ -808,6 +1193,112 @@ export function Dashboard({ profile }: DashboardProps) {
     setPeriodDropdownPos(null);
   };
 
+  useEffect(() => {
+    if (!selectedGigId || selectedGigId === 'all') return;
+    setSimGigs((current) => (
+      current[selectedGigId] ? current : { ...current, [selectedGigId]: { calls: '', transactions: '' } }
+    ));
+  }, [selectedGigId]);
+
+  // Objectifs appels/transactions → alimentent automatiquement le simulateur
+  useEffect(() => {
+    const calls = callGoals[goalsPeriod] || 0;
+    const txs = Math.min(transactionGoals[goalsPeriod] || 0, calls);
+    if (calls <= 0 && txs <= 0) return;
+    if (gigsData.length === 0) return;
+
+    const preferredId =
+      (selectedGigId !== 'all' && gigsData.some((g) => g._id === selectedGigId) ? selectedGigId : null)
+      || (hoursGigId && gigsData.some((g) => g._id === hoursGigId) ? hoursGigId : null)
+      || gigsData[0]?._id
+      || null;
+    if (!preferredId) return;
+
+    setShowCalculator(true);
+    setSimGigs((current) => {
+      const ids = Object.keys(current).length > 0 ? Object.keys(current) : [preferredId];
+      const next: Record<string, { calls: string; transactions: string }> = { ...current };
+      ids.forEach((id) => {
+        next[id] = {
+          calls: calls > 0 ? String(calls) : '',
+          transactions: txs > 0 ? String(txs) : '',
+        };
+      });
+      if (!next[preferredId]) {
+        next[preferredId] = {
+          calls: calls > 0 ? String(calls) : '',
+          transactions: txs > 0 ? String(txs) : '',
+        };
+      }
+      return next;
+    });
+    // selectedGigId / hoursGigId / gigsData lus au moment du sync objectifs uniquement
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callGoals, transactionGoals, goalsPeriod, gigsData.length]);
+
+  const saveEarningsGoal = (raw: string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setEarningsGoals((current) => {
+      const next = { ...current, [goalsPeriod]: value };
+      localStorage.setItem('harx_earnings_goals', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const toggleSimGig = (id: string) => {
+    setSimGigs((current) => {
+      if (current[id]) {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      return { ...current, [id]: { calls: '', transactions: '' } };
+    });
+  };
+
+  const setSimField = (id: string, field: 'calls' | 'transactions', value: string) => {
+    setSimGigs((current) => {
+      const prev = current[id] || { calls: '', transactions: '' };
+      if (value.trim() === '') {
+        if (field === 'calls') return { ...current, [id]: { calls: '', transactions: '' } };
+        return { ...current, [id]: { ...prev, transactions: '' } };
+      }
+      const digits = Math.max(0, Math.round(Number(value) || 0));
+      if (field === 'calls') {
+        const typedTx = prev.transactions.trim() === '' ? 0 : Math.max(0, Math.round(Number(prev.transactions) || 0));
+        const nextTx = prev.transactions.trim() === '' ? '' : String(Math.min(typedTx, digits));
+        return { ...current, [id]: { calls: String(digits), transactions: nextTx } };
+      }
+      const callCap = Math.max(0, Math.round(Number(prev.calls) || 0));
+      return { ...current, [id]: { ...prev, transactions: String(Math.min(digits, callCap)) } };
+    });
+  };
+
+  const saveCountGoal = (kind: 'calls' | 'transactions', raw: string) => {
+    let value = Math.max(0, Math.round(Number(raw) || 0));
+    if (kind === 'transactions') value = Math.min(value, callGoals[goalsPeriod] || 0);
+    const apply = (current: CountGoals, storageKey: string, nextValue: number) => {
+      const next = { ...current, [goalsPeriod]: nextValue };
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    };
+    if (kind === 'calls') {
+      setCallGoals((current) => apply(current, 'harx_call_goals', value));
+      setTransactionGoals((current) => {
+        if ((current[goalsPeriod] || 0) <= value) return current;
+        return apply(current, 'harx_transaction_goals', value);
+      });
+    } else {
+      setTransactionGoals((current) => apply(current, 'harx_transaction_goals', value));
+    }
+  };
+
+  const goToProduction = () => {
+    const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+    if (gigId) persistActiveGigId(gigId);
+    navigate(withActiveGig('/workspace', gigId || undefined));
+  };
+
   const openGigDropdown = () => {
     if (!gigTriggerRef.current) return;
     closePeriodDropdown();
@@ -830,20 +1321,6 @@ export function Dashboard({ profile }: DashboardProps) {
   const togglePeriodDropdown = () => {
     if (isPeriodDropdownOpen) closePeriodDropdown();
     else openPeriodDropdown();
-  };
-
-  const openCallDetails = (call: any) => {
-    const callId = resolveCallRefId(call);
-    if (callId) setOverlayCallId(callId);
-  };
-
-  const openTransactionDetails = (tx: RepTransactionRow) => {
-    const callId = resolveTransactionCallId(tx);
-    if (callId) {
-      setOverlayCallId(callId);
-      return;
-    }
-    setSelectedTransaction(tx);
   };
 
   useLayoutEffect(() => {
@@ -878,33 +1355,44 @@ export function Dashboard({ profile }: DashboardProps) {
     };
   }, [isPeriodDropdownOpen]);
 
+  if (isCallCenterStaff()) {
+    return <CallCenterAgentHome displayName={displayName} />;
+  }
+
   return (
-    <div className="space-y-10 pb-10 animate-in fade-in duration-700">
+    <div ref={dashboardTopRef} className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden pb-8 animate-in fade-in duration-500 lg:gap-3 xl:gap-4 xl:pb-10 2xl:gap-5 2xl:pb-12 3xl:gap-6 3xl:pb-14 4xl:gap-8 4xl:pb-16">
       {/* Dynamic Filter Header */}
-      <div className="flex flex-col gap-4 bg-white/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-xl shadow-slate-200/10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-4 xl:gap-3 xl:px-5 xl:py-3.5 2xl:px-6 2xl:py-4">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 xl:gap-4">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:gap-x-4">
+          <div className="min-w-0">
+            <h1 className="break-words text-base font-black uppercase tracking-tight text-slate-800 sm:truncate sm:text-xl lg:text-2xl xl:text-2xl 2xl:text-3xl 3xl:text-4xl">
               {t('dashboard.home.greeting', { name: displayName })}
             </h1>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-              {t('dashboard.home.subtitle')}
-            </p>
           </div>
+          <button
+            type="button"
+            onClick={goToProduction}
+            className="harx-go-live group inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 sm:w-auto sm:self-start xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
+          >
+            <Rocket size={13} className="transition-transform group-hover:rotate-12 xl:h-4 xl:w-4 2xl:h-[18px] 2xl:w-[18px]" />
+            {t('dashboard.home.goLive.title')}
+            <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5 xl:h-4 xl:w-4" />
+          </button>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="relative flex items-center gap-2.5">
-              <Briefcase size={16} className="text-purple-600 animate-pulse" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.gigLabel')}</span>
-              <div className="relative w-full min-w-0 sm:min-w-[220px] sm:max-w-[320px]">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:ml-auto sm:w-auto sm:min-w-[280px] sm:max-w-[420px] sm:grid-cols-2 sm:gap-x-2 xl:max-w-[560px]">
+            <div className="relative flex min-w-0 items-center gap-1.5 sm:max-w-none xl:max-w-[300px] 2xl:max-w-[340px]">
+              <Briefcase size={14} className="shrink-0 text-slate-500 xl:h-4 xl:w-4" />
+              <div className="relative w-full min-w-0">
                 <button
                   ref={gigTriggerRef}
                   type="button"
                   onClick={toggleGigDropdown}
-                  className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-purple-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all duration-300"
+                  className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white/80 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm transition-all duration-300 hover:border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 xl:px-3.5 xl:py-2.5 xl:text-sm 2xl:text-base"
                 >
                   <span className="truncate text-left normal-case">{selectedGigLabel}</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isGigDropdownOpen ? 'rotate-180 text-purple-500' : ''}`} />
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-300 ${isGigDropdownOpen ? 'rotate-180 text-purple-500' : ''}`} />
                 </button>
 
                 {isGigDropdownOpen && gigDropdownPos && createPortal(
@@ -984,18 +1472,17 @@ export function Dashboard({ profile }: DashboardProps) {
               </div>
             </div>
 
-            <div className="relative flex items-center gap-2.5">
-              <CalendarDays size={16} className="text-blue-600" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.periodLabel')}</span>
-              <div className="relative w-full min-w-0 sm:min-w-[180px] sm:max-w-[240px]">
+            <div className="relative flex min-w-0 items-center gap-1.5 sm:max-w-none xl:max-w-[240px] 2xl:max-w-[280px]">
+              <CalendarDays size={14} className="shrink-0 text-blue-600 xl:h-4 xl:w-4" />
+              <div className="relative w-full min-w-0">
                 <button
                   ref={periodTriggerRef}
                   type="button"
                   onClick={togglePeriodDropdown}
-                  className="w-full flex items-center justify-between gap-2 bg-white/80 border border-slate-100 hover:border-blue-200 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-300"
+                  className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white/80 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm transition-all duration-300 hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 xl:px-3.5 xl:py-2.5 xl:text-sm 2xl:text-base"
                 >
                   <span className="truncate text-left">{selectedPeriodLabel}</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-300 ${isPeriodDropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-300 ${isPeriodDropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
                 </button>
 
                 {isPeriodDropdownOpen && periodDropdownPos && createPortal(
@@ -1047,836 +1534,724 @@ export function Dashboard({ profile }: DashboardProps) {
                   </>,
                   document.body
                 )}
-              </div>
             </div>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      {/* 1 · À faire aujourd'hui — pleine largeur */}
+      <div className="flex w-full min-w-0 flex-col gap-2.5 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:px-4 xl:flex-row xl:flex-wrap xl:items-center xl:gap-3 xl:px-5 xl:py-3.5 2xl:gap-4 2xl:px-6 2xl:py-4">
+        <div className="flex min-w-0 w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:flex-1 xl:gap-2.5">
+          <div className="flex shrink-0 items-center gap-1.5 xl:gap-2">
+            <ListChecks size={14} className="text-violet-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
+            <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">À faire aujourd'hui</h3>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <GraduationCap size={11} className="shrink-0 text-violet-600 xl:h-3.5 xl:w-3.5" />
+              Formations
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <BookOpen size={11} className="shrink-0 text-blue-600 xl:h-3.5 xl:w-3.5" />
+              Scripts
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-slate-700 xl:gap-1.5 xl:rounded-xl xl:px-3 xl:py-1.5 xl:text-xs 2xl:text-sm">
+              <FileText size={11} className="shrink-0 text-emerald-600 xl:h-3.5 xl:w-3.5" />
+              KB
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/academy')}
+              className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <GraduationCap size={11} className="xl:h-3.5 xl:w-3.5" />
+              Academy
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="hidden h-6 w-px shrink-0 bg-slate-200 xl:block xl:h-8" />
+        <div className="h-px w-full bg-slate-100 xl:hidden" />
+
+        <div className="flex min-w-0 w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:flex-1 xl:gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
+            <PhoneCall size={14} className="shrink-0 text-amber-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
+            <h3 className="shrink-0 text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">Rappels</h3>
+            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">Aucun rappel pour le moment</p>
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <button
+              type="button"
+              onClick={() => navigate('/workspace')}
+              className="harx-flash harx-flash--amber group inline-flex w-full items-center justify-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 sm:w-auto xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <PhoneCall size={11} className="xl:h-3.5 xl:w-3.5" />
+              Prospects
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/workspace?tab=calls')}
+              className="harx-flash harx-flash--slate group inline-flex w-full items-center justify-center gap-1 rounded-full bg-gradient-to-r from-slate-700 to-slate-900 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
+            >
+              <History size={11} className="xl:h-3.5 xl:w-3.5" />
+              {t('dashboard.home.sections.callHistory', 'Historique')}
+              <ChevronRight size={11} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Gains pipeline */}
-      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3">
-        {/* 1. Solde au début de la période */}
-        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm min-h-[118px] flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {earningsPipeline.periodStartTitle}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
-              <CalendarDays size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.periodStartBalance)} €
-          </p>
-          {earningsPipeline.periodStartDateLabel && (
-            <p className="text-[10px] text-slate-400 mt-auto pt-2">
-              {earningsPipeline.periodStartDateLabel}
-            </p>
-          )}
-        </div>
-
-        {/* 2. Solde disponible */}
-        <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/50 p-4 shadow-sm min-h-[118px] flex flex-col">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">
-              {t('dashboard.home.pipeline.availableBalance')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-              <WalletIcon size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-slate-900 tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.availableBalance)} €
-          </p>
-          <p className="text-[10px] font-semibold text-emerald-600 mt-auto pt-2">
-            {t('dashboard.home.pipeline.readyToWithdraw')}
-          </p>
-        </div>
-
-        {/* 3. Gains validés */}
-        <button
-          type="button"
-          onClick={focusValidatedEarnings}
-          disabled={earningsPipeline.validatedInPeriod === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            transactionFilter === 'earned'
-              ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-400/30'
-              : 'border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 hover:border-emerald-300 hover:shadow-md'
-          } ${earningsPipeline.validatedInPeriod === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaValidated')}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 leading-tight">
-              {t('dashboard.home.pipeline.validatedEarnings')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-              <ShieldCheck size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-emerald-700 tracking-tight mt-2">
-            +{fmtMoney(earningsPipeline.validatedInPeriod)} €
-          </p>
-          <p className="text-[10px] text-emerald-600/80 mt-auto pt-2 truncate">
-            {t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount })}
-            {' · '}
-            {t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount })}
-          </p>
-        </button>
-
-        {/* 4. Rétractation */}
-        <button
-          type="button"
-          onClick={focusRetractionTransactions}
-          disabled={earningsPipeline.retractionCount === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            transactionFilter === 'pending_retraction'
-              ? 'border-orange-400 bg-orange-50 ring-2 ring-orange-400/30'
-              : 'border-orange-200/60 bg-gradient-to-br from-white to-orange-50/40 hover:border-orange-300 hover:shadow-md'
-          } ${earningsPipeline.retractionCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaRetraction')}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700 leading-tight">
-              {t('dashboard.home.pipeline.retraction')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
-              <RotateCcw size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-orange-700 tracking-tight mt-2">
-            {earningsPipeline.retractionAmount > 0 ? '+' : ''}{fmtMoney(earningsPipeline.retractionAmount)} €
-          </p>
-          <p className="text-[10px] text-orange-600/80 mt-auto pt-2">
-            {earningsPipeline.retractionCount > 0
-              ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
-              : t('dashboard.home.pipeline.noSales')}
-          </p>
-        </button>
-
-        {/* 5. Validation client */}
-        <button
-          type="button"
-          onClick={focusClientValidationPending}
-          disabled={earningsPipeline.clientValidationCount === 0}
-          className={`rounded-2xl border p-4 shadow-sm min-h-[118px] flex flex-col text-left transition-all ${
-            callFilter === 'pending_client'
-              ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-400/30'
-              : 'border-amber-200/60 bg-gradient-to-br from-white to-amber-50/40 hover:border-amber-300 hover:shadow-md'
-          } ${earningsPipeline.clientValidationCount === 0 ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-          aria-label={t('dashboard.home.pipeline.ariaClientValidation')}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
-              {t('dashboard.home.pipeline.clientValidation')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-              <Building2 size={14} />
-            </div>
-          </div>
-          <p className="text-xl font-black text-amber-700 tracking-tight mt-2">
-            +{fmtMoney(earningsPipeline.clientValidationAmount)} €
-          </p>
-          <p className="text-[10px] text-amber-600/80 mt-auto pt-2">
-            {earningsPipeline.clientValidationCount > 0
-              ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
-              : t('dashboard.home.pipeline.nothingPending')}
-          </p>
-        </button>
-
-        {/* 6. Total période */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg min-h-[118px] flex flex-col relative overflow-hidden col-span-2 md:col-span-1">
-          <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/25 blur-2xl pointer-events-none" />
-          <div className="relative z-10 flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 leading-tight">
-              {t('dashboard.home.pipeline.periodTotal')}
-            </p>
-            <div className="h-8 w-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
-              <Trophy size={14} />
-            </div>
-          </div>
-          <p className="relative z-10 text-xl font-black text-white tracking-tight mt-2">
-            {fmtMoney(earningsPipeline.totalGains)} €
-          </p>
-        </div>
-      </div>
-
-      {/* Activité Récente — Transactions & Calls cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Transactions card */}
-        <div ref={transactionsSectionRef} className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col">
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                  <Receipt size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.transactions.title')}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    {t('dashboard.home.transactions.subtitle')}
-                  </p>
-                </div>
-              </div>
-              <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                {transactionStats.all.total.toFixed(2)} €
-              </span>
-            </div>
-
-            {/* Filter pills */}
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'all', label: t('dashboard.home.transactions.filterAll'), accent: 'slate', count: transactionStats.all.count },
-                { key: 'earned', label: t('dashboard.home.transactions.filterEarned'), accent: 'emerald', count: transactionStats.earned.count },
-                { key: 'pending_retraction', label: t('dashboard.home.transactions.filterRetraction'), accent: 'amber', count: transactionStats.pending_retraction.count },
-                { key: 'paid', label: t('dashboard.home.transactions.filterPaid'), accent: 'blue', count: transactionStats.paid.count },
-                { key: 'refused', label: t('dashboard.home.transactions.filterRefused'), accent: 'rose', count: transactionStats.refused.count },
-              ] as { key: TransactionFilter; label: string; accent: string; count: number }[]).map((tab) => {
-                const active = transactionFilter === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setTransactionFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                      active
-                        ? tab.accent === 'slate'
-                          ? 'bg-slate-900 text-white shadow-md'
-                          : tab.accent === 'emerald'
-                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                          : tab.accent === 'amber'
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                          : tab.accent === 'blue'
-                          ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
-                          : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'bg-white/60 text-slate-500 hover:bg-white hover:text-slate-800'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
-                      active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Transactions list */}
-          <div className="px-6 pb-6 flex-1">
-            {visibleTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                  <Inbox size={22} />
-                </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('dashboard.home.transactions.empty')}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{t('dashboard.home.transactions.emptyFilter')}</p>
-              </div>
-            ) : (
-              <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
-                {visibleTransactions.map((tx) => {
-                  const statusMeta =
-                    tx.status === 'earned'
-                      ? { label: t('dashboard.home.transactions.statusEarned'), cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
-                      : tx.status === 'paid'
-                      ? { label: t('dashboard.home.transactions.statusPaid'), cls: 'bg-blue-50 text-blue-700 border-blue-100' }
-                      : tx.status === 'pending_retraction'
-                      ? { label: t('dashboard.home.transactions.statusRetraction'), cls: 'bg-amber-50 text-amber-800 border-amber-200' }
-                      : { label: t('dashboard.home.transactions.statusRefused'), cls: 'bg-rose-50 text-rose-700 border-rose-100' };
-                  const typeLabel =
-                    tx.type === 'call_validated' ? t('dashboard.home.transactions.typeCallValidated')
-                    : tx.type === 'transaction' ? t('dashboard.home.transactions.typeSale')
-                    : t('dashboard.home.transactions.typeBonus');
-                  const gigTitle = tx.gig?.title || (gigsData.find((g: any) => (g._id || g.id) === tx.gigId)?.title) || t('dashboard.home.gigFallback');
-                  return (
-                    <li key={tx._id}>
-                      <button
-                        type="button"
-                        onClick={() => openTransactionDetails(tx)}
-                        className={clickableRowClass}
-                        aria-label={t('dashboard.home.transactions.ariaView', { type: typeLabel })}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                            <DollarSign size={16} />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-slate-900 truncate">{typeLabel} · {gigTitle}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              {new Date(tx.createdAt).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${statusMeta.cls}`}>
-                            {statusMeta.label}
-                          </span>
-                          <span className="text-sm font-black text-slate-900 tracking-tighter">
-                            +{(tx.repShare || 0).toFixed(2)} €
-                          </span>
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0" />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Calls card */}
-        <div
-          ref={callsSectionRef}
-          className={`bg-white/50 backdrop-blur-xl border rounded-[28px] shadow-xl shadow-slate-200/20 overflow-hidden flex flex-col transition-all ${
-            callFilter === 'pending_client'
-              ? 'border-amber-300 ring-2 ring-amber-200/80'
-              : 'border-white/60'
-          }`}
-        >
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                  <Phone size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.callsSection.title')}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    {callFilter === 'pending_client'
-                      ? t('dashboard.home.callsSection.subtitlePending')
-                      : t('dashboard.home.callsSection.subtitle')}
-                  </p>
-                </div>
-              </div>
-              <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                {t('dashboard.home.callsSection.count', { count: callStats.all })}
-              </span>
-            </div>
-
-            {/* Filter pills */}
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'all', label: t('dashboard.home.callsSection.filterAll'), accent: 'slate', count: callStats.all },
-                { key: 'valid', label: t('dashboard.home.callsSection.filterValid'), accent: 'emerald', count: callStats.valid },
-                { key: 'invalid', label: t('dashboard.home.callsSection.filterInvalid'), accent: 'rose', count: callStats.invalid },
-                { key: 'pending_client', label: t('dashboard.home.callsSection.filterPending'), accent: 'amber', count: callStats.pending_client },
-              ] as { key: CallFilter; label: string; accent: string; count: number }[]).map((tab) => {
-                const active = callFilter === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setCallFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                      active
-                        ? tab.accent === 'slate'
-                          ? 'bg-slate-900 text-white shadow-md'
-                          : tab.accent === 'emerald'
-                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                          : tab.accent === 'amber'
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                          : 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'bg-white/60 text-slate-500 hover:bg-white hover:text-slate-800'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
-                      active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Calls list */}
-          <div className="px-6 pb-6 flex-1">
-            {visibleCalls.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                  <Inbox size={22} />
-                </div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  {callFilter === 'pending_client'
-                    ? t('dashboard.home.callsSection.emptyPending')
-                    : t('dashboard.home.callsSection.empty')}
+      {/* 2 · Finance — grille responsive (titres toujours lisibles) */}
+      <section className="w-full min-w-0" aria-label={t('dashboard.home.sections.finance', 'Finance')}>
+        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-4 2xl:grid-cols-8 2xl:gap-3 3xl:gap-4">
+          {([
+            {
+              key: 'periodStart',
+              title: earningsPipeline.periodStartTitle,
+              icon: <CalendarDays size={14} className="text-slate-400" />,
+              value: `${fmtMoney(earningsPipeline.periodStartBalance)} €`,
+              valueClass: 'text-slate-800',
+              hint: earningsPipeline.periodStartDateLabel || '',
+              hintClass: 'text-slate-400',
+              cardClass: 'border-slate-200 bg-white',
+            },
+            {
+              key: 'available',
+              title: t('dashboard.home.pipeline.availableBalance'),
+              icon: <WalletIcon size={14} className="text-emerald-500" />,
+              value: `${fmtMoney(earningsPipeline.availableBalance)} €`,
+              valueClass: 'text-slate-800',
+              hint: t('dashboard.home.pipeline.readyToWithdraw'),
+              hintClass: 'font-semibold text-emerald-600',
+              cardClass: 'border-emerald-100 bg-white',
+            },
+            {
+              key: 'validated',
+              title: t('dashboard.home.pipeline.validatedEarnings'),
+              icon: <ShieldCheck size={14} className="text-emerald-500" />,
+              value: `+${fmtMoney(earningsPipeline.validatedInPeriod)} €`,
+              valueClass: 'text-emerald-700',
+              hint: `${t('dashboard.home.pipeline.calls', { count: earningsPipeline.validatedCallsCount || 0 })} · ${t('dashboard.home.pipeline.sales', { count: earningsPipeline.validatedSalesCount || 0 })}`,
+              hintClass: 'text-emerald-600/80',
+              cardClass: 'border-emerald-100 bg-white',
+            },
+            {
+              key: 'retraction',
+              title: t('dashboard.home.pipeline.retraction'),
+              icon: <RotateCcw size={14} className="text-orange-500" />,
+              value: `${earningsPipeline.retractionAmount > 0 ? '+' : ''}${fmtMoney(earningsPipeline.retractionAmount)} €`,
+              valueClass: 'text-orange-700',
+              hint: earningsPipeline.retractionCount > 0
+                ? t('dashboard.home.pipeline.salesRetraction', { count: earningsPipeline.retractionCount })
+                : t('dashboard.home.pipeline.noSales'),
+              hintClass: 'text-orange-600/80',
+              cardClass: 'border-orange-100 bg-white',
+            },
+            {
+              key: 'clientValidation',
+              title: t('dashboard.home.pipeline.clientValidation'),
+              icon: <Building2 size={14} className="text-amber-500" />,
+              value: `+${fmtMoney(earningsPipeline.clientValidationAmount)} €`,
+              valueClass: 'text-amber-700',
+              hint: earningsPipeline.clientValidationCount > 0
+                ? t('dashboard.home.pipeline.pendingCount', { count: earningsPipeline.clientValidationCount })
+                : t('dashboard.home.pipeline.nothingPending'),
+              hintClass: 'text-amber-600/80',
+              cardClass: 'border-amber-100 bg-white',
+            },
+            {
+              key: 'fraud',
+              title: 'Fraude',
+              icon: <ShieldAlert size={14} className={qualityAlerts.fraud > 0 ? 'text-rose-600' : 'text-emerald-500'} />,
+              value: String(qualityAlerts.fraud),
+              valueClass: qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-emerald-600',
+              hint: '',
+              hintClass: '',
+              cardClass: qualityAlerts.fraud > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white',
+            },
+            {
+              key: 'quality',
+              title: 'Score qualité',
+              icon: <Award size={14} className="text-indigo-500" />,
+              value: qualityAlerts.quality == null ? '—' : String(qualityAlerts.quality),
+              valueClass: 'text-indigo-600',
+              hint: '',
+              hintClass: '',
+              cardClass: 'border-slate-200 bg-white',
+            },
+            {
+              key: 'periodTotal',
+              title: t('dashboard.home.pipeline.periodTotal'),
+              icon: <Trophy size={14} className="text-amber-300" />,
+              value: `${fmtMoney(earningsPipeline.totalGains)} €`,
+              valueClass: 'text-white',
+              hint: '',
+              hintClass: '',
+              cardClass: 'border-slate-700 bg-slate-800',
+            },
+          ] as const).map((card) => (
+            <div
+              key={card.key}
+              className={`relative flex min-w-0 flex-col rounded-xl border p-2.5 shadow-sm sm:p-3 xl:rounded-2xl xl:p-3.5 2xl:p-4 ${card.cardClass}`}
+            >
+              <div className="mb-1.5 flex items-start gap-2 pr-1">
+                <p className={`min-w-0 flex-1 whitespace-normal break-words text-[10px] font-bold uppercase leading-tight tracking-wide sm:text-[11px] xl:text-xs 2xl:text-sm ${
+                  card.key === 'periodTotal' ? 'text-slate-300' : card.key === 'validated' ? 'text-emerald-700' : card.key === 'retraction' ? 'text-orange-700' : card.key === 'clientValidation' ? 'text-amber-700' : card.key === 'fraud' && qualityAlerts.fraud > 0 ? 'text-rose-700' : 'text-slate-500'
+                }`}>
+                  {card.title}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {callFilter === 'pending_client'
-                    ? t('dashboard.home.callsSection.emptyPendingDetail')
-                    : t('dashboard.home.callsSection.emptyFilter')}
+                <span className="mt-0.5 shrink-0 opacity-90">{card.icon}</span>
+              </div>
+              <p className={`whitespace-normal break-words text-base font-black tracking-tight leading-none sm:text-lg xl:text-xl 2xl:text-2xl 3xl:text-3xl ${card.valueClass}`}>
+                {card.value}
+              </p>
+              {card.hint ? (
+                <p className={`mt-1 whitespace-normal break-words text-[9px] leading-snug sm:text-[10px] xl:text-[11px] ${card.hintClass}`}>
+                  {card.hint}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3 · Réservations 2/3 + Classement 1/3 */}
+      <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-2 xl:grid-cols-3 xl:gap-4 2xl:gap-5 3xl:gap-6 xl:min-h-[min(36vh,420px)] 2xl:min-h-[min(40vh,500px)] 3xl:min-h-[min(44vh,580px)]">
+        <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-2 xl:p-4 2xl:p-5 3xl:p-6">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" />
+          <div className="relative z-10 mb-1.5 flex flex-wrap items-center justify-between gap-2 xl:mb-3">
+            <div className="flex min-w-0 items-center gap-2 xl:gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 xl:h-10 xl:w-10 2xl:h-11 2xl:w-11">
+                <CalendarCheck size={15} className="xl:h-[18px] xl:w-[18px] 2xl:h-5 2xl:w-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-black uppercase tracking-tight text-slate-800 xl:text-base 2xl:text-lg">{t('dashboard.home.reservations.title')}</h3>
+              </div>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 xl:text-[11px] 2xl:text-xs">
+              {t('dashboard.home.reservations.count', {
+                count: reservationStats.total,
+                period: selectedPeriod === 'all'
+                  ? t('dashboard.home.reservations.countPeriodAll')
+                  : selectedPeriodLabel,
+              })}
+            </span>
+          </div>
+
+          <div className="relative z-10 mt-auto grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:gap-2.5 2xl:gap-3 3xl:gap-4">
+            <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.total')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-900 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.total}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-blue-500/80 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.upcoming')}</span>
+              <span className="text-lg font-black tracking-tighter text-blue-600 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.upcoming}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-emerald-600/80 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.completed')}</span>
+              <span className="text-lg font-black tracking-tighter text-emerald-600 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.completed}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-rose-500/80 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.missed')}</span>
+              <span className="text-lg font-black tracking-tighter text-rose-600 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.noShow}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-amber-600/80 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.hoursWorked')}</span>
+              <span className="text-lg font-black tracking-tighter text-amber-600 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.workedHours}h</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <span className="truncate text-[8px] font-black uppercase tracking-widest text-slate-400 xl:text-[10px] 2xl:text-[11px]">{t('dashboard.home.reservations.attendance')}</span>
+              <span className="text-lg font-black tracking-tighter text-slate-800 leading-none xl:mt-1 xl:text-2xl 2xl:text-3xl">{reservationStats.attendanceRate == null ? '—' : `${reservationStats.attendanceRate}%`}</span>
+            </div>
+            <div className="col-span-2 flex min-w-0 flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:col-span-3 md:col-span-2 xl:gap-1.5 xl:rounded-2xl xl:px-3.5 xl:py-3">
+              <div className="flex items-center gap-1.5">
+                <Ban size={11} className="shrink-0 text-slate-500 xl:h-3.5 xl:w-3.5" />
+                <p className="min-w-0 truncate text-[8px] font-black uppercase tracking-widest text-slate-400 xl:text-[10px] 2xl:text-[11px]">{t('sessionPlanning.lastMinuteCancel', 'Taux d\'annulation')}</p>
+                <p className="ml-auto shrink-0 text-sm font-black tracking-tight text-slate-800 leading-none xl:text-lg 2xl:text-xl">
+                  {cancelRate == null ? '—' : `${cancelRate}%`}
                 </p>
               </div>
-            ) : (
-              <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
-                {visibleCalls.map((call: any) => {
-                  const isValid = call.valid === true || call.validByAI === true;
-                  const contact = (call.lead?.First_Name || call.lead?.Last_Name)
-                    ? `${call.lead.First_Name || ''} ${call.lead.Last_Name || ''}`.trim()
-                    : (call.lead?.name || call.contactName || call.to || call.from || call.phoneNumber || t('dashboard.home.callsSection.unknownContact'));
-                  const phoneNum = call.lead?.phone || call.lead?.Phone || call.to || call.from || call.phoneNumber;
-                  const hasLeadName = !!(call.lead?.First_Name || call.lead?.Last_Name || call.lead?.name);
-                  const durationSec = Number(call.duration || 0);
-                  const billedMin = billedMinutesFromSeconds(durationSec);
-                  const dateStr = call.startTime || call.createdAt;
-                  const cGigId = typeof call.gigId === 'object' ? (call.gigId?._id || call.gigId?.id) : call.gigId;
-                  const gigTitle = (typeof call.gigId === 'object' && call.gigId?.title) || (gigsData.find((g: any) => (g._id || g.id) === cGigId)?.title) || '';
-                  const callId = resolveCallRefId(call);
-                  const isPendingClient = callId
-                    ? earningsPipeline.pendingClientValidationCallIds.has(callId)
-                    : false;
-                  const ledgerTxStatus = callId ? repSaleLedgerByCallId.get(callId)?.status ?? null : null;
-                  const inRetraction = isTransactionInRetraction(call, ledgerTxStatus);
-                  const txCommission = resolveTransactionRepCommission(call);
-                  return (
-                    <li key={call._id || call.sid || `${contact}-${dateStr}`}>
-                      <button
-                        type="button"
-                        onClick={() => openCallDetails(call)}
-                        className={clickableCallRowClass}
-                        aria-label={t('dashboard.home.callsSection.ariaView', { contact })}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
-                            isValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                          }`}>
-                            {isValid ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-slate-900 truncate flex items-center gap-2">
-                              <span>{contact}</span>
-                              {hasLeadName && phoneNum && (
-                                <span className="text-[11px] font-normal text-slate-400">({phoneNum})</span>
-                              )}
-                            </p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                              {dateStr ? new Date(dateStr).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' }) : '—'}
-                              {billedMin > 0 && ` · ${billedMin} min`}
-                              {gigTitle && ` · ${gigTitle}`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {inRetraction && (
-                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-800 border-amber-200 inline-flex items-center gap-1">
-                              <RotateCcw size={10} />
-                              {t('dashboard.home.callsSection.retractionBadge', { amount: txCommission.toFixed(2) })}
-                            </span>
-                          )}
-                          {callFilter === 'pending_client' || isPendingClient ? (
-                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                              {t('dashboard.home.callsSection.pendingSale')}
-                            </span>
-                          ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border ${
-                              isValid
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : 'bg-rose-50 text-rose-700 border-rose-100'
-                            }`}>
-                              {isValid ? t('dashboard.home.callsSection.validated') : t('dashboard.home.callsSection.notValidated')}
-                            </span>
-                          )}
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+              <div className="flex flex-wrap gap-0.5 xl:gap-1">
+                {(['week', 'month', 'quarter', 'year'] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedPeriod(key)}
+                    className={`rounded px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider transition xl:rounded-md xl:px-2.5 xl:py-1 xl:text-[10px] 2xl:text-[11px] ${
+                      selectedPeriod === key ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {key === 'week' ? 'Sem.' : key === 'month' ? 'Mois' : key === 'quarter' ? 'Trim.' : 'Année'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
+          <div className="relative z-10 mt-1.5 xl:mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                const gigId = selectedGigId !== 'all' ? selectedGigId : '';
+                navigate(gigId ? `/session-planning?gigId=${encodeURIComponent(String(gigId))}` : '/session-planning');
+              }}
+              className="harx-flash harx-flash--cyan group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
+            >
+              <CalendarCheck size={12} className="xl:h-3.5 xl:w-3.5 2xl:h-4 2xl:w-4" />
+              {t('dashboard.home.reservations.book')}
+              <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5 xl:h-3.5 xl:w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-amber-100 bg-white p-2 shadow-sm sm:p-2.5 xl:col-span-1 xl:p-4 2xl:p-5 3xl:p-6">
+          <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-amber-200/40 blur-3xl" />
+          <div className="relative z-10 mb-1 flex flex-wrap items-center justify-between gap-2 xl:mb-3">
+            <div className="flex items-center gap-2 xl:gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 xl:h-10 xl:w-10 2xl:h-11 2xl:w-11 3xl:h-12 3xl:w-12">
+                <Medal size={15} className="xl:h-[18px] xl:w-[18px] 2xl:h-5 2xl:w-5 3xl:h-6 3xl:w-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800 xl:text-base 2xl:text-lg 3xl:text-xl">Classement des gains</h3>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 xl:text-[11px] 2xl:text-xs 3xl:text-sm">
+                  {selectedGigId === 'all' ? 'Sélectionnez un GIG' : selectedGigLabel}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="relative z-10 min-h-[2.5rem] flex-1 xl:min-h-[4rem] 2xl:min-h-[5rem] 3xl:min-h-[6rem]" aria-hidden={true} />
         </div>
       </div>
 
-      {/* Reservations / Travail planifié */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center">
-              <CalendarCheck size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.reservations.title')}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {t('dashboard.home.reservations.subtitle')}
-              </p>
-            </div>
-          </div>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            {t('dashboard.home.reservations.count', { count: reservationStats.total })}
-          </span>
-        </div>
+      {/* 4 · Objectifs — pleine largeur */}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.total')}</span>
-              <CalendarDays size={16} className="text-slate-500" />
-            </div>
-            <span className="text-2xl font-black text-slate-900 tracking-tighter">{reservationStats.total}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.sessions')}</p>
-          </div>
+      <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-2.5 xl:p-4 2xl:p-5 3xl:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
 
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.upcoming')}</span>
-              <CalendarClock size={16} className="text-blue-500" />
-            </div>
-            <span className="text-2xl font-black text-blue-600 tracking-tighter">{reservationStats.upcoming}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.scheduled')}</p>
-          </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.completed')}</span>
-              <CheckCircle2 size={16} className="text-emerald-500" />
-            </div>
-            <span className="text-2xl font-black text-emerald-600 tracking-tighter">{reservationStats.completed}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.honored')}</p>
-          </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.missed')}</span>
-              <CalendarX size={16} className="text-rose-500" />
-            </div>
-            <span className="text-2xl font-black text-rose-600 tracking-tighter">{reservationStats.noShow + reservationStats.cancelled}</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">
-              {t('dashboard.home.reservations.missedDetail', { cancelled: reservationStats.cancelled, noShow: reservationStats.noShow })}
-            </p>
-          </div>
-
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-5 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.reservations.hoursWorked')}</span>
-              <Timer size={16} className="text-amber-500" />
-            </div>
-            <span className="text-2xl font-black text-amber-600 tracking-tighter">{reservationStats.workedHours}h</span>
-            <p className="text-[10px] font-bold text-slate-500 mt-1">{t('dashboard.home.reservations.hoursScheduled', { hours: reservationStats.scheduledHours })}</p>
-          </div>
-
-          <div className="bg-slate-950 text-white border border-slate-800 rounded-[24px] p-5 shadow-xl shadow-slate-900/30 relative overflow-hidden">
-            <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-harx-500/30 blur-2xl" />
-            <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">{t('dashboard.home.reservations.attendance')}</span>
-              <Award size={16} className="text-harx-400" />
-            </div>
-            <span className="text-2xl font-black tracking-tighter relative z-10">{reservationStats.attendanceRate}%</span>
-            <p className="text-[10px] font-bold text-white/60 mt-1 relative z-10">{t('dashboard.home.reservations.attendanceRate')}</p>
-          </div>
-        </div>
-
-        {/* Upcoming reservations list */}
-        {upcomingReservations.length > 0 && (
-          <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[24px] p-6 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.reservations.upcomingSessions')}</h3>
-              <Clock size={14} className="text-slate-400" />
-            </div>
-            <ul className="space-y-2.5">
-              {upcomingReservations.map((r: any) => {
-                const dateStr = r.reservationDate || r.date;
-                const d = new Date(dateStr);
-                const gigTitle = typeof r.gigId === 'object' ? (r.gigId?.title || t('dashboard.home.gigFallback')) : (gigsData.find((g: any) => (g._id || g.id) === r.gigId)?.title || t('dashboard.home.gigFallback'));
-                return (
-                  <li key={r._id || `${r.gigId}-${dateStr}-${r.startTime}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const gigId = typeof r.gigId === 'object' ? (r.gigId?._id || r.gigId?.id) : r.gigId;
-                        if (gigId) navigate(`/session-planning?gigId=${encodeURIComponent(String(gigId))}`);
-                      }}
-                      className="group w-full text-left flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/60 border border-white/60 hover:border-violet-200 hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/20 active:scale-[0.99]"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                          <CalendarClock size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate">{gigTitle}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {d.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: 'short' })} · {r.startTime}–{r.endTime}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                          {r.duration}h
-                        </span>
-                        <ChevronRight size={14} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Multi-objectifs */}
-      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-8 overflow-hidden relative">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <Target size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">{t('dashboard.home.goals.title')}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {t('dashboard.home.goals.subtitle')}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* Daily objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone size={14} className="text-cyan-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.dailyTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.daily.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.daily.current}<span className="text-base text-slate-400">/{multiObjectifs.daily.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.dailyLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.daily.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-cyan-400 to-cyan-600'
-                }`}
-                style={{ width: `${multiObjectifs.daily.progressPct}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Weekly objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={14} className="text-indigo-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.weeklyTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.weekly.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.weekly.current}<span className="text-base text-slate-400">/{multiObjectifs.weekly.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.weeklyLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.weekly.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-indigo-400 to-indigo-600'
-                }`}
-                style={{ width: `${multiObjectifs.weekly.progressPct}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Reservations objective */}
-          <div className="bg-white/60 border border-white/60 rounded-[24px] p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarCheck size={14} className="text-violet-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.sessionsTitle')}</span>
-              </div>
-              <span className="text-[10px] font-black text-slate-700">{multiObjectifs.reservationsWeekly.progressPct}%</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-slate-900 tracking-tighter">
-                {multiObjectifs.reservationsWeekly.current}<span className="text-base text-slate-400">/{multiObjectifs.reservationsWeekly.target}</span>
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{t('dashboard.home.goals.sessionsLabel')}</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-700 ease-out rounded-full ${
-                  multiObjectifs.reservationsWeekly.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-violet-400 to-violet-600'
-                }`}
-                style={{ width: `${multiObjectifs.reservationsWeekly.progressPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Objectif gig */}
-      <div className="bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-xl shadow-slate-200/20 p-8 overflow-hidden relative">
-        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-harx-500/10 blur-3xl -mr-24 -mt-24" />
-        <div className="flex items-start justify-between gap-6 flex-wrap relative z-10">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
-              <Target size={22} />
+        {/* Header */}
+        <div className={`relative z-10 flex flex-wrap items-center justify-between gap-2 ${goalsOpen ? 'mb-2 xl:mb-3' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setGoalsOpen((open) => !open)}
+            className="flex min-w-0 items-center gap-2 text-left xl:gap-3"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-sm shadow-violet-300/50 xl:h-10 xl:w-10 2xl:h-11 2xl:w-11">
+              <Target size={15} className="xl:h-[18px] xl:w-[18px] 2xl:h-5 2xl:w-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">{t('dashboard.home.gigGoal.title')}</h3>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 truncate">
-                {objectif.label}
+              <h2 className="text-sm font-black uppercase tracking-tight text-slate-800 xl:text-base 2xl:text-lg">{t('dashboard.home.goals.title')}</h2>
+              <p className="truncate text-[9px] font-bold uppercase tracking-widest text-violet-500 xl:text-[11px] 2xl:text-xs">
+                {goals.label}
               </p>
             </div>
-          </div>
-
-          {objectif.target > 0 ? (
-            <div className="text-right shrink-0">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                {t('dashboard.home.gigGoal.bonusUnlock')}
+            <span className="relative inline-flex h-7 w-7 shrink-0 items-center justify-center xl:h-8 xl:w-8">
+              {!goalsOpen && (
+                <span className="absolute inset-0 rounded-full bg-violet-400/60 motion-reduce:hidden animate-ping" />
+              )}
+              <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white ring-2 ring-violet-100 xl:h-8 xl:w-8">
+                <ChevronDown size={14} className={`transition-transform duration-300 xl:h-4 xl:w-4 ${goalsOpen ? 'rotate-180' : ''}`} />
               </span>
-              <span className="text-2xl font-black text-emerald-600 tracking-tighter block mt-1 flex items-center justify-end gap-1.5">
-                <Flame size={18} className="text-emerald-500" />
-                +{objectif.bonusAmount.toFixed(2)} €
-              </span>
-            </div>
-          ) : (
-            <span className="text-[10px] font-bold text-slate-400 italic">
-              {t('dashboard.home.gigGoal.selectGig')}
             </span>
-          )}
+          </button>
+          {/* Sélecteur période */}
+          <div className="flex shrink-0 flex-wrap gap-0.5 xl:gap-1.5">
+            {(GOALS_PERIODS as GoalsPeriod[]).map((key) => {
+              const periodTone: Record<GoalsPeriod, { on: string; off: string }> = {
+                today: {
+                  on: 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm shadow-sky-300/60',
+                  off: 'bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-100',
+                },
+                week: {
+                  on: 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm shadow-violet-300/60',
+                  off: 'bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-100',
+                },
+                month: {
+                  on: 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-300/60',
+                  off: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100',
+                },
+                quarter: {
+                  on: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm shadow-amber-300/60',
+                  off: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100',
+                },
+                year: {
+                  on: 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-sm shadow-rose-300/60',
+                  off: 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100',
+                },
+              };
+              const tone = periodTone[key];
+              return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedPeriod(key)}
+                className={`rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-wider transition xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs ${
+                  selectedPeriod === key ? tone.on : tone.off
+                }`}
+              >
+                {goalsPeriodLabels[key]}
+              </button>
+              );
+            })}
+          </div>
         </div>
 
-        {objectif.target > 0 && (
-          <div className="mt-6 space-y-3 relative z-10">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-600">
-                <span className="text-slate-900 text-base font-black">{objectif.current}</span>
-                {' '}/{' '}
-                <span>{objectif.target}</span>
-                {' '}{t('dashboard.home.gigGoal.validatedCalls')}
-              </span>
-              <span className="font-black text-slate-900">{objectif.progressPct}%</span>
+        {goalsOpen && (
+        <div className="relative z-10 space-y-3 xl:space-y-4 2xl:space-y-5">
+
+          {/* Consigne claire — 3 étapes */}
+          <div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-violet-50 p-3.5 shadow-sm xl:p-5 2xl:p-6">
+            <p className="text-[10px] font-black text-cyan-700 uppercase tracking-[0.18em] mb-2 xl:mb-3 xl:text-xs 2xl:text-sm">
+              {t('dashboard.home.goals.howtoTitle')}
+            </p>
+            <ol className="grid gap-2 sm:grid-cols-3 xl:gap-3">
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2 xl:rounded-2xl xl:px-4 xl:py-3">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5 xl:mb-1 xl:text-xs">1 · {t('dashboard.home.goals.step1Title', 'Objectifs')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug xl:text-sm 2xl:text-base">{t('dashboard.home.goals.step1Body', 'À gauche : fixez appels, transactions et gains avec le crayon.')}</p>
+              </li>
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2 xl:rounded-2xl xl:px-4 xl:py-3">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5 xl:mb-1 xl:text-xs">2 · {t('dashboard.home.goals.step2Title', 'Simulateur')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug xl:text-sm 2xl:text-base">{t('dashboard.home.goals.step2Body', 'À droite : estimez ce que vous gagnez si vous atteignez ces volumes.')}</p>
+              </li>
+              <li className="rounded-xl border border-cyan-100 bg-white/80 px-3 py-2 xl:rounded-2xl xl:px-4 xl:py-3">
+                <p className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-0.5 xl:mb-1 xl:text-xs">3 · {t('dashboard.home.goals.step3Title', 'Heures GIG')}</p>
+                <p className="text-[12px] font-semibold text-slate-700 leading-snug xl:text-sm 2xl:text-base">{t('dashboard.home.goals.step3Body', 'En haut : respectez le minimum d’heures du GIG pour rester conforme.')}</p>
+              </li>
+            </ol>
+          </div>
+
+          <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">{t('dashboard.home.goals.hoursMinLabel')}</p>
+
+          {selectedGigId === 'all' ? (
+            <div className="space-y-3">
+              <p className="text-[12px] font-bold text-slate-600 leading-snug">
+                Chaque GIG a ses propres heures et son propre bonus. Les objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
+              </p>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setHoursMenuOpen((open) => !open)}
+                  className="w-full flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+                >
+                  <span className="text-[12px] font-black text-slate-900 truncate">
+                    {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || 'Choisir un GIG'}
+                      </span>
+                  <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {hoursMenuOpen && (
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    {goals.perGig.map((gig) => (
+                      <button
+                        key={gig.id}
+                        type="button"
+                        onClick={() => { setHoursGigId(gig.id); setHoursMenuOpen(false); }}
+                        className={`w-full px-3 py-2.5 text-left text-[12px] font-bold truncate transition ${gig.id === hoursGigId ? 'bg-slate-800 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        {gig.title}
+                      </button>
+                    ))}
+                </div>
+              )}
+                    </div>
+              {goals.perGig.filter((gig) => gig.id === hoursGigId).map((gig) => (
+                <div key={gig.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {([
+                    { label: 'Jour', row: gig.hours.daily },
+                    { label: 'Semaine', row: gig.hours.weekly },
+                    { label: 'Mois', row: gig.hours.monthly },
+                  ] as const).map(({ label, row }) => (
+                    <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-2.5 py-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+                      <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-600' : 'text-slate-900'}`}>
+                        {row.target > 0 ? `${row.current}h / ${row.target}h` : `${row.current}h · pas de minimum`}
+                      </span>
+                    </div>
+                  ))}
+                  </div>
+                  <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-600' : 'text-slate-500'}`}>
+                    {gig.bonus.triggered
+                      ? `Bonus déclenché · +${gig.bonus.bonusAmount.toFixed(2)} €`
+                      : gig.bonus.target > 0
+                        ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
+                        : 'Pas de bonus sur ce GIG'}
+                  </p>
+                  </div>
+              ))}
+                  </div>
+          ) : (
+          <>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {([
+            { label: 'Quotidien', row: goals.hours.daily },
+            { label: 'Semaine', row: goals.hours.weekly },
+            { label: 'Mois', row: goals.hours.monthly },
+          ] as const).map(({ label, row }) => (
+            <div key={label} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarCheck size={13} className="text-violet-400 shrink-0" />
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                <span className="text-slate-900 font-black tracking-tighter">
+                    {row.current}h<span className="text-slate-400 font-bold text-sm">{row.target > 0 ? `/${row.target}h` : ''}</span>
+                </span>
+                  <span className={`text-[10px] font-black min-w-[32px] text-right ${row.reached ? 'text-emerald-600' : 'text-slate-500'}`}>
+                    {row.target > 0 ? `${row.progressPct}%` : '—'}
+                </span>
+              </div>
             </div>
-            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${row.reached ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-violet-500'}`} style={{ width: `${row.progressPct}%` }} />
+            </div>
+          </div>
+          ))}
+          </div>
+
+          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Flame size={13} className={goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-400'} />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('dashboard.home.goals.bonusTitle')}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-emerald-300 font-black tracking-tight">
+                  {goals.bonus.bonusAmount > 0 ? `+${goals.bonus.bonusAmount.toFixed(2)} €` : '—'}
+                </span>
+                <span className={`text-[10px] font-black min-w-[32px] text-right ${goals.bonus.triggered ? 'text-emerald-400' : 'text-orange-300'}`}>
+                  {goals.bonus.target > 0 ? `${goals.bonus.progressPct}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${goals.bonus.triggered ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-400'}`} style={{ width: `${goals.bonus.progressPct}%` }} />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400">
+              {goals.bonus.gigsWithTarget > 1
+                ? `${goals.bonus.gigsTriggered}/${goals.bonus.gigsWithTarget} GIGs ont déclenché le bonus`
+                : goals.bonus.triggered
+                  ? `Bonus déclenché · ${goals.bonus.current} transactions réussies ${bonusPeriodLabel[goals.bonus.period]}`
+                  : goals.bonus.target > 0
+                    ? `${goals.bonus.current}/${goals.bonus.target} transactions réussies ${bonusPeriodLabel[goals.bonus.period]} · seuil du GIG`
+                    : 'Aucun volume minimum de transactions sur ce GIG'}
+            </p>
+          </div>
+          </>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 xl:items-start xl:gap-4 2xl:gap-5">
+          {/* Colonne Objectifs */}
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm xl:space-y-3 xl:p-4 2xl:p-5">
+          <div>
+            <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">
+              {t('dashboard.home.goals.myGoalsLabel')} · {goalsPeriodLabels[goalsPeriod]}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-500 leading-snug">
+              {t('dashboard.home.goals.goalsColHint', 'Cliquez sur le crayon pour définir vos cibles. Ce sont vos objectifs personnels, pas ceux du GIG.')}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+          {([
+            {
+              kind: 'calls' as const,
+              title: t('dashboard.home.goals.callsTitle'),
+              icon: <Phone size={13} className="text-cyan-300" />,
+              current: goals.calls.current,
+              target: repCallGoal,
+              progress: callGoalProgress,
+              barClass: 'bg-gradient-to-r from-cyan-400 to-sky-400',
+              doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
+              unit: '',
+            },
+            {
+              kind: 'transactions' as const,
+              title: t('dashboard.home.goals.transactionsTitle'),
+              icon: <Zap size={13} className="text-amber-300" />,
+              current: goals.transactions.current,
+              target: repTxGoal,
+              progress: txGoalProgress,
+              barClass: 'bg-gradient-to-r from-amber-400 to-orange-400',
+              doneClass: 'bg-gradient-to-r from-emerald-400 to-lime-400',
+              unit: '',
+            },
+          ]).map((item) => (
+            <div key={item.kind} className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  {item.icon}
+                  <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{item.title}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-900 font-black tracking-tighter tabular-nums">
+                    {item.current}<span className="text-slate-400 font-bold text-sm">/</span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={item.kind === 'transactions' ? repCallGoal : undefined}
+                    value={item.target > 0 ? String(item.target) : ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (item.kind === 'transactions' && raw.trim() !== '') {
+                        const capped = Math.min(Math.max(0, Math.round(Number(raw) || 0)), repCallGoal);
+                        saveCountGoal(item.kind, String(capped));
+                        return;
+                      }
+                      saveCountGoal(item.kind, raw);
+                    }}
+                    className="w-16 bg-white border border-cyan-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    aria-label={`Objectif ${item.title}`}
+                  />
+                  <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-500' : 'text-cyan-600'}`}>
+                    {item.target > 0 ? `${item.progress}%` : '—'}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${item.progress >= 100 && item.target > 0 ? item.doneClass : item.barClass}`} style={{ width: `${item.target > 0 ? item.progress : 0}%` }} />
+              </div>
+            </div>
+          ))}
+
+          <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Trophy size={13} className="text-amber-500" />
+                <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{t('dashboard.home.goals.earningsTitle')}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-slate-900 font-black tracking-tighter tabular-nums">
+                  {fmtMoney(goals.earned)}€<span className="text-slate-400 font-bold text-sm">/</span>
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={repEarningsGoal > 0 ? String(repEarningsGoal) : ''}
+                  placeholder="0"
+                  onChange={(e) => saveEarningsGoal(e.target.value)}
+                  className="w-20 bg-white border border-amber-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-label="Objectif de gains"
+                />
+                <span className="text-[10px] font-black text-amber-600">€</span>
+                <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'text-emerald-500' : 'text-amber-600'}`}>
+                  {repEarningsGoal > 0 ? `${earningsGoalProgress}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                  objectif.progressPct >= 100
-                    ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-r from-rose-400 to-rose-600'
-                }`}
-                style={{ width: `${objectif.progressPct}%` }}
+                className={`h-full rounded-full transition-all duration-700 ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'bg-gradient-to-r from-emerald-400 to-lime-400' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`}
+                style={{ width: `${repEarningsGoal > 0 ? earningsGoalProgress : 0}%` }}
               />
             </div>
-            {objectif.progressPct >= 100 ? (
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 size={12} /> {t('dashboard.home.gigGoal.achieved')}
+          </div>
+          </div>
+          </div>
+
+          {/* Colonne Simulateur */}
+          <div className="space-y-2 rounded-2xl border border-cyan-200 bg-cyan-50/60 p-3 shadow-sm xl:space-y-3 xl:p-4 2xl:p-5">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calculator size={14} className="text-cyan-600" />
+                <p className="text-[10px] font-black text-cyan-800 uppercase tracking-[0.2em]">{t('dashboard.home.goals.simulatorTitle')}</p>
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-cyan-800/80 leading-snug">
+                {t('dashboard.home.goals.simulatorHint', 'Cochez un GIG, saisissez appels et transactions : le gain potentiel s’affiche en bas. Les transactions ne peuvent pas dépasser les appels.')}
               </p>
-            ) : (
-              <p className="text-[10px] font-bold text-slate-500">
-                {t('dashboard.home.gigGoal.remaining', { count: objectif.target - objectif.current })}
-              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCalculator((open) => !open)}
+              className="shrink-0 rounded-lg border border-cyan-200 bg-white p-1.5 text-cyan-700 hover:bg-cyan-100 transition"
+              aria-label={showCalculator ? 'Réduire' : 'Ouvrir'}
+            >
+              <ChevronDown size={14} className={`transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+          {showCalculator && (
+            <div className="rounded-2xl border border-cyan-200 bg-white p-3 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
+              {gigsData.length === 0 ? (
+                <p className="text-[12px] font-bold text-slate-500">Aucun GIG disponible.</p>
+              ) : gigsData.map((gig) => {
+                const selected = Boolean(simGigs[gig._id]);
+                const row = simRows.find((item) => item.id === gig._id);
+                return (
+                  <div key={gig._id} className={`rounded-xl border p-3 space-y-2 ${selected ? 'border-cyan-400/50 bg-cyan-500/10' : 'border-slate-200 bg-slate-50'}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSimGig(gig._id)}
+                      className="w-full flex items-center gap-2 text-left"
+                    >
+                      <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-cyan-400 border-cyan-300 text-slate-950' : 'border-white/40'}`}>
+                        {selected ? <Check size={10} /> : null}
+                      </span>
+                      <span className="text-[12px] font-black text-slate-900 truncate">{gig.title || t('dashboard.home.gigFallback')}</span>
+                    </button>
+                    {selected && row && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                            <label className="text-[9px] font-black text-cyan-700 uppercase tracking-wider block">Appels</label>
+                  <input
+                    type="number"
+                              min={0}
+                              value={simGigs[gig._id]?.calls ?? ''}
+                              onChange={(e) => setSimField(gig._id, 'calls', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white border border-cyan-200 text-slate-900 rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-cyan-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <p className="text-[10px] font-bold text-cyan-700/80 text-center">× {fmtMoney(row.callRate)} €</p>
+                </div>
+                <div className="space-y-1">
+                            <label className="text-[9px] font-black text-amber-700 uppercase tracking-wider block">Transactions</label>
+                  <input
+                    type="number"
+                              min={0}
+                              max={Math.max(0, Math.round(Number(simGigs[gig._id]?.calls) || 0))}
+                              value={simGigs[gig._id]?.transactions ?? ''}
+                              onChange={(e) => setSimField(gig._id, 'transactions', e.target.value)}
+                              placeholder="0"
+                              className="w-full bg-white border border-amber-200 text-slate-900 rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <p className="text-[10px] font-bold text-amber-700/80 text-center">× {fmtMoney(row.txRate)} €</p>
+                            <p className="text-[9px] font-bold text-slate-400 text-center">Pas plus que les appels</p>
+                </div>
+                </div>
+                        {row.bonusAmount > 0 && (
+                          <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-600' : 'text-amber-700/80'}`}>
+                            {row.bonusIncluded
+                              ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
+                              : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
+                          </p>
+                        )}
+                        <p className="text-[11px] font-bold text-slate-700">
+                          {row.calls} × {fmtMoney(row.callRate)} € + {row.transactions} × {fmtMoney(row.txRate)} €
+                          {row.bonusIncluded ? ` + ${fmtMoney(row.bonusAmount)} €` : ''}
+                          {' = '}{fmtMoney(row.total)} €
+                        </p>
+                      </>
             )}
+          </div>
+                );
+              })}
+              <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 px-4 py-3 shadow-[0_0_24px_-6px_rgba(52,211,153,0.55)]">
+                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{t('dashboard.home.goals.simulatorResult')}</p>
+                <p className="text-2xl font-black text-emerald-600 tracking-tight">+{fmtMoney(simTotal)} €</p>
+            </div>
+          </div>
+          )}
+          </div>
+          </div>
+
           </div>
         )}
       </div>
-
-      {overlayCallId && (
-        <CallRecords
-          overlayOpenCallId={overlayCallId}
-          onOverlayClose={() => setOverlayCallId(null)}
-        />
-      )}
-
-      {selectedTransaction && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-[9998] bg-slate-950/60 backdrop-blur-sm"
-            onClick={() => setSelectedTransaction(null)}
-            aria-hidden
-          />
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-md bg-white rounded-[28px] border border-slate-200 shadow-2xl overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{t('dashboard.home.transactionModal.title')}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
-                    {selectedTransaction.type === 'bonus'
-                      ? t('dashboard.home.transactionModal.typeBonus')
-                      : selectedTransaction.type === 'transaction'
-                        ? t('dashboard.home.transactionModal.typeSale')
-                        : t('dashboard.home.transactionModal.typeCommission')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTransaction(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                  aria-label={t('dashboard.home.transactionModal.close')}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="px-6 py-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('dashboard.home.transactionModal.repAmount')}</span>
-                  <span className="text-xl font-black text-emerald-600">+{(selectedTransaction.repShare || 0).toFixed(2)} €</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.status')}</span>
-                  <span className="text-xs font-bold text-slate-700 capitalize">
-                    {selectedTransaction.status === 'pending_retraction'
-                      ? t('dashboard.home.transactionModal.statusRetraction')
-                      : selectedTransaction.status === 'earned'
-                        ? t('dashboard.home.transactionModal.statusEarned')
-                        : selectedTransaction.status === 'paid'
-                          ? t('dashboard.home.transactionModal.statusPaid')
-                          : selectedTransaction.status === 'refused'
-                            ? t('dashboard.home.transactionModal.statusRefused')
-                            : selectedTransaction.status}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.gig')}</span>
-                  <span className="text-xs font-semibold text-slate-700 text-right">
-                    {selectedTransaction.gig?.title || gigsData.find((g) => g._id === selectedTransaction.gigId)?.title || '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{t('dashboard.home.transactionModal.date')}</span>
-                  <span className="text-xs font-semibold text-slate-700">
-                    {new Date(selectedTransaction.createdAt).toLocaleString(dateLocale)}
-                  </span>
-                </div>
-                {selectedTransaction.description && (
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                    {selectedTransaction.description}
-                  </p>
-                )}
-                {selectedTransaction.status === 'pending_retraction' && (
-                  <p className="text-xs font-medium text-amber-800 leading-relaxed bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                    {t('dashboard.home.transactionModal.retractionNote')}
-                  </p>
-                )}
-              </div>
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTransaction(null)}
-                  className="w-full py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
-                >
-                  {t('dashboard.home.transactionModal.close')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
 
     </div>
   );

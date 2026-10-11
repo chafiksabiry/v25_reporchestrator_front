@@ -9,7 +9,9 @@ import {
 } from '../../services/api/notificationsApi';
 import {
   fetchEnrolledGigsForAgent,
+  fetchScriptReadsFromApi,
   gigIdFromJourney,
+  hydrateScriptReadCache,
   journeyKey,
   journeyTitle,
   scriptModuleStillPending,
@@ -98,6 +100,9 @@ export function ScriptRequirementNotificationsSync() {
       const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
 
       try {
+        const scriptReads = await fetchScriptReadsFromApi(repId);
+        hydrateScriptReadCache(scriptReads);
+
         const enrolled = await fetchEnrolledGigsForAgent(repId, token);
         const journeyMap = new Map<string, JourneyRowLite>();
 

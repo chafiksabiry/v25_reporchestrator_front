@@ -1,6 +1,7 @@
 import { profileApi } from './client.tsx';
 import Cookies from 'js-cookie';
-import { getProfileData as getCachedProfileData, setProfileData } from './authUtils';
+import { getProfileData as getCachedProfileData, setProfileData, redirectToLoginIfUnauthorized } from './authUtils';
+import { dashRepApiUrl } from './repApiUrl';
 
 /** Fired when `users.fullName` changes — TopBar listens for instant UI update. */
 export const USER_FULLNAME_UPDATE_EVENT = 'USER_FULLNAME_UPDATED';
@@ -113,7 +114,7 @@ export const fetchProfileFromAPI = async () => {
 
     if (!userId) {
       console.error('❌ No userId found based on run mode:', runMode);
-      window.location.href = '/auth';
+      redirectToLoginIfUnauthorized('missing-user-id');
       throw new Error('User ID not found');
     }
 
@@ -139,6 +140,7 @@ export const fetchProfileFromAPI = async () => {
     // Store the entire profile data in localStorage
     localStorage.setItem('profileData', JSON.stringify(profileData));
     localStorage.setItem('profileDataTimestamp', Date.now().toString());
+    window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
 
     return profileData;
   } catch (idError: any) {
@@ -166,6 +168,7 @@ export const fetchProfileFromAPI = async () => {
       // Store the entire profile data in localStorage
       localStorage.setItem('profileData', JSON.stringify(profileData));
       localStorage.setItem('profileDataTimestamp', Date.now().toString());
+      window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
 
       return profileData;
     } catch (fallbackError: any) {
@@ -586,4 +589,50 @@ export const checkCountryMismatch = async (
     console.error('Error checking country mismatch:', error);
     return null;
   }
-}; 
+};
+
+/**
+ * Re-compare every experience video to the current profile photo.
+ * Includes the first experience. A failed recheck must not undo the photo save.
+ */
+/**
+ * Hear the accent on experience videos that were scored from a transcript only.
+ * Does not change the CEFR score.
+ */
+export async function recheckExperienceAccents(profileId: string): Promise<boolean> {
+  const token = localStorage.getItem('token');
+  if (!token || !profileId) return false;
+  try {
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/language/accent/recheck`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.warn('Accent recheck failed', response.status);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('Accent recheck failed', error);
+    return false;
+  }
+}
+
+export async function recheckExperienceIdentity(profileId: string): Promise<boolean> {
+  const token = localStorage.getItem('token');
+  if (!token || !profileId) return false;
+  try {
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/identity/recheck`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.warn('Identity recheck failed', response.status);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('Identity recheck failed', error);
+    return false;
+  }
+} 

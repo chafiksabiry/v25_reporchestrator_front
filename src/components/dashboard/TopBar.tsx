@@ -1,36 +1,44 @@
 import { useEffect, useState, useRef } from 'react';
-import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings } from 'lucide-react';
+import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import config from '../../config';
-import { HARX_NAVBAR_BG, HARX_BAR_SHADOW, HARX_TEXT_SHADOW } from '../../utils/harxBrand';
+import { getRepShellChrome } from '../../utils/harxBrand';
+import { isCallCenterStaff } from '../../utils/callCenterStaff';
+import { withActiveGig } from '../../utils/activeGigNav';
 import {
   PROFILE_UPDATE_EVENT,
   USER_FULLNAME_UPDATE_EVENT,
 } from '../../utils/profileUtils';
+import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 
 /**
- * Onboarding is complete (agent profile created) only when phases 1-4 are all
- * completed. Returns false when there is no progress data yet, so Wallet and
- * Planning stay hidden by default until we know the rep is onboarded.
+ * Full shell (wallet, planning, marketplace nav) unlocks only after the
+ * profile is published — not merely when phases 1–4 are done.
  */
 const computeOnboardingComplete = (): boolean => {
+  if (isCallCenterStaff()) return true;
   try {
     const raw = localStorage.getItem('profileData');
     if (!raw) return false;
-    const profile = JSON.parse(raw);
-    const phases = profile?.onboardingProgress?.phases;
-    if (!phases) return false;
+    return isRepProfilePublished(JSON.parse(raw));
+  } catch {
+    return false;
+  }
+};
 
-    for (let i = 1; i <= 4; i++) {
-      const phase = phases[`phase${i}`];
-      if (!phase || phase.status !== 'completed') return false;
-    }
-    return true;
+/** Full profile page stays locked until the rep publishes (or is CC staff). */
+const computeCanOpenProfile = (): boolean => {
+  if (isCallCenterStaff()) return true;
+  try {
+    const raw = localStorage.getItem('profileData');
+    const profile = raw ? JSON.parse(raw) : null;
+    return isRepProfilePublished(profile);
   } catch {
     return false;
   }
@@ -61,6 +69,7 @@ interface ProfileData {
 
 // Add event listener for profile updates
 export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
+  const { t } = useTranslation();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -75,6 +84,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [balance, setBalance] = useState(() => readWalletTotal());
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
   const [displayName, setDisplayName] = useState<string>('User');
+  const [canOpenProfile, setCanOpenProfile] = useState<boolean>(() => computeCanOpenProfile());
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -173,6 +183,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       loadProfileData();
       resolveDisplayName();
       setOnboardingComplete(computeOnboardingComplete());
+      setCanOpenProfile(computeCanOpenProfile());
     };
 
     // Immediate update when the user edits their name in Account Settings:
@@ -212,10 +223,13 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   };
 
   const initials = getInitials(userName);
+  const ccStaff = isCallCenterStaff();
+  const chrome = getRepShellChrome(ccStaff);
+  const hoverAccent = chrome.hoverAccent;
 
   return (
     <header
-      style={{ backgroundImage: HARX_NAVBAR_BG, boxShadow: HARX_BAR_SHADOW, textShadow: HARX_TEXT_SHADOW }}
+      style={{ backgroundImage: chrome.navbarBg, boxShadow: chrome.barShadow, textShadow: chrome.textShadow }}
       className="relative h-16 grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 sm:px-8 shrink-0 z-20"
     >
 
@@ -229,24 +243,29 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
         </button>
       </div>
 
-      {/* ── Col 2: Center — Wallet + Planning (only once onboarding done) ──
-          Lives in the flexible middle column so it never overflows onto the
-          side columns. Hidden below sm where there isn't enough room. */}
+      {/* ── Col 2: Center — Wallet + Planning (marketplace reps only) ── */}
       <div className="hidden sm:flex items-center justify-center gap-2 sm:gap-3 min-w-0">
 
-        {onboardingComplete && (
+        {ccStaff ? (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+            {t('topbar.callCenterAgent')}
+          </div>
+        ) : onboardingComplete ? (
           <>
             {/* Wallet */}
             <button
               onClick={() => navigate('/wallet')}
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
-              title="Mon Portefeuille"
+              title={t('topbar.myWallet')}
             >
-              <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
-                <Wallet className="w-4 h-4" />
+              <div
+                className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white transition-all duration-200 shadow-sm"
+                style={{ ['--hover-accent' as string]: hoverAccent }}
+              >
+                <Wallet className="w-4 h-4 group-hover:text-[#E6188D]" />
               </div>
               <div className="hidden md:block text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Mon Portefeuille</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">{t('topbar.myWallet')}</span>
                 <span className="text-sm font-black text-white tracking-wide mt-0.5 block">
                   {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                 </span>
@@ -258,20 +277,20 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
             {/* Session Planning */}
             <button
-              onClick={() => navigate('/session-planning')}
+              onClick={() => navigate(withActiveGig('/session-planning'))}
               className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 px-2.5 md:px-4 py-2.5 rounded-2xl text-white transition-all duration-200 shadow-lg shadow-black/10 group active:scale-95"
-              title="Session Planning"
+              title={t('topbar.sessionPlanning')}
             >
               <div className="p-1.5 bg-white/20 text-white rounded-xl group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200 shadow-sm">
                 <Calendar className="w-4 h-4" />
               </div>
               <div className="hidden md:block text-left leading-none">
-                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">Planning</span>
-                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">Sessions</span>
+                <span className="text-[9px] text-white/70 font-black uppercase tracking-wider hidden xl:block">{t('topbar.planning')}</span>
+                <span className="text-sm font-black text-white tracking-wide mt-0.5 block">{t('topbar.sessions')}</span>
               </div>
             </button>
           </>
-        )}
+        ) : null}
 
       </div>
 
@@ -303,8 +322,10 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
           {isDropdownOpen && (
             <div
-              style={{ backgroundImage: HARX_NAVBAR_BG }}
-              className="absolute right-0 mt-2 w-64 border border-white/20 rounded-2xl shadow-2xl shadow-[#8A1250]/40 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+              style={{ backgroundImage: chrome.navbarBg }}
+              className={`absolute right-0 mt-2 w-64 border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+                ccStaff ? 'shadow-slate-950/40' : 'shadow-[#8A1250]/40'
+              }`}
             >
 
               {/* ── Header: Photo + Name + Role ── */}
@@ -322,20 +343,50 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-black text-white truncate">{userName}</p>
-                  <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">{userRole}</p>
+                  <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">
+                    {ccStaff ? 'Call center agent' : userRole}
+                  </p>
                 </div>
               </div>
 
               {/* ── Menu Items ── */}
               <div className="py-2 px-1.5">
                 <button
-                  onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-white/15 transition-colors group"
+                  type="button"
+                  disabled={!canOpenProfile}
+                  aria-disabled={!canOpenProfile}
+                  title={
+                    canOpenProfile
+                      ? undefined
+                      : t(
+                          'topBar.profileLocked',
+                          'Publiez votre profil pour ouvrir Mon Profil'
+                        )
+                  }
+                  onClick={() => {
+                    if (!canOpenProfile) return;
+                    setIsDropdownOpen(false);
+                    navigate('/profile');
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors group ${
+                    canOpenProfile
+                      ? 'text-white hover:bg-white/15'
+                      : 'cursor-not-allowed bg-white/[0.04] text-white/30'
+                  }`}
                 >
-                  <div className="p-1.5 bg-white/20 text-white rounded-lg group-hover:bg-white group-hover:text-[#E6188D] transition-all duration-200">
+                  <div
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${
+                      canOpenProfile
+                        ? 'bg-white/20 text-white group-hover:bg-white group-hover:text-[#E6188D]'
+                        : 'bg-white/10 text-white/25'
+                    }`}
+                  >
                     <UserCircle className="h-4 w-4" />
                   </div>
-                  <span>Mon Profil</span>
+                  <span className="flex-1 text-left">Mon Profil</span>
+                  {!canOpenProfile && (
+                    <Lock className="h-3.5 w-3.5 shrink-0 text-white/25" aria-hidden="true" />
+                  )}
                 </button>
                 <button
                   onClick={() => { setIsDropdownOpen(false); navigate('/account-settings'); }}

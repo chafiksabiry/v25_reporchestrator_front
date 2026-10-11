@@ -2,13 +2,14 @@ import { getAgentId, getAuthToken } from './authUtils';
 import { repApiUrl } from './repApiUrl';
 
 // Types pour les statuts de gigs
-export type GigStatus = 'enrolled' | 'invited' | 'pending' | 'none';
+export type GigStatus = 'enrolled' | 'invited' | 'pending' | 'rejected' | 'none';
 
 // Interface pour les données de statut
 export interface GigStatusData {
   enrolledGigIds: string[];
   invitedGigIds: string[];
   pendingGigIds: string[];
+  rejectedGigIds?: string[];
 }
 
 const matchingApiBase = () =>
@@ -91,10 +92,26 @@ async function fetchEnrolledFromProfile(): Promise<string[]> {
     if (!profileData.gigs || !Array.isArray(profileData.gigs)) return [];
 
     return profileData.gigs
-      .filter((gig: { status?: string }) => gig.status === 'enrolled')
-      .map((gig: { gigId?: { $oid?: string } | string }) => {
+      .filter(
+        (gig: {
+          status?: string;
+          gigId?: { $oid?: string; _id?: string; status?: string } | string;
+        }) => {
+          if (gig.status !== 'enrolled') return false;
+          const id = gig.gigId;
+          // Only lifecycle-active company gigs (when populate provides status).
+          if (id && typeof id === 'object' && id.status != null) {
+            return String(id.status).toLowerCase() === 'active';
+          }
+          return true;
+        }
+      )
+      .map((gig: { gigId?: { $oid?: string; _id?: string } | string }) => {
         const id = gig.gigId;
-        if (id && typeof id === 'object' && '$oid' in id) return id.$oid;
+        if (id && typeof id === 'object') {
+          if ('$oid' in id && id.$oid) return id.$oid;
+          if ('_id' in id && id._id) return String(id._id);
+        }
         return typeof id === 'string' ? id : null;
       })
       .filter((id: string | null): id is string => Boolean(id));
@@ -137,6 +154,14 @@ export const fetchEnrolledGigsFromProfile = async (): Promise<string[]> => {
   return fetchEnrolledFromProfile();
 };
 
+/** Invitations refusées par le REPS (historique). */
+export const fetchRejectedInvitations = async (): Promise<string[]> => {
+  const agentId = getAgentId();
+  const token = getAuthToken();
+  if (!agentId || !token) return [];
+  return fetchMatchingAgentGigIds('rejected');
+};
+
 // Fonction pour obtenir le statut d'un gig
 export const getGigStatus = (
   gigId: string,
@@ -148,6 +173,10 @@ export const getGigStatus = (
 
   if (statusData.invitedGigIds.includes(gigId)) {
     return 'invited';
+  }
+
+  if (statusData.rejectedGigIds?.includes(gigId)) {
+    return 'rejected';
   }
 
   if (statusData.pendingGigIds.includes(gigId)) {

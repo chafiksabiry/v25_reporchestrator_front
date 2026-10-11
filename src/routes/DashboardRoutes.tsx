@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
 import { ScriptRequirementNotificationsSync } from '../components/dashboard/ScriptRequirementNotificationsSync';
+import { GigActivityNotificationsSync } from '../components/dashboard/GigActivityNotificationsSync';
 import { Sidebar } from '../components/dashboard/Sidebar';
 import { TopBar } from '../components/dashboard/TopBar';
 import { Dashboard } from '../components/dashboard/pages/Dashboard';
@@ -24,13 +25,23 @@ import { ImportLeads } from '../components/dashboard/pages/ImportLeads';
 import { SessionPlanning } from '../components/dashboard/pages/SessionPlanning';
 import { Calls } from '../components/dashboard/pages/Calls';
 import CallReportCard from '../components/dashboard/CallReport';
-import { fetchProfileFromAPI } from '../utils/profileUtils';
+import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../utils/profileUtils';
 import { PhaseProtectedRoute } from '../components/dashboard/ProtectedRoute';
 import { getAgentId } from '../utils/authUtils';
 import api from '../utils/client';
-import { HARX_NAVBAR_BG } from '../utils/harxBrand';
+import { getRepShellChrome } from '../utils/harxBrand';
+import { isCallCenterStaff } from '../utils/callCenterStaff';
+import {
+  getRepOnboardingStep,
+  isRepProfilePublished,
+} from '../utils/repOnboardingNextStep';
 import { connectRepEscrowSocket } from '../lib/escrowSocket';
-import { handleCallAnalysisCompleteMessage } from '../lib/callAnalysisCompleteNotification';
+import {
+  CALL_ANALYSIS_COMPLETE_EVENT,
+  callAnalysisHistoryPath,
+  handleCallAnalysisCompleteMessage,
+  type CallAnalysisCompleteDetail,
+} from '../lib/callAnalysisCompleteNotification';
 import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
@@ -73,6 +84,18 @@ function DashboardAppContent() {
 
     initializeProfileData();
 
+    const onProfileUpdated = () => {
+      // Cache was just written by fetchProfileFromAPI — read it (don't refetch,
+      // or we'd re-dispatch PROFILE_UPDATED in a loop).
+      try {
+        const raw = localStorage.getItem('profileData');
+        if (raw) setUserProfile(JSON.parse(raw));
+      } catch {
+        /* keep current */
+      }
+    };
+    window.addEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
+
     // Live wallet updates over WebSocket: refresh as soon as the backend books
     // new commissions for this rep (after a validated call/sale).
     const disposeSocket = connectRepEscrowSocket(
@@ -88,6 +111,7 @@ function DashboardAppContent() {
 
     return () => {
       disposeSocket();
+      window.removeEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
     };
   }, []);
 
@@ -95,6 +119,7 @@ function DashboardAppContent() {
     <RepTrainingNavProvider>
       <NotificationsProvider>
         <ScriptRequirementNotificationsSync />
+        <GigActivityNotificationsSync />
         <DashboardRoutingWrapper
           userProfile={userProfile}
           loading={loading}
@@ -108,7 +133,59 @@ function DashboardAppContent() {
 
 function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSidebarOpen }: any) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    if (loading) return;
+    const path = location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/' || path === '/dashboard' || path.endsWith('/dashboard')) {
+      if (mainRef.current) mainRef.current.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+  }, [loading, location.pathname]);
+
+  useEffect(() => {
+    const onAnalysisOpen = (e: Event) => {
+      const detail = (e as CustomEvent<CallAnalysisCompleteDetail>).detail;
+      if (!detail?.openModal) return;
+      const callId = detail.callId ? String(detail.callId) : '';
+      if (!callId) return;
+      navigate(callAnalysisHistoryPath(callId));
+    };
+    window.addEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
+    return () => window.removeEventListener(CALL_ANALYSIS_COMPLETE_EVENT, onAnalysisOpen);
+  }, [navigate]);
+
+  // After login / any dashboard deep-link: unfinished onboarding always resumes
+  // the current step — never stay on dashboard/orchestrator hub.
+  useEffect(() => {
+    if (loading || !userProfile) return;
+    if (isCallCenterStaff()) return;
+    if (isRepProfilePublished(userProfile)) return;
+
+    const path = location.pathname;
+    // /profile is the confirm step after phase 2 (before subscription).
+    const allowedDuringOnboarding = ['/account-settings', '/profile'];
+    if (allowedDuringOnboarding.some((p) => path === p || path.startsWith(`${p}/`))) {
+      // Still bounce off /profile if phase 2 isn't ready yet.
+      if (path === '/profile' || path.startsWith('/profile/')) {
+        const next = getRepOnboardingStep(userProfile);
+        if (next.path === '/profile-editor' || next.path === '/profile-import') {
+          navigate(next.path, { replace: true });
+        }
+      }
+      return;
+    }
+
+    const next = getRepOnboardingStep(userProfile);
+    if (next.path && next.path !== path) {
+      navigate(next.path, { replace: true });
+    }
+  }, [loading, userProfile, location.pathname, navigate]);
+
   const isProfileEdit = location.pathname.includes('/profile') && location.search.includes('edit=true');
+  const chrome = getRepShellChrome(isCallCenterStaff());
 
   usePageTitle(
     buildRepPageTitle(resolveRepTabTitle(location.pathname, `${location.search}${location.hash}`)),
@@ -116,7 +193,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
   );
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+    <div className="flex h-screen overflow-hidden" style={{ backgroundImage: chrome.navbarBg }}>
       {!isProfileEdit && (
         <>
           <Sidebar
@@ -134,35 +211,35 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
           )}
         </>
       )}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: HARX_NAVBAR_BG }}>
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundImage: chrome.navbarBg }}>
         {!isProfileEdit && (
           <TopBar
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
           />
         )}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
+        <main ref={mainRef} className={`flex-1 overflow-y-auto overflow-x-hidden ${isCallCenterStaff() ? 'bg-slate-50' : 'bg-white'}`}>
           <PageContainer variant={resolvePageContainerVariant(location.pathname)}>
           {loading ? (
             <div className="flex justify-center items-center min-h-[50vh]">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-harx-500"></div>
+              <div className={`animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 ${isCallCenterStaff() ? 'border-emerald-600' : 'border-harx-500'}`}></div>
             </div>
           ) : (
           <Routes>
             <Route path="/" element={<Dashboard profile={userProfile} />} />
             <Route path="/dashboard" element={<Dashboard profile={userProfile} />} />
             <Route path="/marketplace" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <GigsMarketplace />
               </PhaseProtectedRoute>
             } />
             <Route path="/gig/:gigId" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <GigDetails />
               </PhaseProtectedRoute>
             } />
             <Route path="/company/:companyId" element={
-              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4}>
+              <PhaseProtectedRoute phases={userProfile?.onboardingProgress?.phases} requiredPhase={4} requirePublished>
                 <CompanyProfile />
               </PhaseProtectedRoute>
             } />

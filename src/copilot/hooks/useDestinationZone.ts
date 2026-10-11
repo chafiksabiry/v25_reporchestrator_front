@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getGigsApiBase } from '../../utils/gigsApiBase';
 
 export interface DestinationZoneState {
   zone: string | null;
@@ -53,7 +54,7 @@ export const useDestinationZone = (gigId?: string) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const response = await fetch(`${import.meta.env.VITE_GIGS_API}/gigs/${effectiveGigId}/destination-zone`);
+      const response = await fetch(`${getGigsApiBase()}/gigs/${effectiveGigId}/destination-zone`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

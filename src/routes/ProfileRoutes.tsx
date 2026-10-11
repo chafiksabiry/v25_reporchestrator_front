@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
-import ImportDialogV2 from '../components/profile/ImportDialogV2.jsx';
-import SummaryEditorV2 from '../components/profile/SummaryEditorV2.jsx';
 import ProtectedRoute from '../components/profile/ProtectedRoute.jsx';
 import { fetchProfileFromAPI } from '../utils/profileUtils';
 import harxLogo from '../assets/logo_harx.png';
@@ -12,6 +10,11 @@ import { buildRepPageTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { useTranslation } from 'react-i18next';
 import { getRepOnboardingStep } from '../utils/repOnboardingNextStep';
+
+// Heavy: PDF.js / OpenAI parsing — only needed when the import dialog opens.
+const ImportDialogV2 = lazy(() => import('../components/profile/ImportDialogV2.jsx'));
+// Heavy: large editor tree — only needed on /profile-editor.
+const SummaryEditorV2 = lazy(() => import('../components/profile/SummaryEditorV2.jsx'));
 
 const POWERED_BY_CAPABILITIES = [
   {
@@ -164,6 +167,23 @@ function ProfileImportPage({
           {t('profileImport.subtitle')}
         </p>
 
+        {/* Steps */}
+        <div className="mb-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+          {IMPORT_STEPS.map((s, i) => (
+            <div key={s.n} className="flex items-center gap-2.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
+                {s.n}
+              </span>
+              <span className="text-sm font-medium text-gray-600">{t(s.labelKey)}</span>
+              {i < IMPORT_STEPS.length - 1 && (
+                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+
         <button
           onClick={() => setIsImportOpen(true)}
           className="group inline-flex items-center gap-2 px-8 py-3 text-base font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-full shadow-lg shadow-harx-500/25 hover:shadow-xl hover:shadow-harx-500/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harx-500 transition-all duration-200"
@@ -188,23 +208,6 @@ function ProfileImportPage({
               </span>
               <p className="text-sm font-semibold text-gray-900">{t(f.titleKey)}</p>
               <p className="text-xs text-gray-500 mt-0.5 max-w-[14rem]">{t(f.descKey)}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Steps */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
-          {IMPORT_STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
-                {s.n}
-              </span>
-              <span className="text-sm font-medium text-gray-600">{t(s.labelKey)}</span>
-              {i < IMPORT_STEPS.length - 1 && (
-                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
             </div>
           ))}
         </div>
@@ -235,11 +238,15 @@ function ProfileImportPage({
         </div>
         </div>
 
-        <ImportDialogV2
-          isOpen={isImportOpen}
-          onClose={() => setIsImportOpen(false)}
-          onImport={onImport}
-        />
+        {isImportOpen && (
+          <Suspense fallback={null}>
+            <ImportDialogV2
+              isOpen={isImportOpen}
+              onClose={() => setIsImportOpen(false)}
+              onImport={onImport}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
@@ -258,12 +265,14 @@ function ProfileEditorPage({
 }) {
   return (
     <div className="max-w-4xl mx-auto">
-      <SummaryEditorV2
-        profileData={profileData}
-        generatedSummary={generatedSummary}
-        setGeneratedSummary={setGeneratedSummary}
-        onProfileUpdate={onProfileUpdate}
-      />
+      <Suspense fallback={<ProfileLoading />}>
+        <SummaryEditorV2
+          profileData={profileData}
+          generatedSummary={generatedSummary}
+          setGeneratedSummary={setGeneratedSummary}
+          onProfileUpdate={onProfileUpdate}
+        />
+      </Suspense>
     </div>
   );
 }
@@ -281,8 +290,9 @@ export default function ProfileRoutes() {
 
   const [profileData, setProfileData] = useState<ProfileRecord | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
-  // Start true so /profile-import does not flash Import CV before the resume redirect check.
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  // Only block the editor on profile fetch. Import CV paints immediately so the
+  // page is not blank while Qiankun + Profile API + heavy chunks finish.
+  const [loadingProfile, setLoadingProfile] = useState(isEditor);
 
   const applyProfileData = useCallback((data: ProfileRecord) => {
     const { generatedSummary: summary, ...profileInfo } = data;
@@ -307,9 +317,8 @@ export default function ProfileRoutes() {
     [applyProfileData, navigate]
   );
 
-  // When landing on /profile-editor directly (refresh, link), load profile if missing.
-  // On /profile-import, if the user already progressed past CV import, resume their
-  // current onboarding step instead of forcing Import CV again.
+  // Editor: load profile before render.
+  // Import: show UI immediately; resume-redirect runs in the background.
   useEffect(() => {
     let cancelled = false;
 
@@ -319,7 +328,10 @@ export default function ProfileRoutes() {
         return;
       }
 
-      setLoadingProfile(true);
+      if (isEditor) {
+        setLoadingProfile(true);
+      }
+
       try {
         if (isEditor) {
           const cached = localStorage.getItem('profileData');
@@ -328,6 +340,14 @@ export default function ProfileRoutes() {
             if (parsed?.personalInfo) {
               if (!cancelled) {
                 applyProfileData(parsed);
+                const next = getRepOnboardingStep(parsed);
+                // Stay on the editor to finish phase 2 — never bounce back to import.
+                if (
+                  next.path !== '/profile-editor' &&
+                  next.path !== '/profile-import'
+                ) {
+                  navigate(next.path, { replace: true });
+                }
               }
               return;
             }
@@ -339,6 +359,13 @@ export default function ProfileRoutes() {
 
         if (isEditor) {
           applyProfileData(fromApi as ProfileRecord);
+          const next = getRepOnboardingStep(fromApi);
+          if (
+            next.path !== '/profile-editor' &&
+            next.path !== '/profile-import'
+          ) {
+            navigate(next.path, { replace: true });
+          }
           return;
         }
 
@@ -349,7 +376,7 @@ export default function ProfileRoutes() {
       } catch (err) {
         console.error('Failed to load profile for editor:', err);
       } finally {
-        if (!cancelled) setLoadingProfile(false);
+        if (!cancelled && isEditor) setLoadingProfile(false);
       }
     };
 
@@ -372,8 +399,6 @@ export default function ProfileRoutes() {
             onProfileUpdate={handleProfileData}
           />
         )
-      ) : loadingProfile ? (
-        <ProfileLoading label={t('profileImport.loadingProfile')} />
       ) : (
         <ProfileImportPage onImport={handleProfileData} />
       )}

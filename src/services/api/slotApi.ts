@@ -11,6 +11,8 @@ export interface Slot {
     duration: number; // hours
     capacity: number;
     reservedCount: number;
+    /** Recurring weekly slots: reserved seats per yyyy-MM-dd. */
+    occupancyByDate?: Record<string, number>;
     status: 'available' | 'full' | 'cancelled';
     notes?: string;
 }
@@ -19,7 +21,8 @@ export interface Reservation {
     _id?: string;
     agentId: string;
     slotId: string;
-    gigId: string;
+    /** API may return a plain id or a populated gig document. */
+    gigId: string | { _id?: string; $oid?: string; id?: string; title?: string; name?: string };
     date: string;
     reservationDate?: string;
     startTime: string;
@@ -27,6 +30,12 @@ export interface Reservation {
     duration: number;
     status: 'reserved' | 'cancelled';
     notes?: string;
+    /** Present when attendance was explicitly tracked for the slot. */
+    attended?: boolean;
+    cancelledAt?: string;
+    canceledAt?: string;
+    updatedAt?: string;
+    createdAt?: string;
 }
 
 export const slotApi = {

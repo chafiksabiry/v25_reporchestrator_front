@@ -13,6 +13,61 @@ export function dispatchCallAnalysisCompleteEvent(data: CallAnalysisCompleteDeta
   window.dispatchEvent(new CustomEvent(CALL_ANALYSIS_COMPLETE_EVENT, { detail: data }));
 }
 
+/** App-relative path. The router basename is already `/reps`. */
+export function callAnalysisHistoryPath(callId: string): string {
+  return `/workspace?tab=calls&callId=${encodeURIComponent(callId)}`;
+}
+
+/**
+ * Where a notification click should go.
+ * Analysis notifications deep-link the call even when the stored path is the
+ * old `/reps/workspace?tab=calls` (that prefix doubles the basename and the
+ * catch-all sends the rep back to the dashboard).
+ * Enrollment alerts open the related gig details page.
+ */
+export function resolveRepNotificationPath(n: {
+  notificationKey?: string;
+  actionPath?: string;
+  gigId?: string;
+  kind?: string;
+  status?: string;
+}): string | null {
+  const fromKey = /^call-analysis-complete-(.+)$/.exec(String(n.notificationKey || ''));
+  if (fromKey?.[1]) return callAnalysisHistoryPath(fromKey[1]);
+
+  const gigId = String(n.gigId || '').trim();
+  const isEnrollment =
+    n.kind === 'enrollment' ||
+    n.status === 'enrolled' ||
+    n.status === 'rejected' ||
+    n.status === 'invited' ||
+    String(n.notificationKey || '').startsWith('enrollment-');
+
+  if (n.status === 'invited' || String(n.notificationKey || '').includes('-invited')) {
+    return '/marketplace?tab=invited';
+  }
+
+  if (isEnrollment && gigId) {
+    return `/gig/${encodeURIComponent(gigId)}`;
+  }
+
+  const raw = String(n.actionPath || '').trim();
+  if (!raw) {
+    if (isEnrollment) return '/marketplace';
+    return null;
+  }
+  if (raw === '/reps' || raw === '/reps/') return '/dashboard';
+  if (raw === '/gigs' || raw.startsWith('/gigs?')) {
+    return gigId ? `/gig/${encodeURIComponent(gigId)}` : '/marketplace';
+  }
+  if (raw.startsWith('/reps/')) return raw.slice('/reps'.length);
+  // Stored path like `/gig/:id` or `/marketplace`
+  if (raw.startsWith('/gig/') || raw.startsWith('/marketplace') || raw.startsWith('/workspace')) {
+    return raw;
+  }
+  return raw;
+}
+
 export function showCallAnalysisCompleteToast(data: EscrowMessage) {
   const callId = data.callId ? String(data.callId) : '';
   if (!callId) return;

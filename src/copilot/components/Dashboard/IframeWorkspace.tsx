@@ -4,6 +4,9 @@ import { useLocation } from 'react-router-dom';
 import { useAgent } from '../../contexts/AgentContext';
 import { useLead } from '../../hooks/useLead';
 import { useGigScript } from '../../hooks/useGigScript';
+import { useAgentProfile } from '../../hooks/useAgentProfile';
+import { getAgentName } from '../../utils';
+import { renderScript } from '../../utils/scriptVariables';
 import { 
   Globe, 
   X, 
@@ -31,7 +34,80 @@ export function IframeWorkspace() {
   const leadId = searchParams.get('leadId') || sessionStorage.getItem('activeLeadId');
   const urlGigId = searchParams.get('gigId') || sessionStorage.getItem('activeGigId');
   const { lead: apiLead } = useLead(leadId);
+  const { profile: agentProfile } = useAgentProfile();
   const gig = apiLead?.gigId;
+
+  const [repVisibility, setRepVisibility] = useState<Record<string, boolean> | undefined>(undefined);
+
+  useEffect(() => {
+    const gigIdForVisibility =
+      urlGigId || (typeof gig === 'string' ? gig : gig?._id) || '';
+    if (!gigIdForVisibility) {
+      setRepVisibility(undefined);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const base = String(
+          import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
+            import.meta.env.VITE_DASHBOARD_API ||
+            'https://v25dashboardbackend-development.up.railway.app/api'
+        ).replace(/\/$/, '');
+        const res = await fetch(`${base}/file-processing/visibility/${gigIdForVisibility}`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const rep = json?.data?.visibility?.rep;
+        if (!cancelled && rep && typeof rep === 'object') {
+          setRepVisibility(rep as Record<string, boolean>);
+        }
+      } catch {
+        /* keep previous / undefined */
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [urlGigId, gig]);
+
+  const mergeVars = useMemo(() => {
+    const contact = activeContact as { name?: string; company?: string; First_Name?: string; Last_Name?: string } | undefined;
+    const fromProfile = String(agentProfile?.personalInfo?.name || '').trim();
+    const fromLocal = String(getAgentName() || '').trim();
+    const fromStorage = String(localStorage.getItem('userName') || '').trim();
+    const repName = [fromProfile, fromLocal, fromStorage].find(
+      (n) => n && n.toLowerCase() !== 'agent' && n.toLowerCase() !== 'utilisateur'
+    ) || fromProfile || fromLocal || fromStorage;
+    const companyName = (
+      (typeof (gig as any)?.companyName === 'string' && (gig as any).companyName) ||
+      (typeof (gig as any)?.company?.name === 'string' && (gig as any).company.name) ||
+      (typeof (gig as any)?.companyId?.name === 'string' && (gig as any).companyId.name) ||
+      (typeof apiLead?.company === 'string' ? apiLead.company : '') ||
+      (typeof apiLead?.Company === 'string' ? apiLead.Company : '') ||
+      (typeof contact?.company === 'string' ? contact.company : '') ||
+      localStorage.getItem('companyName') ||
+      ''
+    ).trim();
+    const prospectName = (
+      apiLead?.name ||
+      apiLead?.Deal_Name ||
+      [apiLead?.First_Name, apiLead?.Last_Name].filter(Boolean).join(' ').trim() ||
+      contact?.name ||
+      [contact?.First_Name, contact?.Last_Name].filter(Boolean).join(' ').trim() ||
+      ''
+    ).trim();
+    return { repName, companyName, prospectName };
+  }, [agentProfile, gig, apiLead, activeContact]);
+
+  const fill = (text?: string) =>
+    renderScript(text, apiLead || activeContact || null, {
+      ...mergeVars,
+      repVisibility,
+      emptyFallback: '—',
+    });
   
   const resolvedGigId = urlGigId || (typeof gig === 'string' ? gig : gig?._id);
   const { scripts, activeScript, loading: scriptLoading } = useGigScript(resolvedGigId);
@@ -397,7 +473,7 @@ export function IframeWorkspace() {
                                         {currentStage.introTitle || "CONSEILLER (VOUS)"}
                                       </span>
                                       <button
-                                        onClick={() => handleCopy(currentStage.introReplica, 'agent_replica')}
+                                        onClick={() => handleCopy(fill(currentStage.introReplica), 'agent_replica')}
                                         className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all flex items-center gap-1 shrink-0 cursor-pointer"
                                         title="Copier la réplique du conseiller"
                                       >
@@ -409,7 +485,7 @@ export function IframeWorkspace() {
                                       </button>
                                     </div>
                                     <p className="text-[13px] md:text-sm leading-relaxed font-medium text-slate-200 tracking-wide">
-                                      {currentStage.introReplica}
+                                      {fill(currentStage.introReplica)}
                                     </p>
                                   </div>
                                 </div>
@@ -429,7 +505,7 @@ export function IframeWorkspace() {
                                         }`}
                                       >
                                         <span className="text-[10px] font-black opacity-50">•</span>
-                                        <p className="text-[10px] font-bold leading-normal">{rem.text}</p>
+                                        <p className="text-[10px] font-bold leading-normal">{fill(rem.text)}</p>
                                       </div>
                                     ))}
                                   </div>
@@ -456,10 +532,10 @@ export function IframeWorkspace() {
                                           }`}
                                         >
                                           <span className="text-[10px] font-black text-slate-100 flex items-center gap-1">
-                                            {opt.id === 'prospect_confirms' ? '✓' : '↻'} {opt.label}
+                                            {opt.id === 'prospect_confirms' ? '✓' : '↻'} {fill(opt.label)}
                                           </span>
                                           <span className="text-[9px] text-slate-400 font-bold mt-0.5 leading-snug">
-                                            {opt.subtext}
+                                            {fill(opt.subtext)}
                                           </span>
                                         </button>
                                       ))}
@@ -473,14 +549,14 @@ export function IframeWorkspace() {
                                             Réponse Recommandée
                                           </span>
                                           <button
-                                            onClick={() => handleCopy(currentStage.options.find((o: any) => o.id === selectedOptionId)?.recommendedResponse || '', 'recommended')}
+                                            onClick={() => handleCopy(fill(currentStage.options.find((o: any) => o.id === selectedOptionId)?.recommendedResponse || ''), 'recommended')}
                                             className="text-[8px] font-bold text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer"
                                           >
                                             {copiedField === 'recommended' ? 'Copié' : 'Copier'}
                                           </button>
                                         </div>
                                         <p className="text-[10px] font-black text-emerald-100 leading-normal italic">
-                                          {currentStage.options.find((o: any) => o.id === selectedOptionId)?.recommendedResponse}
+                                          {fill(currentStage.options.find((o: any) => o.id === selectedOptionId)?.recommendedResponse)}
                                         </p>
                                       </div>
                                     )}
@@ -507,7 +583,7 @@ export function IframeWorkspace() {
                                               className="rounded border-white/10 bg-slate-950 text-indigo-500 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
                                             />
                                             <span className={`text-[10px] font-bold ${isChecked ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-                                              {item}
+                                              {fill(item)}
                                             </span>
                                           </label>
                                         );
@@ -568,7 +644,7 @@ export function IframeWorkspace() {
                                           CONSEILLER (VOUS)
                                         </span>
                                         <button
-                                          onClick={() => handleCopy(currentPair.agent.replica, 'agent_replica')}
+                                          onClick={() => handleCopy(fill(currentPair.agent.replica), 'agent_replica')}
                                           className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all flex items-center gap-1 shrink-0 cursor-pointer"
                                           title="Copier la réplique du conseiller"
                                         >
@@ -580,7 +656,7 @@ export function IframeWorkspace() {
                                         </button>
                                       </div>
                                       <p className="text-[13px] md:text-sm leading-relaxed font-medium text-slate-200 tracking-wide">
-                                        {currentPair.agent.replica}
+                                        {fill(currentPair.agent.replica)}
                                       </p>
                                     </div>
                                   </div>
@@ -607,7 +683,7 @@ export function IframeWorkspace() {
                                           PROSPECT (RÉPONSE ATTENDUE)
                                         </span>
                                         <button
-                                          onClick={() => handleCopy(currentPair.lead.replica, 'lead_replica')}
+                                          onClick={() => handleCopy(fill(currentPair.lead.replica), 'lead_replica')}
                                           className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all flex items-center gap-1 shrink-0 cursor-pointer"
                                           title="Copier la réplique attendue"
                                         >
@@ -619,7 +695,7 @@ export function IframeWorkspace() {
                                         </button>
                                       </div>
                                       <p className="text-[13px] md:text-sm leading-relaxed font-medium text-slate-200 tracking-wide">
-                                        {currentPair.lead.replica}
+                                        {fill(currentPair.lead.replica)}
                                       </p>
                                     </div>
                                   </div>

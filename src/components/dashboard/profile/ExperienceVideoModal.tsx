@@ -26,17 +26,21 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../../utils/taxonomyI18n';
+import { getIndustries, getActivities, getSkillsGrouped } from '../../../lib/api/profiles';
+import { getAllLanguages } from '../../../lib/api/languages';
 import { useLiveFaceMatch } from './useLiveFaceMatch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type RefLabel = string | { _id?: string; name?: string };
+type RefLabel = string | { _id?: string; name?: string; name_i18n?: { en?: string; fr?: string } | null };
 
 // AI text fields are stored bilingually; older data may still be a plain string.
 type LocalizedText = string | { en?: string; fr?: string } | null;
 
 interface SkillScore {
   name?: string;
+  name_i18n?: { en?: string; fr?: string } | null;
   skill?: RefLabel;
   score: number;
   evidence?: LocalizedText;
@@ -44,6 +48,7 @@ interface SkillScore {
 
 interface LanguageScore {
   language: RefLabel;
+  languageName?: string;
   name?: string;
   level: string;
   score: number;
@@ -52,6 +57,7 @@ interface LanguageScore {
 
 interface NamedScore {
   name?: string;
+  name_i18n?: { en?: string; fr?: string } | null;
   industry?: RefLabel;
   activity?: RefLabel;
   score: number;
@@ -66,6 +72,16 @@ interface SubScore {
   score: number;
   feedback?: LocalizedText;
   confidence?: 'low' | 'medium' | 'high';
+  confidenceReason?: LocalizedText;
+}
+
+interface AccentInfo {
+  category?: 'neutral' | 'mild_regional' | 'strong_regional' | 'non_native' | string;
+  variety?: LocalizedText | string;
+  confidence?: 'low' | 'medium' | 'high' | string;
+  feedback?: LocalizedText | string;
+  confidenceReason?: LocalizedText | string;
+  source?: 'audio' | 'transcript' | string;
 }
 
 interface LanguageAssessmentEntry {
@@ -78,6 +94,7 @@ interface LanguageAssessmentEntry {
   vocabulary?: SubScore;
   coherence?: SubScore;
   pronunciationEstimate?: SubScore;
+  accent?: AccentInfo;
   strengths?: LocalizedText;
   areasForImprovement?: LocalizedText;
 }
@@ -96,6 +113,7 @@ interface FraudCheck {
   identityMatch?: boolean | null;
   identityConfidence?: number;
   identityChecked?: boolean;
+  referencePhotoUrl?: string | null;
   fraudRisk: 'low' | 'medium' | 'high' | 'unknown';
   reasons: LocalizedText[];
   checkedFrames?: number;
@@ -151,7 +169,12 @@ interface SavedVideoData {
 interface ExperienceVideoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  experience: { title: string; company: string };
+  experience: {
+    title: string;
+    company: string;
+    description?: string;
+    responsibilities?: string[];
+  };
   profileId: string;
   experienceIndex?: number;
   savedData?: SavedVideoData | null;
@@ -172,23 +195,226 @@ const ABSENCE_CUT_TICKS = 4; // ~8s absent → auto-stop + block analysis
 const localize = (value: LocalizedText | undefined, lang: string): string => {
   if (!value) return '';
   if (typeof value === 'string') return value;
-  const code = (lang || 'en').slice(0, 2);
-  return value[code as 'en' | 'fr'] || value.en || value.fr || '';
+  const code = (lang || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
+  return value[code] || value.en || value.fr || '';
 };
 
-const refLabel = (value?: RefLabel | null, fallback = 'Unknown'): string => {
+type CatalogEntity = TaxonomyEntity & {
+  _id?: string;
+  nativeName?: string;
+  code?: string;
+};
+
+type TaxonomyCatalog = Map<string, CatalogEntity>;
+
+const catalogKey = (value: string | undefined | null) =>
+  String(value || '').trim().toLowerCase();
+
+const buildTaxonomyCatalog = (items: CatalogEntity[] | null | undefined): TaxonomyCatalog => {
+  const map: TaxonomyCatalog = new Map();
+  for (const item of items || []) {
+    if (!item || typeof item !== 'object') continue;
+    const entity: CatalogEntity = {
+      _id: item._id,
+      name: item.name,
+      name_i18n: item.name_i18n || null,
+      nativeName: item.nativeName,
+      code: item.code,
+    };
+    if (item._id) map.set(String(item._id), entity);
+    const en = catalogKey(item.name_i18n?.en || item.name);
+    const fr = catalogKey(item.name_i18n?.fr || item.nativeName);
+    if (en) map.set(en, entity);
+    if (fr) map.set(fr, entity);
+    if (item.code) map.set(catalogKey(item.code), entity);
+  }
+  return map;
+};
+
+const flattenSkillGroups = (grouped: any): CatalogEntity[] => {
+  if (!grouped || typeof grouped !== 'object') return [];
+  const out: CatalogEntity[] = [];
+  Object.values(grouped).forEach((bucket) => {
+    if (Array.isArray(bucket)) {
+      out.push(...bucket);
+      return;
+    }
+    if (bucket && typeof bucket === 'object') {
+      Object.values(bucket as Record<string, unknown>).forEach((list) => {
+        if (Array.isArray(list)) out.push(...(list as CatalogEntity[]));
+      });
+    }
+  });
+  return out;
+};
+
+const localizeLanguageEntity = (entity: CatalogEntity | null | undefined, lang: string): string => {
+  if (!entity) return '';
+  const fromI18n = localizeTaxonomyEntity(entity, lang);
+  if (fromI18n && entity.name_i18n) return fromI18n;
+  const code = (lang || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
+  if (code === 'fr' && entity.nativeName) return String(entity.nativeName).trim();
+  return fromI18n || String(entity.name || entity.nativeName || '').trim();
+};
+
+const resolveCatalogLabel = (
+  catalog: TaxonomyCatalog,
+  value: RefLabel | string | null | undefined,
+  lang: string,
+  opts?: { isLanguage?: boolean }
+): string => {
+  if (!value) return '';
+
+  const fromEntity = (entity: CatalogEntity | null | undefined) =>
+    opts?.isLanguage ? localizeLanguageEntity(entity, lang) : localizeTaxonomyEntity(entity, lang);
+
+  if (typeof value === 'object') {
+    // Prefer bilingual fields / nativeName from the payload itself.
+    const direct = fromEntity(value);
+    if (value.name_i18n?.en || value.name_i18n?.fr || (opts?.isLanguage && (value as CatalogEntity).nativeName)) {
+      if (direct) return direct;
+    }
+    const byId = value._id ? catalog.get(String(value._id)) : undefined;
+    if (byId) {
+      const hit = fromEntity(byId);
+      if (hit) return hit;
+    }
+    const byName = catalog.get(catalogKey(value.name));
+    if (byName) {
+      const hit = fromEntity(byName);
+      if (hit) return hit;
+    }
+    return direct || value.name || '';
+  }
+
+  if (/^[a-f0-9]{24}$/i.test(value)) {
+    return fromEntity(catalog.get(value)) || '';
+  }
+  return fromEntity(catalog.get(catalogKey(value))) || value;
+};
+
+const refLabel = (
+  value: RefLabel | null | undefined,
+  lang = 'en',
+  fallback = 'Unknown',
+  catalog?: TaxonomyCatalog,
+  opts?: { isLanguage?: boolean }
+): string => {
   if (!value) return fallback;
+  if (catalog) {
+    const resolved = resolveCatalogLabel(catalog, value, lang, opts);
+    if (resolved) return resolved;
+  }
   if (typeof value === 'string') {
     if (/^[a-f0-9]{24}$/i.test(value)) return fallback;
     return value;
   }
-  return value.name || fallback;
+  if (opts?.isLanguage) {
+    return localizeLanguageEntity(value, lang) || value.name || fallback;
+  }
+  return localizeTaxonomyEntity(value, lang) || value.name || fallback;
 };
 
-const skillLabel = (skill: SkillScore): string => skill.name || refLabel(skill.skill);
-const industryLabel = (item: NamedScore): string => item.name || refLabel(item.industry);
-const activityLabel = (item: NamedScore): string => item.name || refLabel(item.activity);
-const languageLabel = (lang: LanguageScore): string => lang.name || refLabel(lang.language);
+const skillLabel = (skill: SkillScore, lang = 'en', catalog?: TaxonomyCatalog): string => {
+  const fromSkillRef = resolveCatalogLabel(catalog || new Map(), skill.skill, lang);
+  if (fromSkillRef) return fromSkillRef;
+  const fromName = resolveCatalogLabel(catalog || new Map(), skill.name, lang);
+  if (fromName) return fromName;
+  return (
+    localizeTaxonomyEntity(
+      (skill.skill && typeof skill.skill === 'object' ? skill.skill : null) || {
+        name: skill.name,
+        name_i18n: skill.name_i18n,
+      },
+      lang
+    ) ||
+    skill.name ||
+    refLabel(skill.skill, lang)
+  );
+};
+
+const industryLabel = (item: NamedScore, lang = 'en', catalog?: TaxonomyCatalog): string => {
+  const fromIndustry = resolveCatalogLabel(catalog || new Map(), item.industry, lang);
+  if (fromIndustry) return fromIndustry;
+  const fromName = resolveCatalogLabel(catalog || new Map(), item.name, lang);
+  if (fromName) return fromName;
+  return (
+    localizeTaxonomyEntity(
+      (item.industry && typeof item.industry === 'object' ? item.industry : null) || {
+        name: item.name,
+        name_i18n: item.name_i18n,
+      },
+      lang
+    ) ||
+    item.name ||
+    refLabel(item.industry, lang)
+  );
+};
+
+const activityLabel = (item: NamedScore, lang = 'en', catalog?: TaxonomyCatalog): string => {
+  const fromActivity = resolveCatalogLabel(catalog || new Map(), item.activity, lang);
+  if (fromActivity) return fromActivity;
+  const fromName = resolveCatalogLabel(catalog || new Map(), item.name, lang);
+  if (fromName) return fromName;
+  return (
+    localizeTaxonomyEntity(
+      (item.activity && typeof item.activity === 'object' ? item.activity : null) || {
+        name: item.name,
+        name_i18n: item.name_i18n,
+      },
+      lang
+    ) ||
+    item.name ||
+    refLabel(item.activity, lang)
+  );
+};
+
+const languageLabel = (langEntry: LanguageScore, lang = 'en', catalog?: TaxonomyCatalog): string => {
+  const fromRef = resolveCatalogLabel(catalog || new Map(), langEntry.language, lang, { isLanguage: true });
+  if (fromRef) return fromRef;
+  const fromName = resolveCatalogLabel(
+    catalog || new Map(),
+    langEntry.name || (langEntry as any).languageName,
+    lang,
+    { isLanguage: true }
+  );
+  if (fromName) return fromName;
+  return (
+    langEntry.name ||
+    (langEntry as any).languageName ||
+    refLabel(langEntry.language, lang, 'Unknown', catalog, { isLanguage: true })
+  );
+};
+
+const PHOTO_MISMATCH = /photo de profil|profile photo/i;
+
+const reasonText = (reason: LocalizedText): string => {
+  if (!reason) return '';
+  if (typeof reason === 'string') return reason;
+  return `${reason.en || ''} ${reason.fr || ''}`;
+};
+
+/**
+ * A score under 70% means the model was not sure (angle, sunglasses, short clip).
+ * A live single face in that case matches the profile photo.
+ */
+const presentFraudCheck = (fraud?: FraudCheck): FraudCheck | undefined => {
+  if (!fraud) return fraud;
+  const weakNo = fraud.identityMatch === false && (fraud.identityConfidence ?? 0) < 70;
+  const liveSingleFace =
+    fraud.faceDetected === true &&
+    (fraud.faceCount == null || fraud.faceCount <= 1) &&
+    fraud.looksLive === true &&
+    fraud.samePersonAcrossFrames !== false;
+  if (!weakNo || !liveSingleFace) return fraud;
+  return {
+    ...fraud,
+    identityMatch: true,
+    identityConfidence: Math.max(fraud.identityConfidence || 0, 60),
+    fraudRisk: 'low',
+    reasons: (fraud.reasons || []).filter((reason) => !PHOTO_MISMATCH.test(reasonText(reason))),
+  };
+};
 
 const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
   if (!saved?.videoAnalysis) return null;
@@ -197,14 +423,23 @@ const buildResultFromSaved = (saved: SavedVideoData): AnalysisResult | null => {
     duration: saved.videoDuration,
     transcription: saved.videoTranscription || '',
     languageAssessment: saved.videoLanguageAssessment,
-    fraudCheck: saved.videoFraudCheck,
+    fraudCheck: presentFraudCheck(saved.videoFraudCheck),
     relevance: saved.videoRelevance,
     analysis: saved.videoAnalysis,
   };
 };
 
-const langAssessmentLabel = (entry: LanguageAssessmentEntry): string =>
-  entry.languageName || refLabel(entry.language);
+const langAssessmentLabel = (
+  entry: LanguageAssessmentEntry,
+  lang = 'en',
+  catalog?: TaxonomyCatalog
+): string => {
+  const fromRef = resolveCatalogLabel(catalog || new Map(), entry.language, lang, { isLanguage: true });
+  if (fromRef) return fromRef;
+  const fromName = resolveCatalogLabel(catalog || new Map(), entry.languageName, lang, { isLanguage: true });
+  if (fromName) return fromName;
+  return entry.languageName || refLabel(entry.language, lang, 'Unknown', catalog, { isLanguage: true });
+};
 
 const fraudRiskStyles: Record<string, { badge: string }> = {
   low: { badge: 'bg-emerald-100 text-emerald-700' },
@@ -283,6 +518,14 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   identityMatchYes: { en: 'Matches your profile photo', fr: 'Correspond à votre photo de profil' },
   identityMatchNo: { en: 'Does not match your profile photo', fr: 'Ne correspond pas à votre photo de profil' },
   identityMatchUnknown: { en: 'Could not be verified', fr: 'Non vérifiable' },
+  fraudPhotoVideoAdviceBadge: {
+    en: 'Action required',
+    fr: 'Action requise',
+  },
+  fraudPhotoVideoAdvice: {
+    en: 'Make sure your profile photo and this experience video clearly show the same person, then record again if needed.',
+    fr: 'Assurez-vous que votre photo de profil et cette vidéo d’expérience montrent clairement la même personne, puis réenregistrez si besoin.',
+  },
   yes: { en: 'Yes', fr: 'Oui' },
   no: { en: 'No', fr: 'Non' },
   langAssessment: { en: 'Language Assessment (CEFR)', fr: 'Évaluation linguistique (CECR)' },
@@ -291,17 +534,46 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   metricVocabulary: { en: 'Vocabulary', fr: 'Vocabulaire' },
   metricCoherence: { en: 'Coherence', fr: 'Cohérence' },
   metricPronunciation: { en: 'Pronunciation', fr: 'Prononciation' },
+  metricAccent: { en: 'Accent', fr: 'Accent' },
+  accentNeutral: { en: 'Neutral / standard', fr: 'Neutre / standard' },
+  accentMild: { en: 'Mild regional', fr: 'Régional léger' },
+  accentStrong: { en: 'Strong regional', fr: 'Régional marqué' },
+  accentNonNative: { en: 'Non-native', fr: 'Non natif' },
   confLow: { en: 'low confidence', fr: 'confiance faible' },
   confMedium: { en: 'medium confidence', fr: 'confiance moyenne' },
   confHigh: { en: 'high confidence', fr: 'confiance élevée' },
+  confWhyFallbackMedium: {
+    en: 'Medium confidence: cues are plausible on a short sample, but not fully conclusive.',
+    fr: 'Confiance moyenne : les indices sont plausibles sur un échantillon court, mais pas totalement concluants.',
+  },
+  confWhyFallbackLow: {
+    en: 'Low confidence: the sample is short, noisy, or accent cues are ambiguous.',
+    fr: 'Confiance faible : l’échantillon est court, bruyant, ou les indices d’accent sont ambigus.',
+  },
+  confWhyFallbackHigh: {
+    en: 'High confidence: accent markers are clear and consistent across the sample.',
+    fr: 'Confiance élevée : les marqueurs d’accent sont clairs et constants sur l’échantillon.',
+  },
+  confWhyFallbackTranscript: {
+    en: 'Confidence is limited because this accent was estimated from the transcript, not from fine audio cues.',
+    fr: 'La confiance est limitée car cet accent a été estimé à partir de la transcription, sans analyse audio fine.',
+  },
   strengths: { en: 'Strengths', fr: 'Points forts' },
   toImprove: { en: 'To improve', fr: 'À améliorer' },
-  technicalSkills: { en: 'Technical Skills', fr: 'Compétences techniques' },
-  professionalSkills: { en: 'Professional Skills', fr: 'Compétences professionnelles' },
-  softSkills: { en: 'Soft Skills', fr: 'Compétences comportementales' },
+  technicalSkills: { en: 'Technical skills (proposals)', fr: 'Compétences techniques (propositions)' },
+  professionalSkills: { en: 'Professional skills (proposals)', fr: 'Compétences professionnelles (propositions)' },
+  softSkills: { en: 'Soft skills (proposals)', fr: 'Compétences comportementales (propositions)' },
+  skillsProposalHint: {
+    en: 'These skills are suggestions only — confirm or remove them later in the Skills tab. Matching missions mainly uses your industries and activities.',
+    fr: 'Ces compétences sont des suggestions uniquement — confirmez-les ou retirez-les plus tard dans l’onglet Compétences. Le matching des missions s’appuie surtout sur vos secteurs et activités.',
+  },
+  matchingSignalsHint: {
+    en: 'Industries and activities below feed the matching algorithm so we can propose relevant missions.',
+    fr: 'Les secteurs et activités ci-dessous alimentent l’algorithme de matching pour vous proposer des missions pertinentes.',
+  },
   languages: { en: 'Languages', fr: 'Langues' },
-  industries: { en: 'Industries', fr: 'Secteurs' },
-  activities: { en: 'Activities', fr: 'Activités' },
+  industries: { en: 'Industries (matching)', fr: 'Secteurs (matching)' },
+  activities: { en: 'Activities (matching)', fr: 'Activités (matching)' },
   contactCenterSkills: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
   ccCustomerService: { en: 'Customer Service', fr: 'Service client' },
   ccCommunication: { en: 'Communication', fr: 'Communication' },
@@ -407,7 +679,8 @@ const MetricTile: React.FC<{
   label: string;
   feedback?: string;
   extra?: string;
-}> = ({ score, label, feedback, extra }) => (
+  extraReason?: string;
+}> = ({ score, label, feedback, extra, extraReason }) => (
   <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] font-black text-slate-600 uppercase tracking-wide">{label}</span>
@@ -419,8 +692,9 @@ const MetricTile: React.FC<{
         style={{ width: `${score}%` }}
       />
     </div>
-    {extra && <p className="text-[10px] font-bold text-slate-400 uppercase">{extra}</p>}
     {feedback && <p className="text-[11px] text-slate-500 leading-relaxed">{feedback}</p>}
+    {extra && <p className="text-[10px] font-bold text-slate-400 uppercase">{extra}</p>}
+    {extraReason && <p className="text-[11px] text-slate-500 leading-relaxed">{extraReason}</p>}
   </div>
 );
 
@@ -481,8 +755,47 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete, referencePhotoUrl,
 }) => {
   const { i18n } = useTranslation();
-  const uiLang = i18n.language || 'en';
+  const uiLang = (i18n.language || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
   const t = makeTr(uiLang);
+
+  const [industryCatalog, setIndustryCatalog] = useState<TaxonomyCatalog>(() => new Map());
+  const [activityCatalog, setActivityCatalog] = useState<TaxonomyCatalog>(() => new Map());
+  const [skillCatalog, setSkillCatalog] = useState<TaxonomyCatalog>(() => new Map());
+  const [languageCatalog, setLanguageCatalog] = useState<TaxonomyCatalog>(() => new Map());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const loadCatalogs = async () => {
+      try {
+        const [industries, activities, technical, professional, soft, languages] = await Promise.all([
+          getIndustries().catch(() => []),
+          getActivities().catch(() => []),
+          getSkillsGrouped('technical').catch(() => ({})),
+          getSkillsGrouped('professional').catch(() => ({})),
+          getSkillsGrouped('soft').catch(() => ({})),
+          getAllLanguages().catch(() => []),
+        ]);
+        if (cancelled) return;
+        setIndustryCatalog(buildTaxonomyCatalog(Array.isArray(industries) ? industries : []));
+        setActivityCatalog(buildTaxonomyCatalog(Array.isArray(activities) ? activities : []));
+        setSkillCatalog(
+          buildTaxonomyCatalog([
+            ...flattenSkillGroups(technical),
+            ...flattenSkillGroups(professional),
+            ...flattenSkillGroups(soft),
+          ])
+        );
+        setLanguageCatalog(buildTaxonomyCatalog(Array.isArray(languages) ? languages : []));
+      } catch (err) {
+        console.warn('Could not load taxonomy catalogs for experience analysis labels:', err);
+      }
+    };
+    void loadCatalogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -599,6 +912,24 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     };
   }, [isOpen, savedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Photo change recheck updates fraud in place without resetting the open video.
+  useEffect(() => {
+    if (!isOpen || !savedData?.videoFraudCheck) return;
+    setResult((prev) => {
+      if (!prev || prev.fraudCheck === savedData.videoFraudCheck) return prev;
+      return { ...prev, fraudCheck: presentFraudCheck(savedData.videoFraudCheck) };
+    });
+  }, [isOpen, savedData?.videoFraudCheck]);
+
+  // Accent measured from the audio replaces the transcript-only guess in place.
+  useEffect(() => {
+    if (!isOpen || !savedData?.videoLanguageAssessment) return;
+    setResult((prev) => {
+      if (!prev || prev.languageAssessment === savedData.videoLanguageAssessment) return prev;
+      return { ...prev, languageAssessment: savedData.videoLanguageAssessment };
+    });
+  }, [isOpen, savedData?.videoLanguageAssessment]);
+
   // Lock background scroll while the modal is open (it's portaled to body).
   useEffect(() => {
     if (!isOpen) return;
@@ -672,6 +1003,15 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       formData.append('video', new File([recordedBlob], 'experience-video.webm', { type: 'video/webm' }));
       formData.append('title', experience.title);
       formData.append('company', experience.company);
+      if (experience.description) {
+        formData.append('description', experience.description);
+      }
+      const responsibilities = Array.isArray(experience.responsibilities)
+        ? experience.responsibilities.map((r) => String(r || '').trim()).filter(Boolean)
+        : [];
+      if (responsibilities.length) {
+        formData.append('responsibilities', JSON.stringify(responsibilities));
+      }
       if (experienceIndex !== undefined && experienceIndex >= 0) {
         formData.append('experienceIndex', String(experienceIndex));
       }
@@ -689,6 +1029,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
       const json = await response.json();
       const data = json.data;
+      if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
@@ -739,19 +1080,19 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       <div className="relative w-full max-w-4xl max-h-[calc(100vh-6rem)] bg-white rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-harx-500/20 rounded-xl">
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 flex-shrink-0">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="p-2 bg-harx-500/20 rounded-xl flex-shrink-0">
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1 pr-2">
               <h2 className="text-base font-black text-white">{t('headerTitle')}</h2>
-              <p className="text-xs text-slate-400 font-medium truncate max-w-xs">
+              <p className="text-xs text-slate-400 font-medium break-words whitespace-normal leading-relaxed">
                 {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1204,6 +1545,27 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                           ))}
                         </ul>
                       )}
+
+                      {(result.fraudCheck.fraudRisk === 'high' ||
+                        result.fraudCheck.fraudRisk === 'medium' ||
+                        result.fraudCheck.identityMatch === false) && (
+                        <div className="relative overflow-hidden rounded-xl border-2 border-yellow-300 bg-gradient-to-br from-red-600 via-rose-600 to-harx-700 p-3.5 shadow-[0_0_0_3px_rgba(248,113,113,0.45),0_10px_28px_rgba(220,38,38,0.45)]">
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_55%)]" />
+                          <div className="relative flex items-start gap-3">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-300 text-red-700 shadow-md ring-2 ring-white/80">
+                              <AlertCircle className="h-5 w-5" strokeWidth={2.75} />
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1.5">
+                              <span className="inline-flex items-center rounded-md bg-yellow-300 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-red-800 shadow-sm">
+                                {t('fraudPhotoVideoAdviceBadge')}
+                              </span>
+                              <p className="text-[13px] font-extrabold leading-snug text-white">
+                                {t('fraudPhotoVideoAdvice')}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1217,7 +1579,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   >
                     <div className="space-y-4">
                       {result.languageAssessment.languages.map((lang) => {
-                        const name = langAssessmentLabel(lang);
+                        const name = langAssessmentLabel(lang, uiLang, languageCatalog);
                         const strengths = localize(lang.strengths, uiLang);
                         const improvements = localize(lang.areasForImprovement, uiLang);
                         const confKey =
@@ -1226,6 +1588,22 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             : lang.pronunciationEstimate?.confidence === 'medium'
                             ? 'confMedium'
                             : 'confLow';
+                        const accentConfReason =
+                          localize(lang.accent?.confidenceReason, uiLang) ||
+                          (lang.accent?.source === 'transcript'
+                            ? t('confWhyFallbackTranscript')
+                            : lang.accent?.confidence === 'high'
+                            ? t('confWhyFallbackHigh')
+                            : lang.accent?.confidence === 'medium'
+                            ? t('confWhyFallbackMedium')
+                            : t('confWhyFallbackLow'));
+                        const pronunciationConfReason =
+                          localize(lang.pronunciationEstimate?.confidenceReason, uiLang) ||
+                          (lang.pronunciationEstimate?.confidence === 'high'
+                            ? t('confWhyFallbackHigh')
+                            : lang.pronunciationEstimate?.confidence === 'medium'
+                            ? t('confWhyFallbackMedium')
+                            : t('confWhyFallbackLow'));
                         const metrics = [
                           lang.fluency && {
                             key: 'fluency',
@@ -1257,6 +1635,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             score: lang.pronunciationEstimate.score,
                             feedback: localize(lang.pronunciationEstimate.feedback, uiLang),
                             extra: t(confKey),
+                            extraReason: pronunciationConfReason,
                           },
                         ].filter(Boolean) as Array<{
                           key: string;
@@ -1264,6 +1643,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                           score: number;
                           feedback: string;
                           extra?: string;
+                          extraReason?: string;
                         }>;
 
                         return (
@@ -1290,6 +1670,53 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                             </div>
 
                             <div className="p-4 space-y-3">
+                              {lang.accent && (
+                                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-black text-indigo-700 uppercase tracking-wide">
+                                      {t('metricAccent')}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-indigo-500 uppercase">
+                                      {t(
+                                        lang.accent.category === 'mild_regional'
+                                          ? 'accentMild'
+                                          : lang.accent.category === 'strong_regional'
+                                          ? 'accentStrong'
+                                          : lang.accent.category === 'non_native'
+                                          ? 'accentNonNative'
+                                          : 'accentNeutral'
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-black text-indigo-950">
+                                    {localize(lang.accent.variety, uiLang) || t('accentNeutral')}
+                                  </p>
+                                  {localize(lang.accent.feedback, uiLang) && (
+                                    <p className="text-[11px] text-indigo-800/80 leading-relaxed">
+                                      {localize(lang.accent.feedback, uiLang)}
+                                    </p>
+                                  )}
+                                  {lang.accent.confidence && (
+                                    <div className="pt-1 space-y-0.5">
+                                      <p className="text-[10px] font-bold text-indigo-400 uppercase">
+                                        {t(
+                                          lang.accent.confidence === 'high'
+                                            ? 'confHigh'
+                                            : lang.accent.confidence === 'medium'
+                                            ? 'confMedium'
+                                            : 'confLow'
+                                        )}
+                                      </p>
+                                      {accentConfReason && (
+                                        <p className="text-[11px] text-indigo-800/80 leading-relaxed">
+                                          {accentConfReason}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
                               <div className="space-y-2.5">
                                 {metrics.map((metric) => (
                                   <MetricTile
@@ -1298,6 +1725,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                                     score={metric.score}
                                     feedback={metric.feedback}
                                     extra={metric.extra}
+                                    extraReason={metric.extraReason}
                                   />
                                 ))}
                               </div>
@@ -1324,42 +1752,34 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </Section>
                 )}
 
-                {/* Technical Skills */}
-                {result.analysis.technicalSkills?.length > 0 && (
-                  <Section
-                    icon={<Briefcase className="w-4 h-4" />}
-                    title={t('technicalSkills')}
-                    count={result.analysis.technicalSkills.length}
-                  >
-                    {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
+                {/* Matching-critical: industries & activities first */}
+                {(result.analysis.industries?.length > 0 || result.analysis.activities?.length > 0) && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-[11px] font-semibold text-emerald-900 leading-relaxed">
+                    {t('matchingSignalsHint')}
+                  </div>
+                )}
+
+                {result.analysis.industries?.length > 0 && (
+                  <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
+                    {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
+                      <ScoreBar key={industryLabel(ind, uiLang, industryCatalog)} score={ind.score} label={industryLabel(ind, uiLang, industryCatalog)} />
                     ))}
                   </Section>
                 )}
 
-                {/* Professional Skills */}
-                {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
-                  <Section
-                    icon={<Briefcase className="w-4 h-4" />}
-                    title={t('professionalSkills')}
-                    count={result.analysis.professionalSkills!.length}
-                  >
-                    {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
-                    ))}
-                  </Section>
-                )}
-
-                {/* Soft Skills */}
-                {(result.analysis.softSkills?.length ?? 0) > 0 && (
-                  <Section
-                    icon={<Sparkles className="w-4 h-4" />}
-                    title={t('softSkills')}
-                    count={result.analysis.softSkills!.length}
-                  >
-                    {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
-                      <ScoreBar key={skillLabel(skill)} score={skill.score} label={skillLabel(skill)} feedback={localize(skill.evidence, uiLang)} />
-                    ))}
+                {result.analysis.activities?.length > 0 && (
+                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length}>
+                    <div className="flex flex-wrap gap-2">
+                      {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
+                        <span
+                          key={activityLabel(act, uiLang, activityCatalog)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900"
+                        >
+                          {activityLabel(act, uiLang, activityCatalog)}
+                          <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
+                        </span>
+                      ))}
+                    </div>
                   </Section>
                 )}
 
@@ -1371,11 +1791,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     count={result.analysis.spokenLanguages.length}
                   >
                     {result.analysis.spokenLanguages.filter((l) => l.score > 0).sort((a, b) => b.score - a.score).map((lang) => (
-                      <div key={languageLabel(lang)} className="flex items-center gap-3">
+                      <div key={languageLabel(lang, uiLang, languageCatalog)} className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-slate-700">{languageLabel(lang)}</span>
+                              <span className="text-xs font-black text-slate-700">{languageLabel(lang, uiLang, languageCatalog)}</span>
                               <span className={`px-2 py-0.5 text-[9px] font-black rounded-full ${levelBadge[lang.level] || 'bg-slate-100 text-slate-500'}`}>
                                 {lang.level}
                               </span>
@@ -1391,29 +1811,51 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   </Section>
                 )}
 
-                {/* Industries */}
-                {result.analysis.industries?.length > 0 && (
-                  <Section icon={<Building2 className="w-4 h-4" />} title={t('industries')} count={result.analysis.industries.filter((i) => i.score > 0).length}>
-                    {result.analysis.industries.filter((i) => i.score > 0).sort((a, b) => b.score - a.score).map((ind) => (
-                      <ScoreBar key={industryLabel(ind)} score={ind.score} label={industryLabel(ind)} />
+                {/* Skills are proposals only */}
+                {((result.analysis.technicalSkills?.length ?? 0) > 0 ||
+                  (result.analysis.professionalSkills?.length ?? 0) > 0 ||
+                  (result.analysis.softSkills?.length ?? 0) > 0) && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-[11px] font-semibold text-amber-900 leading-relaxed">
+                    {t('skillsProposalHint')}
+                  </div>
+                )}
+
+                {result.analysis.technicalSkills?.length > 0 && (
+                  <Section
+                    icon={<Briefcase className="w-4 h-4" />}
+                    title={t('technicalSkills')}
+                    count={result.analysis.technicalSkills.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.technicalSkills.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill, uiLang, skillCatalog)} score={skill.score} label={skillLabel(skill, uiLang, skillCatalog)} feedback={localize(skill.evidence, uiLang)} />
                     ))}
                   </Section>
                 )}
 
-                {/* Activities */}
-                {result.analysis.activities?.length > 0 && (
-                  <Section icon={<Activity className="w-4 h-4" />} title={t('activities')} count={result.analysis.activities.filter((a) => a.score > 0).length}>
-                    <div className="flex flex-wrap gap-2">
-                      {result.analysis.activities.filter((a) => a.score > 0).sort((a, b) => b.score - a.score).map((act) => (
-                        <span
-                          key={activityLabel(act)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                        >
-                          {activityLabel(act)}
-                          <span className={`text-[10px] font-black ${scoreTextColor(act.score)}`}>{act.score}</span>
-                        </span>
-                      ))}
-                    </div>
+                {(result.analysis.professionalSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Briefcase className="w-4 h-4" />}
+                    title={t('professionalSkills')}
+                    count={result.analysis.professionalSkills!.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.professionalSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill, uiLang, skillCatalog)} score={skill.score} label={skillLabel(skill, uiLang, skillCatalog)} feedback={localize(skill.evidence, uiLang)} />
+                    ))}
+                  </Section>
+                )}
+
+                {(result.analysis.softSkills?.length ?? 0) > 0 && (
+                  <Section
+                    icon={<Sparkles className="w-4 h-4" />}
+                    title={t('softSkills')}
+                    count={result.analysis.softSkills!.length}
+                    defaultOpen={false}
+                  >
+                    {result.analysis.softSkills!.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((skill) => (
+                      <ScoreBar key={skillLabel(skill, uiLang, skillCatalog)} score={skill.score} label={skillLabel(skill, uiLang, skillCatalog)} feedback={localize(skill.evidence, uiLang)} />
+                    ))}
                   </Section>
                 )}
 
@@ -1446,8 +1888,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                         <ScoreBar
                           key={key}
                           score={val.score}
-                          label={labelKeys[key] ? t(labelKeys[key]) : key}
-                          feedback={localize(val.notes, uiLang)}
+                          label={t(labelKeys[key] || 'contactCenterSkills')}
+                          feedback={localize(val.evidence, uiLang)}
                         />
                       ))}
                     </Section>

@@ -5,6 +5,7 @@ import { ProfileView } from '../ProfileView';
 import { ProfileEditView } from '../ProfileEditView';
 import { getProfileData, updateProfileData, updateSkills, updateBasicInfo, updateExperience, fetchProfileFromAPI } from '../../../utils/profileUtils';
 import { setProfileData } from '../../../utils/authUtils';
+import { buildSyncedLanguagesFromExperience, toPersistedProfileLanguage } from '../profile/languageVideoUtils';
 
 // Import Timezone type from repWizard service
 import { Timezone } from '../../../services/api/repWizard';
@@ -119,6 +120,12 @@ interface ProfileData {
       };
     }>;
   };
+  proposedSkills?: {
+    technical?: Array<{ skill: string; level: number; details?: string }>;
+    professional?: Array<{ skill: string; level: number; details?: string }>;
+    soft?: Array<{ skill: string; level: number; details?: string }>;
+  };
+  excludedProposedSkillIds?: string[];
   experience: Array<{
     title: string;
     company: string;
@@ -190,10 +197,16 @@ export function Profile() {
         const profileData = await fetchProfileFromAPI();
         console.log('✅ Profile data received successfully');
         console.log('💽 Setting profile data in component state');
-        setProfile(profileData);
+        const synced = await syncExperienceLanguagesIfNeeded(profileData);
+        setProfile(synced);
+        if (synced) setProfileData(synced);
         setLoading(false);
       } catch (err: any) {
         console.error('❌ Error loading profile:', err);
+        if (err?.response?.status === 401) {
+          // Global interceptor redirects to login; keep loading UI meanwhile.
+          return;
+        }
         setError(err.message || t('profile.page.loadError'));
         setLoading(false);
       }
@@ -207,6 +220,32 @@ export function Profile() {
     setProfileData(data);
     // Notify other components
     window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
+  };
+
+  const syncExperienceLanguagesIfNeeded = async (profileData: ProfileData | null) => {
+    if (!profileData?._id) return profileData;
+    const syncedLanguages = buildSyncedLanguagesFromExperience(profileData);
+    if (!syncedLanguages) return profileData;
+
+    const payload = {
+      'personalInfo.languages': syncedLanguages.map((lang: any) => toPersistedProfileLanguage(lang)),
+    };
+
+    try {
+      await updateProfileData(profileData._id, payload);
+      const refreshed = await getProfileData();
+      return refreshed || {
+        ...profileData,
+        personalInfo: { ...profileData.personalInfo, languages: syncedLanguages },
+      };
+    } catch (error) {
+      console.error('Error syncing experience languages onto profile:', error);
+      // Still show enriched data locally even if persist fails.
+      return {
+        ...profileData,
+        personalInfo: { ...profileData.personalInfo, languages: syncedLanguages },
+      };
+    }
   };
 
   // Handle profile update
@@ -223,7 +262,8 @@ export function Profile() {
   const handleVideoAnalysisComplete = async () => {
     try {
       const fresh = await fetchProfileFromAPI();
-      if (fresh) updateProfileStateAndStorage(fresh);
+      const synced = await syncExperienceLanguagesIfNeeded(fresh);
+      if (synced) updateProfileStateAndStorage(synced);
     } catch (error) {
       console.error('Error refreshing profile after video analysis:', error);
     }
@@ -232,8 +272,8 @@ export function Profile() {
   const getSkillRefId = (entry: any): string | undefined => {
     if (!entry) return undefined;
     if (typeof entry.skill === 'string') return entry.skill;
-    if (entry.skill?._id) return entry.skill._id;
-    if (entry._id) return entry._id;
+    if (entry.skill?._id != null) return String(entry.skill._id);
+    if (entry._id != null) return String(entry._id);
     return undefined;
   };
 
@@ -334,7 +374,8 @@ export function Profile() {
       updateProfileStateAndStorage(refreshed);
     } catch (error: any) {
       console.error('Error adding skill:', error);
-      const serverMessage =
+      const detail =
+        (Array.isArray(error?.errors) && error.errors[0]) ||
         error?.message ||
         error?.error ||
         (typeof error === 'string' ? error : JSON.stringify(error));
@@ -345,6 +386,138 @@ export function Profile() {
         updateProfileStateAndStorage(refreshed);
       } catch (refreshError) {
         console.error('Error refreshing profile after failed skill add:', refreshError);
+      }
+    }
+  };
+
+  const mapSkillPayload = (entries: any[] = []) =>
+    entries
+      .map((entry: any) => ({
+        skill: getSkillRefId(entry),
+        level: typeof entry.level === 'number' ? entry.level : 0,
+        details: entry.details || ''
+      }))
+      .filter((entry: any) => !!entry.skill);
+
+  const handleConfirmProposedSkill = async (
+    type: 'technical' | 'professional' | 'soft',
+    skillId: string
+  ) => {
+    if (!profile?._id || !skillId) return;
+
+    const proposedLevel =
+      (profile.proposedSkills?.[type] || []).find(
+        (entry: any) => getSkillRefId(entry) === skillId
+      )?.level ?? 0;
+
+    const nextSkills = {
+      technical: [...(profile.skills?.technical || [])],
+      professional: [...(profile.skills?.professional || [])],
+      soft: [...(profile.skills?.soft || [])]
+    };
+    if (!nextSkills[type].some((entry: any) => getSkillRefId(entry) === skillId)) {
+      nextSkills[type].unshift({
+        skill: skillId,
+        level: typeof proposedLevel === 'number' ? proposedLevel : 0,
+        details: ''
+      });
+    }
+
+    const nextProposed = {
+      technical: [...(profile.proposedSkills?.technical || [])],
+      professional: [...(profile.proposedSkills?.professional || [])],
+      soft: [...(profile.proposedSkills?.soft || [])]
+    };
+    nextProposed[type] = nextProposed[type].filter(
+      (entry: any) => getSkillRefId(entry) !== skillId
+    );
+
+    const payload = {
+      skills: {
+        technical: mapSkillPayload(nextSkills.technical),
+        professional: mapSkillPayload(nextSkills.professional),
+        soft: mapSkillPayload(nextSkills.soft),
+        contactCenter: profile.skills?.contactCenter || []
+      },
+      proposedSkills: {
+        technical: mapSkillPayload(nextProposed.technical),
+        professional: mapSkillPayload(nextProposed.professional),
+        soft: mapSkillPayload(nextProposed.soft)
+      }
+    };
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        skills: { ...(prev.skills || {}), ...nextSkills },
+        proposedSkills: nextProposed
+      };
+    });
+
+    try {
+      await updateProfileData(profile._id, payload);
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
+    } catch (error) {
+      console.error('Error confirming proposed skill:', error);
+      try {
+        const refreshed = await getProfileData();
+        updateProfileStateAndStorage(refreshed);
+      } catch (refreshError) {
+        console.error('Error refreshing profile after failed propose confirm:', refreshError);
+      }
+    }
+  };
+
+  const handleDismissProposedSkill = async (
+    type: 'technical' | 'professional' | 'soft',
+    skillId: string
+  ) => {
+    if (!profile?._id || !skillId) return;
+
+    const nextProposed = {
+      technical: [...(profile.proposedSkills?.technical || [])],
+      professional: [...(profile.proposedSkills?.professional || [])],
+      soft: [...(profile.proposedSkills?.soft || [])]
+    };
+    nextProposed[type] = nextProposed[type].filter(
+      (entry: any) => getSkillRefId(entry) !== skillId
+    );
+
+    const excluded = Array.from(
+      new Set([...(profile.excludedProposedSkillIds || []).map(String), skillId])
+    );
+
+    const payload = {
+      proposedSkills: {
+        technical: mapSkillPayload(nextProposed.technical),
+        professional: mapSkillPayload(nextProposed.professional),
+        soft: mapSkillPayload(nextProposed.soft)
+      },
+      excludedProposedSkillIds: excluded
+    };
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        proposedSkills: nextProposed,
+        excludedProposedSkillIds: excluded
+      };
+    });
+
+    try {
+      await updateProfileData(profile._id, payload);
+      const refreshed = await getProfileData();
+      updateProfileStateAndStorage(refreshed);
+    } catch (error) {
+      console.error('Error dismissing proposed skill:', error);
+      try {
+        const refreshed = await getProfileData();
+        updateProfileStateAndStorage(refreshed);
+      } catch (refreshError) {
+        console.error('Error refreshing profile after failed propose dismiss:', refreshError);
       }
     }
   };
@@ -566,7 +739,6 @@ export function Profile() {
 
     const payload = {
       professionalSummary: {
-        ...currentSummary,
         [section]: updatedSection
       }
     };
@@ -602,7 +774,6 @@ export function Profile() {
 
     const payload = {
       professionalSummary: {
-        ...currentSummary,
         [section]: [trimmedValue, ...sourceIds]
       }
     };
@@ -714,6 +885,8 @@ export function Profile() {
             }}
             onDeleteSkill={handleDeleteSkill}
             onAddSkill={handleAddSkill}
+            onConfirmProposedSkill={handleConfirmProposedSkill}
+            onDismissProposedSkill={handleDismissProposedSkill}
             onDeleteLanguage={handleDeleteLanguage}
             onAddLanguage={handleAddLanguage}
             onUpdateLanguageProficiency={handleUpdateLanguageProficiency}

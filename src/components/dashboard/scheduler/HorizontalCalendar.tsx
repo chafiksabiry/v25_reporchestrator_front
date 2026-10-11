@@ -39,7 +39,7 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                             Réservés
                         </div>
                         <div className="flex items-center text-[10px] font-bold text-gray-500 px-3 border-l border-gray-200">
-                            <div className="w-2 h-2 rounded-full bg-harx-300 mr-2 shadow-sm"></div>
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shadow-sm"></div>
                             Disponibles
                         </div>
                     </div>
@@ -103,9 +103,9 @@ export function HorizontalCalendar({ selectedDate, onDateSelect, slots, selected
                                     </div>
                                 )}
                                 {availableSlots > 0 && (
-                                    <div className={`h-1 rounded-full transition-all duration-500 ${isSelected ? 'bg-white/20' : 'bg-harx-100/70 group-hover:bg-harx-200'} w-full`}>
+                                    <div className={`h-1 rounded-full transition-all duration-500 ${isSelected ? 'bg-white/20' : 'bg-emerald-100/70 group-hover:bg-emerald-100'} w-full`}>
                                         <div
-                                            className={`h-full rounded-full ${isSelected ? 'bg-white/60' : 'bg-harx-400'}`}
+                                            className={`h-full rounded-full ${isSelected ? 'bg-white/60' : 'bg-emerald-500'}`}
                                             style={{ width: `${Math.min(100, (availableSlots / (daySlots.length || 1)) * 100)}%` }}
                                         ></div>
                                     </div>

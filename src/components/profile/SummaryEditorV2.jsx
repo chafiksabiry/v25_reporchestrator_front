@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
@@ -6,9 +6,15 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
+import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
+import { repApiUrl } from '../../utils/repApiUrl';
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
+import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { setProfileData, getProfileData } from '../../utils/authUtils';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -454,6 +460,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // (no global "Edit profile" mode). Keys: basic | experience | availability |
   // summary | companies.
   const [sectionEditing, setSectionEditing] = useState({});
+  // Per-section undo stacks (snapshots taken before each change).
+  const [sectionUndoStacks, setSectionUndoStacks] = useState({});
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | pending | saving | saved | error
+  const [autoSaveSection, setAutoSaveSection] = useState(null);
+  const autoSaveTimerRef = useRef(null);
+  const summaryUndoSkipRef = useRef(false);
+  const summaryTypingBaselineRef = useRef(null);
+  const summaryUndoIdleTimerRef = useRef(null);
+  const basicTypingBaselineRef = useRef(null);
+  const basicUndoIdleTimerRef = useRef(null);
+  const persistSectionRef = useRef(null);
+  const sectionEditingRef = useRef({});
   const [editedProfile, setEditedProfile] = useState(profileData);
   const [tempLanguage, setTempLanguage] = useState({ languageObj: null, proficiency: 'B1' });
   const [tempIndustry, setTempIndustry] = useState('');
@@ -497,6 +515,20 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [timezoneSearch, setTimezoneSearch] = useState('');
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [isSearchingTimezone, setIsSearchingTimezone] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [imgSrc, setImgSrc] = useState('');
+  const [crop, setCrop] = useState();
+  const [completedCrop, setCompletedCrop] = useState();
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const photoInputRef = useRef(null);
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const imgRef = useRef(null);
   const [availableSkills, setAvailableSkills] = useState({
     technical: {},
     professional: {},
@@ -534,8 +566,72 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     description: t(`proficiency.${value}.description`),
   }));
 
+  sectionEditingRef.current = sectionEditing;
+
+  const scheduleSectionAutoSave = useCallback((section) => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveSection(section);
+    setAutoSaveStatus('pending');
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (persistSectionRef.current) {
+        void persistSectionRef.current(section, { keepEditing: true, silent: true });
+      }
+    }, 900);
+  }, []);
+
+  const snapshotSection = (section, profile = editedProfile, summary = editedSummary) => {
+    if (section === 'summary') {
+      return {
+        summary,
+        profileDescription: profile.professionalSummary?.profileDescription,
+        profileDescription_i18n: profile.professionalSummary?.profileDescription_i18n
+          ? { ...profile.professionalSummary.profileDescription_i18n }
+          : undefined,
+      };
+    }
+    if (section === 'basic') {
+      return { personalInfo: JSON.parse(JSON.stringify(profile.personalInfo || {})) };
+    }
+    if (section === 'experience') {
+      return { experience: JSON.parse(JSON.stringify(profile.experience || [])) };
+    }
+    if (section === 'availability') {
+      return { availability: JSON.parse(JSON.stringify(profile.availability || {})) };
+    }
+    if (section === 'companies') {
+      return {
+        notableCompanies: JSON.parse(JSON.stringify(profile.professionalSummary?.notableCompanies || [])),
+        industries: JSON.parse(JSON.stringify(profile.professionalSummary?.industries || [])),
+        activities: JSON.parse(JSON.stringify(profile.professionalSummary?.activities || [])),
+      };
+    }
+    return null;
+  };
+
+  const pushSectionUndo = (section, snapshot) => {
+    if (!snapshot) return;
+    setSectionUndoStacks((prev) => {
+      const stack = Array.isArray(prev[section]) ? prev[section] : [];
+      return {
+        ...prev,
+        [section]: [...stack.slice(-19), snapshot],
+      };
+    });
+  };
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (summaryUndoIdleTimerRef.current) clearTimeout(summaryUndoIdleTimerRef.current);
+    if (basicUndoIdleTimerRef.current) clearTimeout(basicUndoIdleTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (profileData) {
+      // Avoid clobbering local edits while a section is open (autosave refreshes parent).
+      if (Object.values(sectionEditingRef.current).some(Boolean)) {
+        return;
+      }
+
       console.log('🔍 Initializing editedProfile with profileData:', profileData);
 
       setEditedProfile({
@@ -615,10 +711,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             };
           });
 
-          // Save to database
+          // Save to database — only bio fields (do not wipe industries/activities)
           await updateProfileData(profileData._id, {
             professionalSummary: {
-              ...profileData.professionalSummary,
               profileDescription: generatedSummary
             }
           });
@@ -1113,6 +1208,17 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
 
   const handleProfileChange = (field, value) => {
+    if (sectionEditingRef.current.basic) {
+      if (basicTypingBaselineRef.current === null) {
+        basicTypingBaselineRef.current = snapshotSection('basic');
+        pushSectionUndo('basic', basicTypingBaselineRef.current);
+      }
+      if (basicUndoIdleTimerRef.current) clearTimeout(basicUndoIdleTimerRef.current);
+      basicUndoIdleTimerRef.current = setTimeout(() => {
+        basicTypingBaselineRef.current = null;
+      }, 1500);
+    }
+
     // Update the profile state immediately for UI responsiveness
     const updatedPersonalInfo = {
       ...editedProfile.personalInfo,
@@ -1127,6 +1233,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     setEditedProfile(updatedProfile);
     setHasUnsavedChanges(true);
     setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+    if (sectionEditingRef.current.basic) {
+      scheduleSectionAutoSave('basic');
+    }
 
     // Validation rules
     const validations = {
@@ -1390,6 +1499,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         languageEntry
       ];
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1405,6 +1518,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
       setShowLanguageDropdown(false);
       setLanguageSearch('');
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error adding language:', error);
     }
@@ -1429,6 +1545,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         }));
       }
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1440,6 +1560,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error removing language:', error);
     }
@@ -1451,6 +1574,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         i === index ? { ...lang, proficiency: newProficiency } : lang
       );
 
+      if (sectionEditingRef.current.basic) {
+        pushSectionUndo('basic', snapshotSection('basic'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -1462,6 +1589,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
       setHasUnsavedChanges(true);
       setModifiedSections(prev => ({ ...prev, personalInfo: true }));
+      if (sectionEditingRef.current.basic) {
+        scheduleSectionAutoSave('basic');
+      }
     } catch (error) {
       console.error('Error updating language proficiency:', error);
     }
@@ -1481,23 +1611,30 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       // the textarea shows the active-language string and we keep the _i18n mirror.
       const { active, i18n } = normalizeBilingualText(newSummary, uiLang);
 
-      // Update only local state, don't save to database yet
+      // Keep previous text undoable before replacing with AI output.
+      pushSectionUndo('summary', {
+        summary: editedSummary,
+        profileDescription: editedProfile.professionalSummary?.profileDescription,
+        profileDescription_i18n: editedProfile.professionalSummary?.profileDescription_i18n,
+      });
+      summaryTypingBaselineRef.current = null;
+
+      summaryUndoSkipRef.current = true;
       setEditedSummary(active);
-      setEditedProfile(prev => ({
+      setEditedProfile((prev) => ({
         ...prev,
         professionalSummary: {
           ...prev.professionalSummary,
           profileDescription: active,
-          profileDescription_i18n: i18n
-        }
+          profileDescription_i18n: i18n,
+        },
       }));
 
-      // Mark as having unsaved changes
       setHasUnsavedChanges(true);
-      setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+      setModifiedSections((prev) => ({ ...prev, professionalSummary: true }));
       setIsEditing(false);
       showToast(t('toasts.summaryRegenerated'));
-
+      scheduleSectionAutoSave('summary');
     } catch (error) {
       console.error('Failed to regenerate summary:', error);
       showToast(t('toasts.summaryRegenerateFailed'), 'error');
@@ -1507,40 +1644,298 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
 
   const handleSummaryChange = (newSummary) => {
-    // Update only local state
-    setEditedSummary(newSummary);
-    setEditedProfile(prev => ({
+    setEditedSummary((prev) => {
+      if (!summaryUndoSkipRef.current && prev !== newSummary) {
+        // One undo entry per typing burst (not per keystroke).
+        if (summaryTypingBaselineRef.current === null) {
+          summaryTypingBaselineRef.current = prev;
+          pushSectionUndo('summary', {
+            summary: prev,
+            profileDescription: prev,
+            profileDescription_i18n: {
+              en: '',
+              fr: '',
+              ...(editedProfile.professionalSummary?.profileDescription_i18n || {}),
+              [uiLang]: prev,
+            },
+          });
+        }
+        if (summaryUndoIdleTimerRef.current) clearTimeout(summaryUndoIdleTimerRef.current);
+        summaryUndoIdleTimerRef.current = setTimeout(() => {
+          summaryTypingBaselineRef.current = null;
+        }, 1500);
+      }
+      summaryUndoSkipRef.current = false;
+      return newSummary;
+    });
+    setEditedProfile((prev) => ({
       ...prev,
       professionalSummary: {
         ...prev.professionalSummary,
         profileDescription: newSummary,
-        // Keep the active-language slice of the _i18n mirror in sync so the
-        // read-only view (which prefers _i18n) reflects manual edits.
         profileDescription_i18n: {
           en: '',
           fr: '',
           ...(prev.professionalSummary?.profileDescription_i18n || {}),
           [uiLang]: newSummary,
         },
-      }
+      },
     }));
 
-    // Mark as having unsaved changes
     setHasUnsavedChanges(true);
-    setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+    setModifiedSections((prev) => ({ ...prev, professionalSummary: true }));
+    scheduleSectionAutoSave('summary');
   };
 
+  const stopCameraStream = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const closeCameraModal = useCallback(() => {
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+  }, [stopCameraStream]);
+
+  const applyUploadedPhoto = (photoPayload) => {
+    setEditedProfile((prev) => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        photo: photoPayload,
+      },
+    }));
+    setPhotoError(null);
+
+    // Keep TopBar / local cache in sync so the header avatar updates immediately.
+    try {
+      const cached = getProfileData() || {};
+      setProfileData({
+        ...cached,
+        personalInfo: {
+          ...(cached.personalInfo || {}),
+          photo: photoPayload,
+        },
+      });
+      window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+    } catch (err) {
+      console.warn('Could not sync photo to profile cache:', err);
+    }
+  };
+
+  const normalizePhotoPayload = (raw, blob) => {
+    if (typeof raw === 'string' && raw.trim()) return { url: raw.trim() };
+    if (raw && typeof raw === 'object') {
+      const url = raw.url || raw.secure_url || raw.src || '';
+      if (url) return { ...raw, url };
+    }
+    if (blob) return { url: URL.createObjectURL(blob) };
+    return null;
+  };
+
+  const uploadProfilePhotoBlob = async (blob, filename = 'profile.jpg') => {
+    const profileId = editedProfile?._id || profile?._id;
+    const token = localStorage.getItem('token');
+    if (!profileId || !token) {
+      throw new Error(t('photoAuthError'));
+    }
+    const formData = new FormData();
+    formData.append('photo', blob, filename);
+    const response = await fetch(repApiUrl(`/profiles/${profileId}/photo`), {
+      method: 'PUT',
+      body: formData,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error(t('photoUploadError'));
+    }
+    const data = await response.json().catch(() => ({}));
+    let photo = normalizePhotoPayload(
+      data?.photo ||
+        data?.personalInfo?.photo ||
+        data?.data?.personalInfo?.photo ||
+        data?.data?.photo,
+      blob
+    );
+
+    // Prefer fresh API profile so TopBar and review page share the same URL.
+    try {
+      const refreshed = await fetchProfileFromAPI();
+      const refreshedPhoto = normalizePhotoPayload(refreshed?.personalInfo?.photo, null);
+      if (refreshedPhoto?.url) {
+        photo = refreshedPhoto;
+        if (refreshed) {
+          setEditedProfile((prev) => ({
+            ...prev,
+            ...refreshed,
+            personalInfo: {
+              ...(prev.personalInfo || {}),
+              ...(refreshed.personalInfo || {}),
+              photo: refreshedPhoto,
+            },
+          }));
+          setProfileData(refreshed);
+          window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+          setPhotoError(null);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Photo uploaded but profile refresh failed:', err);
+    }
+
+    if (!photo?.url) {
+      throw new Error(t('photoUploadError'));
+    }
+    applyUploadedPhoto(photo);
+  };
+
+  const openPhotoSourceModal = () => {
+    if (isUploadingPhoto) return;
+    setPhotoError(null);
+    setShowPhotoSourceModal(true);
+  };
+
+  const openDevicePicker = () => {
+    setShowPhotoSourceModal(false);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      setImgSrc(reader.result?.toString() || '');
+      setIsCropModalOpen(true);
+    });
+    reader.readAsDataURL(file);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  const startPhotoCamera = async () => {
+    setShowPhotoSourceModal(false);
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t('photoCameraError'));
+      setShowCameraModal(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setShowCameraModal(true);
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          void cameraVideoRef.current.play().catch(() => undefined);
+        }
+      });
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError(t('photoCameraError'));
+      setShowCameraModal(true);
+    }
+  };
+
+  const capturePhotoFromCamera = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setImgSrc(dataUrl);
+    setIsCropModalOpen(true);
+  };
+
+  const onImageLoad = (e) => {
+    const { width, height } = e.currentTarget;
+    setCrop(
+      centerCrop(
+        makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+        width,
+        height
+      )
+    );
+  };
+
+  const getCroppedImg = async (image, pixelCrop) => {
+    const canvas = document.createElement('canvas');
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    canvas.width = pixelCrop.width * scaleX;
+    canvas.height = pixelCrop.height * scaleY;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas unavailable');
+    ctx.drawImage(
+      image,
+      pixelCrop.x * scaleX,
+      pixelCrop.y * scaleY,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY,
+      0,
+      0,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY
+    );
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg', 0.95);
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!imgRef.current || !completedCrop) return;
+    try {
+      setIsUploadingPhoto(true);
+      setIsCropModalOpen(false);
+      const croppedBlob = await getCroppedImg(imgRef.current, completedCrop);
+      await uploadProfilePhotoBlob(croppedBlob, 'profile.jpg');
+      setImgSrc('');
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      setPhotoError(err?.message || t('photoUploadError'));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => stopCameraStream();
+  }, [stopCameraStream]);
+
   const pushToRepsProfile = () => {
-    // Requirements are cancelled for now: confirm & continue without gating.
+    if (!canContinue) return;
     updateProfileData(editedProfile._id, { isBasicProfileCompleted: true })
       .then(() => {
-        // Always stay inside the unified app — internal SPA navigation only.
+        // Step 2 done → profile page to confirm infos, then Continuer Onboarding → subscription.
         navigate('/profile');
       })
       .catch(error => {
         console.error('Error updating isBasicProfileCompleted:', error);
-        // Navigate anyway so the user is not stuck on the editor.
-        navigate('/profile');
+        // Still only continue if gate is satisfied (defense in depth).
+        if (canContinue) navigate('/profile');
       });
   };
 
@@ -1600,6 +1995,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             companies: ''
           }));
 
+          if (sectionEditingRef.current.companies) {
+            pushSectionUndo('companies', snapshotSection('companies'));
+          }
+
           // Local update only
           setEditedProfile(prev => ({
             ...prev,
@@ -1612,6 +2011,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           setTempCompany('');
           setHasUnsavedChanges(true);
           setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+          if (sectionEditingRef.current.companies) {
+            scheduleSectionAutoSave('companies');
+          }
 
         } else {
           // Handle skills (technical, professional, soft)
@@ -1655,6 +2057,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             }
           }
 
+          if (type === 'notableCompanies' && sectionEditingRef.current.companies) {
+            pushSectionUndo('companies', snapshotSection('companies'));
+          }
+
           // Local update only
           setEditedProfile(prev => ({
             ...prev,
@@ -1666,6 +2072,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
           setHasUnsavedChanges(true);
           setModifiedSections(prev => ({ ...prev, professionalSummary: true }));
+          if (type === 'notableCompanies' && sectionEditingRef.current.companies) {
+            scheduleSectionAutoSave('companies');
+          }
         } else {
           // Handle skills removal locally
           const currentSkills = editedProfile.skills?.[type] || [];
@@ -2146,6 +2555,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       onClick={() => setVideoModalExp({
                         title: String(role.title || role.role || ''),
                         company: String(role.company || ''),
+                        description: String(role.description || ''),
+                        responsibilities: Array.isArray(role.responsibilities)
+                          ? role.responsibilities
+                          : (localizeList(role.responsibilities_i18n, uiLang).length
+                            ? localizeList(role.responsibilities_i18n, uiLang)
+                            : []),
                         index,
                       })}
                       className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
@@ -2168,7 +2583,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           <ExperienceVideoModal
             isOpen={!!videoModalExp}
             onClose={() => setVideoModalExp(null)}
-            experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+            experience={{
+              title: videoModalExp.title,
+              company: videoModalExp.company,
+              description: videoModalExp.description,
+              responsibilities: videoModalExp.responsibilities,
+            }}
             experienceIndex={videoModalExp.index}
             profileId={editedProfile._id || editedProfile.id || ''}
             referencePhotoUrl={editedProfile?.personalInfo?.photo?.url || null}
@@ -2185,6 +2605,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             onAnalysisComplete={(data) => {
               if (!data) return;
               const idx = videoModalExp.index;
+              const catalog = availableLanguages;
+              let pendingLanguageSave = null;
               setEditedProfile((prev) => {
                 const experience = [...(prev.experience || [])];
                 if (!experience[idx]) return prev;
@@ -2199,10 +2621,50 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   videoRelevance: data.relevance,
                   videoAnalyzedAt: new Date().toISOString(),
                 };
-                const updated = { ...prev, experience };
+
+                const existingLanguages = prev.personalInfo?.languages || [];
+                const missing = buildMissingLanguagesFromVideoAnalysis(
+                  data,
+                  existingLanguages,
+                  catalog
+                );
+                const languages =
+                  missing.length > 0
+                    ? [...existingLanguages, ...missing]
+                    : existingLanguages;
+
+                const updated = {
+                  ...prev,
+                  experience,
+                  personalInfo: {
+                    ...prev.personalInfo,
+                    languages,
+                  },
+                };
+
+                if (missing.length > 0 && (prev._id || prev.id)) {
+                  pendingLanguageSave = {
+                    id: prev._id || prev.id,
+                    personalInfo: updated.personalInfo,
+                    addedCount: missing.length,
+                  };
+                }
+
                 if (onProfileUpdate) onProfileUpdate(updated);
                 return updated;
               });
+
+              if (pendingLanguageSave) {
+                setHasUnsavedChanges(true);
+                setModifiedSections((prev) => ({ ...prev, personalInfo: true }));
+                setValidationErrors((prev) => ({ ...prev, languages: '' }));
+                void updateBasicInfo(
+                  pendingLanguageSave.id,
+                  pendingLanguageSave.personalInfo
+                ).catch((err) => {
+                  console.error('Failed to persist languages detected from video:', err);
+                });
+              }
             }}
           />
         )}
@@ -2231,6 +2693,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       };
       updatedExperiences[index] = merged;
 
+      if (sectionEditingRef.current.experience) {
+        pushSectionUndo('experience', snapshotSection('experience'));
+      }
+
       // Local update only
       setEditedProfile(prev => ({
         ...prev,
@@ -2240,6 +2706,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       setModifiedSections(prev => ({ ...prev, experience: true }));
       setEditingExperience(null);
       setEditingExperienceIndex(-1);
+      if (sectionEditingRef.current.experience) {
+        scheduleSectionAutoSave('experience');
+      }
     } catch (error) {
       console.error('Error updating experience:', error);
     }
@@ -2324,7 +2793,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     try {
       await updateProfileData(editedProfile._id, {
         professionalSummary: {
-          ...editedProfile.professionalSummary,
           profileDescription: tempProfileDescription
         }
       });
@@ -2359,6 +2827,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       };
     }
 
+    if (sectionEditingRef.current.availability) {
+      pushSectionUndo('availability', snapshotSection('availability'));
+    }
+
     setEditedProfile(prev => ({
       ...prev,
       availability: updatedAvailability
@@ -2366,6 +2838,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     setHasUnsavedChanges(true);
     setModifiedSections(prev => ({ ...prev, availability: true }));
+    if (sectionEditingRef.current.availability) {
+      scheduleSectionAutoSave('availability');
+    }
   };
 
   // NEW: Save all profile changes at once
@@ -2391,16 +2866,24 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       }
 
       if (modifiedSections.professionalSummary) {
-        // Extract only IDs for industries and activities before saving
+        // Never send empty industries/activities from the CV editor when those
+        // sections are hidden — video analysis owns them for matching.
         const professionalSummaryToSave = {
           ...editedProfile.professionalSummary,
-          industries: editedProfile.professionalSummary.industries?.map(industry =>
-            typeof industry === 'object' ? industry._id : industry
-          ) || [],
-          activities: editedProfile.professionalSummary.activities?.map(activity =>
-            typeof activity === 'object' ? activity._id : activity
-          ) || []
         };
+        if (SHOW_PROFILE_DETAILS) {
+          professionalSummaryToSave.industries =
+            editedProfile.professionalSummary.industries?.map((industry) =>
+              typeof industry === 'object' ? industry._id : industry
+            ) || [];
+          professionalSummaryToSave.activities =
+            editedProfile.professionalSummary.activities?.map((activity) =>
+              typeof activity === 'object' ? activity._id : activity
+            ) || [];
+        } else {
+          delete professionalSummaryToSave.industries;
+          delete professionalSummaryToSave.activities;
+        }
 
         await updateProfileData(editedProfile._id, {
           professionalSummary: professionalSummaryToSave
@@ -2485,9 +2968,57 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // ── Per-section editing ──────────────────────────────────────────────────
   const isSectionEditing = (section) => !!sectionEditing[section];
 
+  const applySectionSnapshot = (section, snapshot) => {
+    if (!snapshot) return;
+    if (section === 'summary') {
+      const text = snapshot.summary ?? snapshot.profileDescription ?? '';
+      summaryUndoSkipRef.current = true;
+      summaryTypingBaselineRef.current = null;
+      setEditedSummary(text);
+      setEditedProfile((prev) => ({
+        ...prev,
+        professionalSummary: {
+          ...prev.professionalSummary,
+          profileDescription: snapshot.profileDescription ?? text,
+          ...(snapshot.profileDescription_i18n
+            ? { profileDescription_i18n: snapshot.profileDescription_i18n }
+            : {}),
+        },
+      }));
+      return;
+    }
+    if (section === 'basic') {
+      setEditedProfile((prev) => ({ ...prev, personalInfo: snapshot.personalInfo }));
+      return;
+    }
+    if (section === 'experience') {
+      setEditedProfile((prev) => ({ ...prev, experience: snapshot.experience }));
+      return;
+    }
+    if (section === 'availability') {
+      setEditedProfile((prev) => ({ ...prev, availability: snapshot.availability }));
+      return;
+    }
+    if (section === 'companies') {
+      setEditedProfile((prev) => ({
+        ...prev,
+        professionalSummary: {
+          ...prev.professionalSummary,
+          notableCompanies: snapshot.notableCompanies || [],
+          industries: snapshot.industries || prev.professionalSummary?.industries || [],
+          activities: snapshot.activities || prev.professionalSummary?.activities || [],
+        },
+      }));
+    }
+  };
+
   const startSectionEdit = (section) => {
     setSectionEditing((prev) => ({ ...prev, [section]: true }));
+    setSectionUndoStacks((prev) => ({ ...prev, [section]: [] }));
+    setAutoSaveStatus('idle');
+    setAutoSaveSection(null);
     if (section === 'summary') {
+      summaryTypingBaselineRef.current = null;
       // Seed the editor with the CURRENT language version of the summary.
       const localized = localizeText(
         editedProfile.professionalSummary?.profileDescription_i18n,
@@ -2498,6 +3029,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         ...prev,
         professionalSummary: { ...prev.professionalSummary, profileDescription: localized },
       }));
+    }
+    if (section === 'basic') {
+      basicTypingBaselineRef.current = null;
     }
   };
 
@@ -2526,19 +3060,51 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       return next;
     });
     if (section === 'summary') {
-      setEditedSummary(profileData.professionalSummary?.profileDescription || '');
+      const localized = localizeText(
+        profileData.professionalSummary?.profileDescription_i18n,
+        uiLang
+      ) || profileData.professionalSummary?.profileDescription || '';
+      summaryUndoSkipRef.current = true;
+      summaryTypingBaselineRef.current = null;
+      setEditedSummary(localized);
       setIsEditing(false);
     }
   };
 
   const cancelSection = (section) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     revertSection(section);
     setSectionEditing((prev) => ({ ...prev, [section]: false }));
+    setSectionUndoStacks((prev) => ({ ...prev, [section]: [] }));
+    setAutoSaveStatus('idle');
+    setAutoSaveSection(null);
   };
 
-  const saveSection = async (section) => {
-    if (isSaving) return;
+  const undoSection = (section) => {
+    const stack = sectionUndoStacks[section] || [];
+    if (stack.length === 0) return;
+    const snapshot = stack[stack.length - 1];
+    setSectionUndoStacks((prev) => ({
+      ...prev,
+      [section]: (prev[section] || []).slice(0, -1),
+    }));
+    applySectionSnapshot(section, snapshot);
+    setHasUnsavedChanges(true);
+    scheduleSectionAutoSave(section);
+  };
+
+  const saveSection = async (section, options = {}) => {
+    const { keepEditing = false, silent = false } = options;
+    if (isSaving && !silent) return;
+    if (silent) {
+      setAutoSaveSection(section);
+      setAutoSaveStatus('saving');
+    } else {
     setIsSaving(true);
+    }
     try {
       let savedProfile = editedProfile;
       if (section === 'basic') {
@@ -2567,16 +3133,30 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 editedProfile.professionalSummary?.profileDescription_i18n
               )
             : editedProfile.professionalSummary?.profileDescription_i18n;
-        const professionalSummaryToSave = {
-          ...editedProfile.professionalSummary,
-          ...(profileDescription_i18n ? { profileDescription_i18n } : {}),
-          industries: editedProfile.professionalSummary.industries?.map((industry) =>
-            typeof industry === 'object' ? industry._id : industry
-          ) || [],
-          activities: editedProfile.professionalSummary.activities?.map((activity) =>
-            typeof activity === 'object' ? activity._id : activity
-          ) || [],
-        };
+
+        // Field-level payload only — never replace industries/activities with [].
+        const professionalSummaryToSave =
+          section === 'summary'
+            ? {
+                profileDescription: editedProfile.professionalSummary?.profileDescription,
+                ...(profileDescription_i18n ? { profileDescription_i18n } : {}),
+              }
+            : {
+                notableCompanies: editedProfile.professionalSummary?.notableCompanies || [],
+                ...(SHOW_PROFILE_DETAILS
+                  ? {
+                      industries:
+                        editedProfile.professionalSummary.industries?.map((industry) =>
+                          typeof industry === 'object' ? industry._id : industry
+                        ) || [],
+                      activities:
+                        editedProfile.professionalSummary.activities?.map((activity) =>
+                          typeof activity === 'object' ? activity._id : activity
+                        ) || [],
+                    }
+                  : {}),
+              };
+
         await updateProfileData(editedProfile._id, { professionalSummary: professionalSummaryToSave });
         savedProfile = {
           ...editedProfile,
@@ -2588,53 +3168,93 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         setEditedProfile(savedProfile);
       }
       if (onProfileUpdate) onProfileUpdate(savedProfile);
+      if (!keepEditing) {
       setSectionEditing((prev) => ({ ...prev, [section]: false }));
       if (section === 'summary') setIsEditing(false);
+      }
+      if (silent) {
+        setAutoSaveStatus('saved');
+        setTimeout(() => {
+          setAutoSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev));
+        }, 2000);
+      } else {
       showToast(t('savedSuccess'), 'success');
+      }
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error(`Error saving section "${section}":`, error);
+      if (silent) {
+        setAutoSaveStatus('error');
+      } else {
       showToast(t('saveError'), 'error');
+      }
     } finally {
-      setIsSaving(false);
+      if (!silent) setIsSaving(false);
     }
   };
 
-  // Reusable Edit / Save / Cancel controls for a section header.
-  const renderSectionControls = (section) =>
-    isSectionEditing(section) ? (
-      <div className="flex items-center gap-2 flex-shrink-0">
+  persistSectionRef.current = saveSection;
+
+  // Reusable Edit / Undo / Cancel controls for a section header (autosave — no Save button).
+  const renderSectionControls = (section) => {
+    const canUndo = (sectionUndoStacks[section] || []).length > 0;
+    const showStatus = autoSaveSection === section && autoSaveStatus !== 'idle';
+
+    if (!isSectionEditing(section)) {
+      return (
         <button
+          onClick={() => startSectionEdit(section)}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          {t('edit')}
+        </button>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {showStatus && (
+          <span
+            className={`text-xs font-medium ${
+              autoSaveStatus === 'error'
+                ? 'text-red-600'
+                : autoSaveStatus === 'saved'
+                  ? 'text-green-600'
+                  : 'text-gray-500'
+            }`}
+          >
+            {autoSaveStatus === 'error'
+              ? t('autoSaveError')
+              : autoSaveStatus === 'saved'
+                ? t('autoSaved')
+                : t('autoSaving')}
+          </span>
+        )}
+      <button
+          type="button"
+          onClick={() => undoSection(section)}
+          disabled={!canUndo}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          title={t('undo')}
+      >
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4" />
+        </svg>
+          {t('undo')}
+      </button>
+        <button
+          type="button"
           onClick={() => cancelSection(section)}
-          disabled={isSaving}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
         >
           {t('cancel')}
         </button>
-        <button
-          onClick={() => saveSection(section)}
-          disabled={isSaving}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
-        >
-          {isSaving && (
-            <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          )}
-          {isSaving ? t('saving') : t('save')}
-        </button>
       </div>
-    ) : (
-      <button
-        onClick={() => startSectionEdit(section)}
-        className="px-3 py-1.5 text-xs font-semibold rounded-lg text-harx-700 bg-harx-50 hover:bg-harx-100 border border-harx-100 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
-      >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-        {t('edit')}
-      </button>
     );
+  };
 
   if (!editedProfile?.personalInfo) {
     return (
@@ -2666,6 +3286,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const allExperiencesHaveVideo =
     experienceList.length > 0 && experiencesWithVideo === experienceList.length;
   const missingVideosCount = experienceList.length - experiencesWithVideo;
+  const hasProfilePhoto = Boolean(editedProfile?.personalInfo?.photo?.url);
 
   const hasAvailabilitySet = (() => {
     const avail = editedProfile.availability;
@@ -2677,9 +3298,43 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     return hasSchedule;
   })();
 
-  // The "Continue" button is only unlocked when every experience has a video
-  // AND the availability (schedule + time zone) has been filled in.
-  const canContinue = allExperiencesHaveVideo && hasAvailabilitySet;
+  // The "Continue" button stays visible but locked until every experience has a
+  // video, a profile photo is set, and availability (schedule) has been filled in.
+  const canContinue = allExperiencesHaveVideo && hasProfilePhoto && hasAvailabilitySet;
+  const continueBlockedReason = !hasProfilePhoto
+    ? t('warnBottomPhoto')
+    : !allExperiencesHaveVideo
+    ? t('warnBottom')
+    : !hasAvailabilitySet
+    ? t('warnBottomAvail')
+    : '';
+
+  const confirmContinueButton = (variant = 'header') => (
+    <button
+      type="button"
+      onClick={pushToRepsProfile}
+      disabled={!canContinue}
+      title={canContinue ? undefined : continueBlockedReason}
+      className={
+        variant === 'header'
+          ? `px-4 py-2 text-sm font-semibold rounded-xl inline-flex items-center gap-2 transition-colors ${
+              canContinue
+                ? 'text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700'
+                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'
+            }`
+          : `px-6 py-3 text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-2 transition-all duration-200 ${
+              canContinue
+                ? 'text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5'
+                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed shadow-none'
+            }`
+      }
+    >
+      {variant === 'header' ? t('confirmContinue') : t('continueToProfile')}
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+    </button>
+  );
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -2699,20 +3354,123 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 {t('pageSubtitle')}
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {canContinue && (
-                <button
-                  onClick={pushToRepsProfile}
-                  className="px-4 py-2 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 hover:from-harx-700 hover:to-harx-alt-700 transition-colors inline-flex items-center gap-2"
+            <div className="flex items-center gap-3 flex-shrink-0 self-start">
+              {/* Photo card — same interaction as Profile page */}
+              <div className="relative group shrink-0">
+                <div
+                  className={`w-28 h-28 sm:w-36 sm:h-36 rounded-[28px] shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
+                    hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
+                  }`}
+                  onClick={() => {
+                    if (hasProfilePhoto) {
+                      setShowImageModal(true);
+                      return;
+                    }
+                    openPhotoSourceModal();
+                  }}
                 >
-                  {t('confirmContinue')}
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  {hasProfilePhoto ? (
+                    <img
+                      src={editedProfile.personalInfo.photo.url}
+                      alt={i18nT('profile.header.profilePhotoAlt')}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl font-black text-red-200 bg-red-50 uppercase tracking-tighter">
+                      {(editedProfile.personalInfo?.name || '?').charAt(0)}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
+                    <div className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full border border-white/30 truncate">
+                      {hasProfilePhoto
+                        ? i18nT('profile.header.viewPhoto')
+                        : t('addPhoto')}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPhotoSourceModal();
+                  }}
+                  disabled={isUploadingPhoto}
+                  className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white shadow-lg hover:opacity-90 disabled:opacity-60"
+                  title={i18nT('profile.header.changePhoto')}
+                >
+                  {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 </button>
+              </div>
+              {confirmContinueButton('header')}
+            </div>
+          </div>
+
+          {/* Guidance: re-read and edit extracted CV data */}
+          <div className="mb-4 relative overflow-hidden rounded-2xl border border-violet-300/70 bg-gradient-to-r from-violet-50 via-indigo-50 to-fuchsia-50 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 ring-4 ring-violet-200/60">
+                <Info className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-black uppercase tracking-wide text-violet-800">
+                  {t('reviewHintTitle')}
+                </p>
+                <p className="mt-1 text-sm font-medium text-violet-700/90 leading-relaxed">
+                  {t('reviewHintBody')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Mandatory: add / take a profile photo */}
+          {!hasProfilePhoto && (
+            <div className="mb-4 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-rose-50 to-red-50 p-5 shadow-lg shadow-red-200/40">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
+                    <Camera className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-base font-black uppercase tracking-wide text-red-700 flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      {t('warnPhotoTitle')}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-red-600 leading-relaxed">
+                      {t('warnPhotoBody')}
+                    </p>
+                    {photoError && (
+                      <p className="mt-2 text-xs font-semibold text-red-700">{photoError}</p>
+                    )}
+                    {isUploadingPhoto && (
+                      <p className="mt-2 text-xs font-semibold text-red-700 flex items-center gap-2">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        {t('photoUploading')}
+                      </p>
               )}
             </div>
           </div>
+                <div className="flex flex-wrap gap-2 sm:pl-16">
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={openPhotoSourceModal}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-harx-500/25 hover:opacity-95 disabled:opacity-60"
+                  >
+                    <Camera className="h-4 w-4" />
+                    {t('addPhoto')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoSelect}
+          />
 
           {/* Loud warning: record a video for every experience before continuing */}
           {!allExperiencesHaveVideo && (
@@ -2740,14 +3498,213 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           )}
 
+          {/* Fullscreen photo preview — same as ProfileView */}
+          {showImageModal && editedProfile?.personalInfo?.photo?.url && (
+            <div
+              className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 backdrop-blur-md"
+              onClick={() => setShowImageModal(false)}
+            >
+              <div
+                className="relative max-w-2xl w-full bg-slate-100 rounded-3xl overflow-hidden shadow-2xl border border-slate-200/50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 p-2 bg-slate-900/20 hover:bg-slate-900/40 text-white rounded-full transition-colors z-10"
+                  onClick={() => setShowImageModal(false)}
+                >
+                  <X size={24} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImageModal(false);
+                    openPhotoSourceModal();
+                  }}
+                  className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black uppercase tracking-widest text-harx-700 shadow-lg hover:bg-white"
+                >
+                  <Camera className="w-4 h-4" />
+                  {i18nT('profile.header.changePhoto')}
+                </button>
+                <img
+                  src={editedProfile.personalInfo.photo.url}
+                  alt={i18nT('profile.header.profilePhotoAlt')}
+                  className="w-full h-auto object-contain"
+                  style={{ maxHeight: '80vh' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Photo source chooser — same as ProfileView */}
+          {showPhotoSourceModal && (
+            <div
+              className="fixed inset-0 z-[125] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowPhotoSourceModal(false)}
+            >
+              <div
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                    {i18nT('profile.header.photoSourceTitle')}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowPhotoSourceModal(false)}
+                    className="p-2 hover:bg-slate-50 rounded-xl"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                <div className="p-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={openDevicePicker}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+                  >
+                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-600">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">
+                      {i18nT('profile.header.chooseFromDevice')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startPhotoCamera()}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+                  >
+                    <div className="p-2.5 rounded-xl bg-harx-50 text-harx-600">
+                      <ImagePlus className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">
+                      {i18nT('profile.header.takePhoto')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live camera capture — same as ProfileView */}
+          {showCameraModal && (
+            <div className="fixed inset-0 z-[130] bg-slate-900/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-lg font-black text-slate-900">{i18nT('profile.header.takePhoto')}</h3>
+                  <button type="button" onClick={closeCameraModal} className="p-2 hover:bg-slate-50 rounded-xl">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                <div className="p-5 bg-slate-950 flex items-center justify-center min-h-[280px]">
+                  {cameraError ? (
+                    <p className="text-sm font-semibold text-rose-200 text-center px-4">{cameraError}</p>
+                  ) : (
+                    <video
+                      ref={cameraVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full max-h-[55vh] rounded-2xl object-cover mirror-x scale-x-[-1]"
+                      aria-label={i18nT('profile.header.cameraPreview')}
+                    />
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeCameraModal}
+                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50"
+                  >
+                    {i18nT('profile.common.cancel')}
+                  </button>
+                  {!cameraError && (
+                    <button
+                      type="button"
+                      onClick={capturePhotoFromCamera}
+                      className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-harx-500/20"
+                    >
+                      {i18nT('profile.header.capturePhoto')}
+                    </button>
+                  )}
+                  {cameraError && (
+                    <button
+                      type="button"
+                      onClick={openDevicePicker}
+                      className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90"
+                    >
+                      {i18nT('profile.header.chooseFromDevice')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Image Crop Modal — same as ProfileView */}
+          {isCropModalOpen && imgSrc && (
+            <div className="fixed inset-0 z-[130] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-xl font-black text-slate-900">{i18nT('profile.header.cropPhoto')}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsCropModalOpen(false)}
+                    className="p-2 hover:bg-slate-50 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-auto p-6 bg-slate-50/50 flex justify-center items-center">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    aspect={1}
+                    circularCrop
+                  >
+                    <img
+                      ref={imgRef}
+                      src={imgSrc}
+                      alt={i18nT('profile.header.cropAlt')}
+                      onLoad={onImageLoad}
+                      className="max-w-full max-h-[50vh] object-contain"
+                    />
+                  </ReactCrop>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCropModalOpen(false)}
+                    className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    {i18nT('profile.common.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCropComplete()}
+                    className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-harx-500/20 active:scale-95"
+                  >
+                    {i18nT('profile.header.savePhoto')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Profile Overview */}
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('personalInfo')}</h3>
             {renderSectionControls('basic')}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 items-start">
             {isSectionEditing('basic') ? (
               <>
+                <div className="space-y-4 min-w-0">
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">👤 {t('name')}</h3>
                   <input
@@ -2759,6 +3716,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   />
                   {renderError(validationErrors.name, 'name')}
                 </div>
+                  <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">📧 {t('email')}</h3>
+                    <input
+                      type="email"
+                      value={editedProfile.personalInfo.email}
+                      onChange={(e) => handleProfileChange('email', e.target.value)}
+                      className="w-full p-2 border rounded-md bg-white/50"
+                      placeholder={t('emailPlaceholder')}
+                    />
+                    {renderError(validationErrors.email, 'email')}
+                  </div>
+                </div>
+                <div className="space-y-4 min-w-0">
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('country')}</h3>
                   <div className="relative country-selector">
@@ -2825,17 +3795,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
                 </div>
                 <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">📧 {t('email')}</h3>
-                  <input
-                    type="email"
-                    value={editedProfile.personalInfo.email}
-                    onChange={(e) => handleProfileChange('email', e.target.value)}
-                    className="w-full p-2 border rounded-md bg-white/50"
-                    placeholder={t('emailPlaceholder')}
-                  />
-                  {renderError(validationErrors.email, 'email')}
-                </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">📱 {t('phone')}</h3>
                   <input
                     type="tel"
@@ -2846,7 +3805,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   />
                   {renderError(validationErrors.phone, 'phone')}
                 </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl col-span-2">
+                </div>
+                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl md:col-span-2">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('languages')}</h3>
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -3053,6 +4013,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </>
             ) : (
               <>
+                <div className="space-y-4 min-w-0">
                 <ProfileReadField
                   label={t('name')}
                   value={editedProfile.personalInfo.name}
@@ -3062,46 +4023,49 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     </svg>
                   }
                 />
-                <div>
                   <ProfileReadField
-                    label={t('country')}
-                    value={countryDisplay}
+                    label={t('email')}
+                    value={editedProfile.personalInfo.email}
                     icon={
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                     }
                   />
-                  {renderError(validationErrors.country, 'country')}
-                  <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
+                <ProfileReadField
+                    label={t('experienceLabel')}
+                    value={t('yearsExperience', { count: Number(editedProfile.professionalSummary?.yearsOfExperience || 0) })}
+                  icon={
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  }
+                />
                 </div>
+                <div className="space-y-4 min-w-0">
+                  <div>
                 <ProfileReadField
-                  label={t('email')}
-                  value={editedProfile.personalInfo.email}
+                      label={t('country')}
+                      value={countryDisplay}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   }
                 />
+                    {renderError(validationErrors.country, 'country')}
+                    <CountryMismatchWarning currentCountry={editedProfile.personalInfo?.country} />
+                  </div>
                 <ProfileReadField
-                  label={t('phone')}
-                  value={editedProfile.personalInfo.phone}
+                    label={t('phone')}
+                    value={editedProfile.personalInfo.phone}
                   icon={
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
                   }
                 />
-                <ProfileReadField
-                  label={t('experienceLabel')}
-                  value={t('yearsExperience', { count: Number(editedProfile.professionalSummary?.yearsOfExperience || 0) })}
-                  icon={
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                  }
-                />
+                </div>
                 <div className="md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-harx-50 text-harx-600">
@@ -3564,32 +4528,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             )}
           </div>
 
-          {/* Action Buttons */}
-          {canContinue ? (
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
-              <p className="text-sm text-gray-600">
-                {t('everythingGood')}
-              </p>
-              <button
-                onClick={pushToRepsProfile}
-                className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-harx-600 to-harx-alt-600 rounded-xl shadow-lg shadow-harx-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center justify-center gap-2"
-              >
-                {t('continueToProfile')}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
+          {/* Action Buttons — always visible; grayed until requirements are met */}
+          <div
+            className={`mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl border ${
+              canContinue
+                ? 'bg-gray-50 border-gray-100'
+                : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <p className={`text-sm ${canContinue ? 'text-gray-600' : 'text-slate-500 font-medium'}`}>
+              {canContinue ? t('everythingGood') : continueBlockedReason}
+            </p>
+            {confirmContinueButton('footer')}
             </div>
-          ) : (
-            <div className="mt-8 flex items-center gap-3 p-5 rounded-2xl bg-red-50 border-2 border-red-200">
-              <svg className="h-5 w-5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm font-bold text-red-700">
-                {!allExperiencesHaveVideo ? t('warnBottom') : t('warnBottomAvail')}
-              </p>
-            </div>
-          )}
         </div>
       </div>
 

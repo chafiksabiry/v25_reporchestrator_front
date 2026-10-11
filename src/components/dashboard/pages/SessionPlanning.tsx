@@ -1,9 +1,23 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav';
 import { useTranslation } from 'react-i18next';
 import { HorizontalCalendar } from '../scheduler/HorizontalCalendar';
 import { TimeSlot, Gig, WeeklyStats, Rep, UserRole, Company } from '../../../types/scheduler';
-import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles } from 'lucide-react';
+import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, CheckCircle2, Sparkles, UserCheck, Ban, LogOut } from 'lucide-react';
+import {
+    engagementTone,
+    ENGAGEMENT_TONE_CLASS,
+    isDateInPeriod,
+    periodEnd,
+    periodStart,
+    toLocalYmd,
+    type StatsPeriod,
+    zonedWallTimeToUtc,
+    resolveIanaZone,
+    computeAttendanceScore,
+    resolveReservationYmd,
+} from '../../../utils/planningMetrics';
 import { CompanyView } from '../scheduler/CompanyView';
 import { WalletFilterSelect } from '../ui/WalletFilterSelect';
 import { WorkloadPredictionComponent as WorkloadPrediction } from '../scheduler/WorkloadPrediction';
@@ -17,6 +31,8 @@ import { schedulerApi } from '../../../services/api/scheduler';
 import { slotApi } from '../../../services/api/slotApi';
 import { AvailableSlotsGrid } from '../scheduler/AvailableSlotsGrid';
 import { Skeleton } from '../ui/Skeleton';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import { callsApi } from '../../../utils/client';
 
 // Define ExternalGig type locally for API response mapping
 interface ExternalGig {
@@ -43,12 +59,20 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
     const agentData = slot.agentId && typeof slot.agentId === 'object' ? slot.agentId : null;
     const gigData = slot.gigId && typeof slot.gigId === 'object' ? slot.gigId : null;
 
-    const id = slot.slotId || (slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID();
+    // Reservation docs must use their own _id. Preferring slotId collapsed every
+    // weekly occurrence of the same template into one row → monthly hours froze.
+    const isReservationDoc = Boolean(
+        slot.reservationDate ||
+        (slot.slotId && slot.agentId && !Array.isArray(slot.reservations))
+    );
+    const id = isReservationDoc
+        ? ((slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID())
+        : (slot.slotId || (slot._id as any)?.$oid || slot._id?.toString() || crypto.randomUUID());
     let repId = (agentData as any)?._id || (agentData as any)?.$oid || slot.agentId?.toString() || slot.repId?.toString() || '';
     const gigId = (gigData as any)?._id || (gigData as any)?.$oid || slot.gigId?.toString() || '';
 
     let status = slot.status;
-    let isReservation = !!slot.isMember;
+    let isReservation = !!slot.isMember || isReservationDoc;
     let repNotes = '';
     let reservationId = '';
 
@@ -56,7 +80,13 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
     const reservedCount = slot.reservedCount !== undefined ? slot.reservedCount : reservations.length;
     const capacity = slot.capacity || 1;
 
-    if (slot.reservationId) {
+    if (isReservationDoc) {
+        status = String(slot.status || 'reserved').toLowerCase() === 'cancelled' ? 'cancelled' : 'reserved';
+        isReservation = status === 'reserved';
+        reservationId = ((slot._id as any)?.$oid || slot._id?.toString() || '') as string;
+        repNotes = slot.notes || '';
+        if (currentAgentId) repId = currentAgentId || repId;
+    } else if (slot.reservationId) {
         status = 'reserved';
         isReservation = true;
         reservationId = slot.reservationId;
@@ -75,10 +105,11 @@ const mapBackendSlotToSlot = (slot: any, currentAgentId?: string): TimeSlot => {
         }
     }
 
-    let date = slot.date;
+    let date = slot.reservationDate || slot.date;
     if (!date && slot.startTime && slot.startTime.includes('T')) {
         date = slot.startTime.split('T')[0];
     }
+    if (date) date = String(date).slice(0, 10);
 
     return {
         id,
@@ -197,7 +228,12 @@ interface EnrolledGig {
                 day: string;
                 hours: { start: string; end: string; };
             }[];
-            time_zone?: string | { name: string };
+            time_zone?: string | { name?: string; zoneName?: string };
+            minimumHours?: {
+                daily?: number;
+                weekly?: number;
+                monthly?: number;
+            };
         };
         commission?: {
             commission_per_call?: number;
@@ -218,6 +254,7 @@ interface EnrolledGig {
 export function SessionPlanning() {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [slots, setSlots] = useState<TimeSlot[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -238,23 +275,56 @@ export function SessionPlanning() {
     const [quickEnd, setQuickEnd] = useState<string>('');
     const [globalNotes, setGlobalNotes] = useState<string>('');
     const [loadingGigs, setLoadingGigs] = useState<boolean>(true);
+    const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('week');
+    const [allReservations, setAllReservations] = useState<any[]>([]);
+    const [agentCalls, setAgentCalls] = useState<any[]>([]);
     const [showAttendancePanel] = useState<boolean>(false);
     const [showAIPanel] = useState<boolean>(true);
+    const refreshSeqRef = React.useRef(0);
     const routeGigId = useMemo(() => {
-        const p = new URLSearchParams(location.search);
-        return String(p.get('gigId') || '').trim();
-    }, [location.search]);
+        const fromSearch = String(new URLSearchParams(location.search).get('gigId') || '').trim();
+        const fromState = String((location.state as { gigId?: string } | null)?.gigId || '').trim();
+        return fromSearch || fromState;
+    }, [location.search, location.state]);
+
+    const applySelectedGig = (gigId: string | null, replaceUrl = true) => {
+        const id = String(gigId || '').trim();
+        setSelectedGigId(id || null);
+        persistActiveGigId(id || null);
+        if (!replaceUrl) return;
+        const params = new URLSearchParams(location.search);
+        if (id) params.set('gigId', id);
+        else params.delete('gigId');
+        const search = params.toString();
+        navigate(
+            { pathname: location.pathname, search: search ? `?${search}` : '' },
+            { replace: true, state: id ? { gigId: id } : undefined }
+        );
+    };
 
     const refreshData = async () => {
         if (!selectedRepId) return;
+        const seq = ++refreshSeqRef.current;
 
         try {
             if (userRole === 'rep') {
-                const [timeSlots, availableSlots, reservations] = await Promise.all([
+                const [timeSlots, availableSlots, reservations, callsRes] = await Promise.all([
                     schedulerApi.getTimeSlots(selectedRepId),
                     selectedGigId ? slotApi.getSlots(selectedGigId) : slotApi.getSlots(),
-                    selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId)
+                    selectedGigId ? slotApi.getReservations(selectedRepId, selectedGigId) : slotApi.getReservations(selectedRepId),
+                    callsApi.getByAgentId(selectedRepId).catch(() => null),
                 ]);
+
+                // Ignore stale responses when gig/date changes rapidly (week navigation).
+                if (seq !== refreshSeqRef.current) return;
+
+                setAllReservations(Array.isArray(reservations) ? reservations : []);
+                const callsList = Array.isArray((callsRes as any)?.data)
+                    ? (callsRes as any).data
+                    : Array.isArray(callsRes)
+                      ? callsRes
+                      : [];
+                setAgentCalls(callsList);
 
                 const mappedTimeSlots = Array.isArray(timeSlots) ? timeSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
                 const mappedAvailableSlots = Array.isArray(availableSlots) ? availableSlots.map(s => mapBackendSlotToSlot(s, selectedRepId)) : [];
@@ -296,6 +366,8 @@ export function SessionPlanning() {
                 if (!selectedGigId) return;
 
                 const gigAgents = await schedulerApi.getGigAgents(selectedGigId, 'enrolled');
+                if (seq !== refreshSeqRef.current) return;
+
                 const mappedReps = gigAgents.map(ga => ({
                     id: ga.agentId._id,
                     name: ga.agentId.personalInfo?.firstName + ' ' + ga.agentId.personalInfo?.lastName,
@@ -313,6 +385,7 @@ export function SessionPlanning() {
                     slotApi.getSlots(selectedGigId)
                 ]);
 
+                if (seq !== refreshSeqRef.current) return;
                 const mappedTimeSlots = Array.isArray(timeSlots) ? timeSlots.map((s: any) => mapBackendSlotToSlot(s, selectedRepId)) : [];
                 const mappedAvailableSlots = Array.isArray(availableSlots) ? availableSlots.map((s: any) => mapBackendSlotToSlot(s, selectedRepId)) : [];
 
@@ -336,6 +409,7 @@ export function SessionPlanning() {
                 setSlots(finalSlots);
             }
         } catch (error) {
+            if (seq !== refreshSeqRef.current) return;
             console.error('Error refreshing data:', error);
         }
     };
@@ -353,7 +427,7 @@ export function SessionPlanning() {
 
             try {
                 setLoadingGigs(true);
-                const apiUrl = import.meta.env.VITE_API_URL_GIGS || 'https://v25gigsmanualcreationbackend-recette.up.railway.app/api';
+                const apiUrl = getGigsApiBase();
                 const response = await axios.get(`${apiUrl}/gigs/company/${companyId}`);
 
                 if (response.data && response.data.data) {
@@ -380,13 +454,19 @@ export function SessionPlanning() {
             if (!selectedRepId) return;
 
             try {
-                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api';
+                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api';
                 const response = await axios.get(`${matchingApiUrl}/gig-agents/agent/${selectedRepId}`);
 
                 if (response.data) {
                     const enrolledOnly = response.data.filter((ga: EnrolledGig) => ga.status?.toLowerCase() === 'enrolled');
 
-                    const mappedGigs: Gig[] = enrolledOnly.map((gigAgent: EnrolledGig) => ({
+                    const mappedGigs: Gig[] = enrolledOnly
+                      .filter((gigAgent: EnrolledGig) => {
+                        if (!gigAgent?.gigId || typeof gigAgent.gigId !== 'object') return false;
+                        // Only lifecycle-active company gigs in REP planning dropdown.
+                        return String((gigAgent.gigId as { status?: string }).status || '').toLowerCase() === 'active';
+                      })
+                      .map((gigAgent: EnrolledGig) => ({
                         id: gigAgent.gigId._id,
                         name: gigAgent.gigId.title,
                         description: gigAgent.gigId.description || '',
@@ -396,7 +476,7 @@ export function SessionPlanning() {
                         skills: [],
                         priority: 'medium',
                         availability: gigAgent.gigId.availability
-                    }));
+                      }));
 
                     setGigs(mappedGigs);
                 }
@@ -416,14 +496,28 @@ export function SessionPlanning() {
 
     useEffect(() => {
         if (gigs.length <= 0) return;
-        if (routeGigId && gigs.some((g) => g.id === routeGigId)) {
-            setSelectedGigId(routeGigId);
-            return;
+        const stored = getActiveGigId();
+        const preferred =
+            [routeGigId, stored].find((id) => Boolean(id) && gigs.some((g) => g.id === id)) ||
+            (selectedGigId && gigs.some((g) => g.id === selectedGigId) ? selectedGigId : '') ||
+            gigs[0].id;
+        if (!preferred) return;
+        if (selectedGigId !== preferred) setSelectedGigId(preferred);
+        persistActiveGigId(preferred);
+        if (routeGigId !== preferred) {
+            const params = new URLSearchParams(location.search);
+            params.set('gigId', preferred);
+            navigate(
+                { pathname: location.pathname, search: `?${params.toString()}` },
+                { replace: true, state: { gigId: preferred } }
+            );
         }
-        if (!selectedGigId) {
-            setSelectedGigId(gigs[0].id);
-        }
-    }, [gigs, routeGigId, selectedGigId]);
+    }, [gigs, routeGigId]);
+
+    const selectedGig = useMemo(
+        () => gigs.find((g) => g.id === selectedGigId) || null,
+        [gigs, selectedGigId]
+    );
 
     const weeklyStats = useMemo<WeeklyStats>(() => {
         const stats: WeeklyStats = {
@@ -435,7 +529,7 @@ export function SessionPlanning() {
         };
 
         const filteredSlots = userRole === 'rep'
-            ? slots.filter(slot => slot.repId === selectedRepId)
+            ? slots.filter(slot => slot.repId === selectedRepId || slot.isMember)
             : slots;
 
         filteredSlots.forEach((slot) => {
@@ -455,6 +549,152 @@ export function SessionPlanning() {
         stats.pendingHours = draftSlots.reduce((sum, s) => sum + (s.duration || 1), 0);
         return stats;
     }, [slots, userRole, selectedRepId, draftSlots]);
+
+    const engagementMetrics = useMemo(() => {
+        const mh = selectedGig?.availability?.minimumHours;
+        const requiredDaily = Number(mh?.daily) || 0;
+        const requiredWeekly = Number(mh?.weekly) || 0;
+        const requiredMonthly = Number(mh?.monthly) || (requiredWeekly > 0 ? requiredWeekly * 4 : 0);
+
+        // Period windows (local calendar):
+        // - day = today only
+        // - week = Monday → Sunday of the current week
+        // - month = 1st → last day of the current calendar month
+        const now = new Date();
+        const todayStr = toLocalYmd(now);
+        const weekFrom = toLocalYmd(periodStart('week', now));
+        const weekTo = toLocalYmd(periodEnd('week', now));
+        const monthFrom = toLocalYmd(periodStart('month', now));
+        const monthTo = toLocalYmd(periodEnd('month', now));
+
+        // Count from raw reservations (one row per occurrence), not deduped slots.
+        const reservedRows = (allReservations || []).filter((r: any) => {
+            const status = String(r.status || 'reserved').toLowerCase();
+            if (status === 'cancelled' || status === 'canceled') return false;
+            const agent = String(r.agentId?._id || r.agentId?.$oid || r.agentId || '');
+            if (selectedRepId && agent && agent !== String(selectedRepId)) return false;
+            if (selectedGigId) {
+                const gid = String(r.gigId?._id || r.gigId?.$oid || r.gigId || '');
+                if (gid && gid !== String(selectedGigId)) return false;
+            }
+            return true;
+        });
+
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const hoursInRange = (fromYmd: string, toYmd: string) =>
+            reservedRows.reduce((sum: number, r: any) => {
+                const ymd =
+                    resolveReservationYmd(r.reservationDate, gigTz, now.getTime()) ||
+                    resolveReservationYmd(r.date, gigTz, now.getTime());
+                if (!ymd || ymd < fromYmd || ymd > toYmd) return sum;
+                const dur = Number(r.duration);
+                return sum + (Number.isFinite(dur) && dur > 0 ? dur : 1);
+            }, 0);
+
+        const plannedDaily = hoursInRange(todayStr, todayStr);
+        const plannedWeekly = hoursInRange(weekFrom, weekTo);
+        const plannedMonthly = hoursInRange(monthFrom, monthTo);
+        const reservedTotal = reservedRows.length;
+
+        const hasReservedToday = reservedRows.some((r: any) => {
+            const ymd =
+                resolveReservationYmd(r.reservationDate, gigTz, now.getTime()) ||
+                resolveReservationYmd(r.date, gigTz, now.getTime());
+            return ymd === todayStr;
+        });
+
+        const dailyTone = engagementTone(plannedDaily, requiredDaily, {
+            dailyZeroWithActivity: plannedDaily === 0 && hasReservedToday,
+        });
+        const dailyFinalTone =
+            plannedDaily === 0 && hasReservedToday
+                ? 'green'
+                : plannedDaily === 0 && requiredDaily === 0
+                  ? 'green'
+                  : dailyTone;
+
+        return {
+            daily: { planned: plannedDaily, required: requiredDaily, tone: dailyFinalTone },
+            weekly: {
+                planned: plannedWeekly,
+                required: requiredWeekly,
+                tone: engagementTone(plannedWeekly, requiredWeekly),
+            },
+            monthly: {
+                planned: plannedMonthly,
+                required: requiredMonthly,
+                tone: engagementTone(plannedMonthly, requiredMonthly),
+            },
+            reservedTotal,
+        };
+    }, [allReservations, selectedGig, selectedGigId, selectedRepId]);
+
+    const attendanceBreakdown = useMemo(() => {
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const reservedUiSlots = (slots || [])
+            .filter((s) => String(s.status || '').toLowerCase() === 'reserved')
+            .map((s) => ({
+                status: 'reserved',
+                reservationDate: s.date,
+                date: s.date,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                gigId: s.gigId,
+                agentId: s.repId,
+                duration: s.duration,
+            }));
+        return computeAttendanceScore({
+            reservations: allReservations,
+            slots: reservedUiSlots,
+            calls: agentCalls,
+            gigId: selectedGigId,
+            gigTz,
+            agentId: selectedRepId,
+        });
+    }, [allReservations, slots, agentCalls, selectedGigId, selectedGig, selectedRepId]);
+    const attendanceScore = attendanceBreakdown.score;
+
+    const formatAttendanceValue = (rate: number | null) => {
+        if (rate != null) return `${rate}%`;
+        if (attendanceBreakdown.reservedUpcoming > 0) {
+            return t('sessionPlanning.attendancePending', 'En attente');
+        }
+        return '—';
+    };
+
+    const lastMinuteCancelRate = useMemo(() => {
+        const gigTz = resolveIanaZone(selectedGig?.availability?.time_zone);
+        const relevant = (allReservations || []).filter((r: any) => {
+            const dateStr = String(r.reservationDate || r.date || '').slice(0, 10);
+            if (!dateStr) return false;
+            if (selectedGigId && String(r.gigId?._id || r.gigId) !== selectedGigId) return false;
+            return isDateInPeriod(dateStr, statsPeriod);
+        });
+        const totalEver = relevant.length;
+        if (totalEver === 0) return null;
+
+        const lastMinute = relevant.filter((r: any) => {
+            if (String(r.status || '').toLowerCase() !== 'cancelled') return false;
+            const dateStr = String(r.reservationDate || r.date || '').slice(0, 10);
+            const start = String(r.startTime || '00:00');
+            const cancelledRaw = r.cancelledAt || r.updatedAt || r.canceledAt;
+            if (!cancelledRaw) return false;
+            const cancelledAt = new Date(cancelledRaw);
+            if (Number.isNaN(cancelledAt.getTime())) return false;
+            let slotStart: Date | null = null;
+            if (gigTz) {
+                slotStart = zonedWallTimeToUtc(dateStr, start, gigTz);
+            }
+            if (!slotStart) {
+                slotStart = new Date(`${dateStr}T${start.slice(0, 5)}:00`);
+            }
+            if (!slotStart || Number.isNaN(slotStart.getTime())) return false;
+            const diffMs = slotStart.getTime() - cancelledAt.getTime();
+            return diffMs >= 0 && diffMs <= 2 * 60 * 60 * 1000;
+        }).length;
+
+        return Math.round((lastMinute / totalEver) * 100);
+    }, [allReservations, selectedGigId, selectedGig, statsPeriod]);
 
     const isPastDate = format(selectedDate, 'yyyy-MM-dd') < format(new Date(), 'yyyy-MM-dd');
 
@@ -632,9 +872,13 @@ export function SessionPlanning() {
                                 <CalendarRange className="h-6 w-6 text-harx-300" />
                             </div>
                             <div>
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-harx-300">Planning des sessions</span>
-                                <h1 className="text-2xl font-black text-white tracking-tight leading-none mt-0.5">{t('sessionPlanning.title')}</h1>
-                                <p className="text-[11px] font-medium text-white/50 mt-1">Gérez et réservez vos créneaux d'appels en toute simplicité.</p>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-harx-300">{t('sessionPlanning.eyebrow')}</span>
+                                <h1 className="text-2xl font-black text-white tracking-tight leading-none mt-0.5">
+                                    {selectedGig
+                                        ? t('sessionPlanning.titleOf', { gig: selectedGig.name })
+                                        : t('sessionPlanning.title')}
+                                </h1>
+                                <p className="text-[11px] font-medium text-white/50 mt-1">{t('sessionPlanning.subtitle')}</p>
                             </div>
                             {loadingGigs && (
                                 <div className="ml-2 flex items-center gap-1.5">
@@ -642,32 +886,130 @@ export function SessionPlanning() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-harx-500/20">
-                                    <Clock className="h-4.5 w-4.5 text-harx-300" />
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {([
+                                { key: 'daily' as const, label: t('sessionPlanning.engagementDaily'), m: engagementMetrics.daily },
+                                { key: 'weekly' as const, label: t('sessionPlanning.engagementWeekly'), m: engagementMetrics.weekly },
+                                { key: 'monthly' as const, label: t('sessionPlanning.engagementMonthly'), m: engagementMetrics.monthly },
+                            ]).map(({ key, label, m }) => {
+                                const tone = ENGAGEMENT_TONE_CLASS[m.tone];
+                                return (
+                                    <div
+                                        key={key}
+                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 ${tone.bg} ${tone.ring}`}
+                                    >
+                                        <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <Clock className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{label}</p>
+                                            <p className={`text-sm font-black tracking-tight ${tone.text}`}>
+                                                {t('sessionPlanning.ofRequired', {
+                                                    planned: m.planned,
+                                                    required: m.required || '—',
+                                                })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Engagement hebdo</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.totalHours}<span className="text-sm text-white/40 ml-1">h</span></p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.reserved')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{engagementMetrics.reservedTotal}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20">
-                                    <CheckCircle2 className="h-4.5 w-4.5 text-emerald-300" />
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/20">
+                                    <Briefcase className="h-4 w-4 text-indigo-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Réservés</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{weeklyStats.reservedSlots}</p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.activeGigs')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">{gigs.length}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-4 py-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20">
-                                    <Briefcase className="h-4.5 w-4.5 text-indigo-300" />
+                            <div
+                                className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5"
+                                title={t(
+                                    'sessionPlanning.attendanceHint',
+                                    'Slots réservés passés vs activité téléphonie réelle pendant le créneau (appels / tentatives).'
+                                )}
+                            >
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/20">
+                                    <UserCheck className="h-4 w-4 text-sky-300" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">Projets actifs</p>
-                                    <p className="text-xl font-black text-white tracking-tight">{Object.keys(weeklyStats.gigBreakdown).length}</p>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {formatAttendanceValue(attendanceScore)}
+                                    </p>
+                                    {attendanceBreakdown.reservedPast > 0 && (
+                                        <p className="text-[9px] font-bold text-white/45 tabular-nums">
+                                            {attendanceBreakdown.withActivity}/{attendanceBreakdown.reservedPast}
+                                            {attendanceBreakdown.noShow > 0
+                                                ? ` · ${attendanceBreakdown.noShow} ${t('sessionPlanning.attendanceNoShow', 'absent(s)')}`
+                                                : ''}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20">
+                                    <Clock className="h-4 w-4 text-amber-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lateAttendance')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {formatAttendanceValue(attendanceBreakdown.lateRate)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500/20">
+                                    <LogOut className="h-4 w-4 text-orange-300" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.earlyCheckOut')}</p>
+                                    <p className="text-xl font-black text-white tracking-tight">
+                                        {formatAttendanceValue(attendanceBreakdown.earlyCheckoutRate)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 min-w-[140px]">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/20">
+                                        <Ban className="h-4 w-4 text-rose-300" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lastMinuteCancel')}</p>
+                                        <p className="text-xl font-black text-white tracking-tight">
+                                            {lastMinuteCancelRate == null ? '—' : `${lastMinuteCancelRate}%`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {([
+                                        ['week', t('sessionPlanning.periodWeek')],
+                                        ['month', t('sessionPlanning.periodMonth')],
+                                        ['quarter', t('sessionPlanning.periodQuarter')],
+                                        ['year', t('sessionPlanning.periodYear')],
+                                    ] as const).map(([key, label]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setStatsPeriod(key)}
+                                            className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition ${
+                                                statsPeriod === key
+                                                    ? 'bg-white text-slate-900'
+                                                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -686,7 +1028,7 @@ export function SessionPlanning() {
                                     gigs.map(gig => (
                                         <button
                                             key={gig.id}
-                                            onClick={() => setSelectedGigId(gig.id)}
+                                            onClick={() => applySelectedGig(gig.id)}
                                             className={`px-8 py-4 rounded-2xl whitespace-nowrap transition-all duration-300 text-[10px] font-black uppercase tracking-widest ${selectedGigId === gig.id
                                                 ? 'bg-gradient-harx text-white shadow-lg shadow-harx-500/20'
                                                 : 'bg-white text-gray-500 hover:text-harx-600 hover:bg-harx-50 border border-gray-100 shadow-sm'
@@ -734,17 +1076,18 @@ export function SessionPlanning() {
                         </div>
                     ) : userRole === 'rep' ? (
                         <div className="space-y-3">
-                            <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-                                <div className="flex items-center gap-1.5 mb-3 text-slate-400">
-                                    <Briefcase className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Projet sélectionné</span>
+                            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                                <div className="flex items-center gap-1.5 mb-3 text-slate-700">
+                                    <Briefcase className="w-3.5 h-3.5 text-harx-600" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">{t('sessionPlanning.selectedGig')}</span>
                                 </div>
                                 <WalletFilterSelect
-                                    label="Gig inscrit"
+                                    label={t('sessionPlanning.enrolledGig')}
+                                    hideLabel
                                     value={selectedGigId || ''}
-                                    onChange={(v) => setSelectedGigId(v === '' ? null : v)}
+                                    onChange={(v) => applySelectedGig(v === '' ? null : v)}
                                     options={[
-                                        { value: '', label: 'Choisir un projet…', tone: 'neutral' as const },
+                                        { value: '', label: t('sessionPlanning.chooseGig'), tone: 'neutral' as const },
                                         ...gigs.map((gig: Gig) => ({ value: gig.id, label: gig.name, tone: 'brand' as const })),
                                     ]}
                                     className="w-full md:max-w-[460px]"
@@ -762,14 +1105,17 @@ export function SessionPlanning() {
                                 <AvailableSlotsGrid
                                     selectedDate={selectedDate}
                                     gigId={selectedGigId}
+                                    gigTimeZone={selectedGig?.availability?.time_zone}
+                                    gigNamesById={Object.fromEntries(gigs.map((g) => [g.id, g.name]))}
                                     onReservationMade={refreshData}
+                                    onSelectGig={(id) => applySelectedGig(id)}
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
                                     <div className="h-14 w-14 rounded-2xl bg-harx-50 flex items-center justify-center mb-4">
                                         <Sparkles className="w-7 h-7 text-harx-400" />
                                     </div>
-                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">Sélectionnez un projet</p>
+                                    <p className="text-sm font-black text-slate-700 uppercase tracking-wider">{t('sessionPlanning.selectGigHint')}</p>
                                     <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
                                         Choisissez un gig ci-dessus pour afficher les créneaux disponibles à la réservation.
                                     </p>

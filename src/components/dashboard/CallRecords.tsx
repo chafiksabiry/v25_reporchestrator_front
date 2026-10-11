@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 import {
   Phone,
   Calendar,
+  ChevronDown,
+  ListFilter,
+  CheckCircle2,
   ShieldAlert,
   ShieldCheck,
   RefreshCw,
@@ -24,6 +27,13 @@ import {
   Loader2,
   BellRing,
   RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  Lightbulb,
+  AlertTriangle,
+  PhoneMissed,
+  Voicemail,
+  PhoneOff,
 } from 'lucide-react';
 import api, { repTransactionsApi, type RepTransactionRow } from '../../utils/client';
 import { getAgentId } from '../../utils/authUtils';
@@ -34,12 +44,13 @@ import {
   resolveCallRepCommission,
   resolveTransactionRepCommission,
 } from '../../utils/commissionUtils';
-import { callOutcomeBadge, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getSelfCallTranscriptNotice, getVoicemailCallNotice, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallVoicemail, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, resolveCallDispositionStatus, resolveUnvalidatedTransactionStatus } from '../../utils/callStatusDisplay';
+import { anonymizeEmail, anonymizePhone, callMatchesHistoryStatus, formatRetractionEndsLabel, getDisplayOverallScore, getDisplayTranscript, getExecutiveSummaryScore, getExecutiveSummaryText, getFraudBlacklistWarning, getFraudCommissionNotice, getFraudDetectedCountLabel, getScoreDecisionTooltip, getSelfCallTranscriptNotice, getTooShortAnalysisNotice, getVoicemailCallNotice, HARX_LADDER, hasAiCallAnalysis, isCallApprovedByAI, isCallFraudDetected, isCallRejectedByAI, isCallTooShortForAnalysis, isCallVoicemail, isNoAnalysisTelephonyCall, isNonArguedConnectedCall, isNonEvaluableCall, isSimulatedTranscriptTurn, isTransactionInRetraction, localizeStatusBadge, resolveCallCoaching, resolveCallDispositionStatus, resolveHarxLadderStatusBadge, resolveUnvalidatedTransactionStatus, shouldHideCallScoring } from '../../utils/callStatusDisplay';
 import { fetchAgentFraudStats, pickBilingual, type AgentFraudStatsApi } from '../../lib/fraudStatsApi';
 import { dedupeSaleLedgerRows, indexSaleLedgerByCallId } from '../../utils/repLedgerBreakdown';
 import { PremiumAudioPlayer } from './PremiumAudioPlayer';
 import {
   CALL_ANALYSIS_COMPLETE_EVENT,
+  callAnalysisHistoryPath,
   type CallAnalysisCompleteDetail,
 } from '../../lib/callAnalysisCompleteNotification';
 
@@ -97,8 +108,15 @@ export interface CallRecord {
     refusal_detected?: boolean;
   };
   // ── Unified call-analysis layer (shared with calls backend + ops dashboard) ──
-  /** Lifecycle of the AI analyzer: pending → processing → scored | auto_refused | error. */
-  ai_call_status?: 'pending' | 'processing' | 'scored' | 'auto_refused' | 'error' | null;
+  /** Lifecycle of the AI analyzer: pending → processing → scored | auto_refused | too_short | error. */
+  ai_call_status?: 'pending' | 'processing' | 'scored' | 'auto_refused' | 'too_short' | 'error' | null;
+  /** Calibrage du score IA (thumbs + explication). */
+  scoreCalibration?: {
+    verdict?: 'up' | 'down' | null;
+    explanation?: string | null;
+    calibratedAt?: string | Date | null;
+    calibratedByAgentId?: string | null;
+  } | null;
   /** Rep a alerté la company qu'une analyse est bloquée. */
   analysisCompanyAlert?: {
     requestedAt?: string | Date | null;
@@ -125,9 +143,11 @@ export interface CallRecord {
     | 'fraud'
     | 'too_short'
     | 'connected_no_sale'
+    | 'not_argumented'
     | null;
   callOutcomeSource?: 'ai' | 'rep' | 'system' | null;
   /** Denormalised flags. `flags.fraud` is the canonical fraud signal now. */
+  answeredBy?: string | null;
   flags?: {
     fraud?: boolean;
     selfCall?: boolean;
@@ -140,6 +160,7 @@ export interface CallRecord {
   agentValidation?: string;
   companyValidation?: string;
   childCalls?: string[];
+  gigId?: string | { _id?: string; $oid?: string };
   from?: string;
   to?: string;
   transcript?: {
@@ -161,12 +182,16 @@ type AiRubricMetricData = {
 
 function getAiRubricMetric(
   scores: CallRecord['ai_call_score'] | undefined,
-  key: string
+  key: string,
+  legacyKeys: string[] = []
 ): AiRubricMetricData | undefined {
   if (!scores) return undefined;
-  const raw = (scores as Record<string, unknown>)[key];
-  if (!raw || typeof raw !== 'object' || !('score' in raw)) return undefined;
-  return raw as AiRubricMetricData;
+  const tryKey = (k: string) => {
+    const raw = (scores as Record<string, unknown>)[k];
+    if (!raw || typeof raw !== 'object' || !('score' in raw)) return undefined;
+    return raw as AiRubricMetricData;
+  };
+  return tryKey(key) || legacyKeys.map(tryKey).find(Boolean);
 }
 
 interface Lead {
@@ -190,7 +215,9 @@ interface Lead {
     rewardPerCall?: number;
     rewardPerSale?: number;
   };
-  status?: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost';
+  status?: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost' | string;
+  Stage?: string;
+  repDisposition?: string | null;
   value?: number;
   probability?: number;
   source?: string;
@@ -242,6 +269,7 @@ const STALE_ANALYSIS_MS = 5 * 60 * 1000;
 
 /** Is the AI analyzer still running (or hasn't run yet) for this call? */
 function isAnalysisPending(record: CallRecord): boolean {
+  if (isCallTooShortForAnalysis(record)) return false;
   // Prefer the explicit lifecycle field when the backend has set it.
   if (record.ai_call_status) {
     return record.ai_call_status === 'pending' || record.ai_call_status === 'processing';
@@ -259,6 +287,38 @@ function isAnalysisStale(record: CallRecord): boolean {
   return Date.now() - ts > STALE_ANALYSIS_MS;
 }
 
+/** Filter = official HARX ladder only (no Terminé / Non validé / Twilio raw labels). */
+const HISTORY_STATUS_FILTER_IDS = [
+  'all',
+  'to_call',
+  'called_unreachable',
+  'called_voicemail',
+  'called_wrong_number',
+  'called_callback',
+  'called_rdv',
+  'not_argumented',
+  'argued_rdv',
+  'argued_declined',
+  'argued_done',
+] as const;
+
+function callFallsInDateRange(record: { startTime?: string | Date; createdAt?: string | Date }, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  const raw = record.startTime || record.createdAt;
+  if (!raw) return false;
+  const when = new Date(raw).getTime();
+  if (!Number.isFinite(when)) return false;
+  if (from) {
+    const start = new Date(`${from}T00:00:00`).getTime();
+    if (when < start) return false;
+  }
+  if (to) {
+    const end = new Date(`${to}T23:59:59.999`).getTime();
+    if (when > end) return false;
+  }
+  return true;
+}
+
 function hasAnalysisCompanyAlert(record: Pick<CallRecord, 'analysisCompanyAlert'>): boolean {
   return Boolean(record.analysisCompanyAlert?.requestedAt);
 }
@@ -268,21 +328,27 @@ function canNotifyCompanyForAnalysis(record: CallRecord): boolean {
   return isAnalysisStale(record);
 }
 
-/** Disposition pill — vente validée prime sur RDV / rubriques prospect. */
+/** Disposition pill — official HARX ladder only (AMD→Répondeur, Busy→Injoignable). */
 function dispositionBadge(
-  record: Pick<CallRecord, 'callOutcome' | 'ai_call_score' | 'transaction' | 'validByAI' | 'valid' | 'ai_call_status' | 'flags'>,
+  record: Pick<
+    CallRecord,
+    | 'callOutcome'
+    | 'ai_call_score'
+    | 'transaction'
+    | 'validByAI'
+    | 'valid'
+    | 'ai_call_status'
+    | 'flags'
+    | 'duration'
+    | 'answeredBy'
+    | 'status'
+    | 'lead'
+    | 'recording_url'
+    | 'recording_url_cloudinary'
+  >,
   ledgerTxStatus?: string | null
-): { label: string; tone: string } | null {
-  if (isCallVoicemail(record)) {
-    return callOutcomeBadge('voicemail');
-  }
-  if (isCallFraudDetected(record)) {
-    return callOutcomeBadge('fraud');
-  }
-  if (isCallRejectedByAI(record)) return null;
-  const status = resolveCallDispositionStatus(record, ledgerTxStatus);
-  if (['À confirmer', 'En attente', 'Pas de vente IA'].includes(status.label)) return null;
-  return status;
+): { label: string; tone: string; title?: string } | null {
+  return resolveHarxLadderStatusBadge(record, ledgerTxStatus);
 }
 
 export function CallRecords({
@@ -303,15 +369,35 @@ export function CallRecords({
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   const [activeTab, setActiveTab] = useState<'transcript' | 'insights'>('transcript');
   const [loading, setLoading] = useState(true);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyStatusOpen, setHistoryStatusOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifyingCallId, setNotifyingCallId] = useState<string | null>(null);
+  const [calibrationVerdict, setCalibrationVerdict] = useState<'up' | 'down' | null>(null);
+  const [calibrationExplanation, setCalibrationExplanation] = useState('');
+  const [calibrationSaving, setCalibrationSaving] = useState(false);
   const [repLedgerRows, setRepLedgerRows] = useState<RepTransactionRow[]>([]);
   const [repFraudStats, setRepFraudStats] = useState<AgentFraudStatsApi | null>(null);
   const selectedCallRef = useRef<CallRecord | null>(null);
   selectedCallRef.current = selectedCall;
 
+  useEffect(() => {
+    if (!selectedCall) {
+      setCalibrationVerdict(null);
+      setCalibrationExplanation('');
+      return;
+    }
+    setCalibrationVerdict(selectedCall.scoreCalibration?.verdict || null);
+    setCalibrationExplanation(selectedCall.scoreCalibration?.explanation || '');
+  }, [selectedCall?._id, selectedCall?.scoreCalibration?.verdict, selectedCall?.scoreCalibration?.explanation]);
+
   const resolveCallId = (record: CallRecord) =>
     typeof record._id === 'object' ? String((record._id as any).$oid) : String(record._id);
+
+  const recordMatchesDeepLink = (record: CallRecord, openId: string) =>
+    record.sid === openId || resolveCallId(record) === openId;
 
   const normalizeMongoId = (value: unknown): string | null => {
     if (value == null) return null;
@@ -377,8 +463,13 @@ export function CallRecords({
     const amount = resolveTransactionRepCommission(record).toFixed(2);
     const endsLabel = getRetractionEndsLabel(record);
     const pillClass = compact
-      ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border'
-      : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border';
+      ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black tracking-tight border'
+      : 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border';
+
+    // Busy / Injoignable / AMD — settled, never « pending analyse ».
+    if (isNoAnalysisTelephonyCall(record) || isCallVoicemail(record)) {
+      return <span className="text-slate-300 font-bold text-sm">—</span>;
+    }
 
     if (isTransactionInRetraction(record, ledgerStatus)) {
       return (
@@ -411,6 +502,9 @@ export function CallRecords({
 
     if (isCallRejectedByAI(record) || isCallApprovedByAI(record)) {
       const txStatus = resolveUnvalidatedTransactionStatus(record);
+      if (!txStatus) {
+        return <span className="text-slate-300 font-bold text-sm">—</span>;
+      }
       return (
         <span className={`${pillClass} ${txStatus.tone}`} title={txStatus.title}>
           {isCallRejectedByAI(record) ? (
@@ -484,7 +578,7 @@ export function CallRecords({
           {showCall && (
             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-emerald-100 shadow-sm">
               <Phone className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-[10px] font-black uppercase text-slate-500">Appel</span>
+              <span className="text-[10px] font-black uppercase text-slate-500">$ Appel</span>
               <span className="text-sm font-black text-emerald-700">
                 +{resolveCallRepCommission(record).toFixed(2)}€
               </span>
@@ -598,7 +692,7 @@ export function CallRecords({
         message: isError
           ? `L'analyse de l'appel avec ${leadName} a échoué.`
           : `L'analyse de l'appel avec ${leadName} est prête.`,
-        actionPath: '/reps/workspace?tab=calls',
+        actionPath: callAnalysisHistoryPath(callId),
         playSound: !modalWasOpen,
       });
 
@@ -612,17 +706,20 @@ export function CallRecords({
   }, [onAnalysisSettled, upsertNotification]);
 
   const autoOpenHandledRef = React.useRef<string | null>(null);
+  const callRecordsRef = useRef(callRecords);
+  callRecordsRef.current = callRecords;
   useEffect(() => {
-    if (!autoOpenSid) return;
+    if (!autoOpenSid) {
+      autoOpenHandledRef.current = null;
+      return;
+    }
     if (autoOpenHandledRef.current === autoOpenSid) return;
 
     fetchCallRecords(true);
     let attempts = 0;
     const tryOpen = () => {
       attempts += 1;
-      const match = callRecords.find(
-        (r) => r.sid === autoOpenSid || r._id === autoOpenSid
-      );
+      const match = callRecordsRef.current.find((r) => recordMatchesDeepLink(r, autoOpenSid));
       if (match) {
         autoOpenHandledRef.current = autoOpenSid;
         setSelectedCall(match);
@@ -647,9 +744,7 @@ export function CallRecords({
   useEffect(() => {
     if (!autoOpenSid) return;
     if (autoOpenHandledRef.current === autoOpenSid) return;
-    const match = callRecords.find(
-      (r) => r.sid === autoOpenSid || r._id === autoOpenSid
-    );
+    const match = callRecords.find((r) => recordMatchesDeepLink(r, autoOpenSid));
     if (match) {
       autoOpenHandledRef.current = autoOpenSid;
       setSelectedCall(match);
@@ -769,7 +864,7 @@ export function CallRecords({
         kind: 'general',
         title: 'Alerte analyse envoyée',
         message: `Votre entreprise a été notifiée pour l'appel avec ${leadName}.`,
-        actionPath: '/reps/workspace?tab=calls',
+        actionPath: callAnalysisHistoryPath(callId),
         playSound: false,
       });
     } catch (err: any) {
@@ -828,8 +923,9 @@ export function CallRecords({
       if (!recordLeadId) return false;
     }
     if (gigId) {
-      const recordGigId = normalizeMongoId(record.lead?.gigId);
-      if (recordGigId && recordGigId !== gigId) return false;
+      const recordGigId =
+        normalizeMongoId(record.gigId) || normalizeMongoId(record.lead?.gigId);
+      if (recordGigId !== gigId) return false;
     }
 
     // Call Validation Filter
@@ -861,6 +957,9 @@ export function CallRecords({
         return false;
       }
     }
+
+    if (!callMatchesHistoryStatus(record, historyStatusFilter)) return false;
+    if (!callFallsInDateRange(record, historyDateFrom, historyDateTo)) return false;
 
     return true;
   });
@@ -899,6 +998,37 @@ export function CallRecords({
   const selectedCallNotifying = selectedCallId ? notifyingCallId === selectedCallId : false;
   const selectedCallCanNotify = selectedCall ? canNotifyCompanyForAnalysis(selectedCall) : false;
   const selectedCallCompanyAlerted = selectedCall ? hasAnalysisCompanyAlert(selectedCall) : false;
+  const selectedCallTooShort = selectedCall ? isCallTooShortForAnalysis(selectedCall) : false;
+
+  const handleSaveCalibration = async () => {
+    if (!selectedCallId || !calibrationVerdict) return;
+    if (calibrationVerdict === 'down' && calibrationExplanation.trim().length < 3) {
+      toast.error(t('calls.calibration.explanationRequired'));
+      return;
+    }
+    setCalibrationSaving(true);
+    try {
+      const result = await api.calls.calibrateScore(selectedCallId, {
+        verdict: calibrationVerdict,
+        explanation: calibrationExplanation.trim(),
+      });
+      if (!result?.success) {
+        throw new Error(result?.message || 'Calibration failed');
+      }
+      const next = result.data?.scoreCalibration || {
+        verdict: calibrationVerdict,
+        explanation: calibrationExplanation.trim(),
+        calibratedAt: new Date().toISOString(),
+      };
+      patchCallInLists(selectedCallId, { scoreCalibration: next });
+      setSelectedCall((prev) => (prev ? { ...prev, scoreCalibration: next } : prev));
+      toast.success(t('calls.calibration.saved'));
+    } catch (err: any) {
+      toast.error(err?.message || t('calls.calibration.saveError'));
+    } finally {
+      setCalibrationSaving(false);
+    }
+  };
 
   const renderRepAnalysisWaitState = (emptyLabel: string) => (
     <div className="py-10 text-center flex flex-col items-center justify-center gap-4">
@@ -981,6 +1111,86 @@ export function CallRecords({
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <ListFilter className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setHistoryStatusOpen((open) => !open)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest bg-white transition-all hover:border-harx-200 ${
+              historyStatusFilter !== 'all' ? 'border-harx-200 text-harx-700' : 'border-slate-200 text-slate-500'
+            }`}
+          >
+            <span>
+              {historyStatusFilter === 'all'
+                ? t('workspace.allStatuses', 'Tous statuts')
+                : t(`prospects.disp.${historyStatusFilter}`, HARX_LADDER[historyStatusFilter]?.label || historyStatusFilter)}
+            </span>
+            <ChevronDown className={`w-3 h-3 transition-transform ${historyStatusOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {historyStatusOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setHistoryStatusOpen(false)} />
+              <div className="absolute top-full left-0 mt-1.5 w-80 max-h-80 overflow-y-auto bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-50">
+                {HISTORY_STATUS_FILTER_IDS.map((id) => {
+                  const active = historyStatusFilter === id;
+                  const label =
+                    id === 'all'
+                      ? t('workspace.allStatuses', 'Tous statuts')
+                      : t(`prospects.disp.${id}`, HARX_LADDER[id]?.label || id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setHistoryStatusFilter(id);
+                        setHistoryStatusOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-left hover:bg-slate-50 ${
+                        active ? 'text-harx-700 bg-harx-50/60' : 'text-slate-600'
+                      }`}
+                    >
+                      <span className="flex-1">{label}</span>
+                      {active && <CheckCircle2 className="w-3 h-3 text-harx-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        <Calendar className="w-3.5 h-3.5 text-slate-300 shrink-0 ml-1" />
+        <input
+          type="date"
+          value={historyDateFrom}
+          onChange={(e) => setHistoryDateFrom(e.target.value)}
+          className="text-[10px] font-black border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20"
+          title={t('workspace.dateFrom', 'Du')}
+        />
+        <span className="text-[9px] font-black text-slate-400">→</span>
+        <input
+          type="date"
+          value={historyDateTo}
+          onChange={(e) => setHistoryDateTo(e.target.value)}
+          className="text-[10px] font-black border border-slate-200 rounded-xl px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-harx-400/20"
+          title={t('workspace.dateTo', 'Au')}
+        />
+        {(historyStatusFilter !== 'all' || historyDateFrom || historyDateTo) && (
+          <button
+            type="button"
+            onClick={() => {
+              setHistoryStatusFilter('all');
+              setHistoryDateFrom('');
+              setHistoryDateTo('');
+            }}
+            className="px-2 py-1.5 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200"
+            title={t('workspace.clearFilters', 'Effacer filtres')}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
       {renderFraudBlacklistBanner()}
 
       {loading ? (
@@ -1022,13 +1232,17 @@ export function CallRecords({
               record.lead?.First_Name
                 ? `${record.lead.First_Name} ${record.lead.Last_Name || ''}`.trim()
                 : record.lead?.name || record.to || record.from || 'Client inconnu';
-            const leadPhone = record.lead?.phone || record.lead?.Phone || record.to || record.from;
+            const leadPhone = anonymizePhone(record.lead?.phone || record.lead?.Phone || record.to || record.from);
+            const leadEmail = anonymizeEmail(record.lead?.email || record.lead?.Email_1);
+            const publicCallId = String(record.call_id || record.sid || callId || '').trim();
+            const fraud = isCallFraudDetected(record);
+            const coaching = resolveCallCoaching(record);
             const status = record.status?.toLowerCase() || '';
             const isUnansweredStatus = ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(status);
             const showValidationSection =
               status === 'completed' || record.validByAI != null || record.valid != null || isCallRejectedByAI(record) || isCallApprovedByAI(record) || isUnansweredStatus;
             const ledgerStatus = getLedgerTxStatus(record);
-            const outcomeBadge = dispositionBadge(record, ledgerStatus);
+            const outcomeBadge = localizeStatusBadge(dispositionBadge(record, ledgerStatus), i18n.language);
 
             return (
               <div
@@ -1062,20 +1276,39 @@ export function CallRecords({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-extrabold text-slate-900 text-sm truncate">{leadName}</h3>
-                        {leadPhone && (
-                          <span className="text-[11px] font-semibold text-slate-400">{leadPhone}</span>
-                        )}
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-lg border shrink-0 ${
+                            fraud
+                              ? 'bg-orange-50 text-orange-600 border-orange-200'
+                              : 'bg-slate-50 text-slate-400 border-slate-200'
+                          }`}
+                          title={fraud ? t('calls.fraudDetected', 'Fraude détectée') : t('calls.fraudClear', 'Aucune fraude')}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                        </span>
                         {isCallApprovedByAI(record) && (
                           <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" title="Appel validé par l'IA" />
                         )}
                       </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-semibold text-slate-400">
+                        {publicCallId ? (
+                          <span className="font-mono text-[10px] text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
+                            ID {publicCallId.length > 18 ? `${publicCallId.slice(0, 8)}…${publicCallId.slice(-4)}` : publicCallId}
+                          </span>
+                        ) : null}
+                        {leadPhone ? <span>{leadPhone}</span> : null}
+                        {leadEmail ? <span>{leadEmail}</span> : null}
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {outcomeBadge && (
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${outcomeBadge.tone}`}>
+                        {outcomeBadge ? (
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider border ${outcomeBadge.tone}`}
+                            title={outcomeBadge.title}
+                          >
                             {outcomeBadge.label}
                           </span>
-                        )}
+                        ) : null}
                         {isTransactionInRetraction(record, ledgerStatus) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-200">
                             <RotateCcw className="w-2.5 h-2.5" />
@@ -1095,15 +1328,6 @@ export function CallRecords({
                           </span>
                         )}
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
-                            status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                              : 'bg-rose-50 text-rose-700 border-rose-100'
-                          }`}
-                        >
-                          {record.status}
-                        </span>
-                        <span
                           className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
                             record.direction === 'inbound'
                               ? 'bg-slate-100 text-slate-600'
@@ -1121,10 +1345,22 @@ export function CallRecords({
                         <Clock className="w-3 h-3 shrink-0" />
                         {new Date(record.startTime || record.createdAt).toLocaleString('fr-FR')}
                       </p>
+                      {coaching === 'excellent' && (
+                        <p className="mt-2 inline-flex items-start gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5">
+                          <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {t('calls.coaching.excellentShort', 'Briefing : appel à réécouter pour vous en inspirer.')}
+                        </p>
+                      )}
+                      {coaching === 'critical' && (
+                        <p className="mt-2 inline-flex items-start gap-1.5 text-[10px] font-bold text-orange-800 bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          {t('calls.coaching.criticalShort', 'Briefing : réécoutez cet appel pour ne plus répéter les erreurs.')}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Score */}
+                  {/* Score — hidden for short / non-commercial statuses */}
                   {getDisplayOverallScore(record) != null && (
                     <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
@@ -1136,38 +1372,55 @@ export function CallRecords({
                   {showValidationSection && (
                     <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 shrink-0">
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">$ Appel</span>
                         {isCallApprovedByAI(record) ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
                             <Check className="w-3 h-3" />
                             +{resolveCallRepCommission(record).toFixed(2)}€
                           </span>
-                        ) : isCallRejectedByAI(record) ? (
+                        ) : isNoAnalysisTelephonyCall(record) ? (
                           (() => {
-                            const disp = dispositionBadge(record, ledgerStatus);
-                            if (disp) {
-                              return (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${disp.tone}`}
-                                  title={record.ai_refusal_reason || record.callOutcome || undefined}
-                                >
-                                  {disp.label}
-                                </span>
-                              );
+                            const disp = localizeStatusBadge(
+                              dispositionBadge(record, ledgerStatus) || HARX_LADDER.called_unreachable,
+                              i18n.language
+                            );
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border ${disp!.tone}`}
+                                title={disp!.title || 'Pas d’analyse IA'}
+                              >
+                                {disp!.label}
+                              </span>
+                            );
+                          })()
+                        ) : isNonArguedConnectedCall(record) &&
+                          String(record.callOutcome || '') !== 'not_argumented' &&
+                          !(record.callOutcome === 'connected_no_sale' && record.ai_call_status === 'scored') ? (
+                          <span
+                            className="text-slate-300 font-bold text-sm"
+                            title={
+                              i18n.language?.startsWith('en')
+                                ? 'Connected call ≤30s — no AI analysis yet'
+                                : 'Appel connecté ≤30s — pas encore d’analyse IA'
+                            }
+                          >
+                            —
+                          </span>
+                        ) : isCallRejectedByAI(record) || isNonArguedConnectedCall(record) ? (
+                          (() => {
+                            const disp = localizeStatusBadge(
+                              dispositionBadge(record, ledgerStatus),
+                              i18n.language
+                            );
+                            if (!disp) {
+                              return <span className="text-slate-300 font-bold text-sm">—</span>;
                             }
                             return (
                               <span
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-100"
-                                title={record.ai_refusal_reason || undefined}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black tracking-tight border ${disp.tone}`}
+                                title={disp.title || record.ai_refusal_reason || record.callOutcome || undefined}
                               >
-                                <X className="w-3 h-3" />
-                                {isUnansweredStatus
-                                  ? status === 'busy'
-                                    ? 'Occupé'
-                                    : status === 'no-answer' || status === 'noanswer'
-                                      ? 'Non décroché'
-                                      : 'Annulé'
-                                  : 'Refusé'}
+                                {disp.label}
                               </span>
                             );
                           })()
@@ -1187,7 +1440,7 @@ export function CallRecords({
                       <div className="w-px bg-slate-200 hidden sm:block self-stretch" />
 
                       <div className="flex flex-col items-center justify-center gap-1 min-w-[100px] px-2">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">$ Transaction</span>
                         {renderTransactionCommissionPill(record)}
                       </div>
                     </div>
@@ -1231,10 +1484,20 @@ export function CallRecords({
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5 italic">
                     {new Date(selectedCall.startTime || selectedCall.createdAt).toLocaleString()} • {selectedCall.duration ? `${Math.floor(selectedCall.duration / 60)}m ${selectedCall.duration % 60}s` : '0s'}
                   </p>
-                  <div className="flex items-center gap-1.5 mt-1 opacity-60">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-1.5 py-0.5 rounded-md">
-                      Call ID: {typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                      ID {String(selectedCall.call_id || selectedCall.sid || (typeof selectedCall._id === 'object' ? (selectedCall._id as any).$oid : selectedCall._id))}
                     </span>
+                    {anonymizePhone(selectedCall.lead?.phone || selectedCall.lead?.Phone || selectedCall.to || selectedCall.from) ? (
+                      <span className="text-[8px] font-bold text-slate-400">
+                        {anonymizePhone(selectedCall.lead?.phone || selectedCall.lead?.Phone || selectedCall.to || selectedCall.from)}
+                      </span>
+                    ) : null}
+                    {anonymizeEmail(selectedCall.lead?.email || selectedCall.lead?.Email_1) ? (
+                      <span className="text-[8px] font-bold text-slate-400">
+                        {anonymizeEmail(selectedCall.lead?.email || selectedCall.lead?.Email_1)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 {/* Close button on mobile */}
@@ -1268,6 +1531,19 @@ export function CallRecords({
               </div>
             </div>
 
+            {resolveCallCoaching(selectedCall) === 'excellent' && (
+              <div className="px-4 md:px-8 py-3 bg-emerald-50 border-b border-emerald-100 text-[12px] font-semibold text-emerald-800 flex items-start gap-2 shrink-0">
+                <Lightbulb className="w-4 h-4 shrink-0 mt-0.5" />
+                {t('calls.coaching.excellent', 'Excellent appel — réécoutez-le et inspirez-vous-en pour vous améliorer. Ce briefing peut être partagé (anonymisé) avec les autres REPS du GIG si l’entreprise le souhaite.')}
+              </div>
+            )}
+            {resolveCallCoaching(selectedCall) === 'critical' && (
+              <div className="px-4 md:px-8 py-3 bg-orange-50 border-b border-orange-100 text-[12px] font-semibold text-orange-800 flex items-start gap-2 shrink-0">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                {t('calls.coaching.critical', 'Appel à retravailler — réécoutez-le pour identifier les erreurs et ne plus les commettre. Briefing coaching, partageable anonymisé sur le GIG si l’entreprise le souhaite.')}
+              </div>
+            )}
+
             {/* Tabs & Status Header */}
             <div className="px-4 py-3 md:px-8 md:py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-none pb-1 lg:pb-0">
@@ -1291,24 +1567,38 @@ export function CallRecords({
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-1.5 text-slate-400" title="Appel">
                     <Phone className="w-4 h-4" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Appel</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">$ Appel</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${isCallFraudDetected(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                     isCallVoicemail(selectedCall) ? 'bg-slate-500/10 text-slate-600 border-slate-500/20' :
-                    selectedCall.validByAI === true ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                    selectedCall.validByAI === false ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
+                    isNoAnalysisTelephonyCall(selectedCall) ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    isCallApprovedByAI(selectedCall) ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                    (selectedCall.callOutcome === 'not_argumented' ||
+                      (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored'))
+                      ? 'bg-slate-100 text-slate-700 border-slate-300'
+                    : isNonArguedConnectedCall(selectedCall) ? 'bg-slate-50 text-slate-400 border-slate-200' :
+                    isCallRejectedByAI(selectedCall) ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
                       'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : selectedCall.validByAI === true ? 'Validé par AI' : selectedCall.validByAI === false ? 'Refusé AI' : 'En cours'}>
+                    }`} title={isCallFraudDetected(selectedCall) ? 'Fraude détectée' : isCallVoicemail(selectedCall) ? 'Messagerie' : isNoAnalysisTelephonyCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'No AI analysis — busy / unreachable / AMD' : 'Pas d’analyse IA — busy / injoignable / AMD') : isCallApprovedByAI(selectedCall) ? 'Validé par AI' : (selectedCall.callOutcome === 'not_argumented' || (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored')) ? (i18n.language?.startsWith('en') ? 'Not argumented — invalid' : 'Non argumenté — invalide') : isNonArguedConnectedCall(selectedCall) ? (i18n.language?.startsWith('en') ? 'Connected ≤30s — no AI analysis' : 'Connecté ≤30s — pas d’analyse IA') : isCallRejectedByAI(selectedCall) ? 'Refusé AI' : 'En cours'}>
                     {isCallFraudDetected(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : isCallVoicemail(selectedCall) ? (
                       <X className="w-3 h-3" />
-                    ) : selectedCall.validByAI === true ? (
+                    ) : isNoAnalysisTelephonyCall(selectedCall) ? (
+                      <span className="normal-case tracking-normal font-bold text-slate-400">—</span>
+                    ) : isCallApprovedByAI(selectedCall) ? (
                       <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         +{resolveCallRepCommission(selectedCall).toFixed(2)}€
                       </div>
-                    ) : selectedCall.validByAI === false ? (
+                    ) : selectedCall.callOutcome === 'not_argumented' ||
+                      (selectedCall.callOutcome === 'connected_no_sale' && selectedCall.ai_call_status === 'scored') ? (
+                      <span className="normal-case tracking-normal font-bold">
+                        {t('prospects.disp.not_argumented', 'Non argumenté')}
+                      </span>
+                    ) : isNonArguedConnectedCall(selectedCall) ? (
+                      <span className="normal-case tracking-normal font-bold text-slate-400">—</span>
+                    ) : isCallRejectedByAI(selectedCall) ? (
                       <X className="w-3 h-3" />
                     ) : (
                       <Clock className="w-3 h-3 animate-pulse" />
@@ -1321,8 +1611,9 @@ export function CallRecords({
                     <CreditCard className="w-4 h-4" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction</span>
                   </div>
-                  {(selectedCall.validByAI === null || selectedCall.validByAI === undefined) &&
-                  !isCallFraudDetected(selectedCall) ? (
+                  {isNoAnalysisTelephonyCall(selectedCall) || isCallVoicemail(selectedCall) || isCallFraudDetected(selectedCall) ? (
+                    <span className="text-slate-300 font-bold text-sm" title="Pas de commission">—</span>
+                  ) : (selectedCall.validByAI === null || selectedCall.validByAI === undefined) ? (
                     <span className="inline-flex items-center justify-center p-1.5 rounded-full bg-slate-50 text-slate-400 border border-slate-100/40 shadow-sm" title="En attente">
                       <Clock className="w-3 h-3" />
                     </span>
@@ -1336,6 +1627,9 @@ export function CallRecords({
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   {(() => {
+                    if (isNoAnalysisTelephonyCall(selectedCall) || isCallVoicemail(selectedCall) || isCallFraudDetected(selectedCall)) {
+                      return <span className="text-slate-300 font-bold text-sm">—</span>;
+                    }
                     const inRetraction = isTransactionInRetraction(selectedCall, getLedgerTxStatus(selectedCall));
                     if (selectedCall.transaction?.validByReps === true) {
                       return inRetraction ? (
@@ -1411,7 +1705,32 @@ export function CallRecords({
                       );
                     })
                   ) : (
-                    renderRepAnalysisWaitState('Transcript not available')
+                    renderRepAnalysisWaitState(
+                      (() => {
+                        const st = String(selectedCall.status || '').toLowerCase();
+                        const out = String(selectedCall.callOutcome || '').toLowerCase();
+                        const amd = String(selectedCall.answeredBy || '').toLowerCase();
+                        const noTranscript =
+                          ['no-answer', 'noanswer', 'busy', 'canceled', 'cancelled', 'failed'].includes(st) ||
+                          ['no_answer', 'busy', 'wrong_number', 'voicemail'].includes(out) ||
+                          amd.startsWith('machine') ||
+                          amd === 'fax' ||
+                          isCallVoicemail(selectedCall);
+                        if (noTranscript) {
+                          if (out === 'voicemail' || amd.startsWith('machine') || amd === 'fax' || isCallVoicemail(selectedCall)) {
+                            return i18n.language?.startsWith('en')
+                              ? 'No transcript — voicemail / AMD'
+                              : 'Pas de transcription — répondeur / AMD';
+                          }
+                          return i18n.language?.startsWith('en')
+                            ? 'No transcript — call was busy or unreachable'
+                            : 'Pas de transcription — appel occupé ou injoignable';
+                        }
+                        return i18n.language?.startsWith('en')
+                          ? 'Transcript not available yet'
+                          : 'Transcription non disponible pour le moment';
+                      })()
+                    )
                   )}
                       </>
                     );
@@ -1419,7 +1738,28 @@ export function CallRecords({
                 </div>
               ) : (
                 <div className="max-w-5xl mx-auto space-y-8 pb-4">
-                  {(!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
+                  {selectedCallTooShort ? (
+                    <div className="py-12 text-center flex flex-col items-center justify-center gap-4 px-6">
+                      {(() => {
+                        const disposition = localizeStatusBadge(
+                          resolveHarxLadderStatusBadge(selectedCall),
+                          i18n.language
+                        );
+                        if (!disposition) return null;
+                        return (
+                          <span
+                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[11px] font-black tracking-wider border ${disposition.tone}`}
+                            title={disposition.title}
+                          >
+                            {disposition.label}
+                          </span>
+                        );
+                      })()}
+                      <p className="text-sm font-medium text-slate-500 max-w-lg leading-relaxed">
+                        {getTooShortAnalysisNotice(i18n.language, Number(selectedCall.duration) || undefined)}
+                      </p>
+                    </div>
+                  ) : (!selectedCall.ai_call_score || !hasAiCallAnalysis(selectedCall)) ? (
                     renderRepAnalysisWaitState('Analyse détaillée non encore générée')
                   ) : (
                     <>
@@ -1436,12 +1776,13 @@ export function CallRecords({
                                   <Star className="w-6 h-6 sm:w-8 sm:h-8" />
                                 </div>
                                 <div>
-                                  <h4 className="text-lg sm:text-2xl font-black text-slate-900 uppercase tracking-widest">{t('calls.executiveSummary')}</h4>
-                                  <p className="text-[10px] sm:text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5 sm:mt-1 opacity-80">Audit Global de Performance</p>
+                                  <h4 className="text-lg sm:text-2xl font-black text-slate-900 uppercase tracking-widest">{t('calls.executiveSummary', "Résumé de l'appel")}</h4>
+                                  <p className="text-[10px] sm:text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5 sm:mt-1 opacity-80">{t('calls.globalAudit', "Analyse qualité · Centre d'appel")}</p>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-4 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm self-start sm:self-auto">
+                              {!shouldHideCallScoring(selectedCall) && (
+                              <div className="relative group/score flex items-center gap-4 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm self-start sm:self-auto cursor-help">
                                 <div className="text-right">
                                   <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Score Global</p>
                                   <div className="text-2xl sm:text-4xl font-black text-slate-900 leading-none">
@@ -1451,7 +1792,11 @@ export function CallRecords({
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
                                   <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${getExecutiveSummaryScore(selectedCall) >= 70 ? 'text-emerald-500' : 'text-rose-500'}`} />
                                 </div>
+                                <div className="pointer-events-none absolute right-0 top-full z-30 mt-2 hidden w-72 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-left text-[11px] font-medium leading-relaxed text-white shadow-xl group-hover/score:block whitespace-pre-line">
+                                  {getScoreDecisionTooltip(selectedCall, i18n.language)}
+                                </div>
                               </div>
+                              )}
                             </div>
 
                             <div className="bg-gradient-to-br from-slate-50 to-white rounded-[20px] sm:rounded-[32px] p-5 sm:p-8 border border-slate-100 shadow-inner">
@@ -1465,7 +1810,83 @@ export function CallRecords({
                         </div>
                       </div>
 
-                      {!isNonEvaluableCall(selectedCall) && (
+                      {/* Calibrage du scoring */}
+                      {!shouldHideCallScoring(selectedCall) && (
+                        <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-violet-100 shadow-lg shadow-violet-500/5 p-5 sm:p-7 space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                              <h5 className="text-sm font-black uppercase tracking-widest text-violet-700">
+                                {t('calls.calibration.title')}
+                              </h5>
+                              <p className="text-xs font-medium text-slate-500 mt-1">
+                                {t('calls.calibration.subtitle')}
+                              </p>
+                            </div>
+                            {selectedCall.scoreCalibration?.calibratedAt ? (
+                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full self-start">
+                                {t('calls.calibration.recorded')}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setCalibrationVerdict('up')}
+                              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${
+                                calibrationVerdict === 'up'
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/25'
+                                  : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <ThumbsUp className="w-4 h-4" />
+                              {t('calls.calibration.thumbsUp')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCalibrationVerdict('down')}
+                              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${
+                                calibrationVerdict === 'down'
+                                  ? 'bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/25'
+                                  : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                              }`}
+                            >
+                              <ThumbsDown className="w-4 h-4" />
+                              {t('calls.calibration.thumbsDown')}
+                            </button>
+                          </div>
+
+                          {calibrationVerdict === 'down' || calibrationExplanation ? (
+                            <label className="block space-y-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                {t('calls.calibration.explanationLabel')}
+                              </span>
+                              <textarea
+                                value={calibrationExplanation}
+                                onChange={(e) => setCalibrationExplanation(e.target.value)}
+                                rows={3}
+                                placeholder={t('calls.calibration.explanationPlaceholder')}
+                                className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-200/60 resize-y min-h-[88px]"
+                              />
+                            </label>
+                          ) : null}
+
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              disabled={!calibrationVerdict || calibrationSaving}
+                              onClick={() => void handleSaveCalibration()}
+                              className="px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-black uppercase tracking-widest shadow-md shadow-violet-500/20 transition-all"
+                            >
+                              {calibrationSaving
+                                ? t('calls.calibration.saving')
+                                : t('calls.calibration.submit')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!shouldHideCallScoring(selectedCall) && (
                     <>
                       {/* Detailed Metrics Section */}
                       <div className="space-y-6">
@@ -1576,7 +1997,7 @@ export function CallRecords({
                       <div className="space-y-6">
                         <div className="flex items-center gap-4 px-4 pt-4">
                           <div className="h-px flex-1 bg-slate-200/60"></div>
-                          <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center">Statuts & Réponses Prospect</h5>
+                          <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] text-center">État d’avancement du prospect</h5>
                           <div className="h-px flex-1 bg-slate-200/60"></div>
                         </div>
 
@@ -1591,13 +2012,16 @@ export function CallRecords({
                             };
 
                             return [
-                              { label: 'Pas intéressé', key: "PAS INTÉRESSÉS", icon: ShieldAlert, color: 'rose' },
-                              { label: 'Pas au courant', key: "PAS AU COURANT", icon: Globe, color: 'blue' },
-                              { label: 'Déjà équipé / Fourni', key: "DÉJÀ ÉQUIPÉS", icon: ShieldCheck, color: 'indigo' },
-                              { label: 'Prise de RDV', key: "RDV", icon: Calendar, color: 'emerald' },
-                              { label: 'À plus tard / Rappel', key: "A plus tard", icon: Clock, color: 'amber' }
+                              { label: 'Appelé – Injoignable', key: 'called_unreachable', legacyKeys: [] as string[], icon: PhoneMissed, color: 'amber' },
+                              { label: 'Appelé – Répondeur', key: 'called_voicemail', legacyKeys: [] as string[], icon: Voicemail, color: 'amber' },
+                              { label: 'Appelé – Numéro non attribué', key: 'called_wrong_number', legacyKeys: ['PAS AU COURANT'], icon: PhoneOff, color: 'rose' },
+                              { label: 'Appelé – Souhaite être rappelé', key: 'called_callback', legacyKeys: ['A plus tard'], icon: Clock, color: 'amber' },
+                              { label: 'Appelé – RDV pris pour rappel', key: 'called_rdv', legacyKeys: [] as string[], icon: Calendar, color: 'indigo' },
+                              { label: 'Appel argumenté – RDV / délai', key: 'argued_rdv', legacyKeys: ['RDV'], icon: Calendar, color: 'indigo' },
+                              { label: 'Appel argumenté – Transaction déclinée', key: 'argued_declined', legacyKeys: ['PAS INTÉRESSÉS', 'DÉJÀ ÉQUIPÉS'], icon: ShieldAlert, color: 'rose' },
+                              { label: 'Appel argumenté – Transaction aboutie', key: 'argued_done', legacyKeys: [] as string[], icon: ShieldCheck, color: 'emerald' },
                             ].map((metric, mIdx) => {
-                              const metricData = getAiRubricMetric(selectedCall.ai_call_score, metric.key);
+                              const metricData = getAiRubricMetric(selectedCall.ai_call_score, metric.key, metric.legacyKeys);
                               if (!metricData) return null;
                               const score = metricData?.score || 0;
                               const scoreColorClass = score >= 50 ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 bg-slate-50';

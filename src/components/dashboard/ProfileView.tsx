@@ -1,13 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
-import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan } from '../../utils/profileUtils';
-import { getRepOnboardingStep, hasRepGigEngagement, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
+import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
+import { refreshOnboardingStatus } from '../../services/apiConfig';
+import progressService from '../../services/progressService';
+import { toast, Toaster } from 'react-hot-toast';
 import { repApiUrl } from '../../utils/repApiUrl';
 import { repWizardApi, Timezone } from '../../services/api/repWizard';
 import { fetchAllSkills, fetchSkillById, Skill, SkillsByCategory, SkillType } from '../../services/api/skills';
 import { fetchAllLanguages, Language as LanguageOption } from '../../services/api/languages';
+import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../utils/taxonomyI18n';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -16,6 +21,8 @@ import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
 import { LanguageVideoModal } from './profile/LanguageVideoModal';
+import { enrichLanguageFromExperience } from './profile/languageVideoUtils';
+import { getProficiencyStars as getProficiencyStarsFromCefr } from './profile/languageScoreDisplay';
 
 // Tabs
 import { ProfileTab } from './profile/tabs/ProfileTab';
@@ -73,6 +80,8 @@ export const ProfileView: React.FC<{
   onEditClick: (tab?: string) => void,
   onDeleteSkill?: (type: 'technical' | 'professional' | 'soft', index: number) => void,
   onAddSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onConfirmProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onDismissProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
   onDeleteLanguage?: (index: number) => void,
   onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string; code?: string }) => void | Promise<void>,
   onUpdateLanguageProficiency?: (index: number, proficiency: string) => void | Promise<void>,
@@ -95,8 +104,8 @@ export const ProfileView: React.FC<{
   onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
-}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
-  const { t } = useTranslation();
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onConfirmProposedSkill, onDismissProposedSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const getInitialTab = () => {
     try {
@@ -120,7 +129,6 @@ export const ProfileView: React.FC<{
     proficiency: string;
     languageId: string;
   } | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [planData, setPlanData] = useState<PlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -129,7 +137,7 @@ export const ProfileView: React.FC<{
   const [allTimezones, setAllTimezones] = useState<Timezone[]>([]);
   const [countries, setCountries] = useState<Timezone[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<LanguageOption[]>([]);
-  const [skillNameById, setSkillNameById] = useState<Record<string, string>>({});
+  const [skillEntityById, setSkillEntityById] = useState<Record<string, TaxonomyEntity>>({});
 
   const [countryMismatch, setCountryMismatch] = useState<{
     hasMismatch: boolean;
@@ -144,6 +152,16 @@ export const ProfileView: React.FC<{
   const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
   const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showSatisfaction, setShowSatisfaction] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [finalizingPlan, setFinalizingPlan] = useState(false);
+
+  const hasSubscriptionStepDone = Boolean(
+    profile?.onboardingProgress?.phases?.phase4?.status === 'completed' ||
+      profile?.onboardingProgress?.phases?.phase4?.requiredActions?.subscriptionActivated === true
+  );
+
   const closePlanModal = useCallback(async () => {
     setIsPlanModalOpen(false);
     if (!profile?._id) return;
@@ -159,8 +177,37 @@ export const ProfileView: React.FC<{
     }
   }, [profile?._id]);
 
+  const handlePublishProfile = useCallback(async () => {
+    if (!profile?._id) return;
+    setPublishing(true);
+    try {
+      if (!isRepProfilePublished(profile)) {
+        await updateProfileData(profile._id, { status: 'completed' });
+      }
+      toast.success(t('subscriptionFlow.publishSuccess'));
+      setShowPublishModal(false);
+      setShowSatisfaction(true);
+      onProfileUpdate?.({ ...profile, status: 'completed' });
+    } catch (err) {
+      console.error('Profile publish failed:', err);
+      toast.error(t('profile.errors.publish'));
+    } finally {
+      setPublishing(false);
+    }
+  }, [profile, onProfileUpdate, t]);
+
+  const handleSatisfactionClose = useCallback(() => {
+    setShowSatisfaction(false);
+    // Ensure dashboard shell sees published status before marketplace nav.
+    void fetchProfileFromAPI()
+      .catch(() => null)
+      .finally(() => {
+        navigate('/marketplace', { replace: true });
+      });
+  }, [navigate]);
+
   const handlePlanSubscribed = useCallback(
-    (activatedPlan?: { _id: string; name: string; price?: number }) => {
+    async (activatedPlan?: { _id: string; name: string; price?: number }) => {
       if (activatedPlan && profile?._id) {
         setPlanData((prev) => ({
           _id: prev?._id || String(profile._id),
@@ -175,9 +222,27 @@ export const ProfileView: React.FC<{
           },
         }));
       }
-      void closePlanModal();
+      setIsPlanModalOpen(false);
+      setFinalizingPlan(true);
+      try {
+        if (profile?._id) {
+          await refreshOnboardingStatus(String(profile._id)).catch(() => null);
+        }
+        await progressService.updatePhaseStatus(4, 'completed').catch(() => null);
+        toast.success(
+          activatedPlan?.name
+            ? t('subscriptionFlow.planActivated', { name: activatedPlan.name })
+            : t('subscriptionFlow.subscriptionActive')
+        );
+        setShowPublishModal(true);
+      } catch (err) {
+        console.error('Post-plan finalize failed:', err);
+        setShowPublishModal(true);
+      } finally {
+        setFinalizingPlan(false);
+      }
     },
-    [closePlanModal, profile?._id, profile?.userId]
+    [profile?._id, profile?.userId, t]
   );
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [publicInfoDraft, setPublicInfoDraft] = useState({
@@ -190,8 +255,13 @@ export const ProfileView: React.FC<{
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   // Load countries and all timezones on component mount
   useEffect(() => {
@@ -248,11 +318,11 @@ export const ProfileView: React.FC<{
         const skills = await fetchAllSkills();
         const mapFromCategory = (category: SkillsByCategory) =>
           Object.values(category || {}).flat().reduce((acc, skill: Skill) => {
-            acc[skill._id] = skill.name;
+            acc[skill._id] = { name: skill.name, name_i18n: skill.name_i18n || null };
             return acc;
-          }, {} as Record<string, string>);
+          }, {} as Record<string, TaxonomyEntity>);
 
-        setSkillNameById({
+        setSkillEntityById({
           ...mapFromCategory(skills.technical),
           ...mapFromCategory(skills.professional),
           ...mapFromCategory(skills.soft),
@@ -292,23 +362,28 @@ export const ProfileView: React.FC<{
       const toFetch: Array<{ id: string; type: SkillType }> = [];
       (Object.keys(byType) as SkillType[]).forEach((type) => {
         byType[type].forEach((id) => {
-          if (!skillNameById[id]) toFetch.push({ id, type });
+          if (!skillEntityById[id]) toFetch.push({ id, type });
         });
       });
 
       if (toFetch.length === 0) return;
 
       try {
-        const tryResolveSkillAcrossTypes = async (id: string, preferredType: SkillType): Promise<string | null> => {
+        const tryResolveSkillAcrossTypes = async (
+          id: string,
+          preferredType: SkillType
+        ): Promise<TaxonomyEntity | null> => {
           const orderedTypes: SkillType[] = [
             preferredType,
-            ...(['technical', 'professional', 'soft'] as SkillType[]).filter(t => t !== preferredType)
+            ...(['technical', 'professional', 'soft'] as SkillType[]).filter((t) => t !== preferredType),
           ];
 
           for (const type of orderedTypes) {
             try {
               const skill = await fetchSkillById(id, type);
-              if (skill?.name) return skill.name;
+              if (skill?.name) {
+                return { name: skill.name, name_i18n: skill.name_i18n || null };
+              }
             } catch {
               // continue trying other types
             }
@@ -318,23 +393,23 @@ export const ProfileView: React.FC<{
 
         const fetched = await Promise.all(
           toFetch.map(async ({ id, type }) => {
-            const resolvedName = await tryResolveSkillAcrossTypes(id, type);
-            return { id, name: resolvedName };
+            const entity = await tryResolveSkillAcrossTypes(id, type);
+            return { id, entity };
           })
         );
 
         const additions = fetched.reduce((acc, curr) => {
-          if (curr.name) acc[curr.id] = curr.name;
+          if (curr.entity) acc[curr.id] = curr.entity;
           return acc;
-        }, {} as Record<string, string>);
+        }, {} as Record<string, TaxonomyEntity>);
 
-        const unresolved = fetched.filter((f) => !f.name).map((f) => f.id);
+        const unresolved = fetched.filter((f) => !f.entity).map((f) => f.id);
         if (unresolved.length > 0) {
           console.warn('[ProfileView] Unresolved skill IDs after cross-type lookup:', unresolved);
         }
 
         if (Object.keys(additions).length > 0) {
-          setSkillNameById((prev) => ({ ...prev, ...additions }));
+          setSkillEntityById((prev) => ({ ...prev, ...additions }));
         }
       } catch (error) {
         console.error('Error hydrating agent skills by id:', error);
@@ -342,7 +417,7 @@ export const ProfileView: React.FC<{
     };
 
     hydrateAgentSkillNamesById();
-  }, [profile?.skills, skillNameById]);
+  }, [profile?.skills, skillEntityById]);
 
   // Load specific country and timezone data based on profile
   useEffect(() => {
@@ -394,10 +469,8 @@ export const ProfileView: React.FC<{
   if (!profile) return null;
 
   // Helper functions used by tabs
-  const getProficiencyStars = (proficiency: string): number => {
-    const map: Record<string, number> = { 'A1': 1, 'Basic': 1, 'A2': 2, 'B1': 3, 'Intermediate': 3, 'B2': 4, 'C1': 5, 'Advanced': 5, 'C2': 6, 'Native': 6 };
-    return map[proficiency] || 0;
-  };
+  const getProficiencyStars = (proficiency: string): number =>
+    getProficiencyStarsFromCefr(proficiency);
 
   const getTimezoneMismatchInfo = () => {
     const tz = profile.availability?.timeZone;
@@ -478,8 +551,7 @@ export const ProfileView: React.FC<{
 
   const formatSkillsForDisplay = (skillsData: any) => {
     if (!Array.isArray(skillsData)) return [];
-    const readNameFromObject = (obj: any): string | null =>
-      obj?.name || obj?.label || obj?.title || null;
+    const uiLang = i18n.language;
 
     const normalizeId = (raw: any): string | null => {
       if (!raw) return null;
@@ -490,39 +562,30 @@ export const ProfileView: React.FC<{
       return null;
     };
 
-    return skillsData.map(item => {
+    return skillsData.map((item) => {
       if (typeof item === 'string') {
-        const resolvedFromMap = skillNameById[item];
-        return { name: resolvedFromMap || item };
+        return { name: localizeTaxonomyEntity(skillEntityById[item], uiLang) || item };
       }
       if (item?.skill && typeof item.skill === 'object') {
-        const embeddedName = readNameFromObject(item.skill);
-        if (embeddedName) return { name: embeddedName };
+        const localized = localizeTaxonomyEntity(item.skill, uiLang);
+        if (localized) return { name: localized };
       }
 
-      const directName = readNameFromObject(item);
-      if (directName) return { name: directName };
-
       const skillId = normalizeId(item?._id) || normalizeId(item?.id) || normalizeId(item?.skill);
-      const resolvedById = skillId ? skillNameById[skillId] : null;
-      const detailsFallback = typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
-      return { name: resolvedById || detailsFallback || (typeof item?.skill === 'string' ? item.skill : null) || t('profile.common.unknown') };
+      const fromMap = skillId ? localizeTaxonomyEntity(skillEntityById[skillId], uiLang) : '';
+      if (fromMap) return { name: fromMap };
+
+      const detailsFallback =
+        typeof item?.details === 'string' && item.details.trim() ? item.details.trim() : null;
+      return {
+        name:
+          detailsFallback ||
+          (typeof item?.skill === 'string' ? item.skill : null) ||
+          item?.name ||
+          t('profile.common.unknown'),
+      };
     });
   };
-
-  useEffect(() => {
-    if (!profile?.skills) return;
-
-    const normalizeId = (raw: any): string | null => {
-      if (!raw) return null;
-      if (typeof raw === 'string') return raw;
-      if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid;
-      if (typeof raw === 'object' && typeof raw._id === 'string') return raw._id;
-      if (typeof raw === 'object' && typeof raw.id === 'string') return raw.id;
-      return null;
-    };
-
-  }, [profile?.skills, skillNameById]);
 
   const takeLanguageAssessment = (
     language: string,
@@ -571,21 +634,6 @@ export const ProfileView: React.FC<{
       setInlineAssessment(null);
     }
   };
-
-  const handlePublish = async () => {
-    if (!profile?._id) return;
-    try {
-      setIsPublishing(true);
-      const updatedData = await updateProfileData(profile._id, { status: 'completed' });
-      if (onProfileUpdate) onProfileUpdate(updatedData);
-    } catch (error) {
-      console.error('Error publishing profile:', error);
-      alert(t('profile.errors.publish'));
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
 
   const getCountryDisplayName = () => {
     if (countryData?.countryName) return countryData.countryName;
@@ -702,12 +750,20 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const handleSaveAbout = async (value: string) => {
+  const handleSaveAbout = async (value: string, i18nPair?: { en: string; fr: string } | null) => {
+    const nextI18n = i18nPair
+      ? i18nPair
+      : {
+          ...(profile.professionalSummary?.profileDescription_i18n || {}),
+          [(i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en']: value,
+        };
+    // Only send bio fields — never spread the whole professionalSummary (that
+    // used to wipe video-detected industries/activities with empty arrays).
     await handleInlineUpdate(
       {
         professionalSummary: {
-          ...profile.professionalSummary,
           profileDescription: value,
+          profileDescription_i18n: nextI18n,
         }
       },
       (prev) => ({
@@ -715,6 +771,7 @@ export const ProfileView: React.FC<{
         professionalSummary: {
           ...(prev.professionalSummary || {}),
           profileDescription: value,
+          profileDescription_i18n: nextI18n,
         }
       })
     );
@@ -767,6 +824,155 @@ export const ProfileView: React.FC<{
       reader.readAsDataURL(file);
     }
   };
+
+  const stopCameraStream = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const closeCameraModal = useCallback(() => {
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+  }, [stopCameraStream]);
+
+  const openPhotoSourceModal = () => {
+    if (isUploadingPhoto) return;
+    setShowPhotoSourceModal(true);
+  };
+
+  const openDevicePicker = () => {
+    setShowPhotoSourceModal(false);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setCameraError(null);
+    photoInputRef.current?.click();
+  };
+
+  const startPhotoCamera = async () => {
+    setShowPhotoSourceModal(false);
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t('profile.header.cameraUnavailable'));
+      setShowCameraModal(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setShowCameraModal(true);
+      // Attach after modal mounts
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          void cameraVideoRef.current.play().catch(() => undefined);
+        }
+      });
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError(t('profile.header.cameraDenied'));
+      setShowCameraModal(true);
+    }
+  };
+
+  const capturePhotoFromCamera = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    stopCameraStream();
+    setShowCameraModal(false);
+    setImgSrc(dataUrl);
+    setIsCropModalOpen(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, [stopCameraStream]);
+
+  const identityRecheckFor = useRef<string | null>(null);
+  const accentRecheckFor = useRef<string | null>(null);
+  useEffect(() => {
+    const profileId = profile?._id as string | undefined;
+    if (!profileId) return;
+    const experiences = Array.isArray(profile?.experience) ? profile.experience : [];
+    const needsAccent = experiences.some((exp: {
+      videoUrl?: string;
+      videoLanguageAssessment?: { languages?: Array<{ accent?: { source?: string } }>; accent?: { source?: string } };
+    }) => {
+      if (!exp?.videoUrl) return false;
+      const languages = exp.videoLanguageAssessment?.languages;
+      if (Array.isArray(languages) && languages.length > 0) {
+        return languages.some((entry) => entry?.accent?.source !== 'audio');
+      }
+      return Boolean(exp.videoLanguageAssessment) && exp.videoLanguageAssessment?.accent?.source !== 'audio';
+    });
+    if (!needsAccent) return;
+    if (accentRecheckFor.current === profileId) return;
+    accentRecheckFor.current = profileId;
+    void (async () => {
+      const ok = await recheckExperienceAccents(profileId);
+      if (!ok) return;
+      try {
+        const refreshed = await fetchProfileFromAPI();
+        onProfileUpdate?.(refreshed);
+      } catch (err) {
+        console.warn('Profile refresh after accent recheck failed', err);
+      }
+    })();
+  }, [profile, onProfileUpdate]);
+  useEffect(() => {
+    const photoUrl = profile?.personalInfo?.photo?.url as string | undefined;
+    const profileId = profile?._id as string | undefined;
+    if (!photoUrl || !profileId) return;
+    const experiences = Array.isArray(profile?.experience) ? profile.experience : [];
+    const stale = experiences.some((exp: {
+      videoUrl?: string;
+      videoFraudCheck?: { referencePhotoUrl?: string; identityMatch?: boolean | null; identityConfidence?: number };
+    }) => {
+      if (!exp?.videoUrl) return false;
+      const fraud = exp.videoFraudCheck;
+      if (fraud?.referencePhotoUrl !== photoUrl) return true;
+      return fraud?.identityMatch === false && (fraud.identityConfidence ?? 0) < 70;
+    });
+    if (!stale) return;
+    const key = `${profileId}:${photoUrl}`;
+    if (identityRecheckFor.current === key) return;
+    identityRecheckFor.current = key;
+    void (async () => {
+      const ok = await recheckExperienceIdentity(profileId);
+      if (!ok) {
+        identityRecheckFor.current = null;
+        return;
+      }
+      try {
+        const refreshed = await fetchProfileFromAPI();
+        onProfileUpdate?.(refreshed);
+      } catch (err) {
+        console.warn('Profile refresh after identity recheck failed', err);
+      }
+    })();
+  }, [profile?.personalInfo?.photo?.url, profile?._id, profile?.experience, onProfileUpdate]);
+
+  // Re-attach stream when camera modal opens
+  useEffect(() => {
+    if (!showCameraModal || !cameraStreamRef.current || !cameraVideoRef.current) return;
+    cameraVideoRef.current.srcObject = cameraStreamRef.current;
+    void cameraVideoRef.current.play().catch(() => undefined);
+  }, [showCameraModal]);
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
@@ -853,6 +1059,7 @@ export const ProfileView: React.FC<{
         throw new Error(`Photo upload failed with status ${response.status}`);
       }
 
+      await recheckExperienceIdentity(profile._id);
       const refreshed = await fetchProfileFromAPI();
       onProfileUpdate?.(refreshed);
       window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
@@ -879,6 +1086,8 @@ export const ProfileView: React.FC<{
           onEditItemClick={() => onEditClick('skills')}
           onDeleteSkill={(type, index) => onDeleteSkill?.(type, index)}
           onAddSkill={(type, skillId) => onAddSkill?.(type, skillId)}
+          onConfirmProposedSkill={(type, skillId) => onConfirmProposedSkill?.(type, skillId)}
+          onDismissProposedSkill={(type, skillId) => onDismissProposedSkill?.(type, skillId)}
           onAddSpecializationItem={(section, value) => onAddSpecializationItem?.(section, value)}
           onDeleteSpecializationItem={(section, index) => onDeleteSpecializationItem?.(section, index)}
         />
@@ -1040,6 +1249,49 @@ export const ProfileView: React.FC<{
           </p>
         </div>
 
+        {/* Onboarding banners always sit above the tabs so they stay visible
+            on every profile section, never buried inside one tab.
+            Publish is automatic after plan choice — no Publier button here. */}
+        {!isRepProfilePublished(profile) && (
+          profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
+          isRepPhase2Ready(profile) ||
+          isRepCoreOnboardingDone(profile) ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
+              <div className="flex items-start gap-3 min-w-0">
+                <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-emerald-800">
+                    {t('profile.header.phase2Complete')}
+                  </p>
+                  <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
+                    {t('profile.header.phase2CompleteDescription')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/subscription')}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
+              >
+                {t('profile.header.continueOnboarding')}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-black text-yellow-800">
+                  {t('profile.header.completePhase2')}
+                </p>
+                <p className="text-xs font-medium text-yellow-700 mt-0.5">
+                  {t('profile.header.completePhase2Description')}
+                </p>
+              </div>
+            </div>
+          )
+        )}
+
         {/* Navigation Tabs at the Top */}
         <div className="w-full">
           <ProfileNavbar
@@ -1047,10 +1299,11 @@ export const ProfileView: React.FC<{
             onTabChange={setActiveTab}
             warningTabs={[
               ...((profile?.personalInfo?.languages || []).some((l: any) => {
-                const ar = l?.assessmentResults;
+                const enriched = enrichLanguageFromExperience(l, profile);
+                const ar = enriched?.assessmentResults;
                 if (!ar || ar.source === 'cv') return true;
-                const verified = String(ar.verifiedProficiency || l.proficiency || '').toUpperCase();
-                return String(l.proficiency || '').toUpperCase() !== verified;
+                const verified = String(ar.verifiedProficiency || enriched.proficiency || '').toUpperCase();
+                return String(enriched.proficiency || '').toUpperCase() !== verified;
               })
                 ? ['languages']
                 : []),
@@ -1100,7 +1353,7 @@ export const ProfileView: React.FC<{
                 </div>
                 <button
                   type="button"
-                  onClick={() => !isUploadingPhoto && photoInputRef.current?.click()}
+                  onClick={openPhotoSourceModal}
                   disabled={isUploadingPhoto}
                   className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-harx text-white shadow-lg hover:opacity-90 disabled:opacity-60"
                   title={t('profile.header.changePhoto')}
@@ -1111,91 +1364,6 @@ export const ProfileView: React.FC<{
 
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
-                {/* Onboarding banners (phases 1–4 + gig apply). Hidden once published —
-                    status "completed" is the source of truth after logout/login. */}
-                {!isRepProfilePublished(profile) && (
-                isRepCoreOnboardingDone(profile) && hasRepGigEngagement(profile) ? (
-                  profile.status !== 'completed' ? (
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-harx text-white shadow-xl shadow-harx-500/30 ring-1 ring-white/20 animate-pulse-subtle">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
-                          <Sparkles className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-base font-black tracking-tight">
-                            {t('profile.header.publishReady')}
-                          </p>
-                          <p className="text-xs font-medium text-white/85 mt-0.5">
-                            {t('profile.header.publishReadyDescription')}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handlePublish}
-                        disabled={isPublishing}
-                        className="px-7 py-3 rounded-2xl bg-white text-harx-600 hover:bg-white/90 flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-60 whitespace-nowrap"
-                      >
-                        {isPublishing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check size={18} strokeWidth={3} />}
-                        {isPublishing ? t('profile.header.publishing') : t('profile.header.publish')}
-                      </button>
-                    </div>
-                  ) : null
-                ) : isRepCoreOnboardingDone(profile) ? (
-                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-black text-amber-900">
-                          {t('profile.header.finalStep')}
-                        </p>
-                        <p className="text-xs font-medium text-amber-800 mt-0.5">
-                          {t('profile.header.finalStepDescription')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate('/marketplace')}
-                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-                    >
-                      {t('profile.header.browseMissions')}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (profile.onboardingProgress?.phases?.phase2?.status === 'completed') ? (
-                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-                    <div className="flex items-start gap-3">
-                      <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-black text-emerald-800">
-                          {t('profile.header.phase2Complete')}
-                        </p>
-                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                          {t('profile.header.phase2CompleteDescription')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate(getRepOnboardingStep(profile).path)}
-                      className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-                    >
-                      {t('profile.header.continueOnboarding')}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
-                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-black text-yellow-800">
-                        {t('profile.header.completePhase2')}
-                      </p>
-                      <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                        {t('profile.header.completePhase2Description')}
-                      </p>
-                    </div>
-                  </div>
-                )
-                )}
                 {/* Action Buttons Top Right */}
                 <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
                   <div>
@@ -1362,13 +1530,13 @@ export const ProfileView: React.FC<{
                     <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-alt-500 relative z-10">
                       <Briefcase size={24} />
                     </div>
-                    <div className="relative z-10">
+                    <div className="relative z-10 min-w-0 flex-1">
                       <div className="text-[10px] font-black text-harx-alt-400 uppercase tracking-widest">{t('profile.header.growthPlan')}</div>
-                      {isEditingPublicInfo ? (
+                      {hasSubscriptionStepDone ? (
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="w-full text-left text-sm font-black text-harx-alt-900 tracking-tight leading-none mt-1 bg-transparent outline-none hover:text-harx-alt-700 transition-colors underline underline-offset-2"
+                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
                         >
                           {planData?.plan?.name || t('profile.header.choosePlan')}
                         </button>
@@ -1376,9 +1544,10 @@ export const ProfileView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="text-left text-lg font-black text-harx-alt-900 tracking-tight leading-none mt-0.5 hover:text-harx-alt-700 transition-colors"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-harx px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
                         >
-                          {planData?.plan?.name || t('profile.header.defaultPlan')}
+                          {t('profile.header.choosePlanCta')}
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -1395,6 +1564,8 @@ export const ProfileView: React.FC<{
           </div>
         </div>
       </div>
+
+      <Toaster position="top-right" />
 
       {/* Image Modal */}
       {showImageModal && profile.personalInfo?.photo?.url && (
@@ -1431,12 +1602,170 @@ export const ProfileView: React.FC<{
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-              <EmbeddedRepSubscriptionFlow
-                agentId={profile?._id ? String(profile._id) : undefined}
-                customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
-                currentPlanId={planData?.plan?._id ? String(planData.plan._id) : undefined}
-                onSubscribed={handlePlanSubscribed}
-              />
+              {finalizingPlan ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16">
+                  <LoaderIcon className="h-8 w-8 animate-spin text-harx-500" />
+                  <p className="text-sm font-bold text-slate-500">{t('subscriptionFlow.finalizing')}</p>
+                </div>
+              ) : (
+                <EmbeddedRepSubscriptionFlow
+                  agentId={profile?._id ? String(profile._id) : undefined}
+                  customerEmail={String(profile?.personalInfo?.email || '').trim() || undefined}
+                  currentPlanId={
+                    hasSubscriptionStepDone && planData?.plan?._id
+                      ? String(planData.plan._id)
+                      : undefined
+                  }
+                  onSubscribed={handlePlanSubscribed}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPublishModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-publish-title"
+            className="relative w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-harx text-white shadow-lg shadow-harx-500/25">
+              <Rocket className="h-6 w-6" />
+            </div>
+            <h2 id="profile-publish-title" className="text-lg font-black tracking-tight text-slate-900">
+              {t('profile.header.publishReady')}
+            </h2>
+            <p className="mt-2 text-sm font-medium text-slate-500 leading-relaxed">
+              {planData?.plan?.name
+                ? t('subscriptionFlow.planActiveBanner', { name: planData.plan.name })
+                : t('subscriptionFlow.onboardingCompletePublish')}
+            </p>
+            <button
+              type="button"
+              onClick={() => void handlePublishProfile()}
+              disabled={publishing}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-harx px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/20 transition hover:opacity-90 disabled:opacity-60"
+            >
+              {publishing ? (
+                <>
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                  {t('profile.header.publishing')}
+                </>
+              ) : (
+                t('subscriptionFlow.publish')
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <OnboardingSatisfactionModal open={showSatisfaction} onClose={handleSatisfactionClose} />
+
+      {/* Photo source chooser */}
+      {showPhotoSourceModal && (
+        <div
+          className="fixed inset-0 z-[125] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowPhotoSourceModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                {t('profile.header.photoSourceTitle')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPhotoSourceModal(false)}
+                className="p-2 hover:bg-slate-50 rounded-xl"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              <button
+                type="button"
+                onClick={openDevicePicker}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+              >
+                <div className="p-2.5 rounded-xl bg-slate-100 text-slate-600">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-bold text-slate-800">
+                  {t('profile.header.chooseFromDevice')}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void startPhotoCamera()}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-slate-100 hover:border-harx-200 hover:bg-harx-50/40 transition-all text-left"
+              >
+                <div className="p-2.5 rounded-xl bg-harx-50 text-harx-600">
+                  <ImagePlus className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-bold text-slate-800">
+                  {t('profile.header.takePhoto')}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live camera capture */}
+      {showCameraModal && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-black text-slate-900">{t('profile.header.takePhoto')}</h3>
+              <button type="button" onClick={closeCameraModal} className="p-2 hover:bg-slate-50 rounded-xl">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-5 bg-slate-950 flex items-center justify-center min-h-[280px]">
+              {cameraError ? (
+                <p className="text-sm font-semibold text-rose-200 text-center px-4">{cameraError}</p>
+              ) : (
+                <video
+                  ref={cameraVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-h-[55vh] rounded-2xl object-cover mirror-x scale-x-[-1]"
+                  aria-label={t('profile.header.cameraPreview')}
+                />
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCameraModal}
+                className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-black uppercase tracking-widest hover:bg-slate-50"
+              >
+                {t('profile.common.cancel')}
+              </button>
+              {!cameraError && (
+                <button
+                  type="button"
+                  onClick={capturePhotoFromCamera}
+                  className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-harx-500/20"
+                >
+                  {t('profile.header.capturePhoto')}
+                </button>
+              )}
+              {cameraError && (
+                <button
+                  type="button"
+                  onClick={openDevicePicker}
+                  className="px-8 py-2.5 rounded-xl bg-gradient-harx text-white text-sm font-black uppercase tracking-widest hover:opacity-90"
+                >
+                  {t('profile.header.chooseFromDevice')}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -34,7 +34,13 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
-  const [videoModalExp, setVideoModalExp] = useState<{ title: string; company: string; index: number } | null>(null);
+  const [videoModalExp, setVideoModalExp] = useState<{
+    title: string;
+    company: string;
+    description?: string;
+    responsibilities?: string[];
+    index: number;
+  } | null>(null);
 
   const resetDraft = () => {
     setDraft({ title: '', company: '', startDate: '', endDate: '', description: '' });
@@ -254,7 +260,13 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
 
                       <button
                         type="button"
-                        onClick={() => setVideoModalExp({ title: String(exp.title || exp.role || ''), company: String(exp.company || ''), index })}
+                        onClick={() => setVideoModalExp({
+                          title: String(exp.title || exp.role || ''),
+                          company: String(exp.company || ''),
+                          description: String(exp.description || ''),
+                          responsibilities: Array.isArray(exp.responsibilities) ? exp.responsibilities.map(String) : [],
+                          index,
+                        })}
                         className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
                           exp.videoUrl || exp.videoAnalysis
                             ? 'border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50'
@@ -281,7 +293,12 @@ export const ExperienceTab: React.FC<ExperienceTabProps> = ({ profile, onVideoAn
         <ExperienceVideoModal
           isOpen={!!videoModalExp}
           onClose={() => setVideoModalExp(null)}
-          experience={{ title: videoModalExp.title, company: videoModalExp.company }}
+          experience={{
+            title: videoModalExp.title,
+            company: videoModalExp.company,
+            description: videoModalExp.description,
+            responsibilities: videoModalExp.responsibilities,
+          }}
           experienceIndex={videoModalExp.index}
           profileId={profile._id || profile.id || ''}
           referencePhotoUrl={profile?.personalInfo?.photo?.url || null}

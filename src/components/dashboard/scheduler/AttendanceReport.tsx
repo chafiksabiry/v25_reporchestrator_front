@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Rep, TimeSlot } from '../../../types/scheduler';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, parseISO, isWithinInterval } from 'date-fns';
 import { FileText, Download, Filter, CheckCircle, XCircle, Users, BarChart3, TrendingUp } from 'lucide-react';
+import { periodEnd, periodStart } from '../../../utils/planningMetrics';
 
 interface AttendanceReportProps {
     reps: Rep[];
@@ -13,19 +14,23 @@ export function AttendanceReport({ reps, slots }: AttendanceReportProps) {
     const [sortBy, setSortBy] = useState<'name' | 'score'>('score');
 
     const filteredSlots = slots.filter(slot => {
-        const slotDate = parseISO(slot.date);
+        const ymd = String(slot.date || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return timeframe === 'all';
+        const slotDate = parseISO(`${ymd}T12:00:00`);
         const now = new Date();
 
         if (timeframe === 'month') {
-            const monthStart = startOfMonth(now);
-            const monthEnd = endOfMonth(now);
-            return isWithinInterval(slotDate, { start: monthStart, end: monthEnd });
+            // Current calendar month
+            return isWithinInterval(slotDate, {
+                start: periodStart('month', now),
+                end: periodEnd('month', now),
+            });
         } else if (timeframe === 'week') {
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay());
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            return isWithinInterval(slotDate, { start: weekStart, end: weekEnd });
+            // Calendar week Monday → Sunday
+            return isWithinInterval(slotDate, {
+                start: periodStart('week', now),
+                end: periodEnd('week', now),
+            });
         }
 
         return true;

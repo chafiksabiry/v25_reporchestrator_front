@@ -1,36 +1,12 @@
 import { getAgentId, getAuthToken } from './authUtils';
+import { getGigsApiBase } from './gigsApiBase';
+import { isReservationActiveNow, resolveIanaZone } from './planningMetrics';
 
 type StartTarget = 'training' | 'session-planning' | 'workspace';
 
 export interface StartRouteDecision {
   target: StartTarget;
   reason: string;
-}
-
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function parseHHMMToMinutes(raw: unknown): number | null {
-  const m = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const mm = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(mm)) return null;
-  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
-  return h * 60 + mm;
-}
-
-function isReservationForToday(rawDate: unknown, now: Date): boolean {
-  const v = String(rawDate || '').trim();
-  if (!v) return false;
-  if (ISO_DATE_RE.test(v)) {
-    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-      now.getDate()
-    ).padStart(2, '0')}`;
-    const todayIso = now.toISOString().slice(0, 10);
-    return v === iso || v === todayIso;
-  }
-  const todayName = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-  return v.toLowerCase() === todayName;
 }
 
 function normalizeTrainingBase(): string {
@@ -120,17 +96,26 @@ export async function resolveGigStartRoute(gigId: string): Promise<StartRouteDec
     return { target: 'session-planning', reason: `Reservation check failed (${reservationsRes.status})` };
   }
   const reservations = await reservationsRes.json();
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const hasActiveReservation = (Array.isArray(reservations) ? reservations : []).some((r: any) => {
-    if (String(r?.status || '').toLowerCase() !== 'reserved') return false;
-    if (!isReservationForToday(r?.reservationDate || r?.date, now)) return false;
-    const start = parseHHMMToMinutes(r?.startTime);
-    const end = parseHHMMToMinutes(r?.endTime);
-    if (start == null || end == null || end <= start) return false;
-    // Check if current time matches the active slot strictly
-    return nowMinutes >= start && nowMinutes < end;
-  });
+  let gigTz: string | null = 'Europe/Paris';
+  try {
+    const gigRes = await fetch(`${getGigsApiBase()}/gigs/${encodeURIComponent(gigId)}`, {
+      headers,
+    });
+    if (gigRes.ok) {
+      const gigPayload = await gigRes.json();
+      const gigDoc = gigPayload?.data || gigPayload?.gig || gigPayload;
+      gigTz =
+        resolveIanaZone(gigDoc?.availability?.time_zone) ||
+        resolveIanaZone(gigDoc?.availability?.timeZone) ||
+        'Europe/Paris';
+    }
+  } catch {
+    /* default Europe/Paris */
+  }
+
+  const hasActiveReservation = (Array.isArray(reservations) ? reservations : []).some((r: any) =>
+    isReservationActiveNow(r, { gigTz })
+  );
 
   if (!hasActiveReservation) {
     return { target: 'session-planning', reason: 'No active reserved slot right now' };

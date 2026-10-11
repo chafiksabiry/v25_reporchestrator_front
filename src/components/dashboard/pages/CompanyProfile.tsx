@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
   Building2,
@@ -26,6 +27,7 @@ import {
   fetchGigDetailsPayload,
   fetchCompanyFromGigsListing,
 } from '../../../utils/companyProfileLoad';
+import { localizeText } from '../../../utils/i18nText';
 
 type CompanyLocationState = {
   company?: CompanyProfileData;
@@ -38,9 +40,12 @@ export function CompanyProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { t, i18n } = useTranslation();
   const [company, setCompany] = useState<CompanyProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const uiLang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
 
   useEffect(() => {
     if (!companyId) return;
@@ -59,7 +64,11 @@ export function CompanyProfile() {
         }
 
         const cached = loadCompanyProfileFromStorage(id);
-        if (cached && normalizeEntityId(cached._id) === id) {
+        if (
+          cached &&
+          normalizeEntityId(cached._id) === id &&
+          (cached.overview_i18n || cached.mission_i18n || cached.industry_i18n)
+        ) {
           setCompany(cached);
           return;
         }
@@ -107,9 +116,7 @@ export function CompanyProfile() {
           setLoadError(null);
         } else {
           setCompany(null);
-          setLoadError(
-            'Impossible de charger ce profil. Vérifiez le lien, ou ouvrez l’entreprise depuis une fiche gig ou le marketplace.',
-          );
+          setLoadError(t('companyProfile.loadError'));
         }
       } finally {
         setLoading(false);
@@ -120,7 +127,7 @@ export function CompanyProfile() {
     return () => {
       cancelled = true;
     };
-  }, [companyId, location.state, searchParams]);
+  }, [companyId, location.state, searchParams, t]);
 
   const handleBack = useCallback(() => {
     if (!companyId) {
@@ -157,6 +164,30 @@ export function CompanyProfile() {
     return null;
   }, [company]);
 
+  const industryLabel = useMemo(() => {
+    if (!company) return '';
+    return (
+      localizeText(company.industry_i18n, uiLang) ||
+      String(company.industry || '').trim()
+    );
+  }, [company, uiLang]);
+
+  const overviewText = useMemo(() => {
+    if (!company) return '';
+    return (
+      localizeText(company.overview_i18n, uiLang) ||
+      localizeText(company.companyIntro_i18n, uiLang) ||
+      company.overview ||
+      company.companyIntro ||
+      ''
+    );
+  }, [company, uiLang]);
+
+  const missionText = useMemo(() => {
+    if (!company) return '';
+    return localizeText(company.mission_i18n, uiLang) || company.mission || '';
+  }, [company, uiLang]);
+
   if (!companyId) {
     return null;
   }
@@ -165,7 +196,7 @@ export function CompanyProfile() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4 text-slate-600">
         <div className="h-10 w-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-semibold">Chargement du profil…</p>
+        <p className="text-sm font-semibold">{t('companyProfile.loading')}</p>
       </div>
     );
   }
@@ -174,17 +205,16 @@ export function CompanyProfile() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm max-w-md w-full p-10 text-center">
-          <h1 className="text-xl font-black text-slate-900 mb-2">Entreprise introuvable</h1>
+          <h1 className="text-xl font-black text-slate-900 mb-2">{t('companyProfile.notFoundTitle')}</h1>
           <p className="text-slate-600 text-sm mb-4">
-            {loadError ||
-              'Ouvrez cette page depuis une fiche gig ou le marketplace, ou vérifiez que l’URL est correcte.'}
+            {loadError || t('companyProfile.notFoundDesc')}
           </p>
           <button
             type="button"
             onClick={() => navigate('/marketplace')}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black text-sm uppercase tracking-wider hover:opacity-95 transition-opacity"
           >
-            Retour au marketplace
+            {t('companyProfile.backToMarketplace')}
           </button>
         </div>
       </div>
@@ -210,10 +240,10 @@ export function CompanyProfile() {
           <button
             type="button"
             onClick={handleBack}
-            className="inline-flex items-center text-white/80 hover:text-white font-bold text-sm mb-8 transition-colors group"
+            className="inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white font-black text-xs uppercase tracking-widest shadow-[0_4px_18px_-4px_rgba(124,58,237,0.55)] hover:shadow-[0_8px_24px_-4px_rgba(192,38,211,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all group"
           >
-            <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-            Retour
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            {t('companyProfile.back')}
           </button>
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-6">
@@ -227,12 +257,12 @@ export function CompanyProfile() {
             <div className="flex-1 min-w-0 pb-1">
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white drop-shadow-sm">{company.name}</h1>
               <div className="flex flex-wrap gap-2 mt-4">
-                {company.industry && (
+                {industryLabel ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 border border-white/20 backdrop-blur-sm">
                     <Target className="w-3.5 h-3.5 opacity-90" />
-                    {company.industry}
+                    {industryLabel}
                   </span>
-                )}
+                ) : null}
                 {company.founded && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 border border-white/20 backdrop-blur-sm">
                     <Calendar className="w-3.5 h-3.5 opacity-90" />
@@ -258,7 +288,7 @@ export function CompanyProfile() {
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-indigo-500" />
-                Contact
+                {t('companyProfile.contact')}
               </h2>
               <ul className="space-y-3 text-sm">
                 {company.contact?.email && (
@@ -302,7 +332,7 @@ export function CompanyProfile() {
                 !company.contact?.website &&
                 !company.contact?.address &&
                 !company.headquarters && (
-                  <p className="text-sm text-slate-500">Aucune information de contact publiée.</p>
+                  <p className="text-sm text-slate-500">{t('companyProfile.noContact')}</p>
                 )}
 
               {mapsHref && (
@@ -312,7 +342,7 @@ export function CompanyProfile() {
                   rel="noopener noreferrer"
                   className="mt-5 block w-full text-center py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition-colors"
                 >
-                  Voir sur la carte
+                  {t('companyProfile.viewOnMap')}
                 </a>
               )}
             </div>
@@ -320,7 +350,7 @@ export function CompanyProfile() {
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
                 <Globe className="w-4 h-4 text-violet-500" />
-                Présence en ligne
+                {t('companyProfile.onlinePresence')}
               </h2>
               <div className="flex flex-wrap gap-2">
                 {sm.linkedin && (
@@ -368,7 +398,7 @@ export function CompanyProfile() {
                   </a>
                 )}
                 {!sm.linkedin && !sm.twitter && !sm.facebook && !sm.instagram && (
-                  <p className="text-sm text-slate-500">Aucun lien social renseigné.</p>
+                  <p className="text-sm text-slate-500">{t('companyProfile.noSocial')}</p>
                 )}
               </div>
             </div>
@@ -381,24 +411,24 @@ export function CompanyProfile() {
                 <div className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/25">
                   <Building2 className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">Présentation</h2>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">{t('companyProfile.overview')}</h2>
               </div>
               <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
-                {company.overview || company.companyIntro || 'Aucune description disponible pour cette entreprise.'}
+                {overviewText || t('companyProfile.noOverview')}
               </p>
             </section>
 
-            {company.mission && (
+            {missionText ? (
               <section className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 to-violet-50/80 p-8 shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2.5 rounded-2xl bg-white border border-indigo-100 text-indigo-600 shadow-sm">
                     <Target className="w-6 h-6" />
                   </div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">Notre mission</h2>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">{t('companyProfile.mission')}</h2>
                 </div>
-                <p className="text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{company.mission}</p>
+                <p className="text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{missionText}</p>
               </section>
-            )}
+            ) : null}
 
           </div>
         </div>

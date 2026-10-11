@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import config from '../../config';
 import progressService, { UserProgress } from '../../services/progressService';
-import { OnboardingNextStepButton } from './OnboardingNextStepButton';
 import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
 
 // Define the phase interface
@@ -161,7 +160,7 @@ const phaseTemplates = [
     nameKey: 'repOnboarding.phases.profile.name',
     descriptionKey: 'repOnboarding.phases.profile.description',
     icon: UserCircle,
-    path: '/orchestrator/profile',
+    path: '/profile-editor',
     requiredActionKeys: [
       'repOnboarding.actions.addExperience',
       'repOnboarding.actions.recordExperienceVideo'
@@ -643,12 +642,12 @@ function Dashboard() {
   // Handle phase start or continue
   const handlePhaseAction = async (phase: Phase) => {
     try {
-      // Phase 2 (Profile Creation): show the profile page (keeps sidebar + header)
+      // Phase 2 (Profile Creation): open the profile editor (not the read-only profile view)
       if (phase.id === 2) {
         if (phase.status === 'pending') {
           await progressService.updatePhaseStatus(phase.id, 'in-progress');
         }
-        navigate('/profile');
+        navigate('/profile-editor');
         return;
       }
 
@@ -772,10 +771,6 @@ function Dashboard() {
   const visiblePhaseTemplates = phaseTemplates.filter(phase => phase.id <= 5 && phase.id !== 3);
   const visibleCompletedPhases = visiblePhases.filter(p => p.status === 'completed').length;
   const progressPercentage = (visibleCompletedPhases / visiblePhaseTemplates.length) * 100;
-
-  // Next actionable phase = first visible phase that isn't completed yet.
-  // Powers the floating "Next step" guide button (mirrors the company orchestrator).
-  const nextActionablePhase = visiblePhases.find(p => p.status !== 'completed');
 
   return (
     <div className="space-y-6">
@@ -1033,13 +1028,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Floating "Next step" guide — points to the next incomplete phase */}
-      {nextActionablePhase && (
-        <OnboardingNextStepButton
-          title={t(nextActionablePhase.nameKey)}
-          onClick={() => handlePhaseAction(nextActionablePhase)}
-        />
-      )}
+      {/* Floating "Next step" guide removed — phase cards already expose Continue/Start. */}
     </div>
   );
 }

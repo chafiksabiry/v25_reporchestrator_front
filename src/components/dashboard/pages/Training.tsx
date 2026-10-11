@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   BookOpen,
   Briefcase,
-  Clock3,
   Loader2,
   AlertCircle,
   ChevronDown,
@@ -16,9 +16,11 @@ import {
   Award,
   X,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Lightbulb,
 } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
+import { getActiveGigId, persistActiveGigId } from '../../../utils/activeGigNav';
 import { useRepTrainingNav } from '../../../contexts/RepTrainingNavContext';
 import {
   getModuleColorStyles,
@@ -26,11 +28,15 @@ import {
   resolveRepViewerTheme,
 } from '../../../utils/trainingViewerTheme';
 import { GigScriptReaderModal } from '../GigScriptReaderModal';
+import { AcademyUseCases } from '../AcademyUseCases';
 import {
+  fetchScriptReadsFromApi,
   gigIdFromJourney,
+  hydrateScriptReadCache,
   isScriptRequirementModule,
   journeyHasScriptModule,
   markScriptReadLocal,
+  markScriptReadRemote,
   scriptModuleMeta,
   scriptModuleStillPending,
   shouldShowScriptCta,
@@ -128,9 +134,8 @@ type ViewerSlide =
         question: any;
         correctAnswer: number;
       }>;
-    };
-
-type ModulePlanItem = { durationMinutes?: unknown };
+    }
+  | { key: string; kind: 'completion'; title: string };
 
 function notifyTrainingProgressUpdated() {
   window.dispatchEvent(new Event('TRAINING_PROGRESS_UPDATED'));
@@ -206,9 +211,20 @@ function ScriptReadStatus({
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800">
-      <CheckCircle className="h-3.5 w-3.5" />
-      Script : <span className="font-black">lu</span>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800">
+      <span className="inline-flex items-center gap-1.5">
+        <CheckCircle className="h-3.5 w-3.5" />
+        Script : <span className="font-black">lu</span>
+      </span>
+      {onOpenScript ? (
+        <button
+          type="button"
+          onClick={onOpenScript}
+          className="font-black uppercase tracking-wider text-[10px] text-emerald-800 underline underline-offset-2 hover:text-emerald-950 shrink-0"
+        >
+          Relire
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -218,28 +234,6 @@ function extractSlides(j: JourneyRow): SlideRow[] {
   const slides = p.slides;
   if (!Array.isArray(slides)) return [];
   return slides as SlideRow[];
-}
-
-function extractModuleDurationsMinutes(j: JourneyRow): number[] {
-  const planRaw = Array.isArray(j.modulePlan) ? (j.modulePlan as ModulePlanItem[]) : [];
-  const fromPlan = planRaw
-    .map((m) => Number(m?.durationMinutes))
-    .map((n) => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0));
-  if (fromPlan.some((n) => n > 0)) return fromPlan;
-
-  const modules = extractModules(j);
-  return modules.map((m: any) => {
-    const n = Number(m?.duration);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  });
-}
-
-function formatDurationHMS(ms: number): string {
-  const safe = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function mergeJourney(
@@ -405,7 +399,7 @@ function viewerSlideCountFromJourney(journey: JourneyRow): number {
     );
     if (hasQuestions) count += 1; // quiz_group
   });
-  return count;
+  return count + 1; // completion (« Bravo »)
 }
 
 function readQuizMaxAttemptsFromJourneyDoc(qz: unknown): number {
@@ -576,6 +570,17 @@ function isModuleIntroSectionNavigationLocked(
   return sectionIndex > firstInc;
 }
 
+/** `passed: true` côté serveur uniquement. `status: completed` sans ce drapeau ne compte pas. */
+function quizPassedOnServer(qz: unknown, mp: Record<string, unknown> | undefined): boolean {
+  if (!mp) return false;
+  const q = qz as { _id?: unknown; id?: unknown };
+  const qid = normalizeMongoId(q?._id) || normalizeMongoId(q?.id);
+  if (!qid) return false;
+  const qp = mp.quizProgress as Array<{ quizKey?: unknown; passed?: boolean }> | undefined;
+  if (!Array.isArray(qp)) return false;
+  return qp.some((row) => normalizeMongoId(row?.quizKey) === qid && row.passed === true);
+}
+
 function quizIsPassedFromProgress(qz: unknown, _qi: number, mp: Record<string, unknown> | undefined): boolean {
   if (!mp) return false;
   const q = qz as { _id?: unknown; id?: unknown; title?: unknown };
@@ -593,6 +598,30 @@ function quizIsPassedFromProgress(qz: unknown, _qi: number, mp: Record<string, u
   const qs = mp.quizScores as Array<{ quizId?: unknown; passed?: boolean }> | undefined;
   if (Array.isArray(qs) && qs.some((x) => normalizeMongoId(x?.quizId) === qid && x?.passed)) return true;
   return false;
+}
+
+/** Index de la réponse REP pour une question, depuis lastAnswers du quiz (API). */
+function lastAnswerIndexForQuizQuestion(
+  slide: { questions: Array<{ quizKey?: string }> },
+  questionIndex: number,
+  quizProgressRows: Array<{ quizKey?: unknown; lastAnswers?: unknown }>
+): number | null {
+  const q = slide.questions[questionIndex];
+  if (!q) return null;
+  const key = String(q.quizKey || '').trim();
+  if (!key) return null;
+  const row = quizProgressRows.find((r) => {
+    const rk = String(r?.quizKey || '').trim();
+    return rk === key || normalizeMongoId(rk) === normalizeMongoId(key);
+  });
+  const answers = Array.isArray(row?.lastAnswers) ? row!.lastAnswers : null;
+  if (!answers) return null;
+  let idxInQuiz = 0;
+  for (let i = 0; i < questionIndex; i += 1) {
+    if (String(slide.questions[i]?.quizKey || '').trim() === key) idxInQuiz += 1;
+  }
+  const raw = Number(answers[idxInQuiz]);
+  return Number.isFinite(raw) && raw >= 0 ? raw : null;
 }
 
 function hasStructuredResumeMergeEvidence(row: RepProgressRow | undefined): boolean {
@@ -706,7 +735,8 @@ async function fetchEnrolledGigsForAgent(
   const gigs = Array.isArray(data.gigs) ? data.gigs : [];
   const out: { gigId: string; title: string }[] = [];
   for (const item of gigs) {
-    const g = item as { gig?: { _id?: unknown; title?: string } };
+    const g = item as { gig?: { _id?: unknown; title?: string; status?: string } };
+    if (String(g.gig?.status || '').toLowerCase() !== 'active') continue;
     const gigId = normalizeMongoId(g.gig?._id);
     if (gigId) {
       out.push({
@@ -723,6 +753,7 @@ async function fetchEnrolledGigsForAgent(
 }
 
 export function Training() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const repId = getAgentId();
@@ -753,31 +784,29 @@ export function Training() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [formationViewerSlideIndex, setFormationViewerSlideIndex] = useState(0);
+  /** Modules débloqués dès qu’un quiz est réussi à l’écran, sans attendre le statut `locked` du serveur. */
+  const [locallyUnlockedModuleIds, setLocallyUnlockedModuleIds] = useState<string[]>([]);
   /** Onglet actif de la page : formations en cours / certifications obtenues. */
-  const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications'>('trainings');
+  const [trainingTab, setTrainingTab] = useState<'trainings' | 'certifications' | 'usecases'>('trainings');
   type QuizQuestionState = {
     selected: number | null;
     revealed: boolean;
     locked: boolean;
     /** Temps écoulé sans réponse (compte comme une erreur). */
     timedOut?: boolean;
+    /** Revue : pas de lastAnswers en base (soumission antérieure au stockage). */
+    answerMissing?: boolean;
   };
   const [formationViewerQuizState, setFormationViewerQuizState] = useState<Record<string, QuizQuestionState>>({});
   const [formationViewerQuizPage, setFormationViewerQuizPage] = useState<Record<string, number>>({});
   /** Fautes cumulées sur tout le bloc quiz du slide (pas par question). Max 3 affichées. */
   const [quizSlideWrongStrikes, setQuizSlideWrongStrikes] = useState<Record<string, number>>({});
-  const [quizQuestionCountdownSec, setQuizQuestionCountdownSec] = useState<Record<string, number>>({});
-  const quizTimerSlideRef = useRef<{ qk: string } | null>(null);
   const [progressByJourney, setProgressByJourney] = useState<Record<string, RepProgressRow>>({});
   const [slideProgressSummary, setSlideProgressSummary] = useState<RepSlideProgressSummary | null>(null);
   const [structuredProgressByJourney, setStructuredProgressByJourney] = useState<Record<string, StructuredProgressRow>>({});
   const [completedSectionsByJourney, setCompletedSectionsByJourney] = useState<
     Record<string, Record<string, string[]>>
   >({});
-  const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
-  const [sessionManualDurationMs, setSessionManualDurationMs] = useState(0);
-  const [moduleElapsedMs, setModuleElapsedMs] = useState(0);
-  const [moduleManualDurationMs, setModuleManualDurationMs] = useState(0);
   const progressSyncInFlightRef = useRef<Set<string>>(new Set());
   /** POST /section/start déjà envoyé pour cette clé (même parcours). */
   const sectionStartSentRef = useRef<Set<string>>(new Set());
@@ -907,6 +936,7 @@ export function Training() {
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
     if (tab === 'certifications') setTrainingTab('certifications');
+    if (tab === 'usecases' || tab === 'use-cases') setTrainingTab('usecases');
   }, [location.search]);
 
   /** Formations terminées (= certifiées) pour la section Certifications. */
@@ -920,10 +950,15 @@ export function Training() {
     });
   }, [displayJourneys, structuredProgressByJourney, progressByJourney]);
 
-  const openCertificate = useCallback((j: JourneyRow) => {
-    const id = journeyKey(j);
-    if (id) navigate(`/certification/journey/${encodeURIComponent(id)}`);
-  }, [navigate]);
+  const openCertificate = useCallback(
+    (j: JourneyRow, from: 'trainings' | 'certifications' = 'trainings') => {
+      const id = journeyKey(j);
+      if (!id) return;
+      const qs = from === 'certifications' ? '?from=certifications' : '?from=trainings';
+      navigate(`/certification/journey/${encodeURIComponent(id)}${qs}`);
+    },
+    [navigate]
+  );
 
   // When user picks a gig, refetch trainings for that gig so the list updates even if the initial bulk load failed
   useEffect(() => {
@@ -1007,13 +1042,16 @@ export function Training() {
 
   useEffect(() => {
     if (routeGigApplied) return;
-    if (!routeGigId) {
+    const stored = getActiveGigId();
+    const preferred = routeGigId || stored;
+    if (!preferred) {
       setRouteGigApplied(true);
       return;
     }
     if (enrolledGigs.length <= 0) return;
-    if (enrolledGigs.some((g) => g.gigId === routeGigId)) {
-      setGigFilter(routeGigId);
+    if (enrolledGigs.some((g) => g.gigId === preferred)) {
+      setGigFilter(preferred);
+      persistActiveGigId(preferred);
     }
     setRouteGigApplied(true);
   }, [routeGigId, enrolledGigs, routeGigApplied]);
@@ -1096,6 +1134,11 @@ export function Training() {
         });
       }
     });
+    slides.push({
+      key: 'completion',
+      kind: 'completion',
+      title: journeyTitle(selectedJourney),
+    });
     return slides;
   }, [selectedJourney]);
   const formationViewerSlideIndexByKey = useMemo(() => {
@@ -1121,7 +1164,7 @@ export function Training() {
   const isNextModuleLocked = useMemo(() => {
     if (!selectedJourneyId || !currentFormationViewerSlide) return false;
     const nextSlide = formationViewerSlides[formationViewerSlideIndex + 1];
-    if (!nextSlide || nextSlide.kind === 'overview') return false;
+    if (!nextSlide || nextSlide.kind === 'overview' || nextSlide.kind === 'completion') return false;
     const nextModuleIndex = nextSlide.moduleIndex;
     const selected = selectedJourney ? extractModules(selectedJourney) : [];
     const nextModule = selected[nextModuleIndex];
@@ -1129,6 +1172,7 @@ export function Training() {
     const nextModuleId = normalizeMongoId((nextModule as any)?._id) || normalizeMongoId((nextModule as any)?.id);
     const structured = structuredProgressByJourney[selectedJourneyId];
     if (!structured || !Array.isArray(structured.modules)) return false;
+    if (nextModuleId && locallyUnlockedModuleIds.includes(nextModuleId)) return false;
     const moduleState = structured.modules.find((m) => m.moduleId === nextModuleId);
     return moduleState?.status === 'locked';
   }, [
@@ -1138,6 +1182,7 @@ export function Training() {
     formationViewerSlideIndex,
     selectedJourney,
     structuredProgressByJourney,
+    locallyUnlockedModuleIds,
   ]);
 
   /** Dernière slide du viewer = une section : pas d’index suivant, il faut « Terminer » pour envoyer complete. */
@@ -1147,11 +1192,19 @@ export function Training() {
     return currentFormationViewerSlide?.kind === 'section';
   }, [formationViewerSlides, formationViewerSlideIndex, currentFormationViewerSlide]);
 
+  const atLastFormationSlide = useMemo(() => {
+    return (
+      formationViewerSlides.length > 0 &&
+      formationViewerSlideIndex >= formationViewerSlides.length - 1
+    );
+  }, [formationViewerSlides, formationViewerSlideIndex]);
+
   const blockFormationNextByEndPosition = useMemo(() => {
     if (formationViewerSlides.length === 0) return false;
     if (formationViewerSlideIndex < formationViewerSlides.length - 1) return false;
-    return currentFormationViewerSlide?.kind !== 'section';
-  }, [formationViewerSlides, formationViewerSlideIndex, currentFormationViewerSlide]);
+    // Sur Bravo / dernière slide non-section : pas de « Suivant ».
+    return true;
+  }, [formationViewerSlides, formationViewerSlideIndex]);
 
   /** Toutes les questions du bloc ont une réponse verrouillée (peu importe la note). Sert à envoyer quiz/submit même en échec sous 70 %. */
   const isCurrentQuizFullyAnswered = useMemo(() => {
@@ -1198,13 +1251,209 @@ export function Training() {
       if (state.timedOut) return;
       if (state.selected !== null && state.selected === q.correctAnswer) row.correct += 1;
     });
+    let localFullyAnswered = true;
+    let localPassed = true;
     for (const row of byQuiz.values()) {
-      if (row.answered < row.total) return false;
+      if (row.answered < row.total) {
+        localFullyAnswered = false;
+        break;
+      }
       const percent = row.total > 0 ? (row.correct / row.total) * 100 : 0;
-      if (percent < 70) return false;
+      if (percent < 70) localPassed = false;
     }
-    return true;
-  }, [currentFormationViewerSlide, formationViewerQuizState]);
+    if (localFullyAnswered && localPassed) return true;
+
+    // Reprise / formation déjà validée : le backend a le quiz passé, pas l’état local.
+    if (selectedJourney && selectedJourneyId) {
+      const modules = extractModules(selectedJourney);
+      const mod = modules[currentFormationViewerSlide.moduleIndex] as ModuleRow | undefined;
+      const moduleId =
+        normalizeMongoId((mod as any)?._id) || normalizeMongoId((mod as any)?.id) || '';
+      const mp =
+        moduleId && /^[a-f\d]{24}$/i.test(moduleId)
+          ? (progressByJourney[selectedJourneyId]?.modules?.[moduleId] as
+              | Record<string, unknown>
+              | undefined)
+          : undefined;
+      const quizzes = Array.isArray(mod?.quizzes) ? mod.quizzes : [];
+      let anyOnSlide = false;
+      let allPassed = true;
+      let qxi = 0;
+      for (const qz of quizzes) {
+        const qs = Array.isArray((qz as { questions?: unknown })?.questions)
+          ? (qz as { questions: unknown[] }).questions
+          : [];
+        if (qs.length === 0) continue;
+        const qid =
+          normalizeMongoId((qz as { _id?: unknown; id?: unknown })?._id) ||
+          normalizeMongoId((qz as { _id?: unknown; id?: unknown })?.id);
+        const title = String((qz as { title?: unknown })?.title || '').trim();
+        const onSlide = questions.some((q) => {
+          if (qid && (q.quizId === qid || String(q.quizKey || '') === qid)) return true;
+          if (title && String(q.quizTitle || '').trim() === title) return true;
+          if (title && String(q.quizKey || '').includes(title)) return true;
+          return false;
+        });
+        if (!onSlide) {
+          qxi += 1;
+          continue;
+        }
+        anyOnSlide = true;
+        if (!quizIsPassedFromProgress(qz, qxi, mp)) allPassed = false;
+        qxi += 1;
+      }
+      if (anyOnSlide && allPassed) return true;
+    }
+    return false;
+  }, [
+    currentFormationViewerSlide,
+    formationViewerQuizState,
+    selectedJourney,
+    selectedJourneyId,
+    progressByJourney,
+  ]);
+
+  /** Quiz réussi (≥ 70 %) : afficher Suivant tout de suite, même si le module suivant est encore `locked` en base. */
+  useEffect(() => {
+    const slide = currentFormationViewerSlide;
+    if (!slide || slide.kind !== 'quiz_group' || !isCurrentQuizPassed || !selectedJourney) return;
+    const modules = extractModules(selectedJourney);
+    const nextMod = modules[slide.moduleIndex + 1];
+    if (!nextMod) return;
+    const nextId =
+      normalizeMongoId((nextMod as { _id?: unknown; id?: unknown })?._id) ||
+      normalizeMongoId((nextMod as { _id?: unknown; id?: unknown })?.id);
+    if (!nextId) return;
+    setLocallyUnlockedModuleIds((prev) => (prev.includes(nextId) ? prev : [...prev, nextId]));
+  }, [currentFormationViewerSlide, isCurrentQuizPassed, selectedJourney]);
+
+  /** Dernière slide + tout validé (local ou formation 100 %) → Certificat, pas Suivant. */
+  const isSelectedFormationFullyDone = useMemo(() => {
+    if (!selectedJourneyId || !selectedJourney) return false;
+    if (structuredProgressByJourney[selectedJourneyId]?.status === 'completed') return true;
+    const row = progressByJourney[selectedJourneyId];
+    if (Number(row?.progressPercentage) >= 100) return true;
+    if (
+      row &&
+      hasStructuredResumeMergeEvidence(row) &&
+      formationResumeSlideIndexFromRepRow(selectedJourney, row) === null
+    ) {
+      return true;
+    }
+    return false;
+  }, [selectedJourneyId, selectedJourney, structuredProgressByJourney, progressByJourney]);
+
+  /** Formation terminée (ou quiz déjà réussi) : figer les réponses en mode revue. */
+  useEffect(() => {
+    const slide = currentFormationViewerSlide;
+    if (!slide || slide.kind !== 'quiz_group') return;
+    if (!isSelectedFormationFullyDone && !isCurrentQuizPassed) return;
+    if (!selectedJourneyId || !selectedJourney) return;
+
+    const modules = extractModules(selectedJourney);
+    const mod = modules[slide.moduleIndex];
+    const moduleId =
+      normalizeMongoId((mod as any)?._id) ||
+      normalizeMongoId((mod as any)?.id) ||
+      String(slide.moduleIndex);
+    const journeyProgress = progressByJourney[selectedJourneyId];
+    const moduleProgressAny =
+      moduleId && journeyProgress?.modules && typeof journeyProgress.modules === 'object'
+        ? (journeyProgress.modules as Record<string, any>)[moduleId]
+        : undefined;
+    const quizProgressRows = Array.isArray(moduleProgressAny?.quizProgress)
+      ? moduleProgressAny.quizProgress
+      : [];
+
+    setFormationViewerQuizState((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      slide.questions.forEach((q, idx) => {
+        const qKey = `${slide.key}-q${idx}`;
+        const existing = next[qKey];
+        const fromApi = lastAnswerIndexForQuizQuestion(slide, idx, quizProgressRows);
+        const correctFallback =
+          typeof q?.correctAnswer === 'number' && Number.isFinite(q.correctAnswer) && q.correctAnswer >= 0
+            ? q.correctAnswer
+            : null;
+        // Temporaire : anciennes soumissions sans lastAnswers → réponse reps = bonne réponse.
+        const selected =
+          typeof fromApi === 'number'
+            ? fromApi
+            : correctFallback !== null
+              ? correctFallback
+              : existing?.selected !== null && existing?.selected !== undefined
+                ? existing.selected
+                : null;
+        const desired: QuizQuestionState = {
+          selected,
+          revealed: true,
+          locked: true,
+          timedOut: false,
+          answerMissing: selected === null,
+        };
+        if (
+          existing?.revealed &&
+          existing?.locked &&
+          existing.selected === desired.selected &&
+          !!existing.timedOut === !!desired.timedOut &&
+          !!existing.answerMissing === !!desired.answerMissing
+        ) {
+          return;
+        }
+        next[qKey] = desired;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [
+    currentFormationViewerSlide,
+    isSelectedFormationFullyDone,
+    isCurrentQuizPassed,
+    selectedJourneyId,
+    selectedJourney,
+    progressByJourney,
+  ]);
+
+  const atCompletionSlide = currentFormationViewerSlide?.kind === 'completion';
+
+  const showFormationCertificateCta = useMemo(() => {
+    if (isNextModuleLocked) return false;
+    // CTA certificat uniquement sur la slide Bravo (fin de parcours).
+    if (atCompletionSlide) return true;
+    return false;
+  }, [isNextModuleLocked, atCompletionSlide]);
+
+  /** Index de la slide Bravo (toujours la dernière). */
+  const completionSlideIndex = useMemo(() => {
+    const idx = formationViewerSlides.findIndex((s) => s.kind === 'completion');
+    return idx >= 0 ? idx : Math.max(0, formationViewerSlides.length - 1);
+  }, [formationViewerSlides]);
+
+  /** Après succès du dernier quiz (formation en cours), aller sur Bravo — pas rester sur le quiz.
+   *  Si la formation est déjà terminée, on laisse naviguer librement (revue des quizzes). */
+  useEffect(() => {
+    if (!selectedJourneyId || formationViewerSlides.length === 0) return;
+    if (isSelectedFormationFullyDone) return;
+    const cur = formationViewerSlides[formationViewerSlideIndex];
+    if (!cur) return;
+
+    const next = formationViewerSlides[formationViewerSlideIndex + 1];
+    if (
+      cur.kind === 'quiz_group' &&
+      next?.kind === 'completion' &&
+      isCurrentQuizPassed
+    ) {
+      setFormationViewerSlideIndex(completionSlideIndex);
+    }
+  }, [
+    selectedJourneyId,
+    formationViewerSlides,
+    formationViewerSlideIndex,
+    isSelectedFormationFullyDone,
+    isCurrentQuizPassed,
+    completionSlideIndex,
+  ]);
 
   const repViewerTheme = useMemo(
     () => resolveRepViewerTheme(selectedJourney, selectedJourneyId || ''),
@@ -1225,9 +1474,6 @@ export function Training() {
       setFormationViewerQuizState({});
       setFormationViewerQuizPage({});
       setQuizSlideWrongStrikes({});
-      setQuizQuestionCountdownSec({});
-      setSessionElapsedMs(0);
-      setSessionManualDurationMs(0);
     }
     sectionStartSentRef.current.clear();
     sectionStartPromiseRef.current.clear();
@@ -1235,6 +1481,7 @@ export function Training() {
     prevFormationSlideIndexRef.current = null;
     quizOutcomeSentRef.current.clear();
     quizStartSentRef.current.clear();
+    setLocallyUnlockedModuleIds([]);
   }, [selectedJourneyId]);
 
   useEffect(() => {
@@ -1252,22 +1499,7 @@ export function Training() {
     });
   }, [selectedJourneyId, progressByJourney]);
 
-  useEffect(() => {
-    if (!selectedJourneyId) return;
-    const startedAt = Date.now();
-    const t = window.setInterval(() => {
-      setSessionElapsedMs(Date.now() - startedAt);
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [selectedJourneyId]);
-
-  const currentModuleIndex = useMemo(() => {
-    if (!currentFormationViewerSlide) return null;
-    if (currentFormationViewerSlide.kind === 'overview') return 0;
-    return currentFormationViewerSlide.moduleIndex;
-  }, [currentFormationViewerSlide]);
-
-  /** Après max tentatives échouées ou pendant lockedUntil : on fige le chrono « module » (API). */
+  /** Après max tentatives échouées ou pendant lockedUntil. */
   const quizModuleTimeFrozen = useMemo(() => {
     const slide = currentFormationViewerSlide;
     if (!slide || slide.kind !== 'quiz_group' || !selectedJourneyId || !selectedJourney) return false;
@@ -1284,15 +1516,12 @@ export function Training() {
     );
     let maxCap = 3;
     let att = 0;
-    let lockUntil = 0;
     let anyPassed = false;
     for (const row of quizProg) {
       const k = String(row?.quizKey || '').trim();
       if (!activeKeys.has(k)) continue;
       maxCap = Math.max(maxCap, Number(row?.maxAttempts || 0) || 3);
       att = Math.max(att, Number(row?.attempts || 0));
-      const lu = Date.parse(String(row?.lockedUntil || ''));
-      if (Number.isFinite(lu)) lockUntil = Math.max(lockUntil, lu);
       if (row?.passed === true || String(row?.status) === 'passed') anyPassed = true;
     }
     const fromJourney = Math.max(
@@ -1300,28 +1529,16 @@ export function Training() {
       ...slide.questions.map((q) => Number((q as { maxAttempts?: unknown }).maxAttempts) || 3)
     );
     maxCap = Math.max(maxCap, fromJourney);
-    if (Date.now() < lockUntil) return true;
     if (!anyPassed && att >= maxCap) return true;
     return false;
   }, [currentFormationViewerSlide, selectedJourneyId, selectedJourney, progressByJourney]);
-
-  useEffect(() => {
-    setModuleElapsedMs(0);
-    setModuleManualDurationMs(0);
-    if (!selectedJourneyId || currentModuleIndex == null) return;
-    if (quizModuleTimeFrozen) return;
-    const startedAt = Date.now();
-    const t = window.setInterval(() => {
-      setModuleElapsedMs(Date.now() - startedAt);
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [selectedJourneyId, currentModuleIndex, quizModuleTimeFrozen]);
 
   /** Persiste slide courante + pages quiz dans rep_training_tracking (debounce). */
   useEffect(() => {
     if (!repId || !selectedJourneyId || !selectedJourney) return;
     const slide = formationViewerSlides[formationViewerSlideIndex];
     if (!slide) return;
+    if (slide.kind === 'completion') return;
     const modules = extractModules(selectedJourney);
     const moduleIndex = slide.kind === 'overview' ? 0 : slide.moduleIndex;
     const mod = modules[moduleIndex];
@@ -1477,6 +1694,20 @@ export function Training() {
     void fetchTrainingProgressRows();
   }, [fetchTrainingProgressRows]);
 
+  useEffect(() => {
+    if (!repId) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchScriptReadsFromApi(repId);
+      if (cancelled) return;
+      hydrateScriptReadCache(rows);
+      setScriptReadTick((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [repId]);
+
   const fetchSlideProgressSummary = useCallback(async () => {
     if (!repId) return;
     const base = trainingApiBase();
@@ -1585,10 +1816,6 @@ export function Training() {
       const quizzes = Array.isArray((moduleRow as any)?.quizzes) ? (moduleRow as any).quizzes : [];
       const totalSections = sections.length;
       const hasQuizzes = quizzes.length > 0;
-      const sectionDurationMs = Math.max(
-        10000,
-        Math.floor(Number((sec as any)?.duration || 0) * 60 * 1000) || 45000
-      );
       const syncKey = `complete:${sentKey}`;
       if (progressSyncInFlightRef.current.has(syncKey)) return;
       progressSyncInFlightRef.current.add(syncKey);
@@ -1621,7 +1848,6 @@ export function Training() {
           progress,
           status,
           completedSections: nextDone.filter((id) => /^[a-f\d]{24}$/i.test(id)),
-          durationMs: sectionDurationMs,
         });
 
       const finalizeComplete = async () => {
@@ -1676,7 +1902,17 @@ export function Training() {
       return;
     }
     const { journeyId, gigId } = scriptReader;
-    markScriptReadLocal(journeyId, gigId);
+
+    // Persist in DB (source of truth). Cache updates only on success.
+    if (gigId) {
+      const ok = await markScriptReadRemote({ repId, gigId, journeyId });
+      if (!ok) {
+        setScriptReader(null);
+        return;
+      }
+    } else if (journeyId) {
+      markScriptReadLocal(journeyId);
+    }
     setScriptReadTick((n) => n + 1);
 
     const j = displayJourneys.find((row) => journeyKey(row) === journeyId);
@@ -1715,7 +1951,7 @@ export function Training() {
           fetchStructuredProgress(journeyId),
         ]);
       } catch {
-        /* marquage local déjà appliqué */
+        /* script-read row already persisted when API succeeded */
       }
     }
 
@@ -1809,43 +2045,6 @@ export function Training() {
     completeSectionProgressAtLeave,
   ]);
 
-  const selectedJourneySummary = useMemo(
-    () =>
-      selectedJourneyId && slideProgressSummary?.journeys
-        ? slideProgressSummary.journeys.find((x) => x.journeyId === selectedJourneyId) || null
-        : null,
-    [slideProgressSummary, selectedJourneyId]
-  );
-  const moduleDurationsMinutes = useMemo(
-    () => (selectedJourney ? extractModuleDurationsMinutes(selectedJourney) : []),
-    [selectedJourney]
-  );
-  const plannedTotalMs = useMemo(
-    () => moduleDurationsMinutes.reduce((acc, n) => acc + Math.max(0, n), 0) * 60 * 1000,
-    [moduleDurationsMinutes]
-  );
-  const plannedCurrentModuleMs = useMemo(() => {
-    if (currentModuleIndex == null) return 0;
-    return Math.max(0, Number(moduleDurationsMinutes[currentModuleIndex] || 0)) * 60 * 1000;
-  }, [moduleDurationsMinutes, currentModuleIndex]);
-
-  const trackedFormationMs =
-    Math.max(0, Number(selectedJourneySummary?.followedDurationMs || 0)) +
-    sessionElapsedMs +
-    sessionManualDurationMs;
-  const trackedModuleMs = moduleElapsedMs + moduleManualDurationMs;
-
-  const formationRemainingMs =
-    plannedTotalMs > 0 ? Math.max(0, plannedTotalMs - trackedFormationMs) : 0;
-  const moduleRemainingMs =
-    plannedCurrentModuleMs > 0 ? Math.max(0, plannedCurrentModuleMs - trackedModuleMs) : 0;
-
-  const formationTimerLabel = useMemo(
-    () => formatDurationHMS(formationRemainingMs),
-    [formationRemainingMs]
-  );
-  const moduleTimerLabel = useMemo(() => formatDurationHMS(moduleRemainingMs), [moduleRemainingMs]);
-
   const syncQuizDuration = useCallback(
     async (
       moduleIndex: number,
@@ -1862,22 +2061,18 @@ export function Training() {
       if (!moduleId || !/^[a-f\d]{24}$/i.test(moduleId)) return;
       const base = trainingApiBase();
       if (!base) return;
-      setSessionManualDurationMs((ms) => ms + 40000);
-      setModuleManualDurationMs((ms) => ms + 40000);
       try {
         await axios.post(`${base}/training_journeys/rep-progress`, {
           repId,
           journeyId: selectedJourneyId,
           moduleId,
           status: 'in_progress',
-          durationMs: quizMeta ? 0 : 40000,
           quizUpdate: quizMeta
             ? {
                 quizKey: quizMeta.quizKey,
                 quizMongoId:
                   quizMeta.quizId && /^[a-f\d]{24}$/i.test(quizMeta.quizId) ? quizMeta.quizId : undefined,
                 status: 'in_progress',
-                durationMs: 40000,
               }
             : undefined,
         });
@@ -1970,6 +2165,35 @@ export function Training() {
     if (!repId || !selectedJourneyId || !selectedJourney) return;
     const slide = currentFormationViewerSlide;
     if (!slide || slide.kind !== 'quiz_group' || !isCurrentQuizFullyAnswered) return;
+    // Revue : ne pas resoumettre un quiz déjà validé en base.
+    // Ne pas sauter l’envoi quand seule la note locale est ≥ 70 % : sinon `passed` reste false
+    // et le module suivant reste verrouillé.
+    if (isSelectedFormationFullyDone) return;
+    const modulesForPass = extractModules(selectedJourney);
+    const modForPass = modulesForPass[slide.moduleIndex] as ModuleRow | undefined;
+    const moduleIdForPass =
+      normalizeMongoId((modForPass as any)?._id) || normalizeMongoId((modForPass as any)?.id) || '';
+    const mpForPass =
+      moduleIdForPass && /^[a-f\d]{24}$/i.test(moduleIdForPass)
+        ? (progressByJourney[selectedJourneyId]?.modules?.[moduleIdForPass] as
+            | Record<string, unknown>
+            | undefined)
+        : undefined;
+    const quizzesForPass = Array.isArray(modForPass?.quizzes) ? modForPass.quizzes : [];
+    const questionsForPass = Array.isArray(slide.questions) ? slide.questions : [];
+    const serverAlreadyPassed = quizzesForPass.some((qz) => {
+      const qid =
+        normalizeMongoId((qz as { _id?: unknown; id?: unknown })?._id) ||
+        normalizeMongoId((qz as { _id?: unknown; id?: unknown })?.id);
+      const title = String((qz as { title?: unknown })?.title || '').trim();
+      const onSlide = questionsForPass.some((q) => {
+        if (qid && (q.quizId === qid || String(q.quizKey || '') === qid)) return true;
+        if (title && String(q.quizTitle || '').trim() === title) return true;
+        return false;
+      });
+      return onSlide && quizPassedOnServer(qz, mpForPass);
+    });
+    if (serverAlreadyPassed) return;
 
     const modules = extractModules(selectedJourney);
     const mod = modules[slide.moduleIndex];
@@ -2070,41 +2294,22 @@ export function Training() {
     currentFormationViewerSlide,
     formationViewerQuizState,
     isCurrentQuizFullyAnswered,
+    isSelectedFormationFullyDone,
+    progressByJourney,
     fetchTrainingProgressRows,
     fetchSlideProgressSummary,
     fetchStructuredProgress,
   ]);
 
-  const activeQuizTimerCtx = useMemo(() => {
-    const slide = currentFormationViewerSlide;
-    if (!slide || slide.kind !== 'quiz_group') return null;
-    const total = slide.questions.length;
-    const page = Math.min(Math.max(0, formationViewerQuizPage[slide.key] ?? 0), Math.max(0, total - 1));
-    const qk = `${slide.key}-q${page}`;
-    return { slide, page, qk, total };
-  }, [currentFormationViewerSlide, formationViewerQuizPage]);
-
-  const activeQuizQuestionLocked = activeQuizTimerCtx
-    ? !!formationViewerQuizState[activeQuizTimerCtx.qk]?.locked
-    : false;
-
   const restartQuizSlide = useCallback((slide: any) => {
     const slideKey = String(slide?.key || '');
     if (!slideKey) return;
-    quizTimerSlideRef.current = null;
     setFormationViewerQuizPage((prev) => ({ ...prev, [slideKey]: 0 }));
     setQuizSlideWrongStrikes((prev) => ({
       ...prev,
       [slideKey]: Math.min(maxQuizAttemptsForFormationSlide(slide), (prev[slideKey] ?? 0) + 1),
     }));
     setFormationViewerQuizState((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        if (k.startsWith(`${slideKey}-q`)) delete next[k];
-      });
-      return next;
-    });
-    setQuizQuestionCountdownSec((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((k) => {
         if (k.startsWith(`${slideKey}-q`)) delete next[k];
@@ -2149,64 +2354,28 @@ export function Training() {
     }
   }, [selectedJourney, selectedJourneyId, requestQuizStartForSlide]);
 
-  useEffect(() => {
-    if (!activeQuizTimerCtx || activeQuizQuestionLocked) return;
-    const { slide, page, qk, total } = activeQuizTimerCtx;
-    quizTimerSlideRef.current = { qk };
-    const endAt = Date.now() + 40000;
-    const id = window.setInterval(() => {
-      if (quizTimerSlideRef.current?.qk !== qk) return;
-      const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-      setQuizQuestionCountdownSec((m) => ({ ...m, [qk]: rem }));
-      if (rem > 0) return;
-      window.clearInterval(id);
-      if (quizTimerSlideRef.current?.qk !== qk) return;
-      const cq = slide.questions[page];
-      setQuizSlideWrongStrikes((prev) => ({
-        ...prev,
-        [slide.key]: Math.min(3, (prev[slide.key] ?? 0) + 1),
-      }));
-      setFormationViewerQuizState((prev) => ({
-        ...prev,
-        [qk]: { selected: null, revealed: true, locked: true, timedOut: true },
-      }));
-      void syncQuizDuration(slide.moduleIndex, cq ? { quizKey: cq.quizKey, quizId: cq.quizId } : undefined);
-      window.setTimeout(() => {
-        setFormationViewerQuizPage((prev) => {
-          const cur = Math.min(Math.max(0, prev[slide.key] ?? 0), Math.max(0, total - 1));
-          if (cur < total - 1) return { ...prev, [slide.key]: cur + 1 };
-          return prev;
-        });
-      }, 650);
-    }, 400);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [activeQuizTimerCtx, activeQuizQuestionLocked, syncQuizDuration]);
-
   return (
     <div className={selectedJourney ? 'w-full h-[calc(100vh-120px)]' : 'space-y-6 w-full'}>
       {!selectedJourney && (
         <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Training</h1>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">{t('trainingPage.title')}</h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">
-            Trainings linked to gigs you are enrolled in, plus journeys your company assigned to you
-            directly.
+            {t('trainingPage.subtitle')}
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-[280px] sm:items-end">
           <div className="flex items-center gap-2 rounded-xl bg-harx-500/10 border border-harx-500/20 px-4 py-2 text-harx-700 self-start sm:self-end">
             <BookOpen className="w-5 h-5 shrink-0" />
-            <span className="text-xs font-black uppercase tracking-widest">My gigs & paths</span>
+            <span className="text-xs font-black uppercase tracking-widest">{t('trainingPage.myGigsAndPaths')}</span>
           </div>
           <div className="w-full sm:w-auto">
             <label
               htmlFor="training-gig-filter"
               className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400"
             >
-              Enrolled gig (Marketplace)
+              {t('trainingPage.enrolledGigLabel')}
             </label>
             <div className="relative">
               <select
@@ -2218,8 +2387,8 @@ export function Training() {
               >
                 <option value="__all__">
                   {enrolledGigs.length === 0 && !loading
-                    ? 'No enrolled gigs'
-                    : 'All enrolled gigs'}
+                    ? t('trainingPage.noEnrolledGigs')
+                    : t('trainingPage.allEnrolledGigs')}
                 </option>
                 {enrolledGigs.map((g) => (
                   <option key={g.gigId} value={g.gigId}>
@@ -2231,12 +2400,12 @@ export function Training() {
             </div>
             {gigFilter !== '__all__' && selectedGigTitle && !listLoading && (
               <p className="mt-2 text-xs font-semibold text-harx-700">
-                Showing trainings for: <span className="text-gray-900">{selectedGigTitle}</span>
+                {t('trainingPage.showingFor')} <span className="text-gray-900">{selectedGigTitle}</span>
               </p>
             )}
             {enrolledGigs.length === 0 && !loading && !error && (
               <p className="mt-2 text-xs text-amber-700 font-medium">
-                No enrolled gigs from the matching API — check the Marketplace or your connection.
+                {t('trainingPage.noEnrolledGigsHint')}
               </p>
             )}
           </div>
@@ -2253,7 +2422,7 @@ export function Training() {
           }`}
         >
           <BookOpen className="w-4 h-4" />
-          Formations
+          {t('trainingPage.tabTrainings')}
           {displayJourneys.length > 0 && (
             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
               trainingTab === 'trainings' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
@@ -2273,7 +2442,7 @@ export function Training() {
           }`}
         >
           <Award className="w-4 h-4" />
-          Certifications
+          {t('trainingPage.tabCertifications')}
           {completedJourneys.length > 0 && (
             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
               trainingTab === 'certifications' ? 'bg-harx-500/15 text-harx-700' : 'bg-gray-100 text-gray-500'
@@ -2282,6 +2451,19 @@ export function Training() {
             </span>
           )}
           {trainingTab === 'certifications' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTrainingTab('usecases')}
+          className={`relative flex items-center gap-2 px-4 py-3 text-sm font-black tracking-tight transition-colors ${
+            trainingTab === 'usecases' ? 'text-harx-700' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Lightbulb className="w-4 h-4" />
+          {t('trainingPage.tabUseCases', 'Use cases')}
+          {trainingTab === 'usecases' && (
             <span className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full" />
           )}
         </button>
@@ -2295,7 +2477,7 @@ export function Training() {
         slideProgressSummary.trainingCount > 0 && (
           <div className="rounded-2xl border border-harx-200 bg-gradient-to-br from-harx-50/90 to-white p-5 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-widest text-harx-600">
-              Progression (formations du gig)
+              {t('trainingPage.progressGig')}
             </p>
             {selectedGigTitle ? (
               <p className="mt-1 text-xs font-semibold text-gray-600 truncate">{selectedGigTitle}</p>
@@ -2311,8 +2493,8 @@ export function Training() {
           <Loader2 className="w-6 h-6 animate-spin text-harx-500" />
           <span className="font-medium">
             {gigFilter !== '__all__' && gigFetchLoading
-              ? 'Loading trainings for this gig…'
-              : 'Loading trainings…'}
+              ? t('trainingPage.loadingForGig')
+              : t('trainingPage.loading')}
           </span>
         </div>
       )}
@@ -2326,46 +2508,22 @@ export function Training() {
 
       {!listLoading && !error && gigFilter === '__all__' && journeys.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm text-center text-gray-500">
-          <p className="font-medium">No trainings found for your enrolled gigs.</p>
-          <p className="text-sm mt-2">
-            Enrolling in a gig does not create a training by itself: the company must publish a
-            training for that gig (status active, rehearsal, or completed). The list can stay empty
-            even if the Marketplace shows “Enrolled”.
-          </p>
+          <p className="font-medium">{t('trainingPage.emptyAllTitle')}</p>
+          <p className="text-sm mt-2">{t('trainingPage.emptyAllDesc')}</p>
         </div>
       )}
 
       {!listLoading && !error && gigFilter !== '__all__' && displayJourneys.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm text-center text-gray-500">
-          <p className="font-medium">No trainings for this gig yet.</p>
+          <p className="font-medium">{t('trainingPage.emptyGigTitle')}</p>
           {gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'ok' ? (
-            <p className="text-sm mt-2">
-              The training service responded successfully but has no published journeys for this
-              gig. Your org may still be preparing content, the journey may still be in draft, or
-              the journey may be linked to a different gig id than the one in the Marketplace.
-              All journeys linked to this gig are shown, including draft/not published.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigOk')}</p>
           ) : gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'not_found' ? (
-            <p className="text-sm mt-2">
-              The training API returned 404 for{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
-                GET /training_journeys/gig/:gigId
-              </code>
-              . Deploy the latest training backend or verify API routing and the base URL in{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">VITE_TRAINING_*</code>.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigNotFound')}</p>
           ) : gigFetchOutcome?.gigId === gigFilter && gigFetchOutcome.kind === 'error' ? (
-            <p className="text-sm mt-2">
-              Could not reach the training API for this gig (network error, CORS, or missing auth).
-              Check your connection, sign in again, and confirm{' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">VITE_TRAINING_*</code>{' '}
-              points at the training service.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigError')}</p>
           ) : (
-            <p className="text-sm mt-2">
-              Select the gig again or refresh the page. If this persists, verify the training API URL
-              and that you are signed in.
-            </p>
+            <p className="text-sm mt-2">{t('trainingPage.emptyGigRetry')}</p>
           )}
         </div>
       )}
@@ -2375,7 +2533,6 @@ export function Training() {
           {displayJourneys.map((j) => {
             const id = journeyKey(j);
             const gig = gigLabel(j);
-            const status = String(j.status || '—');
             const slides = extractSlides(j);
             const progress = id ? progressByJourney[id] : undefined;
             const engagement = Number(progress?.engagementScore);
@@ -2437,6 +2594,14 @@ export function Training() {
             const openFormation = () => {
               if (!id) return;
               const slideCount = viewerSlideCountFromJourney(j);
+              // Completed formation → open on the first page (review / browse).
+              // In progress → resume where the REP left off.
+              if (isCompleted) {
+                setFormationViewerSlideIndex(0);
+                setSelectedJourneyId(id);
+                setActiveSlide(0);
+                return;
+              }
               const fromSummary =
                 slideRow != null &&
                 typeof slideRow.currentSlideIndex === 'number' &&
@@ -2479,9 +2644,6 @@ export function Training() {
                     <p className="text-sm text-gray-500 mt-1 line-clamp-1">{String(j.description)}</p>
                   ) : null}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-gray-100 text-gray-600">
-                      {status}
-                    </span>
                     {gig ? (
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-harx-500/10 text-harx-700 flex items-center gap-1 max-w-full">
                         <Briefcase className="w-3 h-3 shrink-0" />
@@ -2491,7 +2653,7 @@ export function Training() {
                   </div>
                   <div className="mt-3">
                     <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-gray-500">
-                      <span>Progress</span>
+                      <span>{t('trainingPage.progress')}</span>
                       <span className="tabular-nums">
                         {showProgressFigure ? `${slidePercent}%` : '—'}
                       </span>
@@ -2511,7 +2673,7 @@ export function Training() {
                     onClick={openFormation}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-harx-600 text-white px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors disabled:opacity-40"
                   >
-                    Continue
+                    {t('trainingPage.continue')}
                   </button>
                   {showScriptCta && (
                     <button
@@ -2521,17 +2683,17 @@ export function Training() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-amber-100 transition-colors disabled:opacity-40"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      Script
+                      {t('trainingPage.script')}
                     </button>
                   )}
                   {isCompleted && (
                     <button
                       type="button"
-                      onClick={() => openCertificate(j)}
+                      onClick={() => openCertificate(j, 'trainings')}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-harx-200 bg-harx-50 text-harx-700 px-4 py-3 text-xs font-black uppercase tracking-widest hover:bg-harx-100 transition-colors"
                     >
                       <Award className="w-4 h-4" />
-                      Certificat
+                      {t('trainingPage.certificate')}
                     </button>
                   )}
                 </div>
@@ -2539,7 +2701,7 @@ export function Training() {
                 {isCompleted && (journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
                   <ScriptReadStatus
                     scriptPending={scriptPending}
-                    onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
+                    onOpenScript={() => openScriptForJourney(j)}
                   />
                 )}
               </li>
@@ -2551,6 +2713,8 @@ export function Training() {
       </>
       )}
 
+      {trainingTab === 'usecases' && <AcademyUseCases gigFilter={gigFilter} />}
+
       {trainingTab === 'certifications' && (
       <>
       {!listLoading && !error && completedJourneys.length === 0 && (
@@ -2558,10 +2722,9 @@ export function Training() {
           <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-harx-500/10 flex items-center justify-center">
             <Award className="w-7 h-7 text-harx-500" />
           </div>
-          <h3 className="text-lg font-black text-gray-900">Aucune certification pour le moment</h3>
+          <h3 className="text-lg font-black text-gray-900">{t('trainingPage.noCertificationsTitle')}</h3>
           <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-            Terminez une formation à 100&nbsp;% pour débloquer votre certificat. Vos certifications
-            apparaîtront ici.
+            {t('trainingPage.noCertificationsDesc')}
           </p>
           <button
             type="button"
@@ -2569,7 +2732,7 @@ export function Training() {
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-harx-600 text-white px-5 py-2.5 text-xs font-black uppercase tracking-widest hover:bg-harx-700 transition-colors"
           >
             <BookOpen className="w-4 h-4" />
-            Voir mes formations
+            {t('trainingPage.seeMyTrainings')}
           </button>
         </div>
       )}
@@ -2577,7 +2740,7 @@ export function Training() {
       {!listLoading && !error && completedJourneys.length > 0 && (
         <section>
           <p className="text-sm text-gray-500 mb-4">
-            Formations complétées à 100&nbsp;%. Consultez ou téléchargez vos certificats.
+            {t('trainingPage.certificationsIntro')}
           </p>
           <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {completedJourneys.map((j) => {
@@ -2608,23 +2771,23 @@ export function Training() {
                       ) : null}
                       <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
                         <CheckCircle className="w-3.5 h-3.5" />
-                        Validé · 100%
+                        {t('trainingPage.validated')}
                       </div>
                     </div>
                   </div>
                   {(journeyHasScriptModule(j) || gigIdFromJourney(j)) && (
                     <ScriptReadStatus
                       scriptPending={scriptPending}
-                      onOpenScript={showScriptCta ? () => openScriptForJourney(j) : undefined}
+                      onOpenScript={() => openScriptForJourney(j)}
                     />
                   )}
                   <button
                     type="button"
-                    onClick={() => openCertificate(j)}
+                    onClick={() => openCertificate(j, 'certifications')}
                     className="relative mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-alt-600 text-white px-4 py-2.5 text-xs font-black uppercase tracking-widest hover:-translate-y-0.5 transition-transform shadow-sm"
                   >
                     <Award className="w-4 h-4" />
-                    Voir le certificat
+                    {t('trainingPage.viewCertificate')}
                   </button>
                 </li>
               );
@@ -2654,52 +2817,13 @@ export function Training() {
                     setSelectedJourneyId(null);
                     void fetchSlideProgressSummary();
                   }}
-                  className="rounded-xl border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-100 transition hover:-translate-y-0.5"
-                  style={{
-                    borderColor: viewerThemeTokens.accentBorder,
-                    background: viewerThemeTokens.cardBg,
-                    boxShadow: viewerThemeTokens.accentShadow,
-                  }}
+                  className="rounded-xl border border-white/90 bg-white px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-harx-700 shadow-md transition hover:-translate-y-0.5 hover:bg-harx-50 hover:text-harx-800"
                 >
-                  Back to list
+                  {t('trainingPage.backToList')}
                 </button>
                 <h3 className="min-w-0 flex-1 truncate text-sm font-black text-white">
                   {journeyTitle(selectedJourney)}
                 </h3>
-                <div className="ml-auto grid w-full grid-cols-2 gap-2 sm:w-auto">
-                  <div
-                    className="rounded-xl border px-2.5 py-1.5 sm:px-3"
-                    style={{
-                      borderColor: viewerThemeTokens.accentBorder,
-                      background: viewerThemeTokens.cardBg,
-                      boxShadow: viewerThemeTokens.accentShadow,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Clock3 className="h-3.5 w-3.5 text-slate-200" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-300">
-                        Timer total
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-xs font-extrabold text-white">{formationTimerLabel}</p>
-                  </div>
-                  <div
-                    className="rounded-xl border px-2.5 py-1.5 sm:px-3"
-                    style={{
-                      borderColor: viewerThemeTokens.accentBorder,
-                      background: viewerThemeTokens.cardBg,
-                      boxShadow: viewerThemeTokens.accentShadow,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5 text-slate-200" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-300">
-                        Timer module
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-xs font-extrabold text-white">{moduleTimerLabel}</p>
-                  </div>
-                </div>
               </div>
               <div
                 className="relative flex-1 overflow-y-auto p-4 md:p-5"
@@ -3065,7 +3189,42 @@ export function Training() {
                             </div>
                           );
                         })()
-                      ) : (
+                      ) : currentFormationViewerSlide.kind === 'completion' ? (
+                        <div
+                          className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border px-6 py-12 text-center sm:px-10"
+                          style={{
+                            borderColor: viewerThemeTokens.accentBorder,
+                            background:
+                              'linear-gradient(160deg, rgba(16,185,129,0.18) 0%, rgba(11,16,37,0.95) 45%, rgba(99,102,241,0.12) 100%)',
+                            boxShadow: viewerThemeTokens.accentShadow,
+                          }}
+                        >
+                          <div
+                            className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border"
+                            style={{
+                              borderColor: 'rgba(52,211,153,0.45)',
+                              background: 'rgba(16,185,129,0.2)',
+                            }}
+                          >
+                            <Award className="h-8 w-8 text-emerald-300" />
+                          </div>
+                          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                            {t('trainingPage.validated')}
+                          </p>
+                          <h3 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                            {t('trainingPage.bravoTitle')}
+                          </h3>
+                          <p className="mt-2 text-base font-semibold text-slate-100">
+                            {t('trainingPage.bravoSubtitle')}
+                          </p>
+                          <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-300">
+                            {t('trainingPage.bravoDesc')}
+                          </p>
+                          <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            {currentFormationViewerSlide.title}
+                          </p>
+                        </div>
+                      ) : currentFormationViewerSlide.kind === 'quiz_group' ? (
                         (() => {
                           const slide = currentFormationViewerSlide;
                           const totalQuestions = slide.questions.length;
@@ -3113,24 +3272,11 @@ export function Training() {
                             1,
                             maxAttemptsFromApi || maxQuizAttemptsForFormationSlide(slide)
                           );
-                          const lockedUntilTs = quizProgressRows.reduce((acc: number, row: any) => {
-                            if (!activeQuizKeys.has(String(row?.quizKey || '').trim())) return acc;
-                            const ts = Date.parse(String(row?.lockedUntil || ''));
-                            return Number.isFinite(ts) ? Math.max(acc, ts) : acc;
-                          }, 0);
-                          const moduleLockRemainingMs = Math.max(0, lockedUntilTs - Date.now());
-                          const moduleLockedByCooldown = moduleLockRemainingMs > 0;
-                          const quizAttemptsBlocked =
-                            !isCurrentQuizPassed &&
-                            (moduleLockedByCooldown || backendAttempts >= quizMaxCap);
+                          const quizAttemptsBlocked = !isCurrentQuizPassed && backendAttempts >= quizMaxCap;
                           const moduleStrikes = Math.min(
                             quizMaxCap,
                             Math.max(quizSlideWrongStrikes[slide.key] ?? 0, backendAttempts)
                           );
-                          const countdown =
-                            qState.locked || qState.revealed
-                              ? 0
-                              : Math.max(0, quizQuestionCountdownSec[qKey] ?? 40);
                           const correctIdx =
                             typeof currentQuestion?.correctAnswer === 'number'
                               ? currentQuestion.correctAnswer
@@ -3145,8 +3291,16 @@ export function Training() {
                             !qState.timedOut &&
                             qState.selected !== null &&
                             qState.selected !== correctIdx;
+                          const reviewMode = isSelectedFormationFullyDone || isCurrentQuizPassed;
                           return (
                             <div className="rounded-3xl border border-harx-500/30 bg-[#0b1025]/90 p-5 shadow-[0_20px_70px_-25px_rgba(236,72,153,0.4)] sm:p-7">
+                              {reviewMode ? (
+                                <p className="mb-3 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                                  {isSelectedFormationFullyDone
+                                    ? 'Formation terminée — revue du quiz (votre réponse + bonne réponse).'
+                                    : 'Quiz réussi — revue de vos réponses.'}
+                                </p>
+                              ) : null}
                               <p className="mb-2 inline-flex rounded-full border border-harx-400/40 bg-harx-500/20 px-2.5 py-1 text-xs font-semibold text-harx-100">
                                 {currentQuestion?.quizTitle || `Quiz module ${slide.moduleIndex + 1}`}
                               </p>
@@ -3157,22 +3311,17 @@ export function Training() {
                                 <span className="rounded-full border border-harx-400/35 bg-[#12172f] px-2.5 py-1 font-semibold text-harx-100">
                                   Essais (soumissions): {moduleStrikes} / {quizMaxCap}
                                 </span>
-                                <span className="rounded-full border border-amber-400/35 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100">
-                                  {moduleLockedByCooldown
-                                    ? `Cooldown ${Math.ceil(moduleLockRemainingMs / 60000)}m`
-                                    : qState.locked
-                                      ? '—'
-                                      : `${countdown}s`}
-                                </span>
                                 <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => restartQuizSlide(slide)}
-                                    disabled={quizAttemptsBlocked}
-                                    className="rounded-lg border border-amber-400/40 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100 transition hover:border-amber-300/70"
-                                  >
-                                    Refaire quiz
-                                  </button>
+                                  {!isSelectedFormationFullyDone ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => restartQuizSlide(slide)}
+                                      disabled={quizAttemptsBlocked}
+                                      className="rounded-lg border border-amber-400/40 bg-[#12172f] px-2.5 py-1 font-semibold text-amber-100 transition hover:border-amber-300/70"
+                                    >
+                                      Refaire quiz
+                                    </button>
+                                  ) : null}
                                   <button
                                     type="button"
                                     disabled={page <= 0}
@@ -3190,7 +3339,8 @@ export function Training() {
                                     type="button"
                                     disabled={
                                       page >= totalQuestions - 1 ||
-                                      !formationViewerQuizState[`${slide.key}-q${page}`]?.locked
+                                      (!reviewMode &&
+                                        !formationViewerQuizState[`${slide.key}-q${page}`]?.locked)
                                     }
                                     onClick={() =>
                                       setFormationViewerQuizPage((prev) => ({
@@ -3223,18 +3373,10 @@ export function Training() {
                                     <button
                                       key={oi}
                                       type="button"
-                                      disabled={
-                                        qState.revealed || qState.locked || moduleLockedByCooldown || quizAttemptsBlocked
-                                      }
-                                      aria-disabled={moduleLockedByCooldown || quizAttemptsBlocked}
+                                      disabled={qState.revealed || qState.locked || quizAttemptsBlocked}
+                                      aria-disabled={quizAttemptsBlocked}
                                       onClick={() => {
-                                        if (
-                                          qState.revealed ||
-                                          qState.locked ||
-                                          moduleLockedByCooldown ||
-                                          quizAttemptsBlocked
-                                        )
-                                          return;
+                                        if (qState.revealed || qState.locked || quizAttemptsBlocked) return;
                                         const wrong = oi !== correctIdx;
                                         if (wrong) {
                                           setQuizSlideWrongStrikes((prev) => ({
@@ -3289,26 +3431,42 @@ export function Training() {
                                 })}
                               </div>
                               {qState.revealed ? (
-                                <div className="mt-4 rounded-xl border border-harx-500/20 bg-[#12172f] px-3 py-3">
+                                <div className="mt-4 space-y-2 rounded-xl border border-harx-500/20 bg-[#12172f] px-3 py-3">
                                   <p
                                     className={`text-sm font-semibold ${
-                                      qState.timedOut
+                                      qState.answerMissing
                                         ? 'text-amber-200'
-                                        : isCorrect
-                                          ? 'text-emerald-300'
-                                          : isWrong
-                                            ? 'text-rose-300'
-                                            : 'text-slate-200'
+                                        : qState.timedOut
+                                          ? 'text-amber-200'
+                                          : isCorrect
+                                            ? 'text-emerald-300'
+                                            : isWrong
+                                              ? 'text-rose-300'
+                                              : 'text-slate-200'
                                     }`}
                                   >
-                                    {qState.timedOut
-                                      ? 'Temps écoulé (40 s). Réponse enregistrée comme incorrecte.'
-                                      : isCorrect
-                                        ? 'Bonne réponse !'
-                                        : isWrong
-                                          ? 'Ce n’était pas la bonne réponse.'
-                                          : ''}
+                                    {qState.answerMissing
+                                      ? 'Réponse non enregistrée pour cette question (soumission antérieure).'
+                                      : qState.timedOut
+                                        ? 'Réponse enregistrée comme incorrecte.'
+                                        : isCorrect
+                                          ? 'Bonne réponse !'
+                                          : isWrong
+                                            ? 'Ce n’était pas la bonne réponse.'
+                                            : 'Revue de la question'}
                                   </p>
+                                  <div className="space-y-1.5 text-sm">
+                                    <p className="text-slate-200">
+                                      <span className="font-semibold text-rose-200">Votre réponse : </span>
+                                      {qState.selected !== null && opts[qState.selected] != null
+                                        ? String(opts[qState.selected])
+                                        : '— (non disponible)'}
+                                    </p>
+                                    <p className="text-slate-200">
+                                      <span className="font-semibold text-emerald-200">Bonne réponse : </span>
+                                      {opts[correctIdx] != null ? String(opts[correctIdx]) : '—'}
+                                    </p>
+                                  </div>
                                   {String(q?.explanation || '').trim() ? (
                                     <p className="mt-2 text-sm leading-relaxed text-slate-300">
                                       {String(q.explanation)}
@@ -3319,7 +3477,7 @@ export function Training() {
                             </div>
                           );
                         })()
-                      )}
+                      ) : null}
                     </div>
                   );
                 })()}
@@ -3345,7 +3503,9 @@ export function Training() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => setFormationViewerSlideIndex((i) => Math.max(0, i - 1))}
+                      onClick={() => {
+                        setFormationViewerSlideIndex((i) => Math.max(0, i - 1));
+                      }}
                       disabled={formationViewerSlideIndex <= 0}
                       className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-slate-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
@@ -3362,71 +3522,106 @@ export function Training() {
                     >
                       {formationViewerSlideIndex + 1} / {formationViewerSlides.length}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const slide = currentFormationViewerSlide;
-                        if (slide?.kind === 'section') {
-                          void completeSectionProgressAtLeave({
-                            moduleIndex: slide.moduleIndex,
-                            section: slide.section,
-                          });
-                        }
-                        if (atLastFormationSlideSection) return;
-                        const nextIndex = Math.min(
-                          formationViewerSlides.length - 1,
-                          formationViewerSlideIndex + 1
-                        );
-                        setFormationViewerSlideIndex(nextIndex);
-                        const nextSlide = formationViewerSlides[nextIndex];
-                        if (
-                          nextSlide?.kind === 'section' &&
-                          selectedJourneyId &&
-                          selectedJourney
-                        ) {
-                          const modules = extractModules(selectedJourney);
-                          const moduleRow = modules[nextSlide.moduleIndex];
-                          const moduleId =
-                            normalizeMongoId((moduleRow as any)?._id) ||
-                            normalizeMongoId((moduleRow as any)?.id) ||
-                            '';
-                          const sectionMongoId =
-                            normalizeMongoId((nextSlide.section as any)?._id) ||
-                            normalizeMongoId((nextSlide.section as any)?.id) ||
-                            '';
-                          if (
-                            /^[a-f\d]{24}$/i.test(moduleId) &&
-                            /^[a-f\d]{24}$/i.test(sectionMongoId)
-                          ) {
-                            void ensureSectionStarted({
-                              courseId: selectedJourneyId,
-                              moduleId,
-                              sectionId: sectionMongoId,
+                    {showFormationCertificateCta ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const slide = currentFormationViewerSlide;
+                          if (slide?.kind === 'section') {
+                            void completeSectionProgressAtLeave({
+                              moduleIndex: slide.moduleIndex,
+                              section: slide.section,
                             });
                           }
+                          if (selectedJourney) openCertificate(selectedJourney, 'trainings');
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110"
+                        style={{
+                          borderColor: viewerThemeTokens.accentBorder,
+                          background: viewerThemeTokens.accentBg,
+                          boxShadow: viewerThemeTokens.accentShadow,
+                        }}
+                      >
+                        <Award className="h-4 w-4" />
+                        {t('trainingPage.certificate')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const slide = currentFormationViewerSlide;
+                          if (slide?.kind === 'section') {
+                            void completeSectionProgressAtLeave({
+                              moduleIndex: slide.moduleIndex,
+                              section: slide.section,
+                            });
+                          }
+                          if (atLastFormationSlideSection) return;
+                          let nextIndex = Math.min(
+                            formationViewerSlides.length - 1,
+                            formationViewerSlideIndex + 1
+                          );
+                          // Formation terminée : navigation libre (revue quizzes + contenu).
+                          setFormationViewerSlideIndex(nextIndex);
+                          const nextSlide = formationViewerSlides[nextIndex];
+                          if (
+                            nextSlide?.kind === 'section' &&
+                            selectedJourneyId &&
+                            selectedJourney
+                          ) {
+                            const modules = extractModules(selectedJourney);
+                            const moduleRow = modules[nextSlide.moduleIndex];
+                            const moduleId =
+                              normalizeMongoId((moduleRow as any)?._id) ||
+                              normalizeMongoId((moduleRow as any)?.id) ||
+                              '';
+                            const sectionMongoId =
+                              normalizeMongoId((nextSlide.section as any)?._id) ||
+                              normalizeMongoId((nextSlide.section as any)?.id) ||
+                              '';
+                            if (
+                              /^[a-f\d]{24}$/i.test(moduleId) &&
+                              /^[a-f\d]{24}$/i.test(sectionMongoId)
+                            ) {
+                              void ensureSectionStarted({
+                                courseId: selectedJourneyId,
+                                moduleId,
+                                sectionId: sectionMongoId,
+                              });
+                            }
+                          }
+                        }}
+                        disabled={
+                          blockFormationNextByEndPosition ||
+                          !isCurrentQuizPassed ||
+                          isNextModuleLocked
                         }
-                      }}
-                      disabled={
-                        blockFormationNextByEndPosition ||
-                        !isCurrentQuizPassed ||
-                        isNextModuleLocked
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                      style={{
-                        borderColor: viewerThemeTokens.accentBorder,
-                        background: viewerThemeTokens.accentBg,
-                        boxShadow: viewerThemeTokens.accentShadow,
-                      }}
-                    >
-                      {atLastFormationSlideSection ? 'Terminer la section' : 'Suivant'}{' '}
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                        style={{
+                          borderColor: viewerThemeTokens.accentBorder,
+                          background: viewerThemeTokens.accentBg,
+                          boxShadow: viewerThemeTokens.accentShadow,
+                        }}
+                      >
+                        {formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
+                          ? t('trainingPage.bravoTitle')
+                          : atLastFormationSlideSection
+                            ? 'Terminer la section'
+                            : 'Suivant'}{' '}
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                  {currentFormationViewerSlide?.kind === 'quiz_group' && !isCurrentQuizPassed ? (
+                  {currentFormationViewerSlide?.kind === 'quiz_group' &&
+                  !isCurrentQuizPassed &&
+                  !showFormationCertificateCta ? (
                     <p className="mt-2 text-center text-[11px] font-semibold text-amber-300">
                       {quizModuleTimeFrozen
-                        ? 'Nombre maximum de tentatives atteint. Le chrono « module » est en pause ; en cas de blocage temporaire, le délai restant s’affiche sur le bandeau du quiz.'
-                        : 'Répondez à toutes les questions (40 s max par question). Le bouton Suivant s’active dès une note ≥ 70 %.'}
+                        ? 'Nombre maximum de tentatives atteint.'
+                        : atLastFormationSlide ||
+                            formationViewerSlides[formationViewerSlideIndex + 1]?.kind === 'completion'
+                          ? 'Répondez à toutes les questions. Le bouton Bravo s’active dès une note ≥ 70 %.'
+                          : 'Répondez à toutes les questions. Le bouton Suivant s’active dès une note ≥ 70 %.'}
                     </p>
                   ) : null}
                   {isNextModuleLocked ? (

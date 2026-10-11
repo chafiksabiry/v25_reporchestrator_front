@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Mail,
   User as UserIcon,
@@ -15,7 +17,12 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import config from '../../../config';
-import { syncRepIdentityName } from '../../../utils/profileUtils';
+import { syncRepIdentityName, fetchProfileFromAPI } from '../../../utils/profileUtils';
+import {
+  getRepOnboardingStep,
+  isRepProfilePublished,
+} from '../../../utils/repOnboardingNextStep';
+import { isCallCenterStaff } from '../../../utils/callCenterStaff';
 
 interface ApiUserResponse {
   success?: boolean;
@@ -34,12 +41,28 @@ interface ApiUserResponse {
 type Section = 'profile' | 'email' | 'password' | 'phone';
 
 export function AccountSettings() {
-  const [section, setSection] = useState<Section>('profile');
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [section, setSection] = useState<Section>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('changePassword') === '1' || localStorage.getItem('mustChangePassword') === '1') {
+        return 'password';
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'profile';
+  });
+  const mustChangePassword =
+    typeof window !== 'undefined' && localStorage.getItem('mustChangePassword') === '1';
 
   const [loadingUser, setLoadingUser] = useState(true);
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [onboardingIncomplete, setOnboardingIncomplete] = useState(false);
+  const [onboardingPath, setOnboardingPath] = useState('/profile-import');
 
   // PROFILE (fullName)
   const [editingFullName, setEditingFullName] = useState('');
@@ -107,6 +130,38 @@ export function AccountSettings() {
     loadUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, baseUrl]);
+
+  useEffect(() => {
+    if (isCallCenterStaff()) {
+      setOnboardingIncomplete(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let profile: any = null;
+        try {
+          const cached = localStorage.getItem('profileData');
+          if (cached) profile = JSON.parse(cached);
+        } catch {
+          /* ignore */
+        }
+        const live = await fetchProfileFromAPI().catch(() => null);
+        if (live) profile = live;
+        if (cancelled || !profile) return;
+        const done = isRepProfilePublished(profile);
+        setOnboardingIncomplete(!done);
+        if (!done) {
+          setOnboardingPath(getRepOnboardingStep(profile).path || '/profile-import');
+        }
+      } catch {
+        /* keep default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const extractError = (err: any, fallback: string) =>
     err?.response?.data?.error ||
@@ -194,6 +249,36 @@ export function AccountSettings() {
   };
 
   // ── Password change ───────────────────────────────────────────────────
+  const handleForcePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwdNew.length < 8) {
+      toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      toast.error('Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+    setPwdLoading(true);
+    try {
+      const authBase = (import.meta.env.VITE_AUTH_API_URL || baseUrl || '').replace(/\/+$/, '');
+      await axios.post(
+        `${authBase}/auth/change-password`,
+        { newPassword: pwdNew },
+        { headers: authHeaders }
+      );
+      localStorage.removeItem('mustChangePassword');
+      setPwdNew('');
+      setPwdConfirm('');
+      toast.success('Mot de passe modifié. Vous pouvez continuer.');
+      window.history.replaceState({}, '', window.location.pathname);
+    } catch (err) {
+      toast.error(extractError(err, 'Échec du changement de mot de passe.'));
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   const handleRequestPasswordCode = async () => {
     if (!userId) return;
     setPwdLoading(true);
@@ -328,6 +413,28 @@ export function AccountSettings() {
           </p>
         </div>
       </div>
+
+      {onboardingIncomplete && (
+        <div className="mb-6 rounded-2xl bg-[#E11D48] p-5 sm:p-6 text-white shadow-lg shadow-rose-500/25">
+          <div className="flex items-center gap-2 mb-2">
+            <Lock className="h-4 w-4 shrink-0 opacity-90" strokeWidth={2.25} />
+            <h2 className="text-[11px] sm:text-xs font-black uppercase tracking-[0.16em]">
+              {t('onboardingGuide.title')}
+            </h2>
+          </div>
+          <p className="text-sm font-medium leading-relaxed text-white/95 max-w-2xl">
+            {t('onboardingGuide.description')}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(onboardingPath)}
+            className="mt-4 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-900 shadow-md transition hover:bg-amber-300 active:scale-[0.98]"
+          >
+            {t('onboardingGuide.cta')}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-md overflow-hidden">
         {/* Tabs */}
@@ -512,6 +619,66 @@ export function AccountSettings() {
           {/* PASSWORD */}
           {section === 'password' && (
             <div className="space-y-5 max-w-xl">
+              {mustChangePassword ? (
+                <>
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex gap-2.5 text-[10px] text-emerald-900 font-bold leading-relaxed">
+                    <ShieldCheck size={16} className="shrink-0 text-emerald-600" />
+                    <span>
+                      Votre call center a créé votre compte avec un mot de passe temporaire.
+                      Choisissez un nouveau mot de passe pour continuer.
+                    </span>
+                  </div>
+                  <form onSubmit={handleForcePasswordChange} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Nouveau mot de passe
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                          <Lock size={16} />
+                        </div>
+                        <input
+                          type={showNew ? 'text' : 'password'}
+                          value={pwdNew}
+                          onChange={(e) => setPwdNew(e.target.value)}
+                          className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 focus:border-emerald-500 rounded-xl font-bold text-sm focus:outline-none transition-all"
+                          required
+                          minLength={8}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNew((v) => !v)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                        >
+                          {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Confirmer le mot de passe
+                      </label>
+                      <input
+                        type="password"
+                        value={pwdConfirm}
+                        onChange={(e) => setPwdConfirm(e.target.value)}
+                        className="w-full px-3 py-3 bg-white border border-gray-200 focus:border-emerald-500 rounded-xl font-bold text-sm focus:outline-none transition-all"
+                        required
+                        minLength={8}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={pwdLoading}
+                      className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {pwdLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Enregistrer le mot de passe
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
               <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex gap-2.5 text-[10px] text-blue-800/80 font-bold leading-relaxed">
                 <ShieldCheck size={16} className="shrink-0 text-blue-600" />
                 <span>
@@ -654,6 +821,8 @@ export function AccountSettings() {
                     </button>
                   </div>
                 </form>
+              )}
+                </>
               )}
             </div>
           )}

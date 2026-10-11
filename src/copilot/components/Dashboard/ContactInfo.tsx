@@ -9,6 +9,7 @@ import { useCallStorage } from '../../hooks/useCallStorage';
 import { useTranscription } from '../../contexts/TranscriptionContext';
 import { useLead } from '../../hooks/useLead';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
+import { anonymizeEmail, anonymizePhone } from '../../../utils/callStatusDisplay';
 import {
   TelnyxCallPersist,
   type GigPhoneLine,
@@ -121,7 +122,7 @@ export function ContactInfo() {
     id: apiLead._id,
     name: apiLead.name || (apiLead.First_Name || apiLead.Last_Name ? `${apiLead.First_Name || ''} ${apiLead.Last_Name || ''}`.trim() : 'Unknown Lead'),
     email: apiLead.email || apiLead.Email_1 || 'No email',
-    phone: apiLead.phone || apiLead.Phone || '',
+    phone: apiLead.phone || apiLead.Phone || apiLead.Telephony || '',
     company: apiLead.company || apiLead.companyId || 'Unknown Company',
     title: apiLead.title || apiLead.Activity_Tag || 'Prospect',
     avatar: apiLead.avatar || '',
@@ -195,16 +196,6 @@ export function ContactInfo() {
     ] as { date: Date; type: 'call' | 'email' | 'meeting' | 'demo'; outcome: string; notes: string; }[]
   };
 
-  const maskPhone = (phone: string) => {
-    if (!phone) return '';
-    const cleanPhone = phone.replace(/\s+/g, '');
-    if (cleanPhone.startsWith('+')) {
-      return `${cleanPhone.substring(0, 5)}...`;
-    }
-    return `+${cleanPhone.substring(0, 4)}...`;
-  };
-
-
   // Debug: Log contact data whenever it changes
   /*  console.log("Contact data:", contact);
    console.log("Contact phone:", contact.phone);
@@ -216,7 +207,6 @@ export function ContactInfo() {
       const line = await TelnyxCallPersist.fetchLineForLead(contact.id);
       activeLineRef.current = line;
       setLineError(null);
-      console.log('[resolveGigLine] provider=', line.provider, 'from=', line.phoneNumber, 'id=', line.phoneNumberId);
       return line;
     } catch (err: any) {
       const msg =
@@ -618,29 +608,18 @@ export function ContactInfo() {
         const call = notification.call;
         const stateName = call.state;
 
-        // Capture ids as soon as Telnyx exposes them (not only on active) so
-        // early failures still leave a sid for logging / partial persist.
-        const callControlId =
-          call.telnyxCallControlId ||
-          call.options?.telnyxCallControlId ||
-          call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
-          null;
-        const Sid = callControlId || call.id || null;
-        if (Sid && !callSidRef.current) {
-          callSidRef.current = Sid;
-          setCurrentCallSid(Sid);
-        }
-
-        if (stateName === 'trying' || stateName === 'ringing' || stateName === 'early') {
-          console.log('[Telnyx] call state=', stateName, 'id=', call.id, 'callControlId=', callControlId);
-          setCallStatus(stateName === 'ringing' ? 'ringing' : 'initiating');
-        }
-
         if (stateName === 'active' || stateName === 'answered') {
           if (!callReachedActiveRef.current) {
             callReachedActiveRef.current = true;
             callStartedAtRef.current = Date.now();
           }
+          // Prefer Call Control id so recording webhooks / record_start match the Call doc.
+          const callControlId =
+            call.telnyxCallControlId ||
+            call.options?.telnyxCallControlId ||
+            call.options?.customHeaders?.find((h: any) => h.name === 'X-Call-Control-Id')?.value ||
+            null;
+          const Sid = callControlId || call.id || null;
           if (Sid) {
             callSidRef.current = Sid;
             setCurrentCallSid(Sid);
@@ -690,13 +669,6 @@ export function ContactInfo() {
           stateName === 'purge' ||
           stateName === 'done'
         ) {
-          console.warn('[Telnyx] hangup', {
-            state: stateName,
-            id: call.id,
-            callControlId,
-            cause: call.cause || call.hangupCause || call.causeCode || call.sipCode,
-            reason: call.sipReason || call.hangupCause || call.reason,
-          });
           await handleTelnyxHangup();
         }
       });
@@ -850,7 +822,7 @@ export function ContactInfo() {
                     <div className="p-1 bg-blue-50 rounded-lg">
                       <Mail className="w-3.5 h-3.5 text-blue-500" />
                     </div>
-                    <span className="text-gray-500">{contact.email}</span>
+                    <span className="text-gray-500 normal-case tracking-normal">{anonymizeEmail(contact.email) || '—'}</span>
                   </div>
 
                   {/* Gig Section */}
@@ -917,9 +889,9 @@ export function ContactInfo() {
           ) : (
             <button
               onClick={handleStartCall}
-              disabled={isCallLoading || callStatus === 'initiating'}
+              disabled={isCallLoading || callStatus === 'initiating' || !apiLead || !contact.phone}
               className={`w-48 flex items-center justify-center space-x-2 px-3 py-2 rounded-xl font-bold text-base transition-all duration-300 shadow-md hover:-translate-y-0.5
-                  ${isCallLoading || callStatus === 'initiating' ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'bg-gradient-harx text-white shadow-harx-500/20 active:scale-95'}`}
+                  ${isCallLoading || callStatus === 'initiating' || !apiLead || !contact.phone ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'bg-gradient-harx text-white shadow-harx-500/20 active:scale-95'}`}
             >
               <Phone className="w-4 h-4 mr-2" />
               {isCallLoading || callStatus === 'initiating' ? '...' : 'Call'}
@@ -932,12 +904,14 @@ export function ContactInfo() {
             </p>
           )}
 
-          <div className="flex items-center space-x-2 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100" title="Secure Line">
-            <div className="p-1 bg-cyan-100 rounded-lg">
-              <Phone className="w-3 h-3 text-cyan-600" />
+          {apiLead && contact.phone ? (
+            <div className="flex items-center space-x-2 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-3 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100" title="Secure Line">
+              <div className="p-1 bg-cyan-100 rounded-lg">
+                <Phone className="w-3 h-3 text-cyan-600" />
+              </div>
+              <span className="text-gray-600 normal-case tracking-normal">{anonymizePhone(contact.phone) || '—'}</span>
             </div>
-            <span className="text-gray-600">{maskPhone(contact.phone)}</span>
-          </div>
+          ) : null}
 
         </div >
         {/* Actions à droite */}

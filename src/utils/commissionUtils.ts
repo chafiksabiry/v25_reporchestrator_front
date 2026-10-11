@@ -31,7 +31,22 @@ function isFraudCommissionBlock(record: CommissionCall): boolean {
   return false;
 }
 
-const PROSPECT_RUBRIC_KEYS = ['RDV', 'A plus tard', 'PAS INTÉRESSÉS', 'PAS AU COURANT', 'DÉJÀ ÉQUIPÉS'];
+const PROSPECT_RUBRIC_KEYS = [
+  'called_unreachable',
+  'called_voicemail',
+  'called_wrong_number',
+  'called_callback',
+  'called_rdv',
+  'argued_rdv',
+  'argued_declined',
+  'argued_done',
+  // legacy AI keys (analyses antérieures)
+  'RDV',
+  'A plus tard',
+  'PAS INTÉRESSÉS',
+  'PAS AU COURANT',
+  'DÉJÀ ÉQUIPÉS',
+];
 
 const NON_SALE_CALLOUTCOMES = new Set([
   'appointment',

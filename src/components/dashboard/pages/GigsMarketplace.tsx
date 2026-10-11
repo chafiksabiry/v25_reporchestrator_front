@@ -2,20 +2,38 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { User, Users, Globe, Calendar, Heart, ChevronLeft, ChevronRight, Phone, Briefcase, Sparkles, BadgeEuro, Play, Check, X, AlertTriangle } from 'lucide-react';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
-import { OnboardingNextStepButton } from '../../onboarding/OnboardingNextStepButton';
+import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
+import { useNotifications } from '../../../contexts/NotificationsContext';
 import type { GigCommissionExtended } from '../../../utils/gigCommissionDisplay';
 import { getResolvedAgentFacing } from '../../../utils/gigCommissionDisplay';
+import { getGigsApiBase } from '../../../utils/gigsApiBase';
+import {
+  localizeTaxonomyEntity,
+  localizeTaxonomyName,
+} from '../../../utils/taxonomyI18n';
 
-const renderCommissionInfo = (gig: any) => {
+/** Shared purple Details CTA (available / enrolled / favorites / invites / pending). */
+const DETAILS_BTN_CLASS =
+  'bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative hover:-translate-y-0.5 active:translate-y-0';
+
+const DetailsBtnInner = ({ label }: { label: string }) => (
+  <>
+    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
+    <Sparkles className="w-4 h-4 shrink-0" />
+    <span>{label}</span>
+  </>
+);
+
+const renderCommissionInfo = (gig: any, isFr: boolean) => {
   if (!gig || !gig.commission) return null;
   const comm = gig.commission as GigCommissionExtended;
   const currencySymbol = typeof comm.currency === 'object' ? comm.currency?.symbol || '€' : comm.currency || '€';
@@ -52,20 +70,19 @@ const renderCommissionInfo = (gig: any) => {
 
   let bonusConditionStr = '';
   if (comm.minimumVolume?.amount) {
-    const unit = String(comm.minimumVolume?.unit || '').toUpperCase();
-    const translatedUnit = unit === 'CALLS' || unit === 'APPELS' ? 'APPELS' :
-      unit === 'TRANSACTIONS' ? 'TRANSACTIONS' :
-        unit === 'SALES' || unit === 'VENTES' ? 'VENTES' : unit;
-    bonusConditionStr = `POUR ${comm.minimumVolume.amount} ${translatedUnit}`;
+    // Bonus threshold is always shown as transactions (never calls).
+    bonusConditionStr = isFr
+      ? `POUR ${comm.minimumVolume.amount} TRANSACTIONS`
+      : `FOR ${comm.minimumVolume.amount} TRANSACTIONS`;
   }
 
   const bonusPeriodRaw = comm.bonusPeriod || comm.bonusType || comm.minimumVolume?.period || '';
   let bonusPeriodStr = 'BONUS';
   if (bonusPeriodRaw) {
     const p = String(bonusPeriodRaw).toLowerCase();
-    if (p.includes('month') || p.includes('mois')) bonusPeriodStr = 'BONUS / MOIS';
-    else if (p.includes('week') || p.includes('semaine')) bonusPeriodStr = 'BONUS / SEMAINE';
-    else if (p.includes('day') || p.includes('jour')) bonusPeriodStr = 'BONUS / JOUR';
+    if (p.includes('month') || p.includes('mois')) bonusPeriodStr = isFr ? 'BONUS / MOIS' : 'BONUS / MONTH';
+    else if (p.includes('week') || p.includes('semaine')) bonusPeriodStr = isFr ? 'BONUS / SEMAINE' : 'BONUS / WEEK';
+    else if (p.includes('day') || p.includes('jour')) bonusPeriodStr = isFr ? 'BONUS / JOUR' : 'BONUS / DAY';
     else bonusPeriodStr = `BONUS / ${bonusPeriodRaw}`.toUpperCase();
   }
 
@@ -96,7 +113,7 @@ const renderCommissionInfo = (gig: any) => {
           <Phone className="w-3.5 h-4 fill-white animate-float" />
           <div className="flex flex-col leading-none">
             <span className="font-black text-xs">{perCall}{currencySymbol}</span>
-            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ appel</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">{isFr ? '/ appel' : '/ call'}</span>
           </div>
         </div>
       )}
@@ -106,7 +123,7 @@ const renderCommissionInfo = (gig: any) => {
           <Briefcase className="w-3.5 h-3.5 fill-white animate-float" />
           <div className="flex flex-col leading-none">
             <span className="font-black text-xs">{transType === '%' ? transDisplay : `${transDisplay}${currencySymbol}`}</span>
-            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ {transType === '%' ? 'Transaction' : transType}</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">/ {transType === '%' ? '%' : (isFr ? 'transaction' : 'transaction')}</span>
           </div>
         </div>
       )}
@@ -238,6 +255,7 @@ interface PopulatedGig {
   activities: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -247,6 +265,7 @@ interface PopulatedGig {
   industries: Array<{
     _id: string;
     name: string;
+    name_i18n?: { en?: string; fr?: string };
     description?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -486,11 +505,34 @@ export function GigsMarketplace() {
   const { t, i18n } = useTranslation();
   const isFrMarket = (i18n.language || 'en').slice(0, 2) === 'fr';
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const agentId = getAgentId();
+  const { addEnrollmentNotification } = useNotifications();
 
-  const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('enrolled');
+  const taxonomyLabel = (raw: string | undefined | null, _gig?: any): string => {
+    const name = String(raw || '').trim();
+    if (!name) return '';
+    const lang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
+    const fromDb = localizeTaxonomyName(name, lang);
+    if (fromDb && fromDb !== name) return fromDb;
+    const key = `gigsMarketplace.taxonomy.${name}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return fromDb || name;
+  };
+
+  const taxonomyEntityLabel = (entity: any, _gig?: any): string => {
+    if (!entity) return '';
+    const lang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
+    return localizeTaxonomyEntity(entity, lang) || taxonomyLabel(entity.name);
+  };
+
+  const [activeTab, setActiveTab] = useState<'available' | 'requested' | 'enrolled' | 'favorite' | 'invited'>('available');
+  const [initialTabResolved, setInitialTabResolved] = useState(false);
   const [gigs, setGigs] = useState<PopulatedGig[]>([]);
   const [invitedEnrollments, setInvitedEnrollments] = useState<InvitedEnrollment[]>([]);
+  /** Local override after accept/reject — gigs list still embeds stale agents[].status=invited. */
+  const [dismissedInviteGigIds, setDismissedInviteGigIds] = useState<string[]>([]);
   const [enrolledGigs, setEnrolledGigs] = useState<EnrolledGig[]>([]);
   const [requestedGigs, setRequestedGigs] = useState<RequestedGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<string[]>([]); // IDs des gigs avec demandes en attente
@@ -506,6 +548,48 @@ export function GigsMarketplace() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
+
+  // First visit → URL tab if any, else Inscrites when enrolled, else Disponibles.
+  useEffect(() => {
+    if (loading || initialTabResolved) return;
+    const tab = (searchParams.get('tab') || '').toLowerCase();
+    if (tab === 'invited' || tab === 'invitations') {
+      setActiveTab('invited');
+    } else if (tab === 'enrolled' || tab === 'inscrites') {
+      setActiveTab('enrolled');
+    } else if (tab === 'requested' || tab === 'pending' || tab === 'attente') {
+      setActiveTab('requested');
+    } else if (tab === 'favorite' || tab === 'favoris') {
+      setActiveTab('favorite');
+    } else if (tab === 'available' || tab === 'disponibles') {
+      setActiveTab('available');
+    } else {
+      const hasEnrolled = enrolledGigIds.length > 0 || enrolledGigs.length > 0;
+      setActiveTab(hasEnrolled ? 'enrolled' : 'available');
+    }
+    setInitialTabResolved(true);
+  }, [loading, enrolledGigIds, enrolledGigs, initialTabResolved, searchParams]);
+
+  // Keep tab in sync when clicking a notification deep-link (?tab=invited) while already on marketplace.
+  useEffect(() => {
+    const tab = (searchParams.get('tab') || '').toLowerCase();
+    if (!tab) return;
+    if (tab === 'invited' || tab === 'invitations') setActiveTab('invited');
+    else if (tab === 'enrolled' || tab === 'inscrites') setActiveTab('enrolled');
+    else if (tab === 'requested' || tab === 'pending' || tab === 'attente') setActiveTab('requested');
+    else if (tab === 'favorite' || tab === 'favoris') setActiveTab('favorite');
+    else if (tab === 'available' || tab === 'disponibles') setActiveTab('available');
+  }, [searchParams]);
+
+  useEffect(() => {
+    const onTab = (e: Event) => {
+      const tab = String((e as CustomEvent<{ tab?: string }>).detail?.tab || '').toLowerCase();
+      if (tab === 'invited') setActiveTab('invited');
+    };
+    window.addEventListener('harx:marketplace-tab', onTab);
+    return () => window.removeEventListener('harx:marketplace-tab', onTab);
+  }, []);
+
   const [sortBy] = useState<'latest' | 'salary' | 'experience'>('latest');
   const [favoriteGigs, setFavoriteGigs] = useState<string[]>([]);
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
@@ -541,15 +625,34 @@ export function GigsMarketplace() {
       return false;
     }
   });
+  const [showSatisfaction, setShowSatisfaction] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const profile = await fetchProfileFromAPI();
-        if (!cancelled && profile) {
-          setIsProfilePublished(profile.status === 'completed');
-          setProfileGigEngaged(hasRepGigEngagement(profile));
+        if (cancelled || !profile) return;
+        const published = profile.status === 'completed';
+        setIsProfilePublished(published);
+        setProfileGigEngaged(hasRepGigEngagement(profile));
+        // Marketplace is only for published profiles — never apply-then-publish here.
+        if (!published) {
+          navigate('/subscription', { replace: true });
+          return;
+        }
+        const serverDone = Boolean(profile?.onboardingSatisfaction?.done);
+        try {
+          const localDone = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
+          if (!serverDone && !localDone) setShowSatisfaction(true);
+          if (serverDone && !localDone) {
+            localStorage.setItem(
+              ONBOARDING_SATISFACTION_KEY,
+              JSON.stringify({ done: true, at: new Date().toISOString(), synced: true })
+            );
+          }
+        } catch {
+          if (!serverDone) setShowSatisfaction(true);
         }
       } catch {
         // keep the cached value on failure
@@ -558,7 +661,7 @@ export function GigsMarketplace() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [navigate]);
 
   const handleSmartStart = (gigId: string) => {
     navigate(`/workspace?tab=copilot&gigId=${encodeURIComponent(gigId)}`, { state: { gigId } });
@@ -575,7 +678,7 @@ export function GigsMarketplace() {
   };
 
   // Fonction pour obtenir le statut d'un gig pour l'agent connecté
-  const getGigStatus = (gigId: string): 'enrolled' | 'invited' | 'pending' | 'none' => {
+  const getGigStatus = (gigId: string): 'enrolled' | 'invited' | 'pending' | 'rejected' | 'none' => {
     const agentId = getAgentId();
     if (!agentId) return 'none';
 
@@ -595,14 +698,31 @@ export function GigsMarketplace() {
       }
     }
 
+    // After local reject/accept, ignore stale `agents[].status === 'invited'` on the gigs payload.
+    if (dismissedInviteGigIds.includes(gigId)) {
+      if (pendingRequests.includes(gigId)) return 'pending';
+      return 'none';
+    }
+
+    // Live invitations list is the source of truth for "invited".
     const invitedGig = invitedEnrollments.find((ie) => ie.gig._id === gigId);
+    if (invitedGig?.enrollmentStatus === 'rejected') {
+      return 'rejected';
+    }
     if (invitedGig) {
       return 'invited';
     }
+
+    // Fallback only when agents say invited AND we still have that invite in memory was cleared —
+    // do NOT use stale agents.invited once invitedEnrollments no longer lists this gig.
     if (currentGig?.agents && Array.isArray(currentGig.agents)) {
       const agentInGig = currentGig.agents.find((agent: { agentId?: string }) => agent.agentId === agentId);
+      // Stale invited on gig payload without a live invite → treat as none (refused / expired).
       if (agentInGig?.status === 'invited') {
-        return 'invited';
+        return 'none';
+      }
+      if (agentInGig?.status === 'rejected') {
+        return 'none';
       }
     }
 
@@ -792,6 +912,9 @@ export function GigsMarketplace() {
       setInvitedEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
       if (acceptedGigId) {
         setEnrolledGigIds(prev => (prev.includes(acceptedGigId) ? prev : [...prev, acceptedGigId]));
+        setDismissedInviteGigIds((prev) =>
+          prev.includes(acceptedGigId) ? prev : [...prev, acceptedGigId]
+        );
       }
 
       showToast('Invitation acceptée ! Vous êtes maintenant inscrit à ce gig.', 'success');
@@ -851,15 +974,42 @@ export function GigsMarketplace() {
       console.log('✅ Invitation rejected successfully:', result);
       showToast('Invitation refusée.', 'success');
 
-      // Retirer immédiatement l'invitation de la liste (UI optimiste)
-      setInvitedEnrollments((prev: any[]) => prev.filter(enrollment => enrollment.id !== enrollmentId));
+      const rejectedGigId =
+        invitedEnrollments.find((e) => e.id === enrollmentId)?.gig?._id ||
+        result?.gigAgent?.gigId?._id ||
+        result?.gigAgent?.gigId ||
+        null;
+      const rejectedGigIdStr = rejectedGigId ? String(rejectedGigId) : '';
 
-      // Rafraîchir tous les statuts pour mettre à jour l'UI
+      // Retirer de l'onglet Invitations (plus d'action en attente)
+      setInvitedEnrollments((prev: InvitedEnrollment[]) =>
+        prev.filter((enrollment) => enrollment.id !== enrollmentId)
+      );
+      if (rejectedGigIdStr) {
+        setDismissedInviteGigIds((prev) =>
+          prev.includes(rejectedGigIdStr) ? prev : [...prev, rejectedGigIdStr]
+        );
+        const me = getAgentId();
+        setGigs((prev) =>
+          prev.map((g) => {
+            if (String(g._id) !== rejectedGigIdStr) return g;
+            const agents = Array.isArray(g.agents)
+              ? g.agents.map((a: any) =>
+                  String(a.agentId) === String(me) ? { ...a, status: 'rejected' } : a
+                )
+              : g.agents;
+            return { ...g, agents };
+          })
+        );
+        setPendingRequests((prev) => prev.filter((id) => id !== rejectedGigIdStr));
+      }
+
+      // Rafraîchir en arrière-plan pour confirmer
       console.log('🔄 Refreshing all statuses after rejection...');
       await Promise.all([
-        fetchInvitedEnrollments(),     // Recharger les invitations
-        fetchEnrolledGigIdsFromProfile(), // Mettre à jour les IDs du profil
-        fetchPendingRequests()         // Mettre à jour les pending requests
+        fetchInvitedEnrollments(),
+        fetchEnrolledGigIdsFromProfile(),
+        fetchPendingRequests(),
       ]);
       console.log('✅ All statuses refreshed');
     } catch (error) {
@@ -974,11 +1124,6 @@ export function GigsMarketplace() {
     setApplyingGigId(gigId);
     setApplicationMessage(null);
 
-    // The "publish your profile" guidance is only relevant for the very first
-    // application. Once the rep already has an engagement (or already published),
-    // subsequent applications just get a plain confirmation.
-    const isFirstApplication = !hasMarketplaceGigEngagement && !isProfilePublished;
-
     try {
       console.log('🚀 Applying to gig:', gigId);
       console.log('👤 Agent ID:', agentId);
@@ -1017,13 +1162,9 @@ export function GigsMarketplace() {
           ]);
 
           showToast(
-            isFirstApplication
-              ? (isFrMarket
-                  ? 'Candidature en attente — publiez votre profil pour continuer.'
-                  : 'Application pending — publish your profile to continue.')
-              : (isFrMarket
-                  ? 'Cette mission est déjà en attente.'
-                  : 'This gig is already pending.'),
+            isFrMarket
+              ? 'Cette mission est déjà en attente.'
+              : 'This gig is already pending.',
             'success'
           );
 
@@ -1036,7 +1177,7 @@ export function GigsMarketplace() {
       const data = await response.json();
       console.log('✅ Application successful:', data);
 
-      setApplicationMessage({ gigId, message: 'Application sent successfully!', type: 'success' });
+      setApplicationMessage({ gigId, message: t('gigDetails.applicationSent'), type: 'success' });
       setProfileGigEngaged(true);
 
       // Rafraîchir tous les statuts pour mettre à jour l'UI
@@ -1049,13 +1190,7 @@ export function GigsMarketplace() {
       ]);
 
       showToast(
-        isFirstApplication
-          ? (isFrMarket
-              ? 'Candidature envoyée ! Prochaine étape : publier votre profil.'
-              : 'Application sent! Next step: publish your profile.')
-          : (isFrMarket
-              ? 'Candidature envoyée !'
-              : 'Application sent!'),
+        isFrMarket ? 'Candidature envoyée !' : 'Application sent!',
         'success'
       );
 
@@ -1193,7 +1328,11 @@ export function GigsMarketplace() {
         const transformedEnrollments = enrollmentData.gigs
           .filter((gigEnrollment: any) => {
             console.log('🔍 Checking enrollment:', gigEnrollment.gig?._id);
-            return gigEnrollment.gig; // Filtrer les enrollments sans gig
+            // Enrolled tab: only lifecycle-active company gigs
+            return (
+              gigEnrollment.gig &&
+              String(gigEnrollment.gig.status || '').toLowerCase() === 'active'
+            );
           })
           .map((gigEnrollment: any) => {
             console.log('🔄 Transforming enrollment:', gigEnrollment.gig._id);
@@ -1241,7 +1380,7 @@ export function GigsMarketplace() {
     }
   };
 
-  // Fonction pour récupérer les enrollments invités avec données complètes des gigs
+  // Pending invitations only (refused ones leave this tab — no badge noise)
   const fetchInvitedEnrollments = async () => {
     const agentId = getAgentId();
     const token = getAuthToken();
@@ -1250,92 +1389,77 @@ export function GigsMarketplace() {
       return;
     }
 
+    const transformRows = (rows: any[], fallbackStatus: string): InvitedEnrollment[] =>
+      (rows || [])
+        .filter((gigInvitation: any) => gigInvitation.gig)
+        .map((gigInvitation: any) => {
+          const currentAgentId = getAgentId();
+          const agentData = gigInvitation.gig.agents?.find((agent: any) =>
+            agent.agentId === currentAgentId || agent.agentId?.$oid === currentAgentId
+          );
+          const enrollmentId = agentData?.gigAgentId || agentData?.gigAgentId?.$oid;
+          const status = gigInvitation.status || fallbackStatus;
+          const invitationDate = new Date(gigInvitation.invitationDate || gigInvitation.updatedAt);
+          const expirationDate = new Date(invitationDate);
+          expirationDate.setDate(expirationDate.getDate() + 7);
+
+          return {
+            id: enrollmentId,
+            gig: {
+              _id: gigInvitation.gig._id,
+              title: gigInvitation.gig.title,
+              description: gigInvitation.gig.description,
+              category: gigInvitation.gig.category,
+              destination_zone: gigInvitation.gig.destination_zone,
+              ...gigInvitation.gig,
+            },
+            enrollmentStatus: status,
+            invitationSentAt: gigInvitation.invitationDate || gigInvitation.updatedAt,
+            invitationExpiresAt: expirationDate.toISOString(),
+            isExpired: new Date() > expirationDate,
+            canEnroll: status === 'invited',
+            notes: gigInvitation.notes,
+            matchScore: 0,
+            matchStatus: status,
+          };
+        })
+        .filter((row) => row.enrollmentStatus === 'invited');
+
     try {
-      // Utiliser le nouvel endpoint /gig-agents/agents/{agentId}/gigs?status=invited
-      const enrollmentResponse = await fetch(
+      const headers = { Authorization: `Bearer ${token}` };
+      const invitedRes = await fetch(
         `${import.meta.env.VITE_MATCHING_API_URL}/gig-agents/agents/${agentId}/gigs?status=invited`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
+        { headers }
       );
 
-      if (!enrollmentResponse.ok) {
+      if (!invitedRes.ok) {
         throw new Error('Failed to fetch invited enrollments');
       }
 
-      const enrollmentData = await enrollmentResponse.json();
-      console.log('📋 Invited enrollments response:', enrollmentData);
-      console.log('📊 Response count:', enrollmentData.count);
-      console.log('🔍 RAW RESPONSE DATA:', JSON.stringify(enrollmentData, null, 2));
+      const invitedData = await invitedRes.json();
+      const invitedRows = transformRows(invitedData.gigs || [], 'invited');
 
-      // La réponse contient un objet avec la propriété 'gigs'
-      if (enrollmentData.gigs && Array.isArray(enrollmentData.gigs)) {
-        console.log('✅ Found invited enrollments:', enrollmentData.gigs.length);
-        if (enrollmentData.gigs.length > 0) {
-          console.log('🔍 First invited enrollment structure:', JSON.stringify(enrollmentData.gigs[0], null, 2));
-          console.log('🔍 First gig structure:', enrollmentData.gigs[0].gig);
-          console.log('🆔 Checking IDs in first enrollment:');
-          console.log('   - _id:', enrollmentData.gigs[0]._id);
-          console.log('   - id:', enrollmentData.gigs[0].id);
-          console.log('   - gigAgentId:', enrollmentData.gigs[0].gigAgentId);
-          console.log('🏢 CompanyId:', enrollmentData.gigs[0].gig?.companyId);
-          console.log('🏭 Industries:', enrollmentData.gigs[0].gig?.industries);
-          console.log('📊 Activities:', enrollmentData.gigs[0].gig?.activities);
-        }
+      invitedRows.sort(
+        (a, b) =>
+          new Date(b.invitationSentAt).getTime() - new Date(a.invitationSentAt).getTime()
+      );
 
-        // Transformer les données pour correspondre à l'interface InvitedEnrollment
-        const transformedInvitations = enrollmentData.gigs
-          .filter((gigInvitation: any) => {
-            console.log('🔍 Checking invitation:', gigInvitation.gig?._id);
-            return gigInvitation.gig; // Filtrer les invitations sans gig
-          })
-          .map((gigInvitation: any) => {
-            console.log('🔄 Transforming invitation:', gigInvitation.gig._id);
+      console.log('✅ Pending invitations:', invitedRows.length);
+      setInvitedEnrollments(invitedRows);
 
-            // ✅ Extraire le gigAgentId depuis gig.agents[]
-            const agentId = getAgentId();
-            const agentData = gigInvitation.gig.agents?.find((agent: any) =>
-              agent.agentId === agentId || agent.agentId?.$oid === agentId
-            );
-            const enrollmentId = agentData?.gigAgentId || agentData?.gigAgentId?.$oid;
-
-            console.log('🆔 Agent data from gig.agents:', agentData);
-            console.log('✅ Extracted gigAgentId:', enrollmentId);
-
-            // Calculer l'expiration basée sur invitationDate + 7 jours (par exemple)
-            const invitationDate = new Date(gigInvitation.invitationDate || gigInvitation.updatedAt);
-            const expirationDate = new Date(invitationDate);
-            expirationDate.setDate(expirationDate.getDate() + 7); // 7 jours pour répondre
-
-            return {
-              id: enrollmentId, // ✅ Utiliser l'ID du document GigAgent (enrollmentId)
-              gig: {
-                _id: gigInvitation.gig._id,
-                title: gigInvitation.gig.title,
-                description: gigInvitation.gig.description,
-                category: gigInvitation.gig.category,
-                destination_zone: gigInvitation.gig.destination_zone,
-                // Copier toutes les autres propriétés du gig (déjà populées)
-                ...gigInvitation.gig
-              },
-              enrollmentStatus: gigInvitation.status, // 'invited'
-              invitationSentAt: gigInvitation.invitationDate || gigInvitation.updatedAt,
-              invitationExpiresAt: expirationDate.toISOString(),
-              isExpired: new Date() > expirationDate,
-              canEnroll: gigInvitation.status === 'invited',
-              notes: gigInvitation.notes,
-              matchScore: 0, // Pas de match score dans cette réponse
-              matchStatus: 'invited'
-            };
-          });
-
-        console.log('✅ Transformed invited enrollments:', transformedInvitations);
-        setInvitedEnrollments(transformedInvitations);
-      } else {
-        console.error('Invalid invited enrollments data structure:', enrollmentData);
-        setInvitedEnrollments([]);
+      // Ensure each pending invite also appears in the top bell (even without WS).
+      for (const row of invitedRows) {
+        const gigId = row.gig?._id ? String(row.gig._id) : '';
+        if (!gigId) continue;
+        addEnrollmentNotification(
+          'invited',
+          gigId,
+          row.gig?.title ? String(row.gig.title) : undefined,
+          {
+            enrollmentId: row.id ? String(row.id) : undefined,
+            invitationSentAt: row.invitationSentAt || undefined,
+          }
+        );
       }
     } catch (error) {
       console.error('Error fetching invited enrollments:', error);
@@ -1347,10 +1471,12 @@ export function GigsMarketplace() {
     console.log('Component mounted, fetching data...');
     const fetchGigs = async () => {
       try {
-        const url = `${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs/active`;
+        const gigsApi = getGigsApiBase();
+        const url = `${gigsApi}/gigs/active`;
         console.log('🌐 Fetching active gigs from:', url);
         console.log('🔧 Environment variables:', {
           VITE_BACKEND_URL_GIGS: import.meta.env.VITE_BACKEND_URL_GIGS,
+          resolvedGigsApi: gigsApi,
           NODE_ENV: import.meta.env.NODE_ENV
         });
 
@@ -1370,7 +1496,7 @@ export function GigsMarketplace() {
 
           // Si l'endpoint /gigs/active ne fonctionne pas, essayer l'ancien endpoint
           console.log('⚠️ Trying fallback to /gigs endpoint...');
-          const fallbackResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL_GIGS}/gigs`);
+          const fallbackResponse = await fetch(`${gigsApi}/gigs`);
 
           if (!fallbackResponse.ok) {
             const fallbackErrorText = await fallbackResponse.text();
@@ -1514,9 +1640,16 @@ export function GigsMarketplace() {
 
     window.addEventListener('refreshGigStatuses', handleRefreshStatuses);
 
+    // Light invite poll (WS is primary). Do not spam bell refreshes.
+    const invitePoll = window.setInterval(() => {
+      if (!agentId) return;
+      void fetchInvitedEnrollments();
+    }, 30_000);
+
     // Cleanup
     return () => {
       window.removeEventListener('refreshGigStatuses', handleRefreshStatuses);
+      window.clearInterval(invitePoll);
     };
   }, [applicationMessage]);
 
@@ -1556,12 +1689,34 @@ export function GigsMarketplace() {
             prev.includes(gigId) ? prev : [...prev, gigId]
           );
         }
+        // Company invite → refresh Invitations tab live (no page refresh)
+        if (data?.status === 'invited') {
+          void fetchInvitedEnrollments();
+          setActiveTab('invited');
+          const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+          const gigTitle = data?.gigTitle ? String(data.gigTitle) : '';
+          showToast(
+            isFr
+              ? gigTitle
+                ? `Nouvelle invitation : ${gigTitle}`
+                : 'Nouvelle invitation reçue'
+              : gigTitle
+                ? `New invitation: ${gigTitle}`
+                : 'New invitation received',
+            'success'
+          );
+        }
         // Reject / cancel: drop from pending so the gig returns to "Available".
-        if (data?.gigId && (data?.status === 'rejected' || data?.status === 'cancelled')) {
+        if (data?.gigId && (data?.status === 'rejected' || data?.status === 'cancelled' || data?.status === 'invitation_rejected')) {
           const gigId = String(data.gigId);
           setPendingRequests((prev) => prev.filter((id) => id !== gigId));
           setRequestedGigs((prev) => prev.filter((g) => g.gig._id !== gigId));
           setEnrolledGigIds((prev) => prev.filter((id) => id !== gigId));
+          if (data?.status === 'invitation_rejected') {
+            setInvitedEnrollments((prev) =>
+              prev.filter((enrollment) => enrollment.gig._id !== gigId)
+            );
+          }
         }
         refreshStatuses();
         const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
@@ -1585,6 +1740,7 @@ export function GigsMarketplace() {
             'success'
           );
         }
+        // invitation_rejected: toast already shown by rejectInvitation local handler
       },
       { onConnect: refreshStatuses }
     );
@@ -1603,7 +1759,9 @@ export function GigsMarketplace() {
       profileGigEngaged ||
       enrolledGigIds.length > 0 ||
       enrolledGigs.length > 0 ||
-      pendingRequests.length > 0
+      pendingRequests.length > 0 ||
+      invitedEnrollments.length > 0 ||
+      requestedGigs.length > 0
     ) {
       return true;
     }
@@ -1612,14 +1770,26 @@ export function GigsMarketplace() {
     if (!agentId) return false;
 
     return gigs.some((gig) => {
+      const status = getGigStatus(gig._id);
+      if (status === 'enrolled' || status === 'pending' || status === 'invited') return true;
       if (!gig.agents || !Array.isArray(gig.agents)) return false;
       return gig.agents.some((agent: any) => {
         const id = agent.agentId?.$oid || agent.agentId;
         if (String(id) !== String(agentId)) return false;
-        return ['requested', 'enrolled', 'pending'].includes(String(agent.status || '').toLowerCase());
+        return ['requested', 'enrolled', 'pending', 'invited', 'accepted'].includes(
+          String(agent.status || '').toLowerCase()
+        );
       });
     });
-  }, [profileGigEngaged, enrolledGigIds, enrolledGigs, pendingRequests, gigs]);
+  }, [
+    profileGigEngaged,
+    enrolledGigIds,
+    enrolledGigs,
+    pendingRequests,
+    invitedEnrollments,
+    requestedGigs,
+    gigs,
+  ]);
 
   // Filter and sort gigs based on active tab
   const getFilteredAndSortedGigs = () => {
@@ -1739,7 +1909,7 @@ export function GigsMarketplace() {
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-6 w-24" variant="rounded" />)}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
               <div className="flex gap-4">
@@ -1792,12 +1962,8 @@ export function GigsMarketplace() {
     }
   };
 
-  const scrollToGigGrid = () => {
-    document.getElementById('rep-gig-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       {/* Toast de notification (accept / reject invitation) */}
       {toast && (
         <div className="fixed top-6 right-6 z-[200] animate-fade-in">
@@ -1817,83 +1983,38 @@ export function GigsMarketplace() {
         </div>
       )}
 
-      <div className="space-y-4">
-        <div>
+      <div className="w-full space-y-4">
+        <div className="w-full">
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{t('gigsMarketplace.title')}</h1>
-          <p className="mt-2 text-gray-500 max-w-2xl text-sm leading-relaxed font-medium">
-            Discover premium projects worldwide that match your unique skills and professional aspirations.<br />
-            Take control of your journey, find your next exclusive mission, and start earning today.
+          <p className="mt-2 text-gray-500 w-full max-w-4xl text-sm leading-relaxed font-medium">
+            {t('gigsMarketplace.subtitle1')}
+            <br />
+            {t('gigsMarketplace.subtitle2')}
           </p>
         </div>
       </div>
 
-      {/* Onboarding status banner. Reaching this page means phases 1-4 are done,
-          so the final phase completes once the rep applies to / enrolls in a gig. */}
-      {!loading && (() => {
-        if (!hasMarketplaceGigEngagement) {
-          return (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
-                    {isFrMarket ? 'Étape 5 · Place de marché' : 'Step 5 · Marketplace'}
-                  </p>
-                  <p className="text-sm font-black text-yellow-800 mt-0.5">
-                    {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
-                  </p>
-                  <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                    {isFrMarket
-                      ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
-                      : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={scrollToGigGrid}
-                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap shrink-0"
-              >
-                {isFrMarket ? 'Voir les missions' : 'Browse gigs'}
-              </button>
-            </div>
-          );
-        }
-
-        // Profile already published → no onboarding banner at all.
-        if (isProfilePublished) {
-          return null;
-        }
-
-        return (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-            <div className="flex items-start gap-3">
-              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" strokeWidth={3} />
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                  {isFrMarket ? 'Prochaine étape · Profil' : 'Next step · Profile'}
-                </p>
-                <p className="text-sm font-black text-emerald-800 mt-0.5">
-                  {isFrMarket ? 'Candidature envoyée — publiez votre profil' : 'Application sent — publish your profile'}
-                </p>
-                <p className="text-xs font-medium text-emerald-700 mt-0.5">
-                  {isFrMarket
-                    ? 'Vous avez postulé (statut Pending). Publiez votre profil pour devenir visible aux entreprises — l’onglet Inscrites restera vide tant que votre candidature n’est pas acceptée.'
-                    : 'You applied (Pending status). Publish your profile to become visible — the Enrolled tab stays empty until your application is accepted.'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/profile')}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap"
-            >
-              {isFrMarket ? 'Publier mon profil' : 'Publish my profile'}
-            </button>
+      {/* Étape 5 banner — only while the REP has not applied / enrolled yet. */}
+      {!hasMarketplaceGigEngagement && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300">
+          <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">
+              {isFrMarket ? 'Étape 5 · MARKETPLACE' : 'Step 5 · MARKETPLACE'}
+            </p>
+            <p className="text-sm font-black text-yellow-800 mt-0.5">
+              {isFrMarket ? 'Postulez à votre première mission' : 'Apply to your first gig'}
+            </p>
+            <p className="text-xs font-medium text-yellow-700 mt-0.5">
+              {isFrMarket
+                ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+                : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
+            </p>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
-      <div className="flex space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
+      <div className="flex w-full space-x-4 sm:space-x-8 border-b border-gray-100 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => setActiveTab('available')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'available'
@@ -1940,16 +2061,22 @@ export function GigsMarketplace() {
           {activeTab === 'favorite' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
-          onClick={() => setActiveTab('invited')}
+          onClick={() => {
+            setActiveTab('invited');
+            navigate('/marketplace?tab=invited', { replace: true });
+          }}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'invited'
             ? 'text-harx-600'
             : 'text-gray-400 hover:text-gray-600'
             }`}
         >
           {t('gigsMarketplace.tabs.invited')}
-          {invitedEnrollments.length > 0 && (
+          {invitedEnrollments.filter((e) => e.enrollmentStatus === 'invited').length > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-md animate-pulse">
-              {invitedEnrollments.length > 99 ? '99+' : invitedEnrollments.length}
+              {(() => {
+                const n = invitedEnrollments.filter((e) => e.enrollmentStatus === 'invited').length;
+                return n > 99 ? '99+' : n;
+              })()}
             </span>
           )}
           {activeTab === 'invited' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
@@ -1971,8 +2098,8 @@ export function GigsMarketplace() {
 
       {activeTab === 'available' ? (
         currentGigs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
+          <div className="flex w-full min-h-[55vh] flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="bg-harx-50/50 rounded-3xl p-12 max-w-lg w-full border border-harx-100/50 backdrop-blur-sm">
               <div className="text-4xl mb-4">🔍</div>
               <h3 className="text-xl font-black text-gray-900 mb-2">
                 No Gigs Available
@@ -1983,7 +2110,7 @@ export function GigsMarketplace() {
             </div>
           </div>
         ) : (
-          <div id="rep-gig-grid" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div id="rep-gig-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             {(currentGigs as PopulatedGig[]).map((gig) => {
               const gigStatus = getGigStatus(gig._id);
               const gigStyle = getCardStyleForStatus(gigStatus);
@@ -2026,14 +2153,15 @@ export function GigsMarketplace() {
                             : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)] animate-pulse-ring cursor-pointer'
                             }`}
                         >
-                          {applyingGigId === gig._id ? '⏳ Applying...' : '🚀 Apply Now'}
+                          {applyingGigId === gig._id ? `⏳ ${t('gigsMarketplace.applying')}` : `🚀 ${t('gigsMarketplace.applyNow')}`}
                         </button>
                       ) : (
                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
                           gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
+                          gigStatus === 'rejected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
                           }`}>
-                          {gigStatus === 'enrolled' ? '✓ Enrolled' : gigStatus === 'invited' ? '✉ Invited' : '⌛ Pending'}
+                          {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : gigStatus === 'rejected' ? `✓ ${t('gigsMarketplace.declinedBadge', 'Declined')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
                         </span>
                       )}
 
@@ -2067,10 +2195,10 @@ export function GigsMarketplace() {
                       {gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                      {gig.category}
+                      {taxonomyLabel(gig.category, gig)}
                     </p>
                     {/* Commission pills — hero visuel */}
-                    {renderCommissionInfo(gig)}
+                    {renderCommissionInfo(gig, isFrMarket)}
                   </div>
 
                   <div className="mt-1 space-y-2">
@@ -2078,12 +2206,12 @@ export function GigsMarketplace() {
                     <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                       <div className="flex items-center gap-1 shrink-0">
                         <Globe className="w-3 h-3 opacity-70" />
-                        <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || 'Remote' : gig.destination_zone || 'Remote'}</span>
+                        <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : gig.destination_zone || t('gigsMarketplace.remote')}</span>
                       </div>
                       <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                       <div className="flex items-center gap-1 shrink-0">
                         <Calendar className="w-3 h-3 opacity-70" />
-                        <span>{gig.availability?.minimumHours?.weekly || 'N/A'}h/wk</span>
+                        <span>{gig.availability?.minimumHours?.weekly != null ? t('gigsMarketplace.hoursPerWeek', { hours: gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                       </div>
                     </div>
                   </div>
@@ -2092,11 +2220,11 @@ export function GigsMarketplace() {
                     {/* Industries */}
                     {gig.industries && gig.industries.length > 0 && (
                       <div className="mb-4">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Industries:</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{t('gigsMarketplace.industries')}</p>
                         <div className="flex flex-wrap gap-1">
                           {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                             <span key={industry._id} className="px-2 py-1 bg-harx-alt-100/50 rounded-lg text-[10px] font-bold text-harx-alt-700">
-                              {industry.name}
+                              {taxonomyEntityLabel(industry, gig)}
                             </span>
                           ))}
                           {gig.industries.length > 3 && (
@@ -2108,7 +2236,7 @@ export function GigsMarketplace() {
                               }}
                               className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs text-gray-600 transition-colors cursor-pointer"
                             >
-                              {expandedIndustries[gig._id] ? 'Show less' : `+${gig.industries.length - 3} more`}
+                              {expandedIndustries[gig._id] ? t('gigsMarketplace.showLess') : t('gigsMarketplace.more', { count: gig.industries.length - 3 })}
                             </button>
                           )}
                         </div>
@@ -2118,11 +2246,11 @@ export function GigsMarketplace() {
                     {/* Activities */}
                     {gig.activities && gig.activities.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Activities:</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">{t('gigsMarketplace.activities')}</p>
                         <div className="flex flex-wrap gap-1">
                           {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                             <span key={activity._id} className="px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700">
-                              {activity.name}
+                              {taxonomyEntityLabel(activity, gig)}
                             </span>
                           ))}
                           {gig.activities.length > 3 && (
@@ -2134,7 +2262,7 @@ export function GigsMarketplace() {
                               }}
                               className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs text-gray-600 transition-colors cursor-pointer"
                             >
-                              {expandedActivities[gig._id] ? 'Show less' : `+${gig.activities.length - 3} more`}
+                              {expandedActivities[gig._id] ? t('gigsMarketplace.showLess') : t('gigsMarketplace.more', { count: gig.activities.length - 3 })}
                             </button>
                           )}
                         </div>
@@ -2151,13 +2279,13 @@ export function GigsMarketplace() {
                           className="flex-[2] bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
                         >
                           <Play className="w-4 h-4 fill-current" />
-                          <span>START</span>
+                          <span>{t('gigsMarketplace.startSession')}</span>
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
-                          className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`flex-1 ${DETAILS_BTN_CLASS}`}
                         >
-                          DETAILS
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     ) : gigStatus === 'invited' ? (
@@ -2180,7 +2308,7 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <Check className="w-4 h-4" strokeWidth={3} />
-                                <span>Accept</span>
+                                <span>{t('gigsMarketplace.accept')}</span>
                               </>
                             )}
                           </button>
@@ -2201,26 +2329,24 @@ export function GigsMarketplace() {
                             ) : (
                               <>
                                 <X className="w-4 h-4" strokeWidth={3} />
-                                <span>Decline</span>
+                                <span>{t('gigsMarketplace.reject')}</span>
                               </>
                             )}
                           </button>
                         </div>
                         <button
                           onClick={() => navigate(`/gig/${gig._id}`)}
-                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`w-full ${DETAILS_BTN_CLASS}`}
                         >
-                          View Details
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => navigate(`/gig/${gig._id}`)}
-                        className="w-full bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                        className={`w-full ${DETAILS_BTN_CLASS}`}
                       >
-                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
-                        <Sparkles className="w-4 h-4" />
-                        <span>VIEW DETAILS</span>
+                        <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                       </button>
                     )}
                   </div>
@@ -2240,22 +2366,22 @@ export function GigsMarketplace() {
               <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">❤️</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  No Favorites Yet
+                  {t('gigsMarketplace.noFavoritesYet')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Love a gig? Click the heart icon to save it here for later.
+                  {t('gigsMarketplace.favoritesEmptyDesc')}
                 </p>
                 <button
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  Browse Available Gigs
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as PopulatedGig[]).map((gig) => {
                   const gigStatus = getGigStatus(gig._id);
                   const gigStyle = getCardStyleForStatus(gigStatus);
@@ -2285,9 +2411,30 @@ export function GigsMarketplace() {
                           )}
                         </button>
                         <div className="flex items-center space-x-2">
-                          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)]">
-                            🚀 Apply Now
-                          </span>
+                          {gigStatus === 'none' ? (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleApplyToGig(gig._id);
+                              }}
+                              disabled={applyingGigId === gig._id}
+                              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${applyingGigId === gig._id
+                                ? 'bg-harx-100 text-harx-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border border-pink-400 shadow-[0_2px_10px_-2px_rgba(244,63,94,0.4)] animate-pulse-ring cursor-pointer'
+                                }`}
+                            >
+                              {applyingGigId === gig._id ? `⏳ ${t('gigsMarketplace.applying')}` : `🚀 ${t('gigsMarketplace.applyNow')}`}
+                            </button>
+                          ) : (
+                            <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${gigStatus === 'enrolled' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-400' :
+                              gigStatus === 'invited' ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-indigo-400' :
+                              gigStatus === 'rejected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400'
+                              }`}>
+                              {gigStatus === 'enrolled' ? `✓ ${t('gigsMarketplace.enrolledBadge')}` : gigStatus === 'invited' ? `✉ ${t('gigsMarketplace.invitedBadge')}` : gigStatus === 'rejected' ? `✓ ${t('gigsMarketplace.declinedBadge', 'Declined')}` : `⌛ ${t('gigsMarketplace.pendingBadge')}`}
+                            </span>
+                          )}
                           <button
                             onClick={(e) => {
                               e.preventDefault();
@@ -2312,10 +2459,10 @@ export function GigsMarketplace() {
                           {gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {gig.category}
+                          {taxonomyLabel(gig.category, gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(gig)}
+                        {renderCommissionInfo(gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2323,12 +2470,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || 'Remote' : gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof gig.destination_zone === 'object' ? gig.destination_zone?.name?.common || gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{gig.availability?.minimumHours?.weekly || 'N/A'}h/wk</span>
+                            <span>{gig.availability?.minimumHours?.weekly != null ? t('gigsMarketplace.hoursPerWeek', { hours: gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2337,11 +2484,11 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {gig.industries && gig.industries.length > 0 && (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[gig._id] ? gig.industries : gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyEntityLabel(industry, gig)}
                                 </span>
                               ))}
                               {gig.industries.length > 3 && (
@@ -2353,7 +2500,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[gig._id] ? 'Less' : `+${gig.industries.length - 3}`}
+                                  {expandedIndustries[gig._id] ? t('gigsMarketplace.less') : `+${gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2363,11 +2510,11 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {gig.activities && gig.activities.length > 0 && (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[gig._id] ? gig.activities : gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyEntityLabel(activity, gig)}
                                 </span>
                               ))}
                               {gig.activities.length > 3 && (
@@ -2379,7 +2526,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[gig._id] ? 'Less' : `+${gig.activities.length - 3}`}
+                                  {expandedActivities[gig._id] ? t('gigsMarketplace.less') : `+${gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2387,14 +2534,30 @@ export function GigsMarketplace() {
                         )}
                       </div>
 
-                      <button
-                        onClick={() => navigate(`/gig/${gig._id}`)}
-                        className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-violet-700 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 group/btn overflow-hidden relative"
-                      >
-                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500 skew-x-[-30deg]" />
-                        <Sparkles className="w-4 h-4" />
-                        <span>View Details</span>
-                      </button>
+                      {gigStatus === 'enrolled' ? (
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => handleSmartStart(gig._id)}
+                            className="flex-[2] bg-gradient-to-r from-rose-500 via-pink-500 to-rose-500 bg-[length:200%_auto] hover:bg-right transition-all duration-500 text-white py-2.5 px-4 rounded-xl hover:shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)] font-black text-sm uppercase tracking-widest hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group/btn overflow-hidden relative"
+                          >
+                            <Play className="w-4 h-4 fill-current" />
+                            <span>{t('gigsMarketplace.startSession')}</span>
+                          </button>
+                          <button
+                            onClick={() => navigate(`/gig/${gig._id}`)}
+                            className={`flex-1 ${DETAILS_BTN_CLASS}`}
+                          >
+                            <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/gig/${gig._id}`)}
+                          className={`mt-4 w-full ${DETAILS_BTN_CLASS}`}
+                        >
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -2413,22 +2576,22 @@ export function GigsMarketplace() {
               <div className="bg-harx-50/50 rounded-3xl p-12 max-w-sm w-full border border-harx-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">✉️</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  No Invitations Yet
+                  {t('gigsMarketplace.invitesEmptyTitle')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Keep your profile updated! When companies love your skills, invitations will appear here.
+                  {t('gigsMarketplace.invitesEmptyDesc')}
                 </p>
                 <button
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  Browse Available Gigs
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as InvitedEnrollment[]).map((enrollment) => {
                   const gigStyle = getCardStyleForStatus('invited');
                   return (
@@ -2457,8 +2620,14 @@ export function GigsMarketplace() {
                           )}
                         </button>
                         <div className="flex items-center space-x-1">
-                          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-600 text-white border border-indigo-400 shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)]">
-                            ✉ Invited
+                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border shadow-[0_2px_10px_-2px_rgba(99,102,241,0.4)] ${
+                            enrollment.enrollmentStatus === 'rejected'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-none'
+                              : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-indigo-400'
+                          }`}>
+                            {enrollment.enrollmentStatus === 'rejected'
+                              ? `✓ ${t('gigsMarketplace.declinedBadge', 'Refusée')}`
+                              : `✉ ${t('gigsMarketplace.invitedBadge')}`}
                           </span>
                           <button
                             onClick={(e) => {
@@ -2490,10 +2659,10 @@ export function GigsMarketplace() {
                           {enrollment.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {enrollment.gig.category}
+                          {taxonomyLabel(enrollment.gig.category, enrollment.gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(enrollment.gig)}
+                        {renderCommissionInfo(enrollment.gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2501,12 +2670,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof enrollment.gig.destination_zone === 'object' ? enrollment.gig.destination_zone?.name?.common || enrollment.gig.destination_zone?.cca2 || 'Remote' : enrollment.gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof enrollment.gig.destination_zone === 'object' ? enrollment.gig.destination_zone?.name?.common || enrollment.gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : enrollment.gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{('availability' in enrollment.gig && enrollment.gig.availability?.minimumHours?.weekly) ? `${enrollment.gig.availability.minimumHours.weekly}h/wk` : 'N/A h/wk'}</span>
+                            <span>{('availability' in enrollment.gig && enrollment.gig.availability?.minimumHours?.weekly != null) ? t('gigsMarketplace.hoursPerWeek', { hours: enrollment.gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2515,11 +2684,11 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {('industries' in enrollment.gig && enrollment.gig.industries && enrollment.gig.industries.length > 0) ? (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrollment.gig._id] ? enrollment.gig.industries : enrollment.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyEntityLabel(industry, enrollment.gig)}
                                 </span>
                               ))}
                               {enrollment.gig.industries.length > 3 && (
@@ -2531,7 +2700,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[enrollment.gig._id] ? 'Less' : `+${enrollment.gig.industries.length - 3}`}
+                                  {expandedIndustries[enrollment.gig._id] ? t('gigsMarketplace.less') : `+${enrollment.gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2541,11 +2710,11 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {('activities' in enrollment.gig && enrollment.gig.activities && enrollment.gig.activities.length > 0) ? (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrollment.gig._id] ? enrollment.gig.activities : enrollment.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyEntityLabel(activity, enrollment.gig)}
                                 </span>
                               ))}
                               {enrollment.gig.activities.length > 3 && (
@@ -2557,7 +2726,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[enrollment.gig._id] ? 'Less' : `+${enrollment.gig.activities.length - 3}`}
+                                  {expandedActivities[enrollment.gig._id] ? t('gigsMarketplace.less') : `+${enrollment.gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2566,55 +2735,57 @@ export function GigsMarketplace() {
                       </div>
 
                       <div className="mt-4 space-y-2">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleAcceptFromCard(enrollment.gig._id);
-                            }}
-                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
-                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
-                              ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
-                              }`}
-                          >
-                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'accept' ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
-                            ) : (
-                              <>
-                                <Check className="w-4 h-4" strokeWidth={3} />
-                                <span>Accept</span>
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleRejectFromCard(enrollment.gig._id);
-                            }}
-                            disabled={respondingInvitation?.gigId === enrollment.gig._id}
-                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
-                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                              : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
-                              }`}
-                          >
-                            {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'reject' ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
-                            ) : (
-                              <>
-                                <X className="w-4 h-4" strokeWidth={3} />
-                                <span>Decline</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        {enrollment.enrollmentStatus !== 'rejected' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAcceptFromCard(enrollment.gig._id);
+                              }}
+                              disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                              className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                                ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_4px_15px_-3px_rgba(16,185,129,0.45)] hover:shadow-[0_8px_20px_-4px_rgba(16,185,129,0.55)]'
+                                }`}
+                            >
+                              {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'accept' ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500" />
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4" strokeWidth={3} />
+                                  <span>{t('gigsMarketplace.accept')}</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleRejectFromCard(enrollment.gig._id);
+                              }}
+                              disabled={respondingInvitation?.gigId === enrollment.gig._id}
+                              className={`flex-1 py-2.5 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all hover:-translate-y-0.5 active:translate-y-0 ${respondingInvitation?.gigId === enrollment.gig._id
+                                ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                                : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+                                }`}
+                            >
+                              {respondingInvitation?.gigId === enrollment.gig._id && respondingInvitation.action === 'reject' ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-rose-400" />
+                              ) : (
+                                <>
+                                  <X className="w-4 h-4" strokeWidth={3} />
+                                  <span>{t('gigsMarketplace.reject')}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
                         <button
                           onClick={() => navigate(`/gig/${enrollment.gig._id}`)}
-                          className="w-full bg-slate-100 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`w-full ${DETAILS_BTN_CLASS}`}
                         >
-                          View Details
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     </div>
@@ -2646,12 +2817,12 @@ export function GigsMarketplace() {
                   onClick={() => setActiveTab('available')}
                   className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
-                  {isFrMarket ? 'Voir les missions' : 'Browse Available Gigs'}
+                  {t('gigsMarketplace.browseAvailable')}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
               {(currentGigs as RequestedGig[]).map((requestedGig) => {
                 const gigStyle = getCardStyleForStatus('pending');
                 return (
@@ -2692,10 +2863,10 @@ export function GigsMarketplace() {
                       {requestedGig.gig.title}
                     </button>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider ${gigStyle.category} mb-3`}>
-                      {requestedGig.gig.category}
+                      {taxonomyLabel(requestedGig.gig.category, requestedGig.gig)}
                     </p>
 
-                    {renderCommissionInfo(requestedGig.gig)}
+                    {renderCommissionInfo(requestedGig.gig, isFrMarket)}
 
                     <p className="mt-3 text-[11px] text-amber-700 font-medium bg-amber-50/80 border border-amber-100 rounded-xl px-3 py-2">
                       {isFrMarket
@@ -2716,9 +2887,9 @@ export function GigsMarketplace() {
                       </button>
                       <button
                         onClick={() => navigate(`/gig/${requestedGig.gig._id}`)}
-                        className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider"
+                        className={`flex-1 ${DETAILS_BTN_CLASS}`}
                       >
-                        {isFrMarket ? 'Détails' : 'Details'}
+                        <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                       </button>
                     </div>
                   </div>
@@ -2738,16 +2909,16 @@ export function GigsMarketplace() {
               <div className="bg-emerald-50/50 rounded-3xl p-12 max-w-sm w-full border border-emerald-100/50 backdrop-blur-sm">
                 <div className="text-4xl mb-4">🚀</div>
                 <h3 className="text-xl font-black text-gray-900 mb-2">
-                  Ready to Start?
+                  {t('gigsMarketplace.enrolledEmptyTitle')}
                 </h3>
                 <p className="text-sm text-gray-500 font-medium">
-                  Accept an invitation or apply to a gig to see your active projects here.
+                  {t('gigsMarketplace.enrolledEmptyDesc')}
                 </p>
               </div>
             </div>
           ) : (
             <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {(currentGigs as EnrolledGig[]).map((enrolledGig) => {
                   const gigStyle = getCardStyleForStatus('enrolled');
                   return (
@@ -2778,7 +2949,7 @@ export function GigsMarketplace() {
                         <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
                           <div className="flex items-center space-x-1">
                             <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-400 shadow-[0_2px_10px_-2px_rgba(16,185,129,0.4)]">
-                              ✓ Enrolled
+                              ✓ {t('gigsMarketplace.enrolledBadge')}
                             </span>
                             <button
                               onClick={(e) => {
@@ -2811,10 +2982,10 @@ export function GigsMarketplace() {
                           {enrolledGig.gig.title}
                         </button>
                         <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors text-indigo-500 mb-3`}>
-                          {enrolledGig.gig.category}
+                          {taxonomyLabel(enrolledGig.gig.category, enrolledGig.gig)}
                         </p>
                         {/* Commission pills — hero visuel */}
-                        {renderCommissionInfo(enrolledGig.gig)}
+                        {renderCommissionInfo(enrolledGig.gig, isFrMarket)}
                       </div>
 
                       <div className="mt-1 space-y-2">
@@ -2822,12 +2993,12 @@ export function GigsMarketplace() {
                         <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400 pt-1">
                           <div className="flex items-center gap-1 shrink-0">
                             <Globe className="w-3 h-3 opacity-70" />
-                            <span className="truncate max-w-[120px]">{typeof enrolledGig.gig.destination_zone === 'object' ? enrolledGig.gig.destination_zone?.name?.common || enrolledGig.gig.destination_zone?.cca2 || 'Remote' : enrolledGig.gig.destination_zone || 'Remote'}</span>
+                            <span className="truncate max-w-[120px]">{typeof enrolledGig.gig.destination_zone === 'object' ? enrolledGig.gig.destination_zone?.name?.common || enrolledGig.gig.destination_zone?.cca2 || t('gigsMarketplace.remote') : enrolledGig.gig.destination_zone || t('gigsMarketplace.remote')}</span>
                           </div>
                           <div className="w-1 h-1 rounded-full bg-slate-200 shrink-0" />
                           <div className="flex items-center gap-1 shrink-0">
                             <Calendar className="w-3 h-3 opacity-70" />
-                            <span>{('availability' in enrolledGig.gig && enrolledGig.gig.availability?.minimumHours?.weekly) ? `${enrolledGig.gig.availability.minimumHours.weekly}h/wk` : 'N/A h/wk'}</span>
+                            <span>{('availability' in enrolledGig.gig && enrolledGig.gig.availability?.minimumHours?.weekly != null) ? t('gigsMarketplace.hoursPerWeek', { hours: enrolledGig.gig.availability.minimumHours.weekly }) : t('gigsMarketplace.hoursNA')}</span>
                           </div>
                         </div>
                       </div>
@@ -2836,11 +3007,11 @@ export function GigsMarketplace() {
                         {/* Industries */}
                         {('industries' in enrolledGig.gig && enrolledGig.gig.industries && enrolledGig.gig.industries.length > 0) ? (
                           <div className="mb-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Industries:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.industries')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedIndustries[enrolledGig.gig._id] ? enrolledGig.gig.industries : enrolledGig.gig.industries.slice(0, 3)).map((industry) => (
                                 <span key={industry._id} className="px-2 py-0.5 bg-pink-50 border border-pink-100 rounded-lg text-[10px] font-medium text-pink-600">
-                                  {industry.name}
+                                  {taxonomyEntityLabel(industry, enrolledGig.gig)}
                                 </span>
                               ))}
                               {enrolledGig.gig.industries.length > 3 && (
@@ -2852,7 +3023,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedIndustries[enrolledGig.gig._id] ? 'Less' : `+${enrolledGig.gig.industries.length - 3}`}
+                                  {expandedIndustries[enrolledGig.gig._id] ? t('gigsMarketplace.less') : `+${enrolledGig.gig.industries.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2862,11 +3033,11 @@ export function GigsMarketplace() {
                         {/* Activities */}
                         {('activities' in enrolledGig.gig && enrolledGig.gig.activities && enrolledGig.gig.activities.length > 0) ? (
                           <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Activities:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('gigsMarketplace.activities')}</p>
                             <div className="flex flex-wrap gap-1">
                               {(expandedActivities[enrolledGig.gig._id] ? enrolledGig.gig.activities : enrolledGig.gig.activities.slice(0, 3)).map((activity) => (
                                 <span key={activity._id} className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded-lg text-[10px] font-medium text-cyan-700">
-                                  {activity.name}
+                                  {taxonomyEntityLabel(activity, enrolledGig.gig)}
                                 </span>
                               ))}
                               {enrolledGig.gig.activities.length > 3 && (
@@ -2878,7 +3049,7 @@ export function GigsMarketplace() {
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-full text-[10px] text-gray-600 transition-colors cursor-pointer"
                                 >
-                                  {expandedActivities[enrolledGig.gig._id] ? 'Less' : `+${enrolledGig.gig.activities.length - 3}`}
+                                  {expandedActivities[enrolledGig.gig._id] ? t('gigsMarketplace.less') : `+${enrolledGig.gig.activities.length - 3}`}
                                 </button>
                               )}
                             </div>
@@ -2926,13 +3097,13 @@ export function GigsMarketplace() {
                           <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
                             <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[7px] border-l-white border-b-[4px] border-b-transparent ml-0.5" />
                           </div>
-                          <span>START SESSION</span>
+                          <span>{t('gigsMarketplace.startSession')}</span>
                         </button>
                         <button
                           onClick={() => navigate(`/gig/${enrolledGig.gig._id}`)}
-                          className="flex-1 bg-slate-100 text-slate-600 py-2.5 px-4 rounded-xl hover:bg-slate-200 transition-all font-black text-[11px] uppercase tracking-wider flex items-center justify-center"
+                          className={`flex-1 ${DETAILS_BTN_CLASS}`}
                         >
-                          Details
+                          <DetailsBtnInner label={t('gigsMarketplace.detailsUpper')} />
                         </button>
                       </div>
                     </div>
@@ -2956,7 +3127,7 @@ export function GigsMarketplace() {
               onClick={() => setActiveTab('available')}
               className="mt-6 bg-slate-900 text-white py-2.5 px-6 rounded-xl hover:bg-slate-800 transition-all font-semibold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5"
             >
-              Browse Available Gigs
+              {t('gigsMarketplace.browseAvailable')}
             </button>
           </div>
         </div>
@@ -3002,25 +3173,10 @@ export function GigsMarketplace() {
         </div>
       )}
 
-      {!loading && !isProfilePublished && (
-        <OnboardingNextStepButton
-          title={
-            hasMarketplaceGigEngagement
-              ? (isFrMarket ? 'Publier mon profil' : 'Publish my profile')
-              : (isFrMarket ? 'Place de marché' : 'Marketplace')
-          }
-          hint={
-            hasMarketplaceGigEngagement
-              ? (isFrMarket ? 'Dernière étape pour devenir visible' : 'Final step to become visible')
-              : (isFrMarket ? 'Postulez à au moins un gig ci-dessous' : 'Apply to at least one gig below')
-          }
-          onClick={
-            hasMarketplaceGigEngagement
-              ? () => navigate('/profile')
-              : scrollToGigGrid
-          }
-        />
-      )}
+      <OnboardingSatisfactionModal
+        open={showSatisfaction}
+        onClose={() => setShowSatisfaction(false)}
+      />
     </div>
   );
 }
