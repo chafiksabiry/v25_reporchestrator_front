@@ -52,7 +52,7 @@ export function IframeWorkspace() {
         const base = String(
           import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
             import.meta.env.VITE_DASHBOARD_API ||
-            'https://v25dashboardbackend-development.up.railway.app/api'
+            'https://v25dashboardbackend-recette.up.railway.app/api'
         ).replace(/\/$/, '');
         const res = await fetch(`${base}/file-processing/visibility/${gigIdForVisibility}`, {
           headers: { Accept: 'application/json' },

@@ -454,7 +454,7 @@ export function SessionPlanning() {
             if (!selectedRepId) return;
 
             try {
-                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api';
+                const matchingApiUrl = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api';
                 const response = await axios.get(`${matchingApiUrl}/gig-agents/agent/${selectedRepId}`);
 
                 if (response.data) {
