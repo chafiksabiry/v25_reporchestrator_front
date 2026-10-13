@@ -7,6 +7,7 @@ import { useGigScript } from '../../hooks/useGigScript';
 import { useAgentProfile } from '../../hooks/useAgentProfile';
 import { getAgentName } from '../../utils';
 import { renderScript } from '../../utils/scriptVariables';
+import { useTranslation } from 'react-i18next';
 import { 
   Globe, 
   X, 
@@ -24,8 +25,19 @@ import {
   PhoneOff
 } from 'lucide-react';
 
+function stagesForUiLanguage(playbook: any, language: string | undefined) {
+  const lang = String(language || '').toLowerCase().startsWith('en') ? 'en' : 'fr';
+  const by = playbook?.stagesByLanguage;
+  const preferred = by?.[lang];
+  if (Array.isArray(preferred) && preferred.length > 0) return preferred;
+  const other = by?.[lang === 'en' ? 'fr' : 'en'];
+  if (Array.isArray(other) && other.length > 0) return other;
+  return Array.isArray(playbook?.stages) ? playbook.stages : [];
+}
+
 export function IframeWorkspace() {
   const { state, dispatch } = useAgent();
+  const { i18n } = useTranslation();
   const activeContact = state.callState?.contact;
   const location = useLocation();
 
@@ -156,7 +168,10 @@ export function IframeWorkspace() {
   const [activeReplicaIndex, setActiveReplicaIndex] = useState(0);
 
   // Support for interactive cockpit stages schema
-  const interactiveStages = activeScript?.playbook?.stages || [];
+  const interactiveStages = useMemo(
+    () => stagesForUiLanguage(activeScript?.playbook, i18n.language),
+    [activeScript, i18n.language]
+  );
   const hasInteractiveStages = Array.isArray(interactiveStages) && interactiveStages.length > 0;
 
   // Interactive UI States for objection options & checklist
@@ -210,7 +225,7 @@ export function IframeWorkspace() {
     if (scriptLoading) return false;
     if (!activeScript || scripts.length === 0) return false;
 
-    const stages = activeScript?.playbook?.stages;
+    const stages = interactiveStages;
     if (Array.isArray(stages) && stages.length > 0) {
       return stages.some(
         (stage: any) =>
@@ -226,7 +241,7 @@ export function IframeWorkspace() {
       Array.isArray(scriptItems) &&
       scriptItems.some((item: any) => Boolean(String(item?.replica || '').trim()))
     );
-  }, [scriptLoading, activeScript, scripts.length]);
+  }, [scriptLoading, activeScript, scripts.length, interactiveStages]);
 
   const shouldShowScriptPanel = showScript && hasScriptContent;
 
