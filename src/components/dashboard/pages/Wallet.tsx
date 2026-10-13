@@ -523,7 +523,7 @@ export function WalletPage() {
   };
 
   // Handle Step 1 Submit (Amount & Method Verification)
-  const handleStep1Submit = (e: React.FormEvent) => {
+  const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -539,28 +539,35 @@ export function WalletPage() {
       return;
     }
     setValidationError('');
-    setWithdrawStep(2); // Advance to 2FA stage
+    try {
+      await api.post('/escrow/agent/withdraw/request-code', { agentId });
+      setWithdrawStep(2); // Advance to 2FA stage — a real SMS code was just sent
+    } catch (err: any) {
+      setValidationError(err.response?.data?.error || "Impossible d'envoyer le code de vérification par SMS.");
+    }
   };
 
-  // Handle Step 2 Submit (2FA Check)
+  // Handle Step 2 Submit (2FA Check) — the code is verified server-side,
+  // against the one just texted to the REP's phone on file.
   const handleStep2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (verificationCode.trim() !== '1234') {
-      setValidationError('Code de vérification incorrect. Saisissez 1234 pour simuler la validation.');
+    if (!verificationCode.trim()) {
+      setValidationError('Veuillez saisir le code reçu par SMS.');
       return;
     }
     setValidationError('');
-    
+
     // Process withdrawal
     const parsedAmount = parseFloat(withdrawAmount);
-    
+
     try {
       const res = await api.post('/escrow/agent/withdraw', {
         agentId,
         amount: parsedAmount,
         method: selectedMethod,
         methodDetails: selectedMethod === 'bank' ? 'Bank Account (...4567)' : 'PayPal (john.doe@example.com)',
-        companyId: Cookies.get('companyId') || localStorage.getItem('companyId')
+        companyId: Cookies.get('companyId') || localStorage.getItem('companyId'),
+        code: verificationCode.trim()
       });
 
       if (res.data?.success) {
@@ -1675,13 +1682,13 @@ export function WalletPage() {
 
                 <div>
                   <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-2 text-center">
-                    Entrer le code à 4 chiffres
+                    Entrer le code à 6 chiffres reçu par SMS
                   </label>
                   <input
                     type="text"
                     required
-                    maxLength={4}
-                    placeholder="••••"
+                    maxLength={6}
+                    placeholder="••••••"
                     value={verificationCode}
                     onChange={(e) => {
                       setVerificationCode(e.target.value.replace(/\D/g, ''));
@@ -1689,8 +1696,8 @@ export function WalletPage() {
                     }}
                     className="block w-32 mx-auto text-center py-2.5 bg-slate-50 border border-slate-100 focus:border-harx-400 focus:bg-white focus:ring-2 focus:ring-harx-500/20 outline-none rounded-2xl text-lg font-black text-slate-800 tracking-[0.75em] transition-all"
                   />
-                  <p className="text-center text-[9px] text-harx-500 font-bold mt-2 uppercase tracking-wide">
-                    Code de démonstration : Saisissez <span className="underline font-black text-xs">1234</span>
+                  <p className="text-center text-[9px] text-slate-400 font-bold mt-2 uppercase tracking-wide">
+                    Un SMS vient de vous être envoyé — valable 5 minutes
                   </p>
                 </div>
 
