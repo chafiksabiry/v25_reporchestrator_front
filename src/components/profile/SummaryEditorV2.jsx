@@ -3255,6 +3255,22 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       </button>
         <button
           type="button"
+          onClick={() => {
+            if (autoSaveTimerRef.current) {
+              clearTimeout(autoSaveTimerRef.current);
+              autoSaveTimerRef.current = null;
+            }
+            if (persistSectionRef.current) {
+              void persistSectionRef.current(section, { keepEditing: true, silent: false });
+            }
+          }}
+          disabled={isSaving}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-harx-200 text-white bg-harx-600 hover:bg-harx-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {t('save')}
+        </button>
+        <button
+          type="button"
           onClick={() => cancelSection(section)}
           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
         >
