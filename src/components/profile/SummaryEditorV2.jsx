@@ -3121,7 +3121,22 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         savedProfile = { ...editedProfile, experience: experienceToSave };
         setEditedProfile(savedProfile);
       } else if (section === 'availability') {
-        await updateProfileData(editedProfile._id, { availability: editedProfile.availability });
+        // availability.timeZone holds the full Timezone document locally
+        // (zoneName, countryCode, gmtOffset, createdAt…) for display — the
+        // backend schema path is an ObjectId ref, so only its _id can be
+        // sent, never the whole object (Mongoose's ObjectId cast was
+        // picking up an unrelated Date field from it and failing with a
+        // CastError, turning every availability save into a 500).
+        const rawTimeZone = editedProfile.availability?.timeZone;
+        const timeZoneId =
+          rawTimeZone && typeof rawTimeZone === 'object' ? rawTimeZone._id : rawTimeZone;
+        await updateProfileData(editedProfile._id, {
+          availability: {
+            schedule: editedProfile.availability?.schedule || [],
+            timeZone: timeZoneId || null,
+            flexibility: editedProfile.availability?.flexibility || [],
+          },
+        });
       } else if (section === 'summary' || section === 'companies') {
         const profileDescription_i18n =
           section === 'summary'
