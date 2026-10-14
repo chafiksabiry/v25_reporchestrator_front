@@ -22,7 +22,7 @@ export type RepEscrowSocketOptions = {
 function getWsUrl(): string | null {
   const base =
     import.meta.env.VITE_COMPORCHESTRATOR_BACK_URL ||
-    'https://v25comporchestratorback-production.up.railway.app/api';
+    'https://v25comporchestratorback-recette.up.railway.app/api';
 
   try {
     const url = new URL(base);

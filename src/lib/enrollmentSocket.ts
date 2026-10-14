@@ -11,7 +11,7 @@ type EnrollmentMessage = {
 function getWsUrl(): string | null {
   const base =
     import.meta.env.VITE_MATCHING_API_URL ||
-    'https://v25matchingbackend-production.up.railway.app/api';
+    'https://v25matchingbackend-recette.up.railway.app/api';
 
   try {
     const url = new URL(base);
