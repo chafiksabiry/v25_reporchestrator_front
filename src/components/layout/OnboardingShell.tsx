@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
@@ -35,10 +35,16 @@ function OnboardingShellContent() {
 
   // Keep profile fresh after CV import / editor saves — a stale empty profile
   // used to bounce editor ↔ import in a loop.
+  //
+  // fetchProfileFromAPI() dispatches PROFILE_UPDATE_EVENT on every successful
+  // read. Reloading on that event would retrigger itself and flood GET /users/:id.
+  const isSelfTriggeredUpdate = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
+      isSelfTriggeredUpdate.current = true;
       try {
         const profileData = await fetchProfileFromAPI();
         if (cancelled) return;
@@ -64,12 +70,17 @@ function OnboardingShellContent() {
         }
       } catch {
         // ignore profile errors; shell still renders
+      } finally {
+        setTimeout(() => {
+          isSelfTriggeredUpdate.current = false;
+        }, 0);
       }
     };
 
     void load();
 
     const onProfileUpdated = () => {
+      if (isSelfTriggeredUpdate.current) return;
       void load();
     };
     window.addEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
