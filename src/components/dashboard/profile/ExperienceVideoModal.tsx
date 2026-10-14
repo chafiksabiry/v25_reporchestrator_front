@@ -590,6 +590,10 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
     fr: 'Accès caméra / micro refusé. Autorisez l’accès à la caméra puis réessayez.',
   },
   analysisFailedRetry: { en: 'Analysis failed. Please try again.', fr: 'L’analyse a échoué. Veuillez réessayer.' },
+  saveFailedRetry: {
+    en: 'The analysis succeeded but could not be saved to your profile. Please try again.',
+    fr: 'L’analyse a réussi mais n’a pas pu être enregistrée sur votre profil. Veuillez réessayer.',
+  },
   faceMatchChecking: { en: 'Verifying your identity…', fr: 'Vérification de votre identité…' },
   faceMatchOk: { en: 'Identity verified', fr: 'Identité vérifiée' },
   faceMatchMismatch: {
@@ -1034,6 +1038,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       if (data?.saved) {
         setSavedFlag(true);
         onAnalysisComplete?.(data);
+      } else {
+        setAnalyzeError(t('saveFailedRetry'));
       }
       if (data?.videoUrl) {
         showSavedVideo(data.videoUrl);

@@ -2654,6 +2654,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 return updated;
               });
 
+              // The video's own backend call may have already persisted it
+              // (data.saved), but nothing here guarantees that a later full
+              // profile save won't overwrite it with a stale `experience`
+              // array — force this section's own save as a safety net.
+              setHasUnsavedChanges(true);
+              setModifiedSections((prev) => ({ ...prev, experience: true }));
+              scheduleSectionAutoSave('experience');
+
               if (pendingLanguageSave) {
                 setHasUnsavedChanges(true);
                 setModifiedSections((prev) => ({ ...prev, personalInfo: true }));
