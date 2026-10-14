@@ -44,6 +44,7 @@ interface SidebarProps {
   setIsSidebarOpen: (isOpen: boolean) => void;
   isCollapsed: boolean;
   setIsCollapsed: (isCollapsed: boolean) => void;
+  userProfile?: any;
 }
 
 type TrainingSidebarSlide = { title: string; globalIndex: number; slideId: string };
@@ -87,7 +88,7 @@ const isProfilePublishedInStorage = (): boolean => {
   }
 };
 
-export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed }: SidebarProps) {
+export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed, userProfile }: SidebarProps) {
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -390,12 +391,18 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 <button
                   type="button"
                   onClick={() => {
-                    let profile: any = null;
-                    try {
-                      const raw = localStorage.getItem('profileData');
-                      if (raw) profile = JSON.parse(raw);
-                    } catch {
-                      /* ignore */
+                    // Prefer the live, parent-fetched profile over the
+                    // localStorage snapshot, which can be stale or absent
+                    // (e.g. cleared storage, a fresh tab) and would wrongly
+                    // send a rep who already has a profile back to step 1.
+                    let profile: any = userProfile || null;
+                    if (!profile) {
+                      try {
+                        const raw = localStorage.getItem('profileData');
+                        if (raw) profile = JSON.parse(raw);
+                      } catch {
+                        /* ignore */
+                      }
                     }
                     let path = getRepOnboardingStep(profile).path || '/profile-import';
                     // Already reviewing the profile → next step is subscription.
