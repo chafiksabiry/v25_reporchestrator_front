@@ -156,6 +156,7 @@ function OnboardingShellContent() {
     <div className="flex h-screen bg-[#E6188D] overflow-hidden">
       <Sidebar
         phases={userProfile?.onboardingProgress?.phases}
+        userProfile={userProfile}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
         isCollapsed={false}

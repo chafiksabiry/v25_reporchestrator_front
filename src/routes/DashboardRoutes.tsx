@@ -198,6 +198,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
         <>
           <Sidebar
             phases={userProfile?.onboardingProgress?.phases}
+            userProfile={userProfile}
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
             isCollapsed={false}
