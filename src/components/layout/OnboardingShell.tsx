@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
@@ -35,10 +35,22 @@ function OnboardingShellContent() {
 
   // Keep profile fresh after CV import / editor saves — a stale empty profile
   // used to bounce editor ↔ import in a loop.
+  //
+  // fetchProfileFromAPI() unconditionally dispatches PROFILE_UPDATE_EVENT on
+  // every successful read, not just on an actual change — so a naive
+  // "reload on PROFILE_UPDATE_EVENT" listener here re-triggers its own
+  // event on every load, flooding the auth backend (GET /users/:id, fired by
+  // TopBar's own listener on the same event) and exhausting its global
+  // rate limit within seconds. isSelfTriggeredUpdate suppresses the event
+  // this effect's own load() causes, while still reacting to a genuine
+  // PROFILE_UPDATE_EVENT dispatched elsewhere (e.g. a real save).
+  const isSelfTriggeredUpdate = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
+      isSelfTriggeredUpdate.current = true;
       try {
         const profileData = await fetchProfileFromAPI();
         if (cancelled) return;
@@ -64,12 +76,19 @@ function OnboardingShellContent() {
         }
       } catch {
         // ignore profile errors; shell still renders
+      } finally {
+        // Deferred: fetchProfileFromAPI's own PROFILE_UPDATE_EVENT dispatch
+        // (synchronous, inside the await above) must still see this as true.
+        setTimeout(() => {
+          isSelfTriggeredUpdate.current = false;
+        }, 0);
       }
     };
 
     void load();
 
     const onProfileUpdated = () => {
+      if (isSelfTriggeredUpdate.current) return;
       void load();
     };
     window.addEventListener(PROFILE_UPDATE_EVENT, onProfileUpdated);
