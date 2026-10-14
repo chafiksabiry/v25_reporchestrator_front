@@ -3261,7 +3261,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               autoSaveTimerRef.current = null;
             }
             if (persistSectionRef.current) {
-              void persistSectionRef.current(section, { keepEditing: true, silent: false });
+              void persistSectionRef.current(section, { keepEditing: false, silent: false });
             }
           }}
           disabled={isSaving}
