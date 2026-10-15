@@ -93,7 +93,7 @@ export function useRealTimeFeatures() {
       dispatch({ type: 'ADD_TRANSCRIPT_ENTRY', entry });
 
       // Trigger AI analysis on simulated transcripts to match real call behavior
-      processAiAnalysis(sample.text, dispatch);
+      processAiAnalysis(sample.text, dispatch, [], state.callState.sid);
 
       index++;
     }, 3000);
