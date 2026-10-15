@@ -34,11 +34,11 @@ export const TranscriptionBridge: React.FC = () => {
                 });
 
                 // Trigger AI analysis on final transcripts
-                processAiAnalysis(message.text, dispatch, transcriptsRef.current);
+                processAiAnalysis(message.text, dispatch, transcriptsRef.current, state.callState.sid);
             } else if (message.type === 'interim' && message.text.trim().length > 40) {
                 // Also trigger analysis on long interims to be more proactive
                 // We don't dispatch it as an entry yet, but we run the analysis
-                processAiAnalysis(message.text, dispatch, transcriptsRef.current);
+                processAiAnalysis(message.text, dispatch, transcriptsRef.current, state.callState.sid);
             }
 
             // Handle AI Analysis (Phase changes, metrics, etc)

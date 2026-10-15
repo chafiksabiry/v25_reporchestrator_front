@@ -5,7 +5,7 @@ export interface AIRecommendationResponse {
     suggestion: string;
 }
 
-export const getAIAssistance = async (transcription: string, context?: any[]) => {
+export const getAIAssistance = async (transcription: string, context?: any[], callSid?: string) => {
     try {
         const response = await fetch(`${API_BASE_URL}/calls/ai-assist`, {
             method: 'POST',
@@ -14,7 +14,10 @@ export const getAIAssistance = async (transcription: string, context?: any[]) =>
             },
             body: JSON.stringify({
                 transcription,
-                context
+                context,
+                // Lets the backend look up the call's company/gig and ground
+                // the suggestion in that knowledge base (see calls.js getAIAssistance).
+                callSid
             }),
         });
 
