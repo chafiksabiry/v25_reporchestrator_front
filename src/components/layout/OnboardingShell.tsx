@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { RepTrainingNavProvider } from '../../contexts/RepTrainingNavContext';
 import { NotificationsProvider } from '../../contexts/NotificationsContext';
@@ -17,6 +19,16 @@ import {
 } from '../../utils/repOnboardingNextStep';
 import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
 import { usePageTitle } from '../../lib/tracking/usePageTitle';
+import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../onboarding/RepOnboardingHelpModal';
+
+/** Maps the current onboarding route to the matching on-demand help content. */
+function guideKeyForPath(pathname: string): RepOnboardingGuideKey | null {
+  if (pathname.includes('profile-import')) return 'profile-import';
+  if (pathname.includes('profile-editor')) return 'profile-editor';
+  if (pathname.includes('subscription')) return 'subscription';
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) return 'profile';
+  return null;
+}
 
 /**
  * Shared shell for onboarding pages. On reconnect, always resume the current
@@ -27,6 +39,9 @@ function OnboardingShellContent() {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const { t } = useTranslation();
+  const guideKey = useMemo(() => guideKeyForPath(location.pathname), [location.pathname]);
 
   usePageTitle(
     buildRepPageTitle(resolveRepTabTitle(location.pathname, location.search)),
@@ -187,6 +202,25 @@ function OnboardingShellContent() {
           </div>
         </main>
       </div>
+
+      {/* Persistent, discoverable help — always available on demand, mirrors
+          the company onboarding's "?" button rather than a one-shot popup. */}
+      {guideKey && (
+        <button
+          type="button"
+          onClick={() => setIsHelpOpen(true)}
+          aria-label={t('repOnboardingGuide.open', 'Aide')}
+          title={t('repOnboardingGuide.open', 'Aide')}
+          className="fixed bottom-5 left-5 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-gradient-harx text-white shadow-lg shadow-black/20 transition-all hover:scale-105 hover:shadow-xl active:scale-95"
+        >
+          <HelpCircle className="h-5 w-5" />
+        </button>
+      )}
+      <RepOnboardingHelpModal
+        open={isHelpOpen}
+        guideKey={guideKey}
+        onClose={() => setIsHelpOpen(false)}
+      />
     </div>
   );
 }
