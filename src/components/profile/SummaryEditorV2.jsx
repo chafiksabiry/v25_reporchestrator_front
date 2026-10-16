@@ -365,17 +365,6 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
         <button
           onClick={() => {
-            console.log('🔥 Cancel button clicked');
-            // Handle cancel logic here
-          }}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-          type="button"
-        >
-          {t('cancel')}
-        </button>
-        <button
-          onClick={() => {
-            console.log('🔥 Save button clicked');
             handleSubmit();
           }}
           className="px-4 py-2 text-sm font-medium text-white bg-harx-600 rounded-lg hover:bg-harx-700 transition-colors duration-200"
@@ -3195,7 +3184,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   persistSectionRef.current = saveSection;
 
-  // Reusable Edit / Undo / Cancel controls for a section header (autosave — no Save button).
+  // Edit / Undo / optional Save. Saving on click is not required; autosave still keeps the draft.
   const renderSectionControls = (section) => {
     const canUndo = (sectionUndoStacks[section] || []).length > 0;
     const showStatus = autoSaveSection === section && autoSaveStatus !== 'idle';
@@ -3233,24 +3222,25 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 : t('autoSaving')}
           </span>
         )}
-      <button
+        <button
           type="button"
           onClick={() => undoSection(section)}
           disabled={!canUndo}
           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
           title={t('undo')}
-      >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4" />
-        </svg>
+          </svg>
           {t('undo')}
-      </button>
+        </button>
         <button
           type="button"
-          onClick={() => cancelSection(section)}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          onClick={() => saveSection(section)}
+          disabled={isSaving}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-harx-600 hover:bg-harx-700 disabled:opacity-50 transition-colors"
         >
-          {t('cancel')}
+          {isSaving ? t('saving') : t('save')}
         </button>
       </div>
     );
