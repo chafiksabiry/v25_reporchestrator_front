@@ -21,6 +21,37 @@ import { setProfileData, getProfileData } from '../../utils/authUtils';
 // Flip back to true to restore them.
 const SHOW_PROFILE_DETAILS = false;
 
+function regionDisplayNames(lang) {
+  try {
+    return new Intl.DisplayNames([lang], { type: 'region' });
+  } catch {
+    return null;
+  }
+}
+
+const countryDisplayNames = {
+  fr: regionDisplayNames('fr'),
+  en: regionDisplayNames('en'),
+};
+
+function regionName(code, lang, fallback) {
+  const iso = String(code || '').trim().toUpperCase();
+  if (!iso) return fallback || '';
+  try {
+    const name = countryDisplayNames[lang]?.of(iso);
+    if (name && name.toUpperCase() !== iso) return name;
+  } catch {
+    /* unknown region code */
+  }
+  return fallback || iso;
+}
+
+function countryNamePair(code, fallback, stored) {
+  const en = stored?.countryNameEn || regionName(code, 'en', stored?.countryName || fallback);
+  const fr = stored?.countryNameFr || regionName(code, 'fr', en);
+  return { en, fr };
+}
+
 // Add CSS styles for error highlighting
 const styles = `
   @keyframes highlightError {
@@ -892,11 +923,30 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     };
   }, []);
 
-  // Filter countries based on search
-  const filteredCountries = countries.filter(country =>
-    country.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
-    country.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
-  );
+  const formatCountry = (country) => {
+    const code = typeof country === 'object' ? country?.countryCode : country;
+    const fallback = typeof country === 'object' ? country?.countryName : '';
+    const { en, fr } = countryNamePair(code, fallback, typeof country === 'object' ? country : null);
+    const primary = uiLang === 'fr' ? fr : en;
+    const secondary = uiLang === 'fr' ? en : fr;
+    const both = primary === secondary ? primary : `${primary} · ${secondary}`;
+    return { primary, secondary, both };
+  };
+
+  // Filter countries in French and English, then sort in the active language.
+  const countryQuery = countrySearch.trim().toLowerCase();
+  const filteredCountries = countries
+    .filter((country) => {
+      if (!countryQuery) return true;
+      const { en, fr } = countryNamePair(country.countryCode, country.countryName, country);
+      return (
+        en.toLowerCase().includes(countryQuery) ||
+        fr.toLowerCase().includes(countryQuery) ||
+        String(country.countryName || '').toLowerCase().includes(countryQuery) ||
+        String(country.countryCode || '').toLowerCase().includes(countryQuery)
+      );
+    })
+    .sort((a, b) => formatCountry(a).primary.localeCompare(formatCountry(b).primary, uiLang));
 
   // Handle country selection
   const handleCountrySelect = (country) => {
@@ -1056,9 +1106,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     const firstLoginCountryCode = firstLoginLocation.countryCode;
 
     if (currentCountryCode !== firstLoginCountryCode) {
-      const currentCountryName = typeof currentCountry === 'object'
-        ? currentCountry.countryName
-        : countries.find(c => c.countryCode === currentCountryCode)?.countryName || currentCountryCode;
+      const currentCountryName = formatCountry(
+        typeof currentCountry === 'object'
+          ? currentCountry
+          : countries.find(c => c.countryCode === currentCountryCode) || { countryCode: currentCountryCode }
+      ).both;
 
       return {
         profileCountry: {
@@ -1067,7 +1119,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
         },
         firstLoginCountry: {
           code: firstLoginCountryCode,
-          name: firstLoginLocation.countryName,
+          name: formatCountry({
+            countryCode: firstLoginCountryCode,
+            countryName: firstLoginLocation.countryName,
+          }).both,
           city: firstLoginLocation.city,
           region: firstLoginLocation.region
         }
@@ -3252,7 +3307,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   const countryDisplay =
     typeof editedProfile.personalInfo.country === 'object'
-      ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
+      ? `${formatCountry(editedProfile.personalInfo.country).both} (${editedProfile.personalInfo.country?.countryCode || ''})`
       : editedProfile.personalInfo.country || '—';
 
   // Continuing is only allowed once EVERY experience has a recorded/analyzed
@@ -3712,7 +3767,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                     <input
                       type="text"
                       value={isSearching ? countrySearch : (typeof editedProfile.personalInfo.country === 'object'
-                        ? `${editedProfile.personalInfo.country?.countryName} (${editedProfile.personalInfo.country?.countryCode})`
+                        ? `${formatCountry(editedProfile.personalInfo.country).both} (${editedProfile.personalInfo.country?.countryCode})`
                         : editedProfile.personalInfo.country || '')}
                       onChange={handleCountryInputChange}
                       onFocus={handleCountryInputFocus}
@@ -3750,16 +3805,24 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                           </button>
                         )}
                         {filteredCountries.length > 0 ? (
-                          filteredCountries.slice(0, 10).map((country) => (
+                          filteredCountries.map((country) => {
+                            const names = formatCountry(country);
+                            return (
                             <button
-                              key={country._id}
+                              key={country._id || country.countryCode}
                               onClick={() => handleCountrySelect(country)}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-harx-50 flex items-center justify-between border-b border-gray-100 last:border-b-0"
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-harx-50 flex items-center justify-between gap-3 border-b border-gray-100 last:border-b-0"
                             >
-                              <span className="font-medium">{country.countryName}</span>
-                              <span className="text-gray-500 text-xs">{country.countryCode}</span>
+                              <span className="min-w-0">
+                                <span className="font-medium">{names.primary}</span>
+                                {names.secondary !== names.primary && (
+                                  <span className="ml-2 text-xs font-normal text-gray-400">{names.secondary}</span>
+                                )}
+                              </span>
+                              <span className="text-gray-500 text-xs shrink-0">{country.countryCode}</span>
                             </button>
-                          ))
+                            );
+                          })
                         ) : countrySearch ? (
                           <div className="px-4 py-2 text-sm text-gray-500">{t('noCountriesMatch', { search: countrySearch })}</div>
                         ) : (
