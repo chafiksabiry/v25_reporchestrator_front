@@ -359,9 +359,12 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
 
       {/* Sidebar body */}
       <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
-      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
+      <nav className={showOrchestratorOnly && !isCollapsed
+        ? 'flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-4'
+        : 'min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto px-3 py-4'}>
         {/* ── Mascotte + onboarding CTA while incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
+          <div className="flex flex-1 flex-col justify-center">
           <div className="relative p-2">
             <div className="relative flex flex-col items-center text-center">
               <img
@@ -409,6 +412,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 </button>
               </div>
             </div>
+          </div>
           </div>
         )}
 
