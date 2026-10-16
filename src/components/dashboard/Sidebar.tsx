@@ -363,19 +363,14 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-5">
         {/* ── Mascotte + onboarding CTA while incomplete ── */}
         {showOrchestratorOnly && !isCollapsed && (
-          <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/15 via-rose-500/15 to-fuchsia-600/10 p-4 shadow-[0_12px_40px_-18px_rgba(255,77,77,0.55)]">
-            <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-rose-400/40 blur-2xl" />
-            <div className="pointer-events-none absolute -bottom-10 -right-6 h-20 w-20 rounded-full bg-fuchsia-500/30 blur-2xl" />
+          <div className="relative p-2">
             <div className="relative flex flex-col items-center text-center">
-              <div className="relative mb-3">
-                <div className="absolute inset-0 scale-110 rounded-full bg-gradient-to-br from-rose-400/50 to-fuchsia-500/40 blur-md" />
-                <img
-                  src={mascotte}
-                  alt=""
-                  aria-hidden="true"
-                  className="relative w-[5.5rem] h-auto drop-shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
-                />
-              </div>
+              <img
+                src={mascotte}
+                alt=""
+                aria-hidden="true"
+                className="mb-3 w-[5.5rem] h-auto"
+              />
               <div className="w-full rounded-2xl bg-[#E11D48] p-3.5 text-left shadow-inner">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-400/15">
