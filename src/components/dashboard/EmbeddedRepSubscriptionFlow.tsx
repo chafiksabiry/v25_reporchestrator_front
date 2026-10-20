@@ -61,16 +61,6 @@ function isPaidPlan(plan: ApiPlan): boolean {
   return plan.price > 0;
 }
 
-const CAMPAIGN_CODE_KEY = 'harx_campaign_code';
-
-function readStoredCampaignCode(): string {
-  try {
-    return localStorage.getItem(CAMPAIGN_CODE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
 export function EmbeddedRepSubscriptionFlow({
   agentId,
   customerEmail,
@@ -87,7 +77,6 @@ export function EmbeddedRepSubscriptionFlow({
     import.meta.env.VITE_STRIPE_REP_PUBLISHABLE_KEY || FALLBACK_PUBLIC_KEY
   );
   const [activePlanId, setActivePlanId] = useState(currentPlanId || '');
-  const [campaignCode, setCampaignCode] = useState(readStoredCampaignCode);
 
   const [selectedPlan, setSelectedPlan] = useState<ApiPlan | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -217,7 +206,6 @@ export function EmbeddedRepSubscriptionFlow({
           planId: plan._id,
           customerEmail: customerEmail?.trim() || undefined,
           locale: uiLang,
-          campaignCode: campaignCode.trim() || undefined,
         });
 
         if (!data?.clientSecret) {
@@ -228,16 +216,11 @@ export function EmbeddedRepSubscriptionFlow({
         setSessionId(data.sessionId);
       } catch (err: unknown) {
         const axiosErr = err as {
-          response?: { data?: { message?: string; error?: string; code?: string } };
+          response?: { data?: { message?: string; error?: string } };
           message?: string;
         };
-        const apiCode = axiosErr?.response?.data?.code;
         const message =
-          apiCode === 'INVALID_PROMO_CODE'
-            ? t('subscriptionFlow.promoInvalid')
-            : apiCode === 'PROMO_CODE_EXPIRED'
-              ? t('subscriptionFlow.promoExpired')
-              : axiosErr?.response?.data?.message ||
+          axiosErr?.response?.data?.message ||
           axiosErr?.response?.data?.error ||
           (err instanceof Error ? err.message : 'Impossible d’initialiser le paiement');
         setInitError(message);
@@ -245,7 +228,7 @@ export function EmbeddedRepSubscriptionFlow({
         setInitLoading(false);
       }
     },
-    [agentId, customerEmail, uiLang, campaignCode, t]
+    [agentId, customerEmail, uiLang]
   );
 
   const handlePlanAction = useCallback(
@@ -328,31 +311,6 @@ export function EmbeddedRepSubscriptionFlow({
           <p className="text-sm font-bold">{initError}</p>
         </div>
       )}
-
-      <div className="mb-5 max-w-md">
-        <label htmlFor="campaign-code" className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-600">
-          {t('subscriptionFlow.promoLabel')}
-        </label>
-        <input
-          id="campaign-code"
-          type="text"
-          value={campaignCode}
-          onChange={(e) => {
-            const value = e.target.value.toUpperCase();
-            setCampaignCode(value);
-            try {
-              localStorage.setItem(CAMPAIGN_CODE_KEY, value.trim());
-            } catch {
-              /* storage unavailable */
-            }
-          }}
-          autoComplete="off"
-          spellCheck={false}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold tracking-widest text-slate-900 outline-none focus:border-harx-500"
-          placeholder={t('subscriptionFlow.promoPlaceholder')}
-        />
-        <p className="mt-1 text-[11px] font-medium text-slate-500">{t('subscriptionFlow.promoHint')}</p>
-      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
