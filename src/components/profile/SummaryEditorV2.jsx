@@ -3255,13 +3255,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
       : editedProfile.personalInfo.country || '—';
 
-  // Continuing is only allowed once EVERY experience has a recorded/analyzed
-  // video. Until then we hide the "Confirm to continue" buttons and show a loud
-  // warning prompting the user to record the missing videos.
+  // Continuing is only allowed once AT LEAST ONE experience has a recorded/analyzed
+  // video. Until then we lock the "Confirm to continue" buttons and show a loud
+  // warning prompting the user to record a video.
   const experienceList = Array.isArray(editedProfile.experience) ? editedProfile.experience : [];
   const experiencesWithVideo = experienceList.filter((exp) => exp && (exp.videoUrl || exp.videoAnalysis)).length;
-  const allExperiencesHaveVideo =
-    experienceList.length > 0 && experiencesWithVideo === experienceList.length;
+  const hasExperienceVideo = experiencesWithVideo >= 1;
   const missingVideosCount = experienceList.length - experiencesWithVideo;
   const hasProfilePhoto = Boolean(editedProfile?.personalInfo?.photo?.url);
 
@@ -3275,12 +3274,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     return hasSchedule;
   })();
 
-  // The "Continue" button stays visible but locked until every experience has a
+  // The "Continue" button stays visible but locked until at least one experience has a
   // video, a profile photo is set, and availability (schedule) has been filled in.
-  const canContinue = allExperiencesHaveVideo && hasProfilePhoto && hasAvailabilitySet;
+  const canContinue = hasExperienceVideo && hasProfilePhoto && hasAvailabilitySet;
   const continueBlockedReason = !hasProfilePhoto
     ? t('warnBottomPhoto')
-    : !allExperiencesHaveVideo
+    : !hasExperienceVideo
     ? t('warnBottom')
     : !hasAvailabilitySet
     ? t('warnBottomAvail')
@@ -3449,8 +3448,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             onChange={handlePhotoSelect}
           />
 
-          {/* Loud warning: record a video for every experience before continuing */}
-          {!allExperiencesHaveVideo && (
+          {/* Loud warning: record a video for at least one experience before continuing */}
+          {!hasExperienceVideo && (
             <div className="mb-8 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 p-5 shadow-lg shadow-red-200/50 animate-pulse">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
