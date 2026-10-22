@@ -80,6 +80,7 @@
         "subtitle": "Your leads are waiting — every call can pay",
         "cta": "Start earning"
       },
+      "noReminders": "No reminders for now",
       "defaultUser": "User",
       "periods": {
         "today": "Today",

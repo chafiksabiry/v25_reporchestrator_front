@@ -1376,7 +1376,7 @@ export function Dashboard({ profile }: DashboardProps) {
             className="harx-go-live group inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 sm:w-auto sm:self-start xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
           >
             <Rocket size={13} className="transition-transform group-hover:rotate-12 xl:h-4 xl:w-4 2xl:h-[18px] 2xl:w-[18px]" />
-            {t('dashboard.home.goLive.title')}
+            {t('dashboard.home.goLive.cta')}
             <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5 xl:h-4 xl:w-4" />
           </button>
         </div>
@@ -1579,7 +1579,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
             <PhoneCall size={14} className="shrink-0 text-amber-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
             <h3 className="shrink-0 text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">Rappels</h3>
-            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">Aucun rappel pour le moment</p>
+            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">{t('dashboard.home.noReminders')}</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <button
