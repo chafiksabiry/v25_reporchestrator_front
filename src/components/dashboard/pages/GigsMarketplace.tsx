@@ -9,7 +9,6 @@ import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
-import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import { useNotifications } from '../../../contexts/NotificationsContext';
@@ -625,8 +624,6 @@ export function GigsMarketplace() {
       return false;
     }
   });
-  const [showSatisfaction, setShowSatisfaction] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -640,19 +637,6 @@ export function GigsMarketplace() {
         if (!published) {
           navigate('/subscription', { replace: true });
           return;
-        }
-        const serverDone = Boolean(profile?.onboardingSatisfaction?.done);
-        try {
-          const localDone = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
-          if (!serverDone && !localDone) setShowSatisfaction(true);
-          if (serverDone && !localDone) {
-            localStorage.setItem(
-              ONBOARDING_SATISFACTION_KEY,
-              JSON.stringify({ done: true, at: new Date().toISOString(), synced: true })
-            );
-          }
-        } catch {
-          if (!serverDone) setShowSatisfaction(true);
         }
       } catch {
         // keep the cached value on failure
@@ -3172,11 +3156,6 @@ export function GigsMarketplace() {
           </button>
         </div>
       )}
-
-      <OnboardingSatisfactionModal
-        open={showSatisfaction}
-        onClose={() => setShowSatisfaction(false)}
-      />
     </div>
   );
 }
