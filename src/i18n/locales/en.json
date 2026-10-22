@@ -18,7 +18,8 @@
     "interactiveStep": "Interactive Step",
     "sectionMain": "Main",
     "sectionTraining": "HARX Academy",
-    "sectionPlanning": "Planning"
+    "sectionPlanning": "Planning",
+    "noSlides": "No slides"
   },
   "onboardingGuide": {
     "title": "Finish your onboarding",

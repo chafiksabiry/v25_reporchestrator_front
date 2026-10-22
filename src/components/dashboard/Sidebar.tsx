@@ -500,7 +500,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                 />
                                 {slideList.length === 0 ? (
                                   <div className={`${slideRow(false)} opacity-70`}>
-                                    <p className={slideTitle(false)}>No slides</p>
+                                    <p className={slideTitle(false)}>{t('sidebar.noSlides')}</p>
                                   </div>
                                 ) : (
                                   slideList.map((slide, slideIdx) => {
@@ -732,7 +732,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                   <div className="pointer-events-none absolute left-0 top-1 bottom-1 w-px bg-gradient-to-b from-harx-500/35 via-white/12 to-transparent" aria-hidden />
                                   {slideList.length === 0 ? (
                                     <div className="flex w-full items-start gap-2 rounded-md py-1.5 pl-2.5 pr-2 opacity-70">
-                                      <p className="text-[9.5px] text-gray-500">No slides</p>
+                                      <p className="text-[9.5px] text-gray-500">{t('sidebar.noSlides')}</p>
                                     </div>
                                   ) : (
                                     slideList.map((slide, slideIdx) => {
