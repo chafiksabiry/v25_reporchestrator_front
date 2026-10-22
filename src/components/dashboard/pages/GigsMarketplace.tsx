@@ -1991,7 +1991,7 @@ export function GigsMarketplace() {
             </p>
             <p className="text-xs font-medium text-yellow-700 mt-0.5">
               {isFrMarket
-                ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+                ? 'Choisissez un gig ci-dessous et cliquez sur « Postuler ». Postuler suffit — l’enrôlement complet viendra après validation.'
                 : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
             </p>
           </div>
