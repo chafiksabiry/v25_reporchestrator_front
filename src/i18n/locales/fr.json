@@ -481,8 +481,39 @@
     "tzGig": "Destination"
   },
   "operations": {
-    "title": "Panneau des Opérations",
-    "emergencyShutdown": "Arrêt d'urgence"
+    "title": "Opérations",
+    "subtitle": "Vue d'ensemble de votre activité : solde, appels, gigs et prochaines sessions.",
+    "availableBalance": "Solde disponible",
+    "callsThisWeek": "Appels cette semaine",
+    "activeGigs": "Gigs actifs",
+    "nextSession": "Prochaine session",
+    "noneScheduled": "Aucune programmée",
+    "quickActions": "Actions rapides",
+    "go": "Accéder",
+    "planSession": "Planifier une session",
+    "planSessionDesc": "Réserver un créneau d'appel",
+    "goToCockpit": "Aller au Cockpit",
+    "goToCockpitDesc": "Reprendre vos appels en cours",
+    "viewWallet": "Voir mon portefeuille",
+    "viewWalletDesc": "Suivre vos gains et paiements",
+    "resumeTraining": "Reprendre la formation",
+    "resumeTrainingDesc": "Continuer vos modules HARX Academy",
+    "activitySummary": "Résumé d'activité",
+    "totalCalls": "Total d'appels enregistrés",
+    "successfulCalls": "Appels réussis",
+    "upcomingSessions": "Sessions à venir"
+  },
+  "certification": {
+    "close": "Fermer",
+    "obtained": "Certification Obtenue",
+    "congratulations": "Félicitations,",
+    "completedIntro": "Vous avez complété avec succès tous les modules et évaluations de la formation :",
+    "date": "Date",
+    "status": "Statut",
+    "validated": "Validé",
+    "level": "Niveau",
+    "expert": "Expert",
+    "certifiedBy": "Certifié par"
   },
   "companyProfile": {
     "back": "Retour",

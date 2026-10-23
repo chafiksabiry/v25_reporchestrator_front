@@ -481,8 +481,39 @@
     "tzGig": "Destination"
   },
   "operations": {
-    "title": "Operations Panel",
-    "emergencyShutdown": "Emergency Shutdown"
+    "title": "Operations",
+    "subtitle": "An overview of your activity: balance, calls, gigs and upcoming sessions.",
+    "availableBalance": "Available balance",
+    "callsThisWeek": "Calls this week",
+    "activeGigs": "Active gigs",
+    "nextSession": "Next session",
+    "noneScheduled": "None scheduled",
+    "quickActions": "Quick actions",
+    "go": "Go",
+    "planSession": "Plan a session",
+    "planSessionDesc": "Book a call slot",
+    "goToCockpit": "Go to Cockpit",
+    "goToCockpitDesc": "Resume your ongoing calls",
+    "viewWallet": "View my wallet",
+    "viewWalletDesc": "Track your earnings and payouts",
+    "resumeTraining": "Resume training",
+    "resumeTrainingDesc": "Continue your HARX Academy modules",
+    "activitySummary": "Activity summary",
+    "totalCalls": "Total calls logged",
+    "successfulCalls": "Successful calls",
+    "upcomingSessions": "Upcoming sessions"
+  },
+  "certification": {
+    "close": "Close",
+    "obtained": "Certification Obtained",
+    "congratulations": "Congratulations,",
+    "completedIntro": "You have successfully completed all modules and assessments of the training:",
+    "date": "Date",
+    "status": "Status",
+    "validated": "Validated",
+    "level": "Level",
+    "expert": "Expert",
+    "certifiedBy": "Certified by"
   },
   "companyProfile": {
     "back": "Back",

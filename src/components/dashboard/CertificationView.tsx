@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Award, CheckCircle, Calendar, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-pink.png';
 
 interface CertificationViewProps {
@@ -36,6 +37,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
   certificateId,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const [showContent, setShowContent] = useState(false);
 
   const certId = useMemo(
@@ -121,7 +123,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
           <div className="absolute top-6 right-6 flex items-center gap-2">
             <button
               onClick={onClose}
-              title="Fermer"
+              title={t('certification.close')}
               className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
@@ -138,15 +140,15 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
 
           {/* Achievement Text */}
           <div className="space-y-2 mb-5">
-            <h2 className="text-harx-400 font-bold tracking-widest uppercase text-xs">Certification Obtenue</h2>
+            <h2 className="text-harx-400 font-bold tracking-widest uppercase text-xs">{t('certification.obtained')}</h2>
             <h1 className="text-2xl md:text-4xl font-black text-white leading-tight">
-              Félicitations,{' '}
+              {t('certification.congratulations')}{' '}
               <span className="cert-shimmer text-transparent bg-clip-text bg-gradient-to-r from-harx-300 via-harx-alt-400 to-harx-alt-500">
                 {traineeName}
               </span>
             </h1>
             <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-              Vous avez complété avec succès tous les modules et évaluations de la formation :
+              {t('certification.completedIntro')}
             </p>
             <div className="inline-block px-5 py-2.5 rounded-2xl bg-harx-500/10 border border-harx-alt-400/20 text-base md:text-lg font-bold text-white shadow-xl backdrop-blur-sm">
               {trainingTitle}
@@ -157,18 +159,18 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
           <div className="grid grid-cols-3 gap-3 mb-6 max-w-2xl mx-auto">
             <div className="p-4 rounded-2xl bg-white/5 border border-harx-alt-400/10 flex flex-col items-center gap-1 hover:bg-harx-500/[0.07] hover:border-harx-alt-400/25 transition-colors">
               <Calendar className="w-5 h-5 text-harx-300" />
-              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">Date</span>
+              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('certification.date')}</span>
               <span className="text-white font-semibold text-sm">{completionDate}</span>
             </div>
             <div className="p-4 rounded-2xl bg-white/5 border border-harx-alt-400/10 flex flex-col items-center gap-1 hover:bg-harx-500/[0.07] hover:border-harx-alt-400/25 transition-colors">
               <CheckCircle className="w-5 h-5 text-harx-alt-400" />
-              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">Statut</span>
-              <span className="text-white font-semibold text-sm">Validé</span>
+              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('certification.status')}</span>
+              <span className="text-white font-semibold text-sm">{t('certification.validated')}</span>
             </div>
             <div className="p-4 rounded-2xl bg-white/5 border border-harx-alt-400/10 flex flex-col items-center gap-1 hover:bg-harx-500/[0.07] hover:border-harx-alt-400/25 transition-colors">
               <Award className="w-5 h-5 text-harx-400" />
-              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">Niveau</span>
-              <span className="text-white font-semibold text-sm">Expert</span>
+              <span className="text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('certification.level')}</span>
+              <span className="text-white font-semibold text-sm">{t('certification.expert')}</span>
             </div>
           </div>
 
@@ -177,7 +179,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
         {/* Footer */}
         <div className="bg-white/5 border-t border-white/10 p-4 text-center">
           <p className="text-slate-500 text-xs">
-            Certifié par <span className="text-harx-alt-300 font-bold">HARX Academy</span> • ID: {certId}
+            {t('certification.certifiedBy')} <span className="text-harx-alt-300 font-bold">HARX Academy</span> • ID: {certId}
           </p>
         </div>
       </div>
