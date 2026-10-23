@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, User, Loader2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useGigScript } from '../../copilot/hooks/useGigScript';
+import { useTranslation } from 'react-i18next';
 
 type ReplicaPair = { agent?: { replica?: string }; lead?: { replica?: string } };
 
@@ -39,6 +40,16 @@ function themeClasses(theme: ScriptReaderTheme) {
   };
 }
 
+function stagesForUiLanguage(playbook: any, language: string | undefined) {
+  const lang = String(language || '').toLowerCase().startsWith('en') ? 'en' : 'fr';
+  const by = playbook?.stagesByLanguage;
+  const preferred = by?.[lang];
+  if (Array.isArray(preferred) && preferred.length > 0) return preferred;
+  const other = by?.[lang === 'en' ? 'fr' : 'en'];
+  if (Array.isArray(other) && other.length > 0) return other;
+  return Array.isArray(playbook?.stages) ? playbook.stages : [];
+}
+
 export function ScriptCockpitPanel({
   gigId,
   gigTitle,
@@ -47,13 +58,17 @@ export function ScriptCockpitPanel({
   onFinish,
 }: ScriptCockpitPanelProps) {
   const t = themeClasses(theme);
+  const { i18n } = useTranslation();
   const { activeScript, loading: scriptLoading } = useGigScript(gigId);
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
   const [activeReplicaIndex, setActiveReplicaIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const interactiveStages = activeScript?.playbook?.stages || [];
+  const interactiveStages = useMemo(
+    () => stagesForUiLanguage(activeScript?.playbook, i18n.language),
+    [activeScript, i18n.language]
+  );
   const hasInteractiveStages = Array.isArray(interactiveStages) && interactiveStages.length > 0;
 
   const scriptByPhase = useMemo(() => {
