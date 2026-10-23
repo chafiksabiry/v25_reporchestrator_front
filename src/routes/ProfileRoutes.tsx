@@ -167,21 +167,34 @@ function ProfileImportPage({
           {t('profileImport.subtitle')}
         </p>
 
-        {/* Steps */}
+        {/* Steps — this page is always step 1 of the import flow, so only the
+            first pill is shown as current; the rest are upcoming (muted), not
+            already-reached, to avoid implying progress that hasn't happened. */}
         <div className="mb-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
-          {IMPORT_STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-harx-600 text-white text-xs font-bold">
-                {s.n}
-              </span>
-              <span className="text-sm font-medium text-gray-600">{t(s.labelKey)}</span>
-              {i < IMPORT_STEPS.length - 1 && (
-                <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              )}
-            </div>
-          ))}
+          {IMPORT_STEPS.map((s, i) => {
+            const isCurrent = s.n === 1;
+            return (
+              <div key={s.n} className="flex items-center gap-2.5">
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                    isCurrent
+                      ? 'bg-harx-600 text-white'
+                      : 'bg-gray-100 text-gray-400 border border-gray-200'
+                  }`}
+                >
+                  {s.n}
+                </span>
+                <span className={`text-sm font-medium ${isCurrent ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {t(s.labelKey)}
+                </span>
+                {i < IMPORT_STEPS.length - 1 && (
+                  <svg className="hidden sm:block h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <button

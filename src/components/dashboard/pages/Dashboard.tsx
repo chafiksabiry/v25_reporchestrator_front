@@ -1078,11 +1078,11 @@ export function Dashboard({ profile }: DashboardProps) {
     ? Math.min(100, Math.round((goals.transactions.current / repTxGoal) * 100))
     : 0;
   const bonusPeriodLabel: Record<GoalsPeriod, string> = {
-    today: "aujourd'hui",
-    week: 'cette semaine',
-    month: 'ce mois',
-    quarter: 'ce trimestre',
-    year: 'cette année',
+    today: t('dashboard.home.goals.periodInlineToday'),
+    week: t('dashboard.home.goals.periodInlineWeek'),
+    month: t('dashboard.home.goals.periodInlineMonth'),
+    quarter: t('dashboard.home.goals.periodInlineQuarter'),
+    year: t('dashboard.home.goals.periodInlineYear'),
   };
 
   const qualityAlerts = useMemo(() => {
@@ -1376,7 +1376,7 @@ export function Dashboard({ profile }: DashboardProps) {
             className="harx-go-live group inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[#e11d48] to-[#be123c] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 sm:w-auto sm:self-start xl:gap-2 xl:px-4 xl:py-2 xl:text-xs 2xl:px-5 2xl:py-2.5 2xl:text-sm"
           >
             <Rocket size={13} className="transition-transform group-hover:rotate-12 xl:h-4 xl:w-4 2xl:h-[18px] 2xl:w-[18px]" />
-            {t('dashboard.home.goLive.title')}
+            {t('dashboard.home.goLive.cta')}
             <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5 xl:h-4 xl:w-4" />
           </button>
         </div>
@@ -1579,7 +1579,7 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="flex min-w-0 flex-1 items-center gap-1.5 xl:gap-2">
             <PhoneCall size={14} className="shrink-0 text-amber-600 xl:h-4 xl:w-4 2xl:h-5 2xl:w-5" />
             <h3 className="shrink-0 text-[10px] font-black uppercase tracking-tight text-slate-800 xl:text-xs 2xl:text-sm">Rappels</h3>
-            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">Aucun rappel pour le moment</p>
+            <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-500 xl:text-sm 2xl:text-base">{t('dashboard.home.noReminders')}</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <button
@@ -1927,7 +1927,7 @@ export function Dashboard({ profile }: DashboardProps) {
           {selectedGigId === 'all' ? (
             <div className="space-y-3">
               <p className="text-[12px] font-bold text-slate-600 leading-snug">
-                Chaque GIG a ses propres heures et son propre bonus. Les objectifs d'appels, de transactions et de gains, plus bas, comptent sur tous les GIGs.
+                {t('dashboard.home.goals.multiGigHoursHint')}
               </p>
               <div className="relative">
                 <button
@@ -1936,7 +1936,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   className="w-full flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
                 >
                   <span className="text-[12px] font-black text-slate-900 truncate">
-                    {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || 'Choisir un GIG'}
+                    {goals.perGig.find((gig) => gig.id === hoursGigId)?.title || t('dashboard.home.goals.chooseGig')}
                       </span>
                   <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${hoursMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -1959,24 +1959,24 @@ export function Dashboard({ profile }: DashboardProps) {
                 <div key={gig.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {([
-                    { label: 'Jour', row: gig.hours.daily },
-                    { label: 'Semaine', row: gig.hours.weekly },
-                    { label: 'Mois', row: gig.hours.monthly },
-                  ] as const).map(({ label, row }) => (
+                    { label: t('dashboard.home.goals.periodDay'), row: gig.hours.daily },
+                    { label: t('dashboard.home.goals.periodWeek'), row: gig.hours.weekly },
+                    { label: t('dashboard.home.goals.periodMonth'), row: gig.hours.monthly },
+                  ]).map(({ label, row }) => (
                     <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-2.5 py-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
                       <span className={`text-[11px] font-black ${row.reached ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        {row.target > 0 ? `${row.current}h / ${row.target}h` : `${row.current}h · pas de minimum`}
+                        {row.target > 0 ? `${row.current}h / ${row.target}h` : t('dashboard.home.goals.hoursNoMinimum', { hours: row.current })}
                       </span>
                     </div>
                   ))}
                   </div>
                   <p className={`text-[11px] font-bold ${gig.bonus.triggered ? 'text-emerald-600' : 'text-slate-500'}`}>
                     {gig.bonus.triggered
-                      ? `Bonus déclenché · +${gig.bonus.bonusAmount.toFixed(2)} €`
+                      ? t('dashboard.home.goals.bonusTriggeredAmount', { amount: gig.bonus.bonusAmount.toFixed(2) })
                       : gig.bonus.target > 0
-                        ? `Bonus ${gig.bonus.current}/${gig.bonus.target} transactions réussies ${bonusPeriodLabel[gig.bonus.period]}`
-                        : 'Pas de bonus sur ce GIG'}
+                        ? t('dashboard.home.goals.bonusProgressPerGig', { current: gig.bonus.current, target: gig.bonus.target, period: bonusPeriodLabel[gig.bonus.period] })
+                        : t('dashboard.home.goals.noBonusOnGig')}
                   </p>
                   </div>
               ))}
@@ -1985,10 +1985,10 @@ export function Dashboard({ profile }: DashboardProps) {
           <>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {([
-            { label: 'Quotidien', row: goals.hours.daily },
-            { label: 'Semaine', row: goals.hours.weekly },
-            { label: 'Mois', row: goals.hours.monthly },
-          ] as const).map(({ label, row }) => (
+            { label: t('dashboard.home.goals.periodDaily'), row: goals.hours.daily },
+            { label: t('dashboard.home.goals.periodWeek'), row: goals.hours.weekly },
+            { label: t('dashboard.home.goals.periodMonth'), row: goals.hours.monthly },
+          ]).map(({ label, row }) => (
             <div key={label} className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
@@ -2031,12 +2031,12 @@ export function Dashboard({ profile }: DashboardProps) {
             </div>
             <p className="text-[10px] font-bold text-slate-400">
               {goals.bonus.gigsWithTarget > 1
-                ? `${goals.bonus.gigsTriggered}/${goals.bonus.gigsWithTarget} GIGs ont déclenché le bonus`
+                ? t('dashboard.home.goals.multiGigBonusTriggered', { triggered: goals.bonus.gigsTriggered, total: goals.bonus.gigsWithTarget })
                 : goals.bonus.triggered
-                  ? `Bonus déclenché · ${goals.bonus.current} transactions réussies ${bonusPeriodLabel[goals.bonus.period]}`
+                  ? t('dashboard.home.goals.bonusTriggeredGlobal', { current: goals.bonus.current, period: bonusPeriodLabel[goals.bonus.period] })
                   : goals.bonus.target > 0
-                    ? `${goals.bonus.current}/${goals.bonus.target} transactions réussies ${bonusPeriodLabel[goals.bonus.period]} · seuil du GIG`
-                    : 'Aucun volume minimum de transactions sur ce GIG'}
+                    ? t('dashboard.home.goals.bonusProgressGlobal', { current: goals.bonus.current, target: goals.bonus.target, period: bonusPeriodLabel[goals.bonus.period] })
+                    : t('dashboard.home.goals.noMinTransactionVolume')}
             </p>
           </div>
           </>
@@ -2105,7 +2105,7 @@ export function Dashboard({ profile }: DashboardProps) {
                       saveCountGoal(item.kind, raw);
                     }}
                     className="w-16 bg-white border border-cyan-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    aria-label={`Objectif ${item.title}`}
+                    aria-label={t('dashboard.home.goals.targetAriaLabel', { title: item.title })}
                   />
                   <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${item.progress >= 100 && item.target > 0 ? 'text-emerald-500' : 'text-cyan-600'}`}>
                     {item.target > 0 ? `${item.progress}%` : '—'}
@@ -2135,7 +2135,7 @@ export function Dashboard({ profile }: DashboardProps) {
                   placeholder="0"
                   onChange={(e) => saveEarningsGoal(e.target.value)}
                   className="w-20 bg-white border border-amber-300 text-slate-900 rounded-lg px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  aria-label="Objectif de gains"
+                  aria-label={t('dashboard.home.goals.earningsTargetAria')}
                 />
                 <span className="text-[10px] font-black text-amber-600">€</span>
                 <span className={`text-[10px] font-black min-w-[2.5rem] text-right ${earningsGoalProgress >= 100 && repEarningsGoal > 0 ? 'text-emerald-500' : 'text-amber-600'}`}>
@@ -2169,7 +2169,7 @@ export function Dashboard({ profile }: DashboardProps) {
               type="button"
               onClick={() => setShowCalculator((open) => !open)}
               className="shrink-0 rounded-lg border border-cyan-200 bg-white p-1.5 text-cyan-700 hover:bg-cyan-100 transition"
-              aria-label={showCalculator ? 'Réduire' : 'Ouvrir'}
+              aria-label={showCalculator ? t('dashboard.home.goals.collapse') : t('dashboard.home.goals.expand')}
             >
               <ChevronDown size={14} className={`transition-transform ${showCalculator ? 'rotate-180' : ''}`} />
             </button>
@@ -2177,7 +2177,7 @@ export function Dashboard({ profile }: DashboardProps) {
           {showCalculator && (
             <div className="rounded-2xl border border-cyan-200 bg-white p-3 space-y-3 shadow-[0_0_32px_-10px_rgba(34,211,238,0.45)]">
               {gigsData.length === 0 ? (
-                <p className="text-[12px] font-bold text-slate-500">Aucun GIG disponible.</p>
+                <p className="text-[12px] font-bold text-slate-500">{t('dashboard.home.goals.noGigAvailable')}</p>
               ) : gigsData.map((gig) => {
                 const selected = Boolean(simGigs[gig._id]);
                 const row = simRows.find((item) => item.id === gig._id);
@@ -2197,7 +2197,7 @@ export function Dashboard({ profile }: DashboardProps) {
                       <>
                         <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-cyan-700 uppercase tracking-wider block">Appels</label>
+                            <label className="text-[9px] font-black text-cyan-700 uppercase tracking-wider block">{t('dashboard.home.goals.callsSimLabel')}</label>
                   <input
                     type="number"
                               min={0}
@@ -2209,7 +2209,7 @@ export function Dashboard({ profile }: DashboardProps) {
                             <p className="text-[10px] font-bold text-cyan-700/80 text-center">× {fmtMoney(row.callRate)} €</p>
                 </div>
                 <div className="space-y-1">
-                            <label className="text-[9px] font-black text-amber-700 uppercase tracking-wider block">Transactions</label>
+                            <label className="text-[9px] font-black text-amber-700 uppercase tracking-wider block">{t('dashboard.home.goals.transactionsTitle')}</label>
                   <input
                     type="number"
                               min={0}
@@ -2220,14 +2220,14 @@ export function Dashboard({ profile }: DashboardProps) {
                               className="w-full bg-white border border-amber-200 text-slate-900 rounded-xl px-2 py-1.5 text-sm font-black text-center focus:outline-none focus:border-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <p className="text-[10px] font-bold text-amber-700/80 text-center">× {fmtMoney(row.txRate)} €</p>
-                            <p className="text-[9px] font-bold text-slate-400 text-center">Pas plus que les appels</p>
+                            <p className="text-[9px] font-bold text-slate-400 text-center">{t('dashboard.home.goals.notMoreThanCalls')}</p>
                 </div>
                 </div>
                         {row.bonusAmount > 0 && (
                           <p className={`text-[11px] font-bold ${row.bonusIncluded ? 'text-emerald-600' : 'text-amber-700/80'}`}>
                             {row.bonusIncluded
-                              ? `Bonus inclus +${fmtMoney(row.bonusAmount)} €`
-                              : `Bonus +${fmtMoney(row.bonusAmount)} € dès ${row.bonusTarget} transactions ${bonusPeriodLabel[row.bonusPeriod]}`}
+                              ? t('dashboard.home.goals.bonusIncludedAmount', { amount: fmtMoney(row.bonusAmount) })
+                              : t('dashboard.home.goals.bonusFromTarget', { amount: fmtMoney(row.bonusAmount), target: row.bonusTarget, period: bonusPeriodLabel[row.bonusPeriod] })}
                           </p>
                         )}
                         <p className="text-[11px] font-bold text-slate-700">
