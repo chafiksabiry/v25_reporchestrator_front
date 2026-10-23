@@ -98,7 +98,7 @@ export function AccountSettings() {
   const loadUser = async () => {
     if (!userId) {
       setLoadingUser(false);
-      toast.error('Identifiant utilisateur introuvable.');
+      toast.error(t('accountSettings.toast.userIdNotFound'));
       return;
     }
     setLoadingUser(true);
@@ -120,7 +120,7 @@ export function AccountSettings() {
       }
     } catch (err) {
       console.error('Failed to load user details:', err);
-      toast.error('Impossible de charger le profil utilisateur.');
+      toast.error(t('accountSettings.toast.loadProfileFailed'));
     } finally {
       setLoadingUser(false);
     }
@@ -174,7 +174,7 @@ export function AccountSettings() {
     if (!userId) return;
     const trimmed = editingFullName.trim();
     if (trimmed.length < 2) {
-      toast.error('Le nom doit contenir au moins 2 caractères.');
+      toast.error(t('accountSettings.toast.nameTooShort'));
       return;
     }
     setSavingProfile(true);
@@ -189,9 +189,9 @@ export function AccountSettings() {
       setEditingFullName(nextName);
       // Mirror on agent profile + local cache so refresh keeps the new name everywhere.
       await syncRepIdentityName(nextName);
-      toast.success('Nom mis à jour.');
+      toast.success(t('accountSettings.toast.nameUpdated'));
     } catch (err) {
-      toast.error(extractError(err, 'Échec de la mise à jour.'));
+      toast.error(extractError(err, t('accountSettings.toast.updateFailed')));
     } finally {
       setSavingProfile(false);
     }
@@ -202,7 +202,7 @@ export function AccountSettings() {
     e.preventDefault();
     if (!userId) return;
     if (!newEmail.trim()) {
-      toast.error('Saisissez un nouvel email.');
+      toast.error(t('accountSettings.toast.enterNewEmail'));
       return;
     }
     setEmailLoading(true);
@@ -213,9 +213,9 @@ export function AccountSettings() {
         { headers: authHeaders }
       );
       setEmailRequestSent(true);
-      toast.success(`Code envoyé à ${newEmail.trim()}.`);
+      toast.success(t('accountSettings.toast.codeSentTo', { target: newEmail.trim() }));
     } catch (err) {
-      toast.error(extractError(err, "Échec de l'envoi du code."));
+      toast.error(extractError(err, t('accountSettings.toast.sendCodeFailed')));
     } finally {
       setEmailLoading(false);
     }
@@ -225,7 +225,7 @@ export function AccountSettings() {
     e.preventDefault();
     if (!userId) return;
     if (emailCode.length < 4) {
-      toast.error('Code invalide.');
+      toast.error(t('accountSettings.toast.invalidCode'));
       return;
     }
     setEmailLoading(true);
@@ -240,9 +240,9 @@ export function AccountSettings() {
       setNewEmail('');
       setEmailCode('');
       setEmailRequestSent(false);
-      toast.success('Email modifié.');
+      toast.success(t('accountSettings.toast.emailUpdated'));
     } catch (err) {
-      toast.error(extractError(err, 'Échec de la confirmation.'));
+      toast.error(extractError(err, t('accountSettings.toast.confirmFailed')));
     } finally {
       setEmailLoading(false);
     }
@@ -252,11 +252,11 @@ export function AccountSettings() {
   const handleForcePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pwdNew.length < 8) {
-      toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      toast.error(t('accountSettings.toast.passwordTooShort'));
       return;
     }
     if (pwdNew !== pwdConfirm) {
-      toast.error('Les deux mots de passe ne correspondent pas.');
+      toast.error(t('accountSettings.toast.passwordsMismatch'));
       return;
     }
     setPwdLoading(true);
@@ -270,10 +270,10 @@ export function AccountSettings() {
       localStorage.removeItem('mustChangePassword');
       setPwdNew('');
       setPwdConfirm('');
-      toast.success('Mot de passe modifié. Vous pouvez continuer.');
+      toast.success(t('accountSettings.toast.passwordChangedContinue'));
       window.history.replaceState({}, '', window.location.pathname);
     } catch (err) {
-      toast.error(extractError(err, 'Échec du changement de mot de passe.'));
+      toast.error(extractError(err, t('accountSettings.toast.passwordChangeFailed')));
     } finally {
       setPwdLoading(false);
     }
@@ -289,9 +289,9 @@ export function AccountSettings() {
         { headers: authHeaders }
       );
       setPwdRequestSent(true);
-      toast.success(`Code envoyé à ${email}.`);
+      toast.success(t('accountSettings.toast.codeSentTo', { target: email }));
     } catch (err) {
-      toast.error(extractError(err, "Échec de l'envoi du code."));
+      toast.error(extractError(err, t('accountSettings.toast.sendCodeFailed')));
     } finally {
       setPwdLoading(false);
     }
@@ -301,15 +301,15 @@ export function AccountSettings() {
     e.preventDefault();
     if (!userId) return;
     if (pwdNew.length < 8) {
-      toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      toast.error(t('accountSettings.toast.passwordTooShort'));
       return;
     }
     if (pwdNew !== pwdConfirm) {
-      toast.error('Les deux mots de passe ne correspondent pas.');
+      toast.error(t('accountSettings.toast.passwordsMismatch'));
       return;
     }
     if (pwdCode.length < 4) {
-      toast.error('Code invalide.');
+      toast.error(t('accountSettings.toast.invalidCode'));
       return;
     }
     setPwdLoading(true);
@@ -328,9 +328,9 @@ export function AccountSettings() {
       setPwdConfirm('');
       setPwdCode('');
       setPwdRequestSent(false);
-      toast.success('Mot de passe modifié.');
+      toast.success(t('accountSettings.toast.passwordChanged'));
     } catch (err) {
-      toast.error(extractError(err, 'Échec du changement de mot de passe.'));
+      toast.error(extractError(err, t('accountSettings.toast.passwordChangeFailed')));
     } finally {
       setPwdLoading(false);
     }
@@ -341,7 +341,7 @@ export function AccountSettings() {
     e.preventDefault();
     if (!userId) return;
     if (!newPhone.trim()) {
-      toast.error('Saisissez un nouveau numéro de téléphone.');
+      toast.error(t('accountSettings.toast.enterNewPhone'));
       return;
     }
     setPhoneLoading(true);
@@ -352,9 +352,9 @@ export function AccountSettings() {
         { headers: authHeaders }
       );
       setPhoneRequestSent(true);
-      toast.success(`OTP envoyé à ${newPhone.trim()}.`);
+      toast.success(t('accountSettings.toast.otpSentTo', { target: newPhone.trim() }));
     } catch (err) {
-      toast.error(extractError(err, "Échec de l'envoi de l'OTP."));
+      toast.error(extractError(err, t('accountSettings.toast.sendOtpFailed')));
     } finally {
       setPhoneLoading(false);
     }
@@ -364,7 +364,7 @@ export function AccountSettings() {
     e.preventDefault();
     if (!userId) return;
     if (phoneOtp.length < 4) {
-      toast.error('OTP invalide.');
+      toast.error(t('accountSettings.toast.invalidOtp'));
       return;
     }
     setPhoneLoading(true);
@@ -379,19 +379,19 @@ export function AccountSettings() {
       setNewPhone('');
       setPhoneOtp('');
       setPhoneRequestSent(false);
-      toast.success('Téléphone modifié.');
+      toast.success(t('accountSettings.toast.phoneUpdated'));
     } catch (err) {
-      toast.error(extractError(err, 'Échec de la confirmation.'));
+      toast.error(extractError(err, t('accountSettings.toast.confirmFailed')));
     } finally {
       setPhoneLoading(false);
     }
   };
 
   const sections: { id: Section; label: string; icon: React.ElementType }[] = [
-    { id: 'profile', label: 'Profil', icon: UserIcon },
-    { id: 'email', label: 'Email', icon: Mail },
-    { id: 'password', label: 'Mot de passe', icon: Lock },
-    { id: 'phone', label: 'Téléphone', icon: Phone },
+    { id: 'profile', label: t('accountSettings.tabs.profile'), icon: UserIcon },
+    { id: 'email', label: t('accountSettings.tabs.email'), icon: Mail },
+    { id: 'password', label: t('accountSettings.tabs.password'), icon: Lock },
+    { id: 'phone', label: t('accountSettings.tabs.phone'), icon: Phone },
   ];
 
   return (
@@ -403,13 +403,13 @@ export function AccountSettings() {
         <div>
           <div className="flex items-center gap-2 mb-1 text-harx-500">
             <Settings className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Paramètres</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('accountSettings.eyebrow')}</span>
           </div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">
-            Paramètres du compte
+            {t('accountSettings.title')}
           </h1>
           <p className="text-xs text-gray-500 mt-0.5 font-medium">
-            Tout changement sensible est confirmé par email ou OTP SMS.
+            {t('accountSettings.subtitle')}
           </p>
         </div>
       </div>
@@ -462,7 +462,7 @@ export function AccountSettings() {
           {loadingUser && (
             <div className="flex items-center gap-2 text-[11px] text-gray-500 font-bold mb-4">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Chargement du profil…
+              {t('accountSettings.loadingProfile')}
             </div>
           )}
 
@@ -471,7 +471,7 @@ export function AccountSettings() {
             <form onSubmit={handleSaveFullName} className="space-y-5 max-w-xl">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                  Nom complet
+                  {t('accountSettings.profile.fullNameLabel')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -488,7 +488,7 @@ export function AccountSettings() {
                   />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">
-                  Le nom est modifié immédiatement (pas de confirmation requise).
+                  {t('accountSettings.profile.fullNameHint')}
                 </p>
               </div>
 
@@ -498,7 +498,7 @@ export function AccountSettings() {
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-harx-500 to-rose-500 hover:from-harx-600 hover:to-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {savingProfile && <Loader2 className="h-4 w-4 animate-spin" />}
-                {savingProfile ? 'Enregistrement…' : 'Enregistrer le nom'}
+                {savingProfile ? t('accountSettings.profile.saving') : t('accountSettings.profile.save')}
               </button>
             </form>
           )}
@@ -509,14 +509,13 @@ export function AccountSettings() {
               <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex gap-2.5 text-[10px] text-blue-800/80 font-bold leading-relaxed">
                 <ShieldCheck size={16} className="shrink-0 text-blue-600" />
                 <span>
-                  Un code de vérification sera envoyé à votre <strong>nouvel</strong> email. Il
-                  expire dans 15 minutes.
+                  {t('accountSettings.email.codeInfoPrefix')} <strong>{t('accountSettings.email.codeInfoBold')}</strong> {t('accountSettings.email.codeInfoSuffix')}
                 </span>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                  Email actuel
+                  {t('accountSettings.email.currentEmailLabel')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -536,7 +535,7 @@ export function AccountSettings() {
                 <form onSubmit={handleRequestEmailCode} className="space-y-4">
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Nouvel email
+                      {t('accountSettings.email.newEmailLabel')}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -548,7 +547,7 @@ export function AccountSettings() {
                         onChange={(e) => setNewEmail(e.target.value)}
                         required
                         className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 focus:border-harx-500 rounded-xl font-bold text-sm focus:outline-none transition-all"
-                        placeholder="vous@exemple.com"
+                        placeholder={t('accountSettings.email.newEmailPlaceholder')}
                       />
                     </div>
                   </div>
@@ -559,9 +558,9 @@ export function AccountSettings() {
                     className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {emailLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {emailLoading ? 'Envoi…' : (
+                    {emailLoading ? t('accountSettings.email.sending') : (
                       <>
-                        Envoyer le code <ArrowRight size={14} />
+                        {t('accountSettings.email.sendCode')} <ArrowRight size={14} />
                       </>
                     )}
                   </button>
@@ -571,13 +570,12 @@ export function AccountSettings() {
               {emailRequestSent && (
                 <form onSubmit={handleConfirmEmailChange} className="space-y-4">
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[11px] text-emerald-800 font-bold">
-                    Code envoyé à <span className="underline">{newEmail}</span>. Vérifiez votre
-                    boîte de réception.
+                    {t('accountSettings.email.codeSentToPrefix')} <span className="underline">{newEmail}</span> {t('accountSettings.email.codeSentToSuffix')}
                   </div>
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Code de vérification (6 chiffres)
+                      {t('accountSettings.email.codeLabel')}
                     </label>
                     <input
                       type="text"
@@ -597,7 +595,7 @@ export function AccountSettings() {
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-harx-500 to-rose-500 hover:from-harx-600 hover:to-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {emailLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {emailLoading ? 'Confirmation…' : 'Confirmer le changement'}
+                      {emailLoading ? t('accountSettings.email.confirming') : t('accountSettings.email.confirmChange')}
                     </button>
                     <button
                       type="button"
@@ -608,7 +606,7 @@ export function AccountSettings() {
                       disabled={emailLoading}
                       className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                     >
-                      <RotateCcw size={14} /> Recommencer
+                      <RotateCcw size={14} /> {t('accountSettings.email.restart')}
                     </button>
                   </div>
                 </form>
@@ -624,14 +622,13 @@ export function AccountSettings() {
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex gap-2.5 text-[10px] text-emerald-900 font-bold leading-relaxed">
                     <ShieldCheck size={16} className="shrink-0 text-emerald-600" />
                     <span>
-                      Votre call center a créé votre compte avec un mot de passe temporaire.
-                      Choisissez un nouveau mot de passe pour continuer.
+                      {t('accountSettings.password.forcedInfo')}
                     </span>
                   </div>
                   <form onSubmit={handleForcePasswordChange} className="space-y-4">
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                        Nouveau mot de passe
+                        {t('accountSettings.password.newPasswordLabel')}
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -656,7 +653,7 @@ export function AccountSettings() {
                     </div>
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                        Confirmer le mot de passe
+                        {t('accountSettings.password.confirmPasswordLabel')}
                       </label>
                       <input
                         type="password"
@@ -673,7 +670,7 @@ export function AccountSettings() {
                       className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {pwdLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Enregistrer le mot de passe
+                      {t('accountSettings.password.save')}
                     </button>
                   </form>
                 </>
@@ -682,8 +679,8 @@ export function AccountSettings() {
               <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex gap-2.5 text-[10px] text-blue-800/80 font-bold leading-relaxed">
                 <ShieldCheck size={16} className="shrink-0 text-blue-600" />
                 <span>
-                  Un code de vérification sera envoyé à votre email actuel (<strong>{email}</strong>).
-                  Il expire dans 15 minutes.
+                  {t('accountSettings.password.codeInfoPrefix')} (<strong>{email}</strong>).
+                  {' '}{t('accountSettings.password.codeInfoSuffix')}
                 </span>
               </div>
 
@@ -695,9 +692,9 @@ export function AccountSettings() {
                   className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {pwdLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {pwdLoading ? 'Envoi…' : (
+                  {pwdLoading ? t('accountSettings.password.sending') : (
                     <>
-                      Envoyer le code par email <ArrowRight size={14} />
+                      {t('accountSettings.password.sendCodeByEmail')} <ArrowRight size={14} />
                     </>
                   )}
                 </button>
@@ -706,12 +703,12 @@ export function AccountSettings() {
               {pwdRequestSent && (
                 <form onSubmit={handleConfirmPasswordChange} className="space-y-4">
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[11px] text-emerald-800 font-bold">
-                    Code envoyé à <span className="underline">{email}</span>.
+                    {t('accountSettings.password.codeSentToPrefix')} <span className="underline">{email}</span>{t('accountSettings.password.codeSentToSuffix')}
                   </div>
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Mot de passe actuel
+                      {t('accountSettings.password.currentPasswordLabel')}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -735,7 +732,7 @@ export function AccountSettings() {
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Nouveau mot de passe
+                      {t('accountSettings.password.newPasswordLabel')}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -758,12 +755,12 @@ export function AccountSettings() {
                         {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Au moins 8 caractères.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{t('accountSettings.password.newPasswordHint')}</p>
                   </div>
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Confirmer le nouveau mot de passe
+                      {t('accountSettings.password.confirmNewPasswordLabel')}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -783,7 +780,7 @@ export function AccountSettings() {
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Code reçu par email (6 chiffres)
+                      {t('accountSettings.password.codeReceivedLabel')}
                     </label>
                     <input
                       type="text"
@@ -803,7 +800,7 @@ export function AccountSettings() {
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-harx-500 to-rose-500 hover:from-harx-600 hover:to-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {pwdLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {pwdLoading ? 'Confirmation…' : 'Confirmer le mot de passe'}
+                      {pwdLoading ? t('accountSettings.password.confirming') : t('accountSettings.password.confirmPassword')}
                     </button>
                     <button
                       type="button"
@@ -817,7 +814,7 @@ export function AccountSettings() {
                       disabled={pwdLoading}
                       className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                     >
-                      <RotateCcw size={14} /> Recommencer
+                      <RotateCcw size={14} /> {t('accountSettings.password.restart')}
                     </button>
                   </div>
                 </form>
@@ -833,14 +830,13 @@ export function AccountSettings() {
               <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex gap-2.5 text-[10px] text-blue-800/80 font-bold leading-relaxed">
                 <ShieldCheck size={16} className="shrink-0 text-blue-600" />
                 <span>
-                  Un OTP sera envoyé par SMS au <strong>nouveau</strong> numéro. Il expire dans
-                  5 minutes.
+                  {t('accountSettings.phone.otpInfoPrefix')} <strong>{t('accountSettings.phone.otpInfoBold')}</strong> {t('accountSettings.phone.otpInfoSuffix')}
                 </span>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                  Téléphone actuel
+                  {t('accountSettings.phone.currentPhoneLabel')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -860,7 +856,7 @@ export function AccountSettings() {
                 <form onSubmit={handleRequestPhoneOtp} className="space-y-4">
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Nouveau téléphone
+                      {t('accountSettings.phone.newPhoneLabel')}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -877,7 +873,7 @@ export function AccountSettings() {
                       />
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1">
-                      Format international, ex. <code>+33612345678</code>.
+                      {t('accountSettings.phone.newPhoneHint')} <code>+33612345678</code>.
                     </p>
                   </div>
 
@@ -887,9 +883,9 @@ export function AccountSettings() {
                     className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {phoneLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {phoneLoading ? 'Envoi…' : (
+                    {phoneLoading ? t('accountSettings.phone.sending') : (
                       <>
-                        Envoyer l'OTP par SMS <ArrowRight size={14} />
+                        {t('accountSettings.phone.sendOtp')} <ArrowRight size={14} />
                       </>
                     )}
                   </button>
@@ -899,12 +895,12 @@ export function AccountSettings() {
               {phoneRequestSent && (
                 <form onSubmit={handleConfirmPhoneChange} className="space-y-4">
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[11px] text-emerald-800 font-bold">
-                    OTP envoyé à <span className="underline">{newPhone}</span>.
+                    {t('accountSettings.phone.otpSentToPrefix')} <span className="underline">{newPhone}</span>{t('accountSettings.phone.otpSentToSuffix')}
                   </div>
 
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      OTP reçu (6 chiffres)
+                      {t('accountSettings.phone.otpReceivedLabel')}
                     </label>
                     <input
                       type="text"
@@ -924,7 +920,7 @@ export function AccountSettings() {
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-harx-500 to-rose-500 hover:from-harx-600 hover:to-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {phoneLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {phoneLoading ? 'Confirmation…' : 'Confirmer le téléphone'}
+                      {phoneLoading ? t('accountSettings.phone.confirming') : t('accountSettings.phone.confirmPhone')}
                     </button>
                     <button
                       type="button"
@@ -935,7 +931,7 @@ export function AccountSettings() {
                       disabled={phoneLoading}
                       className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                     >
-                      <RotateCcw size={14} /> Recommencer
+                      <RotateCcw size={14} /> {t('accountSettings.phone.restart')}
                     </button>
                   </div>
                 </form>
