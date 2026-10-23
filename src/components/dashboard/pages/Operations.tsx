@@ -1,101 +1,181 @@
-import React from 'react';
-import { Activity as ActivityIcon, Users, AlertTriangle, Settings, Database, Zap, BarChart, Shield } from 'lucide-react';
-import { CallRecords } from '../CallRecords';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import {
+  Wallet as WalletIcon,
+  Phone,
+  Briefcase,
+  CalendarDays,
+  CalendarCheck,
+  GraduationCap,
+  PhoneCall,
+  CheckCircle2,
+} from 'lucide-react';
+import { CallRecords } from '../CallRecords';
+import api, { callsApi } from '../../../utils/client';
+import { slotApi, type Reservation } from '../../../services/api/slotApi';
+import { getAgentId } from '../../../utils/authUtils';
 
 export function Operations() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const agentId = getAgentId();
+
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [calls, setCalls] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!agentId) {
+      setLoading(false);
+      return;
+    }
+
+    const load = async () => {
+      try {
+        const [walletRes, callsRes, reservationsRes] = await Promise.all([
+          api.get(`/escrow/agent/wallet/${agentId}`).catch(() => null),
+          callsApi.getByAgentId(agentId).catch(() => null),
+          slotApi.getReservations(agentId).catch(() => []),
+        ]);
+
+        if (walletRes?.data?.success) {
+          setAvailableBalance(walletRes.data.data.availableBalance || 0);
+        }
+        if (callsRes?.success && Array.isArray(callsRes.data)) {
+          setCalls(callsRes.data);
+        }
+        setReservations(Array.isArray(reservationsRes) ? reservationsRes : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [agentId]);
+
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const callsThisWeek = calls.filter((c) => {
+    const created = c.createdAt ? new Date(c.createdAt).getTime() : NaN;
+    return !Number.isNaN(created) && created >= oneWeekAgo;
+  }).length;
+
+  const successfulCalls = calls.filter((c) => {
+    const status = String(c.status || '').toLowerCase();
+    return status === 'completed' || c.validByAI === true || c.valid === true;
+  }).length;
+
+  const activeGigIds = new Set(
+    calls.map((c) => {
+      const gig = c.lead?.gigId;
+      if (!gig) return null;
+      return typeof gig === 'object' ? gig._id || gig.$oid : gig;
+    }).filter(Boolean)
+  );
+
+  const now = new Date();
+  const nextReservation = reservations
+    .filter((r) => r.status === 'reserved' && new Date(r.date) >= new Date(now.toDateString()))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+
+  const formatBalance = (value: number) =>
+    new Intl.NumberFormat(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+
+  const formatNextSessionDate = (r: Reservation) =>
+    new Intl.DateTimeFormat(i18n.language, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(
+      new Date(r.date)
+    );
+
   const metrics = [
     {
-      title: 'System Health',
-      value: '99.9%',
-      status: 'Optimal',
-      icon: ActivityIcon,
+      title: t('operations.availableBalance'),
+      value: loading ? '…' : `${formatBalance(availableBalance)} €`,
+      icon: WalletIcon,
       color: 'green',
+      onClick: () => navigate('/wallet'),
     },
     {
-      title: 'Active Users',
-      value: '1,234',
-      status: '+12% this week',
-      icon: Users,
+      title: t('operations.callsThisWeek'),
+      value: loading ? '…' : String(callsThisWeek),
+      icon: Phone,
       color: 'blue',
+      onClick: () => navigate('/workspace?tab=calls'),
     },
     {
-      title: 'Pending Issues',
-      value: '3',
-      status: 'Low Priority',
-      icon: AlertTriangle,
-      color: 'yellow',
-    },
-    {
-      title: 'Server Load',
-      value: '42%',
-      status: 'Normal',
-      icon: Database,
+      title: t('operations.activeGigs'),
+      value: loading ? '…' : String(activeGigIds.size),
+      icon: Briefcase,
       color: 'purple',
+      onClick: () => navigate('/marketplace'),
+    },
+    {
+      title: t('operations.nextSession'),
+      value: loading ? '…' : nextReservation ? formatNextSessionDate(nextReservation) : t('operations.noneScheduled'),
+      icon: CalendarDays,
+      color: 'yellow',
+      onClick: () => navigate('/session-planning'),
     },
   ];
 
   const quickActions = [
     {
-      title: 'System Maintenance',
-      description: 'Schedule or perform system maintenance',
-      icon: Settings,
-      action: 'Configure',
+      title: t('operations.planSession'),
+      description: t('operations.planSessionDesc'),
+      icon: CalendarCheck,
+      action: () => navigate('/session-planning'),
     },
     {
-      title: 'User Management',
-      description: 'Manage user accounts and permissions',
-      icon: Users,
-      action: 'Manage',
+      title: t('operations.goToCockpit'),
+      description: t('operations.goToCockpitDesc'),
+      icon: PhoneCall,
+      action: () => navigate('/workspace?tab=copilot'),
     },
     {
-      title: 'Performance Monitoring',
-      description: 'View detailed system performance metrics',
-      icon: Zap,
-      action: 'View',
+      title: t('operations.viewWallet'),
+      description: t('operations.viewWalletDesc'),
+      icon: WalletIcon,
+      action: () => navigate('/wallet'),
     },
     {
-      title: 'Security Settings',
-      description: 'Configure security policies and access controls',
-      icon: Shield,
-      action: 'Settings',
+      title: t('operations.resumeTraining'),
+      description: t('operations.resumeTrainingDesc'),
+      icon: GraduationCap,
+      action: () => navigate('/training'),
     },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('operations.title')}</h1>
-        <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 self-start sm:self-auto">
-          {t('operations.emergencyShutdown')}
-        </button>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('operations.title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('operations.subtitle')}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((metric, index) => (
-          <div key={index} className="bg-white rounded-xl p-6 shadow-sm">
+          <button
+            key={index}
+            onClick={metric.onClick}
+            className="bg-white rounded-xl p-6 shadow-sm text-left hover:shadow-md transition-shadow"
+          >
             <div className="flex items-center justify-between">
               <div className={`p-2 bg-${metric.color}-50 rounded-lg`}>
                 <metric.icon className={`w-6 h-6 text-${metric.color}-600`} />
               </div>
-              <span className={`text-sm font-medium text-${metric.color}-600 bg-${metric.color}-50 px-2 py-1 rounded-full`}>
-                {metric.status}
-              </span>
             </div>
             <p className="mt-4 text-2xl font-semibold text-gray-900">{metric.value}</p>
             <p className="text-sm text-gray-500">{metric.title}</p>
-          </div>
+          </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-              View All
-            </button>
+            <h2 className="text-lg font-semibold text-gray-900">{t('operations.quickActions')}</h2>
           </div>
           <div className="space-y-4">
             {quickActions.map((action, index) => (
@@ -109,8 +189,11 @@ export function Operations() {
                     <p className="text-sm text-gray-500">{action.description}</p>
                   </div>
                 </div>
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
-                  {action.action}
+                <button
+                  onClick={action.action}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                >
+                  {t('operations.go')}
                 </button>
               </div>
             ))}
@@ -119,33 +202,20 @@ export function Operations() {
 
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">System Analytics</h2>
-            <select className="border border-gray-200 rounded-lg px-3 py-1 text-sm">
-              <option>Last 24 hours</option>
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-            </select>
+            <h2 className="text-lg font-semibold text-gray-900">{t('operations.activitySummary')}</h2>
           </div>
           <div className="space-y-4">
             {[
-              { label: 'CPU Usage', value: '38%', trend: '+2%' },
-              { label: 'Memory Usage', value: '62%', trend: '-5%' },
-              { label: 'Network Traffic', value: '1.2 TB', trend: '+15%' },
-              { label: 'API Response Time', value: '245ms', trend: '-12%' },
+              { label: t('operations.totalCalls'), value: loading ? '…' : String(calls.length), icon: Phone },
+              { label: t('operations.successfulCalls'), value: loading ? '…' : String(successfulCalls), icon: CheckCircle2 },
+              { label: t('operations.upcomingSessions'), value: loading ? '…' : String(reservations.filter((r) => r.status === 'reserved' && new Date(r.date) >= new Date(now.toDateString())).length), icon: CalendarDays },
             ].map((stat, index) => (
               <div key={index} className="flex items-center justify-between p-3 border-b border-gray-100">
                 <div className="flex items-center space-x-3">
-                  <BarChart className="w-4 h-4 text-gray-400" />
+                  <stat.icon className="w-4 h-4 text-gray-400" />
                   <span className="text-gray-600">{stat.label}</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className="font-medium text-gray-900">{stat.value}</span>
-                  <span className={`text-sm ${
-                    stat.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {stat.trend}
-                  </span>
-                </div>
+                <span className="font-medium text-gray-900">{stat.value}</span>
               </div>
             ))}
           </div>

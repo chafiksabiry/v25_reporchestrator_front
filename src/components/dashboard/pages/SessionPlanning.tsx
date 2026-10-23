@@ -776,28 +776,28 @@ export function SessionPlanning() {
                     format(selectedDate, 'yyyy-MM-dd')
                 );
                 await refreshData();
-                showNotification('success', 'Slot reserved successfully');
+                showNotification('success', t('sessionPlanning.notif.slotReserved'));
                 return;
             }
             if (existing && (existing as any).capacity !== undefined && updates.notes !== undefined && (existing as any).reservationId) {
                 await slotApi.updateReservationNotes((existing as any).reservationId, updates.notes);
                 await refreshData();
-                showNotification('success', 'Reservation notes updated');
+                showNotification('success', t('sessionPlanning.notif.notesUpdated'));
                 return;
             }
             if (existing && (existing as any).capacity !== undefined && updates.status === 'available') {
                 const resId = (existing as any).reservationId || existing.id;
                 await slotApi.cancelReservation(resId);
                 await refreshData();
-                showNotification('success', 'Reservation cancelled');
+                showNotification('success', t('sessionPlanning.notif.reservationCancelled'));
                 return;
             }
             await schedulerApi.upsertTimeSlot(slotWithRep);
             await refreshData();
-            showNotification('success', updates.id ? 'Time slot updated successfully' : 'New time slot created');
+            showNotification('success', updates.id ? t('sessionPlanning.notif.slotUpdated') : t('sessionPlanning.notif.slotCreated'));
         } catch (error) {
             console.error('Error saving slot:', error);
-            showNotification('error', 'Failed to save time slot');
+            showNotification('error', t('sessionPlanning.notif.saveFailed'));
         }
     };
 
@@ -812,10 +812,10 @@ export function SessionPlanning() {
                 await schedulerApi.cancelTimeSlot(slotId);
             }
             await refreshData();
-            showNotification('success', 'Time slot cancelled');
+            showNotification('success', t('sessionPlanning.notif.slotCancelled'));
         } catch (error) {
             console.error('Error cancelling slot:', error);
-            showNotification('error', 'Failed to cancel time slot');
+            showNotification('error', t('sessionPlanning.notif.cancelFailed'));
         }
         if (selectedSlot?.id === slotId) setSelectedSlot(null);
     };
@@ -831,13 +831,13 @@ export function SessionPlanning() {
                 })
             ));
             await refreshData();
-            showNotification('success', `${draftSlots.length} time block(s) reserved successfully`);
+            showNotification('success', t('sessionPlanning.notif.blocksReserved', { count: draftSlots.length }));
             setDraftSlots([]);
             setDraftSlotNotes({});
             setGlobalNotes('');
         } catch (error) {
             console.error('Error in multi-reserve:', error);
-            showNotification('error', 'Failed to reserve time blocks');
+            showNotification('error', t('sessionPlanning.notif.blocksReserveFailed'));
         }
     };
 
@@ -1117,7 +1117,7 @@ export function SessionPlanning() {
                                     </div>
                                     <p className="text-sm font-black text-slate-700 uppercase tracking-wider">{t('sessionPlanning.selectGigHint')}</p>
                                     <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
-                                        Choisissez un gig ci-dessus pour afficher les créneaux disponibles à la réservation.
+                                        {t('sessionPlanning.selectGigHelp')}
                                     </p>
                                 </div>
                             )}
