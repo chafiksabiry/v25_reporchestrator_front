@@ -75,6 +75,20 @@ const TopStatusBar: React.FC = () => {
   const [leadCalls, setLeadCalls] = useState<LeadCallRow[]>([]);
   const [leadCallsLoading, setLeadCallsLoading] = useState(false);
 
+  // Live elapsed-time ticker for the "Active Call" status card — re-renders
+  // every second while a call is in progress so the duration actually counts
+  // up instead of staying frozen at the initial render.
+  const [, setCallTick] = useState(0);
+  useEffect(() => {
+    if (!state.callState.isActive) return;
+    const interval = setInterval(() => setCallTick((n) => n + 1), 1000);
+    return () => clearInterval(interval);
+  }, [state.callState.isActive]);
+
+  const callElapsedSeconds = state.callState.isActive && state.callState.startTime
+    ? Math.max(0, Math.floor((Date.now() - new Date(state.callState.startTime).getTime()) / 1000))
+    : 0;
+
   const prospectName = useMemo(() => {
     if (!lead) return '';
     return (
@@ -171,7 +185,12 @@ const TopStatusBar: React.FC = () => {
           title="Call Status"
           value={
             state.callState.isActive ? (
-              <span className="text-white font-black animate-pulse">ACTIVE CALL</span>
+              <div className="flex items-center gap-2">
+                <span className="text-white font-black animate-pulse">ACTIVE CALL</span>
+                <span className="text-white/90 font-mono text-sm tabular-nums">
+                  {formatDuration(callElapsedSeconds)}
+                </span>
+              </div>
             ) : (
               <span className="text-white/60 font-bold uppercase tracking-widest text-xs">Waiting...</span>
             )
