@@ -275,6 +275,9 @@
     "title": "My Calls",
     "subtitle": "Review your performance and interaction details",
     "recordsTitle": "Call Records",
+    "recordsHeading": "Calls & commissions",
+    "recordsCount": "{{count}} call displayed",
+    "recordsCount_plural": "{{count}} calls displayed",
     "leadFilter": "Calls for this prospect",
     "showAll": "All calls",
     "fraudDetected": "Fraud detected",
@@ -328,6 +331,7 @@
   },
   "workspace": {
     "title": "Workspace",
+    "allStatuses": "All statuses",
     "activeGig": "Active gig",
     "allMyGigs": "All my gigs",
     "tabLeads": "Leads",

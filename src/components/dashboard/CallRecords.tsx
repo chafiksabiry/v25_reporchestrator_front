@@ -1095,10 +1095,10 @@ export function CallRecords({
             {t('calls.recordsTitle')}
           </p>
           <h2 className="text-base font-black text-slate-900 tracking-tight">
-            Appels & commissions
+            {t('calls.recordsHeading')}
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            {filteredRecords.length} appel{filteredRecords.length !== 1 ? 's' : ''} affiché{filteredRecords.length !== 1 ? 's' : ''}
+            {t('calls.recordsCount', { count: filteredRecords.length })}
           </p>
         </div>
         <button
@@ -1123,7 +1123,7 @@ export function CallRecords({
           >
             <span>
               {historyStatusFilter === 'all'
-                ? t('workspace.allStatuses', 'Tous statuts')
+                ? t('workspace.allStatuses')
                 : t(`prospects.disp.${historyStatusFilter}`, HARX_LADDER[historyStatusFilter]?.label || historyStatusFilter)}
             </span>
             <ChevronDown className={`w-3 h-3 transition-transform ${historyStatusOpen ? 'rotate-180' : ''}`} />
@@ -1136,7 +1136,7 @@ export function CallRecords({
                   const active = historyStatusFilter === id;
                   const label =
                     id === 'all'
-                      ? t('workspace.allStatuses', 'Tous statuts')
+                      ? t('workspace.allStatuses')
                       : t(`prospects.disp.${id}`, HARX_LADDER[id]?.label || id);
                   return (
                     <button
