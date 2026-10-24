@@ -275,6 +275,9 @@
     "title": "Mes Appels",
     "subtitle": "Consultez vos performances et les détails de vos interactions",
     "recordsTitle": "Enregistrements d'appels",
+    "recordsHeading": "Appels & commissions",
+    "recordsCount": "{{count}} appel affiché",
+    "recordsCount_plural": "{{count}} appels affichés",
     "leadFilter": "Appels de ce prospect",
     "showAll": "Tous les appels",
     "fraudDetected": "Fraude détectée",
@@ -328,6 +331,7 @@
   },
   "workspace": {
     "title": "Espace de Travail",
+    "allStatuses": "Tous statuts",
     "activeGig": "Gig actif",
     "allMyGigs": "Tous mes gigs",
     "tabLeads": "Prospects",
