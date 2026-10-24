@@ -277,6 +277,29 @@ export function ContactInfo() {
     setShowSchedulerPopover(false);
     setSchedulerType(null);
 
+    // Prime the hidden <audio id="call-audio" autoPlay> element synchronously,
+    // while we're still inside the click's user-activation window. The real
+    // remote stream only gets attached much later (after token fetch, device
+    // registration, WebRTC negotiation, plus a setTimeout on 'accept'), by
+    // which point the browser's autoplay policy has usually expired the
+    // activation — setting srcObject then is silently blocked and the call
+    // connects with no audio at all on the PC side, even though Twilio's own
+    // Dial leg to the phone works. Calling play() now (muted, with no source
+    // yet) keeps the element "unlocked" so the later srcObject swap keeps
+    // playing without needing a fresh gesture.
+    try {
+      const primingAudio = document.getElementById('call-audio') as HTMLAudioElement | null;
+      if (primingAudio) {
+        primingAudio.muted = true;
+        void primingAudio.play().catch(() => {
+          /* best-effort priming; the later explicit play() after the real
+             stream is attached is what actually matters */
+        });
+      }
+    } catch {
+      /* ignore — priming is best-effort */
+    }
+
     // Ensure we have valid contact data
     const phoneNumber = contact.phone;
 
@@ -441,8 +464,13 @@ export function ContactInfo() {
               // Attach remote stream to global call-audio element for speaker control
               const remoteAudio = document.getElementById('call-audio') as HTMLAudioElement;
               if (remoteAudio) {
+                remoteAudio.muted = false;
                 remoteAudio.srcObject = stream;
-                console.log('🔊 Remote audio attached to #call-audio');
+                remoteAudio.play().then(() => {
+                  console.log('🔊 Remote audio attached and playing on #call-audio');
+                }).catch((playError) => {
+                  console.error('🔇 Remote audio attached but play() was blocked:', playError);
+                });
               }
 
               // Log de debug pour la transcription
@@ -647,7 +675,11 @@ export function ContactInfo() {
                 dispatch({ type: 'SET_MEDIA_STREAM', mediaStream: stream });
                 const remoteAudio = document.getElementById('call-audio') as HTMLAudioElement;
                 if (remoteAudio) {
+                  remoteAudio.muted = false;
                   remoteAudio.srcObject = stream;
+                  remoteAudio.play().catch((playError) => {
+                    console.error('🔇 Remote audio attached but play() was blocked:', playError);
+                  });
                 }
                 try {
                   const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
