@@ -45,6 +45,21 @@ import {
 import { buildRepPageTitle, resolveRepTabTitle } from '../lib/repSections';
 import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
+import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../components/onboarding/RepOnboardingHelpModal';
+import { HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+
+/** Maps the current dashboard route to its on-demand help content, if any. */
+function dashboardGuideKeyForPath(pathname: string): RepOnboardingGuideKey | null {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  if (path === '/' || path === '/dashboard') return 'dashboard';
+  if (path === '/marketplace') return 'marketplace';
+  if (path.startsWith('/gig/')) return 'gig-details';
+  if (path.startsWith('/company/')) return 'company-profile';
+  if (path === '/session-planning') return 'session-planning';
+  if (path === '/workspace') return 'workspace';
+  return null;
+}
 
 async function syncRepWalletBalance() {
   const agentId = getAgentId();
@@ -135,6 +150,9 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
   const location = useLocation();
   const navigate = useNavigate();
   const mainRef = useRef<HTMLElement>(null);
+  const { t } = useTranslation();
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const guideKey = dashboardGuideKeyForPath(location.pathname);
 
   useLayoutEffect(() => {
     if (loading) return;
@@ -285,6 +303,25 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
           </PageContainer>
         </main>
       </div>
+
+      {/* Persistent, discoverable help on main dashboard screens — mirrors the
+          "?" button already used during onboarding (OnboardingShell). */}
+      {!isProfileEdit && guideKey && (
+        <button
+          type="button"
+          onClick={() => setIsHelpOpen(true)}
+          aria-label={t('repOnboardingGuide.open', 'Aide')}
+          title={t('repOnboardingGuide.open', 'Aide')}
+          className="fixed bottom-5 left-5 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-gradient-harx text-white shadow-lg shadow-black/20 transition-all hover:scale-105 hover:shadow-xl active:scale-95"
+        >
+          <HelpCircle className="h-5 w-5" />
+        </button>
+      )}
+      <RepOnboardingHelpModal
+        open={isHelpOpen}
+        guideKey={guideKey}
+        onClose={() => setIsHelpOpen(false)}
+      />
     </div>
   );
 }
