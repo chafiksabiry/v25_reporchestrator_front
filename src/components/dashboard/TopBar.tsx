@@ -16,6 +16,8 @@ import {
   USER_FULLNAME_UPDATE_EVENT,
 } from '../../utils/profileUtils';
 import { isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { getProfilePlan } from '../../utils/profileUtils';
+import { localizeRepPlan } from '../../utils/repPlanI18n';
 
 /**
  * Full shell (wallet, planning, marketplace nav) unlocks only after the
@@ -85,6 +87,26 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => computeOnboardingComplete());
   const [displayName, setDisplayName] = useState<string>('User');
   const [canOpenProfile, setCanOpenProfile] = useState<boolean>(() => computeCanOpenProfile());
+  const [planName, setPlanName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!onboardingComplete) return;
+    const agentId = getAgentId();
+    if (!agentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getProfilePlan(agentId);
+        if (cancelled || !data?.plan?.name) return;
+        setPlanName(localizeRepPlan(data.plan, t).name);
+      } catch {
+        /* no subscribed plan yet — badge stays hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [onboardingComplete, t]);
 
   useEffect(() => {
     const handleBalanceUpdate = () => {
@@ -316,6 +338,9 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             )}
             <div className="hidden md:block text-right">
               <p className="text-sm font-black tracking-tight text-white">{userName}</p>
+              {planName && (
+                <p className="text-[9px] font-black uppercase tracking-widest text-white/60">{planName}</p>
+              )}
             </div>
             <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
           </div>
