@@ -21,6 +21,7 @@ import {
   type ApiNotification,
 } from '../services/api/notificationsApi';
 import { fetchEnrolledGigsForAgent, fetchInvitedGigsForAgent } from '../utils/trainingScriptRequirement';
+import { refreshGigStatuses } from '../utils/gigStatusUtils';
 
 export type RepNotificationKind =
   | 'enrollment'
@@ -463,6 +464,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                   : undefined,
             }
           );
+          // The bell updates instantly above, but GigDetails/GigsMarketplace
+          // keep their own enrolledGigIds/pendingGigIds state that only
+          // refetches on mount or after the rep's own apply/accept/reject —
+          // never on a push from the company's side. Without this, a rep
+          // already sitting on the gig page sees the notification land but
+          // the "EN ATTENTE DE VALIDATION" badge never flips to accepted.
+          void refreshGigStatuses();
         } else {
           void refreshNotifications();
         }
