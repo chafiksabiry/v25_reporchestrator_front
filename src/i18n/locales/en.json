@@ -1185,6 +1185,7 @@
       "basicInfo": "Basic information extracted",
       "experience": "Work experience analyzed",
       "matchingLanguages": "Matching languages…",
+      "matchingSkills": "Matching skills…",
       "skills": "Skills categorized and languages matched",
       "achievements": "Achievements extracted",
       "availability": "Availability preferences analyzed",

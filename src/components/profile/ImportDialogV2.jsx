@@ -3,6 +3,7 @@ import { Dialog } from '@headlessui/react';
 import { CVParser } from '../../lib/parsers/cvParser';
 import { useProfile } from '../../hooks/useProfile';
 import { getLanguageByCode, getAllLanguages } from '../../lib/api/languages';
+import { fetchAllSkills } from '../../services/api/skills';
 import {
   extractBasicInfo,
   analyzeExperience,
@@ -293,6 +294,37 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return found || [];
       };
 
+      // The Agent schema stores skills as DB refs ({ skill: ObjectId, level }),
+      // but the AI returns free-text names ({ name, confidence, context }) — the
+      // same free-text-vs-DB-ref gap already solved for languages above. Resolve
+      // each AI skill name against this rep's own skill catalog by name; a skill
+      // the AI mentions but the catalog doesn't have is dropped rather than
+      // failing the whole import (skills aren't mandatory, unlike languages).
+      addAnalysisStep(t('profileImportDialog.analysis.matchingSkills', 'Correspondance des compétences…'));
+      let dbSkillsByType = { technical: {}, professional: {}, soft: {} };
+      try {
+        dbSkillsByType = await fetchAllSkills();
+      } catch (error) {
+        console.warn('Could not load skill catalog for name matching:', error);
+      }
+      const resolveSkillList = (rawList, skillType) => {
+        const grouped = dbSkillsByType[skillType] || {};
+        const flat = Object.values(grouped).flat();
+        const normName = (v) => String(v || '').trim().toLowerCase();
+        const resolved = [];
+        for (const item of Array.isArray(rawList) ? rawList : []) {
+          const aiName = normName(item?.name || item);
+          if (!aiName) continue;
+          const dbSkill = flat.find((s) => normName(s.name) === aiName) ||
+            flat.find((s) => normName(s.name).includes(aiName) || aiName.includes(normName(s.name)));
+          if (!dbSkill) continue;
+          const confidence = Number(item?.confidence);
+          const level = Number.isFinite(confidence) ? Math.min(5, Math.max(0, Math.round(confidence))) : 3;
+          resolved.push({ skill: dbSkill._id, level, details: item?.context || '' });
+        }
+        return resolved;
+      };
+
       // keyAreas may come back bilingual ({ en, fr }[]) from analyzeExperience — flatten
       // to string[] for Mongoose keyExpertise while keeping the _i18n mirror.
       const keyAreasN = normalizeBilingualList(experience.keyAreas || [], activeLang);
@@ -327,10 +359,11 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         // Categorized skills come from analyzeSkills (the dedicated skills
         // analyzer); fall back to analyzeExperience for backwards-compat. Both
         // naming conventions (`technical` / `technicalSkills`) are supported.
+        // Resolved against the DB skill catalog — the schema stores refs, not names.
         skills: {
-          technical: pickSkillList('technical'),
-          professional: pickSkillList('professional'),
-          soft: pickSkillList('soft')
+          technical: resolveSkillList(pickSkillList('technical'), 'technical'),
+          professional: resolveSkillList(pickSkillList('professional'), 'professional'),
+          soft: resolveSkillList(pickSkillList('soft'), 'soft')
         },
         experience: (experience.roles || defaultArrays.roles).map(role => {
           const startDate = new Date(role.startDate);
@@ -411,7 +444,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return;
       }
       console.error('Profile parsing error:', err);
-      const displayError = err.message || t('profileImportDialog.errors.parseFailed');
+      // The backend's generic "Validation error" (Mongoose schema rejection)
+      // carries the actual failing field(s) in `errors`, which was previously
+      // discarded — surface it so a future mismatch is diagnosable from the
+      // UI instead of showing a bare "Impossible d'analyser votre CV".
+      const detail = Array.isArray(err.errors) && err.errors.length > 0 ? `: ${err.errors.join(', ')}` : '';
+      const displayError = (err.message ? `${err.message}${detail}` : '') || t('profileImportDialog.errors.parseFailed');
       setError(displayError);
       addAnalysisStep(t('profileImportDialog.analysis.error', { message: displayError }), true);
     } finally {
