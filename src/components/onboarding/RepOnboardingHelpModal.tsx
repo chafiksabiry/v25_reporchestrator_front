@@ -5,7 +5,13 @@ export type RepOnboardingGuideKey =
   | 'profile-import'
   | 'profile-editor'
   | 'profile'
-  | 'subscription';
+  | 'subscription'
+  | 'dashboard'
+  | 'marketplace'
+  | 'gig-details'
+  | 'company-profile'
+  | 'session-planning'
+  | 'workspace';
 
 type Props = {
   open: boolean;
@@ -59,6 +65,55 @@ export function RepOnboardingHelpModal({ open, guideKey, onClose }: Props) {
       description:
         'Sélectionnez le plan correspondant à votre activité pour activer votre compte. Chaque plan détaille ses propres avantages à l’écran.',
       tips: ['Ce choix active votre compte — comparez les plans proposés avant de valider.'],
+    },
+    dashboard: {
+      title: 'Votre tableau de bord',
+      description:
+        'Vue d’ensemble de votre activité : missions en cours, gains, et raccourcis vers vos prochaines actions.',
+      tips: [
+        'Les cartes vous amènent directement à l’écran correspondant (missions, portefeuille, planification).',
+        'Revenez ici à tout moment via "Tableau de Bord" dans le menu de gauche.',
+      ],
+    },
+    marketplace: {
+      title: 'La Marketplace des GIGs',
+      description:
+        'Parcourez les missions (GIGs) proposées par les entreprises. Postulez à celles qui vous correspondent, ou mettez-les en favori pour plus tard.',
+      tips: [
+        '"POSTULER" envoie votre candidature à l’entreprise ; "INSCRITE" signifie que votre candidature est déjà envoyée.',
+        'Utilisez les onglets (Favoris, Invitations, Inscrites) pour retrouver rapidement vos missions.',
+        'Les filtres Secteurs/Activités affinent la liste selon votre spécialité.',
+      ],
+    },
+    'gig-details': {
+      title: 'Détails de la mission',
+      description:
+        'Retrouvez ici toutes les informations sur la mission : description, prérequis, et l’état de votre candidature.',
+      tips: [
+        '"COMMENCER" lance la mission une fois votre candidature acceptée par l’entreprise.',
+        'Le statut affiché se met à jour automatiquement dès que l’entreprise valide votre candidature.',
+      ],
+    },
+    'company-profile': {
+      title: 'Profil de l’entreprise',
+      description:
+        'Consultez les informations de l’entreprise qui propose la mission avant de postuler ou de démarrer votre activité.',
+      tips: ['Ces informations vous aident à mieux préparer vos échanges avec les prospects.'],
+    },
+    'session-planning': {
+      title: 'Planification',
+      description:
+        'Organisez vos créneaux de travail sur vos missions actives pour structurer votre activité.',
+      tips: ['Planifier vos sessions aide à répartir votre charge de travail sur la semaine.'],
+    },
+    workspace: {
+      title: 'Espace de Travail',
+      description:
+        'Votre espace d’appel : sélectionnez un prospect pour voir sa fiche et son historique d’échanges, puis lancez l’appel depuis le Cockpit.',
+      tips: [
+        '"PROSPECTS" liste les contacts à traiter pour le GIG actif ; "HISTORIQUE" retrace vos appels passés.',
+        'Le panneau "Cockpit" s’ouvre automatiquement pendant un appel pour afficher le script et enregistrer la conversation.',
+      ],
     },
   };
 
