@@ -10,7 +10,8 @@ import {
   analyzeSkills,
   analyzeAchievements,
   analyzeAvailability,
-  generateSummary
+  generateSummary,
+  getTimezones
 } from '../../lib/api/profiles';
 
 import Cookies from 'js-cookie';
@@ -329,15 +330,41 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       // to string[] for Mongoose keyExpertise while keeping the _i18n mirror.
       const keyAreasN = normalizeBilingualList(experience.keyAreas || [], activeLang);
 
+      // Agent.availability.timeZone AND personalInfo.country (despite its name)
+      // are both ObjectId refs into the Timezone collection, not free strings —
+      // analyzeAvailability/extractBasicInfo return raw values ("Europe/Paris",
+      // "FR") straight from the AI, which Mongoose can't cast to an ObjectId.
+      // Same free-text-vs-DB-ref gap as languages/skills above.
+      let timezones = [];
+      try {
+        timezones = await getTimezones();
+      } catch (error) {
+        console.warn('Could not load timezone catalog for name matching:', error);
+      }
+
       const rawTimeZone = availability?.timeZone;
-      const safeTimeZone =
-        rawTimeZone && String(rawTimeZone).trim() ? rawTimeZone : defaultAvailability.timeZone;
+      let safeTimeZone = defaultAvailability.timeZone;
+      if (rawTimeZone && String(rawTimeZone).trim() && rawTimeZone !== 'unknown') {
+        const match = (timezones || []).find(
+          (tz) => String(tz.zoneName || '').toLowerCase() === String(rawTimeZone).trim().toLowerCase()
+        );
+        if (match) safeTimeZone = match._id;
+      }
+
+      let safeCountry = '';
+      const rawCountry = basicInfo.country;
+      if (rawCountry && String(rawCountry).trim()) {
+        const match = (timezones || []).find(
+          (tz) => String(tz.countryCode || '').toLowerCase() === String(rawCountry).trim().toLowerCase()
+        );
+        if (match) safeCountry = match._id;
+      }
 
       // Combine all data with proper error handling and defaults
       const combinedData = {
         personalInfo: {
           name: basicInfo.name || '',
-          country: basicInfo.country || '',
+          country: safeCountry,
           email: basicInfo.email || '',
           phone: basicInfo.phone || '',
           languages: matchedLanguages || defaultArrays.languages
