@@ -33,7 +33,7 @@ function IndustryAssessment({ onComplete, industries = [] }) {
   const fetchIndustryKnowledge = async (industry) => {
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -70,7 +70,7 @@ function IndustryAssessment({ onComplete, industries = [] }) {
     try {
       setLoading(true);
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -156,7 +156,7 @@ function IndustryAssessment({ onComplete, industries = [] }) {
 
     try {
       const analysisResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",

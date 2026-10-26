@@ -86,7 +86,7 @@ function ContactCenterAssessment({ saveResults, onComplete, profileData }) {
       const skill = currentCategory.skills[currentSkill];
 
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -169,7 +169,7 @@ function ContactCenterAssessment({ saveResults, onComplete, profileData }) {
       const skill = currentCategory.skills[currentSkill];
 
       const analysisResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",

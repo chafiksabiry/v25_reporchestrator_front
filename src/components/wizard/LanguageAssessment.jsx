@@ -82,7 +82,7 @@ function LanguageAssessment({ language, onComplete }) {
     try {
       // Simulate AI analysis with GPT-3
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",

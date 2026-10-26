@@ -98,7 +98,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
   const generateSummary = async (data) => {
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -143,7 +143,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Initial analysis to extract basic information
       const basicInfoResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -172,7 +172,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Analyze work experience
       const experienceResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -227,7 +227,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Extract and categorize skills
       const skillsResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -329,7 +329,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
       // Extract achievements and projects
       const achievementsResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
