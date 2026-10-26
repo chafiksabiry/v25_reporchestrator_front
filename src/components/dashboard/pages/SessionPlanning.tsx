@@ -8,6 +8,7 @@ import { Building, Clock, Briefcase, AlertCircle, Users, Brain, CalendarRange, C
 import {
     engagementTone,
     ENGAGEMENT_TONE_CLASS,
+    rateTone,
     isDateInPeriod,
     periodEnd,
     periodStart,
@@ -886,7 +887,7 @@ export function SessionPlanning() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 items-stretch">
                             {([
                                 { key: 'daily' as const, label: t('sessionPlanning.engagementDaily'), m: engagementMetrics.daily },
                                 { key: 'weekly' as const, label: t('sessionPlanning.engagementWeekly'), m: engagementMetrics.weekly },
@@ -896,9 +897,9 @@ export function SessionPlanning() {
                                 return (
                                     <div
                                         key={key}
-                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 ${tone.bg} ${tone.ring}`}
+                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 h-full ${tone.bg} ${tone.ring}`}
                                     >
-                                        <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${tone.bg}`}>
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.bg}`}>
                                             <Clock className={`h-4 w-4 ${tone.text}`} />
                                         </div>
                                         <div>
@@ -913,8 +914,14 @@ export function SessionPlanning() {
                                     </div>
                                 );
                             })}
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20">
+                            <div
+                                className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 h-full"
+                                title={t(
+                                    'sessionPlanning.reservedHint',
+                                    'Nombre total de réservations non annulées, toutes périodes confondues.'
+                                )}
+                            >
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20">
                                     <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                                 </div>
                                 <div>
@@ -922,8 +929,8 @@ export function SessionPlanning() {
                                     <p className="text-xl font-black text-white tracking-tight">{engagementMetrics.reservedTotal}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/20">
+                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 h-full">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20">
                                     <Briefcase className="h-4 w-4 text-indigo-300" />
                                 </div>
                                 <div>
@@ -931,56 +938,93 @@ export function SessionPlanning() {
                                     <p className="text-xl font-black text-white tracking-tight">{gigs.length}</p>
                                 </div>
                             </div>
-                            <div
-                                className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5"
-                                title={t(
-                                    'sessionPlanning.attendanceHint',
-                                    'Slots réservés passés vs activité téléphonie réelle pendant le créneau (appels / tentatives).'
-                                )}
-                            >
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/20">
-                                    <UserCheck className="h-4 w-4 text-sky-300" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
-                                    <p className="text-xl font-black text-white tracking-tight">
-                                        {formatAttendanceValue(attendanceScore)}
-                                    </p>
-                                    {attendanceBreakdown.reservedPast > 0 && (
-                                        <p className="text-[9px] font-bold text-white/45 tabular-nums">
-                                            {attendanceBreakdown.withActivity}/{attendanceBreakdown.reservedPast}
-                                            {attendanceBreakdown.noShow > 0
-                                                ? ` · ${attendanceBreakdown.noShow} ${t('sessionPlanning.attendanceNoShow', 'absent(s)')}`
-                                                : ''}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20">
-                                    <Clock className="h-4 w-4 text-amber-300" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lateAttendance')}</p>
-                                    <p className="text-xl font-black text-white tracking-tight">
-                                        {formatAttendanceValue(attendanceBreakdown.lateRate)}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500/20">
-                                    <LogOut className="h-4 w-4 text-orange-300" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] text-white/50 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.earlyCheckOut')}</p>
-                                    <p className="text-xl font-black text-white tracking-tight">
-                                        {formatAttendanceValue(attendanceBreakdown.earlyCheckoutRate)}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-1.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 min-w-[140px]">
+                            {(() => {
+                                const tone = ENGAGEMENT_TONE_CLASS[rateTone(attendanceScore, { higherIsBetter: true })];
+                                return (
+                                    <div
+                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 h-full ${tone.bg} ${tone.ring}`}
+                                        title={t(
+                                            'sessionPlanning.attendanceHint',
+                                            'Slots réservés passés vs activité téléphonie réelle pendant le créneau (appels / tentatives). Ne mesure pas la ponctualité — voir "À l\'heure".'
+                                        )}
+                                    >
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <UserCheck className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.attendanceScoring')}</p>
+                                            <p className={`text-xl font-black tracking-tight ${tone.text}`}>
+                                                {formatAttendanceValue(attendanceScore)}
+                                            </p>
+                                            {attendanceBreakdown.reservedPast > 0 && (
+                                                <p className="text-[9px] font-bold text-white/45 tabular-nums">
+                                                    {attendanceBreakdown.withActivity}/{attendanceBreakdown.reservedPast}
+                                                    {attendanceBreakdown.noShow > 0
+                                                        ? ` · ${attendanceBreakdown.noShow} ${t('sessionPlanning.attendanceNoShow', 'absent(s)')}`
+                                                        : ''}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {(() => {
+                                const tone = ENGAGEMENT_TONE_CLASS[rateTone(attendanceBreakdown.fullSlotRate, { higherIsBetter: true })];
+                                return (
+                                    <div
+                                        className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 h-full ${tone.bg} ${tone.ring}`}
+                                        title={t(
+                                            'sessionPlanning.onTimeHint',
+                                            "Part des créneaux avec activité où l'appel a commencé et s'est terminé dans la fenêtre réservée (sans retard ni départ anticipé)."
+                                        )}
+                                    >
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <CheckCircle2 className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.onTime', 'À l\'heure')}</p>
+                                            <p className={`text-xl font-black tracking-tight ${tone.text}`}>
+                                                {formatAttendanceValue(attendanceBreakdown.fullSlotRate)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {(() => {
+                                const tone = ENGAGEMENT_TONE_CLASS[rateTone(attendanceBreakdown.lateRate, { higherIsBetter: false })];
+                                return (
+                                    <div className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 h-full ${tone.bg} ${tone.ring}`}>
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <Clock className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.lateAttendance')}</p>
+                                            <p className={`text-xl font-black tracking-tight ${tone.text}`}>
+                                                {formatAttendanceValue(attendanceBreakdown.lateRate)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {(() => {
+                                const tone = ENGAGEMENT_TONE_CLASS[rateTone(attendanceBreakdown.earlyCheckoutRate, { higherIsBetter: false })];
+                                return (
+                                    <div className={`flex items-center gap-3 rounded-2xl backdrop-blur-sm border border-white/15 px-3.5 py-2.5 ring-1 h-full ${tone.bg} ${tone.ring}`}>
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.bg}`}>
+                                            <LogOut className={`h-4 w-4 ${tone.text}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest mb-0.5">{t('sessionPlanning.earlyCheckOut')}</p>
+                                            <p className={`text-xl font-black tracking-tight ${tone.text}`}>
+                                                {formatAttendanceValue(attendanceBreakdown.earlyCheckoutRate)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            <div className="flex flex-col gap-1.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-3.5 py-2.5 h-full">
                                 <div className="flex items-center gap-2">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/20">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500/20">
                                         <Ban className="h-4 w-4 text-rose-300" />
                                     </div>
                                     <div>

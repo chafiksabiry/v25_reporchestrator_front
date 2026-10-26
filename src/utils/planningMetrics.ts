@@ -25,6 +25,24 @@ export const ENGAGEMENT_TONE_CLASS: Record<
   neutral: { text: 'text-white', bg: 'bg-white/10', ring: 'ring-white/15' },
 };
 
+/**
+ * Tone for a 0-100 rate card (attendance/late/early-checkout): green/orange/red
+ * based on the value, with `higherIsBetter` flipping which end is "good"
+ * (e.g. a high late-attendance rate is bad, a high attendance rate is good).
+ * `null` (no data yet) stays neutral.
+ */
+export function rateTone(
+  value: number | null,
+  opts: { higherIsBetter: boolean; goodThreshold?: number; badThreshold?: number }
+): 'red' | 'orange' | 'green' | 'neutral' {
+  if (value == null) return 'neutral';
+  const { higherIsBetter, goodThreshold = 80, badThreshold = 50 } = opts;
+  const v = higherIsBetter ? value : 100 - value;
+  if (v >= goodThreshold) return 'green';
+  if (v >= badThreshold) return 'orange';
+  return 'red';
+}
+
 export function resolveIanaZone(tz: unknown): string | null {
   if (!tz) return null;
   if (typeof tz === 'string') {
