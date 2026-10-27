@@ -1562,7 +1562,7 @@ export function Dashboard({ profile }: DashboardProps) {
             </span>
             <button
               type="button"
-              onClick={() => navigate('/academy')}
+              onClick={() => navigate('/training')}
               className="harx-flash harx-flash--violet group inline-flex shrink-0 items-center justify-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 xl:gap-1.5 xl:px-3.5 xl:py-1.5 xl:text-[11px] 2xl:px-4 2xl:py-2 2xl:text-xs"
             >
               <GraduationCap size={11} className="xl:h-3.5 xl:w-3.5" />
