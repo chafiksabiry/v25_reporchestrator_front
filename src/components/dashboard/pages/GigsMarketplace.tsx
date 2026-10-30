@@ -2874,7 +2874,7 @@ export function GigsMarketplace() {
                         : 'Application sent — waiting for company approval.'}
                     </p>
 
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-auto pt-4 flex gap-2">
                       <button
                         type="button"
                         onClick={() => cancelEnrollmentRequest(requestedGig.id, requestedGig.gig._id)}
