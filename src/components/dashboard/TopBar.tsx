@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Menu, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings, Lock } from 'lucide-react';
+import { Menu, UserPlus, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUserInfo, getProfileData, getAgentId } from '../../utils/authUtils';
@@ -7,6 +7,7 @@ import api from '../../utils/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from './ui/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
+import { InviteShareModal } from '../share/InviteShareModal';
 import config from '../../config';
 import { getRepShellChrome } from '../../utils/harxBrand';
 import { isCallCenterStaff } from '../../utils/callCenterStaff';
@@ -74,6 +75,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -250,6 +252,7 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
   const hoverAccent = chrome.hoverAccent;
 
   return (
+    <>
     <header
       style={{ backgroundImage: chrome.navbarBg, boxShadow: chrome.barShadow, textShadow: chrome.textShadow }}
       className="relative h-16 grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 sm:px-8 shrink-0 z-20"
@@ -319,6 +322,24 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
       {/* ── Col 3: Right — Notifications + Language + Avatar ── */}
       <div className="flex items-center justify-end gap-2 sm:gap-4">
+        {!ccStaff && (
+          <button
+            type="button"
+            onClick={() => setIsInviteOpen(true)}
+            data-testid="open-invite"
+            data-tour="topbar-invite"
+            title={t('share.title')}
+            aria-label={t('share.button')}
+            className="group relative flex items-center gap-2 rounded-2xl bg-white px-3 py-2.5 text-[#E6188D] shadow-lg shadow-black/15 ring-2 ring-white/40 transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 sm:px-4"
+          >
+            <span className="absolute -right-1 -top-1 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-80" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-400 ring-2 ring-white" />
+            </span>
+            <UserPlus className="h-4 w-4" />
+            <span className="hidden text-xs font-black uppercase tracking-wider sm:block">{t('share.button')}</span>
+          </button>
+        )}
         <NotificationBell />
         <LanguageSwitcher />
         <div className="relative" ref={dropdownRef}>
@@ -445,6 +466,12 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
       </div>
 
     </header>
+    <InviteShareModal
+      open={isInviteOpen}
+      onClose={() => setIsInviteOpen(false)}
+      referrerId={profileData?._id ? String(profileData._id) : getAgentId() || null}
+    />
+    </>
   );
 }
 
