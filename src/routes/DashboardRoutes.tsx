@@ -48,6 +48,7 @@ import { PageContainer, resolvePageContainerVariant } from '../components/dashbo
 import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../components/onboarding/RepOnboardingHelpModal';
 import { HelpCircle } from 'lucide-react';
 import { RepProductTour, RepTourLauncher } from '../components/onboarding/RepProductTour';
+import { RepHintBubbles } from '../components/onboarding/RepHintBubbles';
 import { useTranslation } from 'react-i18next';
 
 /** Maps the current dashboard route to its on-demand help content, if any. */
@@ -327,6 +328,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
 
       {/* Post-onboarding product tour (state in the URL: ?tour=1&step=n). */}
       {!isProfileEdit && !loading && !isCallCenterStaff() && <RepProductTour />}
+      {!isProfileEdit && !loading && !isCallCenterStaff() && <RepHintBubbles />}
       {!isProfileEdit && !loading && !isCallCenterStaff() && guideKey === 'dashboard' && (
         <RepTourLauncher className="fixed bottom-5 left-20 z-[60]" />
       )}

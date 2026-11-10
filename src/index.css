@@ -278,3 +278,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .profile-id-pattern { animation: none; }
 }
+
+/* ── Bulles d'aide (RepHintBubbles) ── */
+@keyframes harx-hint-pop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.92); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes harx-hint-ping {
+  0% { transform: scale(0.9); opacity: 0.85; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes harx-hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.harx-hint-bubble { animation: harx-hint-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.harx-hint-bubble-inner { animation: harx-hint-bob 3.2s ease-in-out 600ms infinite; }
+.harx-hint-bubble-inner:hover { animation-play-state: paused; }
+.harx-hint-ping { animation: harx-hint-ping 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .harx-hint-bubble, .harx-hint-bubble-inner, .harx-hint-ping { animation: none; }
+}

@@ -2020,6 +2020,7 @@ export function GigsMarketplace() {
           {activeTab === 'enrolled' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
+          data-hint="tab-requested"
           onClick={() => setActiveTab('requested')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'requested'
             ? 'text-harx-600'
@@ -2035,6 +2036,7 @@ export function GigsMarketplace() {
           {activeTab === 'requested' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
+          data-hint="tab-favorite"
           onClick={() => setActiveTab('favorite')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'favorite'
             ? 'text-harx-600'
@@ -2150,6 +2152,7 @@ export function GigsMarketplace() {
                       )}
 
                       <button
+                        data-hint="gig-heart"
                         onClick={(e) => {
                           e.preventDefault();
                           favoriteGigs.includes(gig._id)

@@ -1837,5 +1837,16 @@
         "text": "On every key screen, this button explains in two minutes how to use it. You can also restart this tour at any time."
       }
     }
+  },
+  "repHints": {
+    "close": "Close",
+    "ok": "Got it",
+    "off": "Stop showing tips",
+    "dash-marketplace": "Start here: browse gigs and request to join.",
+    "dash-wallet": "Your earnings show up here as soon as a call is validated.",
+    "dash-help": "Unsure? This “?” button explains the screen in two minutes.",
+    "mkt-heart": "Tap the heart to set a gig aside and compare it later.",
+    "mkt-favorites": "Find every gig you favorited here.",
+    "mkt-requested": "Your join requests awaiting the company’s answer are here."
   }
 }
