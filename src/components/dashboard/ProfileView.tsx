@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
-import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
+import { OnboardingSatisfactionModal, clearSatisfactionPending, markSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
 import { refreshOnboardingStatus } from '../../services/apiConfig';
 import progressService from '../../services/progressService';
 import { toast, Toaster } from 'react-hot-toast';
@@ -181,6 +181,7 @@ export const ProfileView: React.FC<{
   const handlePublishProfile = useCallback(async () => {
     if (!profile?._id) return;
     setPublishing(true);
+    markSatisfactionPending();
     try {
       if (!isRepProfilePublished(profile)) {
         await updateProfileData(profile._id, { status: 'completed' });
@@ -191,6 +192,7 @@ export const ProfileView: React.FC<{
       onProfileUpdate?.({ ...profile, status: 'completed' });
     } catch (err) {
       console.error('Profile publish failed:', err);
+      clearSatisfactionPending();
       toast.error(t('profile.errors.publish'));
     } finally {
       setPublishing(false);
@@ -198,6 +200,7 @@ export const ProfileView: React.FC<{
   }, [profile, onProfileUpdate, t]);
 
   const handleSatisfactionClose = useCallback(() => {
+    clearSatisfactionPending();
     setShowSatisfaction(false);
     // Ensure dashboard shell sees published status before marketplace nav.
     void fetchProfileFromAPI()

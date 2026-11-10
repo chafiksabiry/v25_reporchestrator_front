@@ -20,6 +20,7 @@ import {
 import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
 import { usePageTitle } from '../../lib/tracking/usePageTitle';
 import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../onboarding/RepOnboardingHelpModal';
+import { isSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
 
 /** Maps the current onboarding route to the matching on-demand help content. */
 function guideKeyForPath(pathname: string): RepOnboardingGuideKey | null {
@@ -118,6 +119,8 @@ function OnboardingShellContent() {
     if (!userProfile || isCallCenterStaff()) return;
 
     const path = location.pathname;
+    // Fenêtre de satisfaction en cours (fin de l'onboarding) : on reste sur la page jusqu'à ce que le rep la ferme.
+    if (isSatisfactionPending()) return;
     if (
       path === '/onboarding/continue' ||
       path === '/orchestrator' ||
