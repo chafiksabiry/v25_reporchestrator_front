@@ -10,6 +10,7 @@ import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptio
 import { localizeRepPlan } from '../../utils/repPlanI18n';
 import { fetchProfileFromAPI, updateProfileData } from '../../utils/profileUtils';
 import { getRepOnboardingStep, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { isRepTourDone, repTourUrl } from './RepProductTour';
 import { OnboardingSatisfactionModal, clearSatisfactionPending, isSatisfactionPending, markSatisfactionPending } from './OnboardingSatisfactionModal';
 
 function Subscription() {
@@ -81,7 +82,8 @@ function Subscription() {
     void fetchProfileFromAPI()
       .catch(() => null)
       .finally(() => {
-        navigate('/marketplace', { replace: true });
+        // Fin d'onboarding : on lance la visite guidée de l'espace (une seule fois).
+        navigate(isRepTourDone() ? '/marketplace' : repTourUrl(0), { replace: true });
       });
   }, [navigate]);
 

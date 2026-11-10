@@ -47,6 +47,7 @@ import { usePageTitle } from '../lib/tracking/usePageTitle';
 import { PageContainer, resolvePageContainerVariant } from '../components/dashboard/ui/PageContainer';
 import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../components/onboarding/RepOnboardingHelpModal';
 import { HelpCircle } from 'lucide-react';
+import { RepProductTour, RepTourLauncher } from '../components/onboarding/RepProductTour';
 import { useTranslation } from 'react-i18next';
 
 /** Maps the current dashboard route to its on-demand help content, if any. */
@@ -310,6 +311,7 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
         <button
           type="button"
           onClick={() => setIsHelpOpen(true)}
+          data-tour="help-button"
           aria-label={t('repOnboardingGuide.open', 'Aide')}
           title={t('repOnboardingGuide.open', 'Aide')}
           className="fixed bottom-5 left-5 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-gradient-harx text-white shadow-lg shadow-black/20 transition-all hover:scale-105 hover:shadow-xl active:scale-95"
@@ -322,6 +324,12 @@ function DashboardRoutingWrapper({ userProfile, loading, isSidebarOpen, setIsSid
         guideKey={guideKey}
         onClose={() => setIsHelpOpen(false)}
       />
+
+      {/* Post-onboarding product tour (state in the URL: ?tour=1&step=n). */}
+      {!isProfileEdit && !loading && !isCallCenterStaff() && <RepProductTour />}
+      {!isProfileEdit && !loading && !isCallCenterStaff() && guideKey === 'dashboard' && (
+        <RepTourLauncher className="fixed bottom-5 left-20 z-[60]" />
+      )}
     </div>
   );
 }

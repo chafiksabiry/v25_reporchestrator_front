@@ -1762,7 +1762,6 @@
       }
     }
   },
-
   "share": {
     "button": "Inviter",
     "title": "Inviter à rejoindre HARX",
@@ -1783,5 +1782,60 @@
     "mailSubject": "Rejoignez-moi sur HARX",
     "messageRep": "Je suis sur HARX, où les professionnels du service client trouvent des missions. Créez votre profil REP en quelques minutes :",
     "messageCompany": "HARX met en relation les entreprises et des professionnels du service client, et leur donne une ligne de téléphonie. Créez le compte de votre entreprise ici :"
+  },
+  "repTour": {
+    "launch": "Visite guidée",
+    "stepOf": "Visite guidée · {{n}} sur {{total}}",
+    "quit": "Quitter la visite",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "start": "C’est parti",
+    "done": "Terminer",
+    "finish": {
+      "title": "Vous êtes prêt !",
+      "text": "Vous savez où tout se trouve. Passez à l’action avec une première mission :",
+      "m1": "Choisir mon premier gig",
+      "m2": "Démarrer ma première formation",
+      "m3": "Planifier ma première session",
+      "later": "Je m’en occupe plus tard"
+    },
+    "steps": {
+      "welcome": {
+        "title": "Bienvenue chez HARX !",
+        "text": "Votre profil est publié : votre espace est ouvert. En moins de deux minutes, découvrez à quoi sert chaque rubrique et comment décrocher votre première mission."
+      },
+      "dashboard": {
+        "title": "Votre tableau de bord",
+        "text": "Votre point de départ : vos indicateurs, votre progression et les prochaines actions à mener. Revenez-y chaque jour pour savoir quoi faire en priorité."
+      },
+      "marketplace": {
+        "title": "La marketplace des gigs",
+        "text": "Ici, les entreprises clientes publient leurs missions. Parcourez-les, ouvrez le détail, mettez vos préférés en favori puis demandez votre inscription.",
+        "tip": "Essayez : ajoutez 2 ou 3 gigs en favori pour les comparer tranquillement."
+      },
+      "training": {
+        "title": "Formation et certifications",
+        "text": "Des parcours courts pour monter en compétence et décrocher des certifications. Plus vous êtes formé, plus les entreprises vous choisissent.",
+        "tip": "Commencez par le premier module : il se termine en quelques minutes."
+      },
+      "workspace": {
+        "title": "Votre poste de travail",
+        "text": "C’est là que vous travaillez : vos leads, vos appels, l’historique et le copilote qui vous souffle les bonnes réponses en direct.",
+        "tip": "Une fois inscrit à un gig, vos leads apparaissent ici."
+      },
+      "planning": {
+        "title": "Votre planning",
+        "text": "Réservez vos sessions de travail et gardez la main sur vos disponibilités : les entreprises savent ainsi quand compter sur vous.",
+        "tip": "Planifiez dès maintenant votre première session."
+      },
+      "wallet": {
+        "title": "Votre portefeuille",
+        "text": "Vos commissions s’y accumulent après chaque appel validé. Suivez votre solde disponible, vos gains en attente et vos retraits."
+      },
+      "help": {
+        "title": "Besoin d’aide ? Le bouton « ? »",
+        "text": "Sur chaque écran important, ce bouton vous explique en deux minutes comment l’utiliser. Vous pouvez aussi relancer cette visite à tout moment."
+      }
+    }
   }
 }
