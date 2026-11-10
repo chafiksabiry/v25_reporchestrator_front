@@ -1837,5 +1837,16 @@
         "text": "Sur chaque écran important, ce bouton vous explique en deux minutes comment l’utiliser. Vous pouvez aussi relancer cette visite à tout moment."
       }
     }
+  },
+  "repHints": {
+    "close": "Fermer",
+    "ok": "Compris",
+    "off": "Ne plus afficher les astuces",
+    "dash-marketplace": "Commencez ici : parcourez les gigs et demandez votre inscription.",
+    "dash-wallet": "Vos gains s’affichent ici dès qu’un appel est validé.",
+    "dash-help": "Un doute ? Ce bouton « ? » vous explique l’écran en deux minutes.",
+    "mkt-heart": "Touchez le cœur pour mettre un gig de côté et le comparer plus tard.",
+    "mkt-favorites": "Retrouvez ici tous les gigs que vous avez mis en favori.",
+    "mkt-requested": "Vos demandes d’inscription en attente de réponse de l’entreprise sont ici."
   }
 }
