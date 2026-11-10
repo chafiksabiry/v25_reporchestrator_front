@@ -17,6 +17,7 @@ import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-im
 import 'react-image-crop/dist/ReactCrop.css';
 
 // Components
+import harxLogo from '../../assets/logo-harx.png';
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
@@ -119,6 +120,50 @@ export const ProfileView: React.FC<{
     return 'profile';
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  // One-page layout: tabs became anchored sections. Navigating = scrolling.
+  const SECTION_IDS = ['profile', 'experience', 'languages', 'skills', 'specialization', 'availability'];
+  const scrollToSection = useCallback((id: string) => {
+    const target = id === 'onboarding' ? 'availability' : id;
+    setActiveTab(target);
+    const el = document.getElementById(`profile-section-${target}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+  useEffect(() => {
+    const initial = getInitialTab();
+    if (initial === 'profile') return;
+    const timer = window.setTimeout(() => scrollToSection(initial), 600);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const id = (entry.target as HTMLElement).dataset.sectionId || '';
+          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect.top);
+          else visible.delete(id);
+        });
+        if (visible.size > 0) {
+          const [first] = [...visible.entries()].sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]))[0];
+          setActiveTab(first);
+        }
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+    );
+    const timer = window.setTimeout(() => {
+      SECTION_IDS.forEach((id) => {
+        const el = document.getElementById(`profile-section-${id}`);
+        if (el) observer.observe(el);
+      });
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [inlineAssessment, setInlineAssessment] = useState<
     | { type: 'contact-center'; skillId: string; category: string; skillName: string }
     | null
@@ -1074,8 +1119,8 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
+  const renderTab = (tabId: string) => {
+    switch (tabId) {
       case 'profile': return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
       case 'skills': return (
         <SkillsTab
@@ -1138,7 +1183,7 @@ export const ProfileView: React.FC<{
           profile={profile}
           onDeleteItemClick={(section, index) => onDeleteSpecializationItem?.(section, index)}
           onAddItemClick={(section, value) => onAddSpecializationItem?.(section, value)}
-          onGoToExperience={() => setActiveTab('experience')}
+          onGoToExperience={() => scrollToSection('experience')}
         />
       );
       case 'availability': return (
@@ -1190,7 +1235,7 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const currentHeader = headerContentMap[activeTab] || headerContentMap.profile;
+  const currentHeader = headerContentMap.profile;
   const filteredCountries = countries
     .filter((country) =>
       String(country.countryName || '')
@@ -1238,10 +1283,10 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2 animate-in fade-in slide-in-from-left-4 duration-500">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1 animate-in fade-in slide-in-from-left-4 duration-500">
             {currentHeader.title}
           </h1>
           <p className="text-slate-500 font-medium tracking-tight animate-in fade-in slide-in-from-left-6 duration-700">
@@ -1296,10 +1341,10 @@ export const ProfileView: React.FC<{
         )}
 
         {/* Navigation Tabs at the Top */}
-        <div className="w-full">
+        <div className="w-full sticky top-0 z-20 -mx-3 sm:-mx-4 lg:-mx-10 px-3 sm:px-4 lg:px-10 bg-[#f8fafc]/90 backdrop-blur [&>div]:mb-0">
           <ProfileNavbar
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={scrollToSection}
             warningTabs={[
               ...((profile?.personalInfo?.languages || []).some((l: any) => {
                 const enriched = enrichLanguageFromExperience(l, profile);
@@ -1323,12 +1368,21 @@ export const ProfileView: React.FC<{
         </div>
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
-        {activeTab === 'profile' && (
-          <div className="bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/60 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
+        {(
+          <div id="profile-section-identity" className="bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/60 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
               <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-1/3 -bottom-20 h-48 w-48 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-10 top-6 h-16 w-16 rounded-full bg-white/10" />
+              <div className="relative flex items-start justify-between px-6 sm:px-8 lg:px-10 pt-4">
+                <img src={harxLogo} alt="HARX" className="h-7 sm:h-8 w-auto drop-shadow" />
+                <div className="text-right">
+                  <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.25em] text-white">{t('profile.header.idCardTitle')}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/70">
+                    {t('profile.header.idCardNumber', { id: String(profile?._id || '').slice(-6).toUpperCase() || '——' })}
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col md:flex-row gap-8 lg:gap-10 items-start px-6 sm:px-8 lg:px-10 pb-8">
               {/* Photo management */}
@@ -1575,10 +1629,24 @@ export const ProfileView: React.FC<{
           </div>
         )}
 
-        <div className="w-full">
-          <div className="flex-1 min-h-[600px]">
-            {renderActiveTab()}
-          </div>
+        {/* One-page profile: every former tab is a section of the same screen */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+          {SECTION_IDS.map((id) => {
+            const wide = id === 'profile' || id === 'availability';
+            const scrolls = !wide;
+            return (
+              <section
+                key={id}
+                id={`profile-section-${id}`}
+                data-section-id={id}
+                className={`scroll-mt-20 min-w-0 ${wide ? 'xl:col-span-2' : ''}`}
+              >
+                <div className={scrolls ? 'xl:max-h-[34rem] xl:overflow-y-auto xl:pr-1 [scrollbar-width:thin]' : ''}>
+                  {renderTab(id)}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
 

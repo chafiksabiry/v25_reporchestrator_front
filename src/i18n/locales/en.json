@@ -902,6 +902,8 @@
       "finalStep": "Final step: publish your profile",
       "finalStepDescription": "Publish your profile to access the missions marketplace and let COMPANIES see your profile.",
       "browseMissions": "Browse gigs",
+      "idCardTitle": "HARX REP · Identity card",
+      "idCardNumber": "ID {{id}}",
       "phase2Complete": "Phase 2 completed",
       "phase2CompleteDescription": "Review your information in the tabs below. When you are done, press “Continue Onboarding” to choose your plan, then publish your profile.",
       "continueOnboarding": "Continue Onboarding",
