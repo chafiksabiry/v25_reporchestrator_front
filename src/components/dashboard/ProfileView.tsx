@@ -1301,17 +1301,17 @@ export const ProfileView: React.FC<{
           profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
           isRepPhase2Ready(profile) ||
           isRepCoreOnboardingDone(profile) ? (
-            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
+            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
               <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
               <div className="relative flex items-start gap-3 min-w-0">
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
                   <ClipboardCheck className="w-5 h-5 text-white" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-base font-extrabold text-white">
+                  <p className="text-sm font-extrabold text-white">
                     {t('profile.header.phase2Complete')}
                   </p>
-                  <p className="text-sm font-medium text-white/90 mt-0.5 leading-relaxed">
+                  <p className="text-xs font-medium text-white/90 mt-0.5 leading-relaxed">
                     {t('profile.header.phase2CompleteDescription')}
                   </p>
                 </div>
@@ -1369,13 +1369,22 @@ export const ProfileView: React.FC<{
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
         {(
-          <div id="profile-section-identity" className="bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/60 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div id="profile-section-identity" className="bg-gradient-to-b from-white to-slate-50/70 rounded-3xl overflow-hidden shadow-xl shadow-slate-300/40 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
               <div className="profile-id-pattern pointer-events-none absolute inset-0 opacity-70" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-amber-300 via-white/70 to-cyan-300 opacity-80" />
               <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-1/3 -bottom-20 h-48 w-48 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-10 top-6 h-16 w-16 rounded-full bg-white/10" />
+              <svg viewBox="0 0 44 32" className="pointer-events-none absolute bottom-4 right-6 sm:right-8 lg:right-10 h-8 w-11 drop-shadow" aria-hidden="true">
+                <defs>
+                  <linearGradient id="idchip" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#fde68a" /><stop offset="0.5" stopColor="#fbbf24" /><stop offset="1" stopColor="#d97706" />
+                  </linearGradient>
+                </defs>
+                <rect x="1" y="1" width="42" height="30" rx="6" fill="url(#idchip)" stroke="#b45309" strokeOpacity="0.45" />
+                <path d="M1 11h14M1 21h14M29 11h14M29 21h14M15 1v30M29 1v30M15 11h14M15 21h14" stroke="#92400e" strokeOpacity="0.4" fill="none" />
+              </svg>
               <div className="relative flex items-start justify-between px-6 sm:px-8 lg:px-10 pt-4">
                 <img src={harxLogo} alt="HARX" className="h-11 sm:h-14 w-auto drop-shadow-md" />
                 <div className="text-right">
@@ -1427,16 +1436,17 @@ export const ProfileView: React.FC<{
               </div>
 
               {/* Properties Grid */}
-              <div className="flex-1 w-full relative">
-                {/* Action Buttons Top Right */}
-                <div className="flex flex-wrap gap-3 mb-6 pb-6 pt-1 md:pt-5 border-b border-slate-100 justify-between items-center">
+              <div className="flex-1 w-full relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_17.5rem] items-start">
+                <div className="min-w-0">
+                <div className="flex flex-wrap gap-3 mb-5 md:pt-5 justify-between items-start">
                   <div>
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
                     <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
                     {(() => {
                       const langs = (profile.personalInfo?.languages || []).length;
                       const skillCount = ['technical', 'professional', 'soft'].reduce((n, k) => n + ((profile.skills?.[k] || []).length), 0);
-                      const years = String(profile.professionalSummary?.yearsOfExperience || '').trim();
+                      const yearsRaw = String(profile.professionalSummary?.yearsOfExperience || '').trim();
+                      const years = /^\d+\+?$/.test(yearsRaw) ? `${yearsRaw} ${t('profile.header.yearsUnit')}` : yearsRaw;
                       const chips = [
                         years ? { icon: Briefcase, label: t('profile.header.chipYears', { years }) } : null,
                         langs ? { icon: LanguagesIcon, label: t('profile.header.chipLanguages', { count: langs }) } : null,
@@ -1464,9 +1474,7 @@ export const ProfileView: React.FC<{
                       </div>
                     </div>
                   )}
-                </div>
-
-                <div className="flex items-center justify-end mb-3">
+                <div className="flex items-center gap-2 ml-auto">
                   {!isEditingPublicInfo ? (
                     <button
                       type="button"
@@ -1497,7 +1505,9 @@ export const ProfileView: React.FC<{
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   {/* Location */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.currentCountry')}</label>
@@ -1560,7 +1570,7 @@ export const ProfileView: React.FC<{
                   </div>
 
                   {/* Email */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:col-span-2 sm:order-3">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.directContact')}</label>
                     <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
@@ -1578,7 +1588,7 @@ export const ProfileView: React.FC<{
                   </div>
 
                   {/* Phone */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:order-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.phoneLine')}</label>
                     <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Phone className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
@@ -1596,8 +1606,10 @@ export const ProfileView: React.FC<{
                   </div>
                 </div>
 
+                </div>
+                <div className="xl:pt-5">
                 {/* Quick Stats Grid (Score & Plan) */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-harx-50/40 rounded-2xl border border-harx-100/70 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-harx-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-100/40 transition-colors"></div>
                     <div className="relative z-10 h-14 w-14 flex-shrink-0">
@@ -1637,7 +1649,7 @@ export const ProfileView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-harx px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
+                          className="mt-1.5 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-harx px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
                         >
                           {t('profile.header.choosePlanCta')}
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -1645,6 +1657,7 @@ export const ProfileView: React.FC<{
                       )}
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -1676,7 +1689,7 @@ export const ProfileView: React.FC<{
                   </span>
                   <span className="profile-chapter-line h-px flex-1" />
                 </div>
-                <div className={scrolls ? 'xl:max-h-[44rem] xl:overflow-y-auto xl:pr-1 [scrollbar-width:thin]' : ''}>
+                <div className={scrolls ? 'xl:max-h-[44rem] xl:overflow-y-auto xl:p-2 xl:-m-2 [scrollbar-width:thin]' : ''}>
                   {renderTab(id)}
                 </div>
               </section>

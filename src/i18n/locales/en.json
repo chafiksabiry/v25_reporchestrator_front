@@ -907,6 +907,7 @@
       "chipLanguages_other": "{{count}} languages",
       "chipSkills_one": "{{count}} skill",
       "chipSkills_other": "{{count}} skills",
+      "yearsUnit": "yrs",
       "idCardTitle": "HARX REP · Identity card",
       "idCardNumber": "ID {{id}}",
       "phase2Complete": "Phase 2 completed",
