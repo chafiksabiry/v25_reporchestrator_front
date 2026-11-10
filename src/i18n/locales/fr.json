@@ -902,6 +902,8 @@
       "finalStep": "Dernière étape : publier votre profil",
       "finalStepDescription": "Publiez votre profil pour accéder à la marketplace des missions et permettre aux COMPANIES de voir votre profil.",
       "browseMissions": "Voir les gigs",
+      "idCardTitle": "HARX REP · Carte d'identité",
+      "idCardNumber": "ID {{id}}",
       "phase2Complete": "Phase 2 terminée",
       "phase2CompleteDescription": "Vérifiez vos informations dans les onglets ci-dessous. Lorsque vous avez fini, appuyez sur « Continuer Onboarding » pour choisir votre formule, puis publier votre profil.",
       "continueOnboarding": "Continuer Onboarding",
