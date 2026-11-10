@@ -1762,7 +1762,6 @@
       }
     }
   },
-
   "share": {
     "button": "Invite",
     "title": "Invite people to join HARX",
@@ -1783,5 +1782,60 @@
     "mailSubject": "Join me on HARX",
     "messageRep": "I'm on HARX, where customer-service professionals find missions. Create your REP profile in a few minutes:",
     "messageCompany": "HARX connects companies with customer-service professionals and gives them a telephony line. Create your company account here:"
+  },
+  "repTour": {
+    "launch": "Guided tour",
+    "stepOf": "Guided tour · {{n}} of {{total}}",
+    "quit": "Quit the tour",
+    "prev": "Back",
+    "next": "Next",
+    "start": "Let’s go",
+    "done": "Finish",
+    "finish": {
+      "title": "You’re ready!",
+      "text": "You know where everything is. Take action with a first mission:",
+      "m1": "Pick my first gig",
+      "m2": "Start my first training",
+      "m3": "Schedule my first session",
+      "later": "I’ll do it later"
+    },
+    "steps": {
+      "welcome": {
+        "title": "Welcome to HARX!",
+        "text": "Your profile is published and your workspace is open. In under two minutes, see what each section is for and how to land your first mission."
+      },
+      "dashboard": {
+        "title": "Your dashboard",
+        "text": "Your starting point: your metrics, your progress and the next actions to take. Come back every day to see what matters most."
+      },
+      "marketplace": {
+        "title": "The gig marketplace",
+        "text": "Client companies post their missions here. Browse them, open the details, favorite the ones you like, then request to join.",
+        "tip": "Try it: favorite 2 or 3 gigs to compare them at your own pace."
+      },
+      "training": {
+        "title": "Training and certifications",
+        "text": "Short paths to build skills and earn certifications. The better trained you are, the more companies choose you.",
+        "tip": "Start with the first module: it only takes a few minutes."
+      },
+      "workspace": {
+        "title": "Your workstation",
+        "text": "This is where you work: your leads, your calls, your history and the copilot that suggests the right answers live.",
+        "tip": "Once you join a gig, your leads show up here."
+      },
+      "planning": {
+        "title": "Your schedule",
+        "text": "Book your work sessions and keep control of your availability, so companies know when they can count on you.",
+        "tip": "Schedule your first session right now."
+      },
+      "wallet": {
+        "title": "Your wallet",
+        "text": "Your commissions accumulate here after each validated call. Track your available balance, pending earnings and withdrawals."
+      },
+      "help": {
+        "title": "Need help? The “?” button",
+        "text": "On every key screen, this button explains in two minutes how to use it. You can also restart this tour at any time."
+      }
+    }
   }
 }

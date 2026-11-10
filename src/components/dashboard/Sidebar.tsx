@@ -474,7 +474,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             <p className={sectionLabelClass}>{t('sidebar.sectionMain')}</p>
           )}
           {group1.map((item) => (
-            <div key={item.path} className="space-y-1">
+            <div key={item.path} data-tour={`nav-${item.path.slice(1)}`} className="space-y-1">
               {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                 <>
                   <button
@@ -732,7 +732,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               <p className={sectionLabelClass}>{t('sidebar.sectionTraining')}</p>
             )}
             {group2.map((item) => (
-              <div key={item.path} className="space-y-1">
+              <div key={item.path} data-tour={`nav-${item.path.slice(1)}`} className="space-y-1">
                 {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                   <>
                     <button
@@ -846,6 +846,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             {group3.map((item) => (
               <NavLink
                 key={item.path}
+                data-tour={`nav-${item.path.slice(1)}`}
                 to={withActiveGig(item.path)}
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'
