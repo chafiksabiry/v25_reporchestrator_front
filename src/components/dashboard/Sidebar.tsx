@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock, Check } from 'lucide-react';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
@@ -383,9 +383,53 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     {t('onboardingGuide.title')}
                   </h3>
                 </div>
-                <p className="text-[11px] font-medium leading-snug text-white/95">
-                  {t('onboardingGuide.description')}
-                </p>
+                {(() => {
+                  // Parcours d'onboarding en 4 phases : inscription, profil, évaluations, abonnement.
+                  const steps = [1, 2, 3, 4].map((n) => ({ n, done: isPhaseCompleted(n) }));
+                  const doneCount = steps.filter((x) => x.done).length;
+                  const current = steps.find((x) => !x.done)?.n ?? 4;
+                  const pct = Math.round((doneCount / steps.length) * 100);
+                  return (
+                    <div data-testid="onboarding-steps">
+                      <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-white/95">
+                        <span>{t('onboardingGuide.progress', { done: doneCount, total: steps.length })}</span>
+                        <span className="tabular-nums">{pct}%</span>
+                      </div>
+                      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-black/25" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                        <div className="h-full rounded-full bg-amber-300 transition-all duration-500" style={{ width: `${pct}%` }} />
+                      </div>
+                      <ol className="space-y-1.5">
+                        {steps.map((x) => {
+                          const isCurrent = x.n === current && !x.done;
+                          return (
+                            <li
+                              key={x.n}
+                              aria-current={isCurrent ? 'step' : undefined}
+                              className={`flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-colors ${isCurrent ? 'bg-white/15 ring-1 ring-amber-300/60' : ''}`}
+                            >
+                              <span
+                                className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                                  x.done ? 'bg-emerald-400 text-slate-900' : isCurrent ? 'bg-amber-300 text-slate-900' : 'bg-black/25 text-white/70'
+                                }`}
+                              >
+                                {x.done ? <Check className="h-3 w-3" strokeWidth={3.5} /> : x.n}
+                              </span>
+                              <span className="min-w-0">
+                                <span className={`block text-[11px] font-black leading-tight ${x.done ? 'text-white/80 line-through decoration-white/40' : isCurrent ? 'text-white' : 'text-white/70'}`}>
+                                  {t(`onboardingGuide.step${x.n}`)}
+                                </span>
+                                {isCurrent ? (
+                                  <span className="mt-0.5 block text-[10.5px] font-medium leading-snug text-white/90">{t(`onboardingGuide.hint${x.n}`)}</span>
+                                ) : null}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="mt-2.5 text-[10px] font-medium leading-snug text-white/80">{t('onboardingGuide.description')}</p>
+                    </div>
+                  );
+                })()}
                 <button
                   type="button"
                   onClick={() => {
