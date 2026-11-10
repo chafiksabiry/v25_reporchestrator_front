@@ -17,15 +17,15 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
   const tabs = [
     { id: 'profile', label: t('profile.nav.profile'), icon: User },
     { id: 'experience', label: t('profile.nav.experience'), icon: Briefcase },
+    { id: 'specialization', label: t('profile.nav.specialization'), icon: Target },
     { id: 'languages', label: t('profile.nav.languages'), icon: Globe },
     { id: 'skills', label: t('profile.nav.skills'), icon: Zap },
-    { id: 'specialization', label: t('profile.nav.specialization'), icon: Target },
     { id: 'availability', label: t('profile.nav.availability'), icon: Clock },
   ];
 
   return (
-    <div className="border-b border-gray-100 mb-8 overflow-x-auto scrollbar-hide md:overflow-visible">
-      <nav className="flex items-center">
+    <div className="mb-8 overflow-x-auto scrollbar-hide md:overflow-visible py-2">
+      <nav className="inline-flex items-center gap-1 rounded-2xl bg-white p-1.5 shadow-md shadow-slate-200/70 ring-1 ring-slate-100">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const hasWarning = warningTabs.includes(tab.id);
@@ -34,13 +34,13 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`
-                relative flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all whitespace-nowrap
+                relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all whitespace-nowrap
                 ${isActive 
-                  ? 'text-harx-600' 
-                  : 'text-gray-400 hover:text-gray-600'}
+                  ? 'bg-gradient-harx text-white shadow-md shadow-harx-500/30' 
+                  : 'text-gray-500 hover:bg-slate-50 hover:text-gray-800'}
               `}
             >
-              <tab.icon className={`w-4 h-4 ${isActive ? 'text-harx-600' : 'text-gray-400'}`} />
+              <tab.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
               <span className="tracking-tight">{tab.label}</span>
 
               {hasWarning && (
@@ -54,11 +54,6 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-b-yellow-900" />
                   </span>
                 </span>
-              )}
-              
-              {/* Active Underline - Twilio Style with HARX Gradient */}
-              {isActive && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-harx animate-in fade-in slide-in-from-bottom-1" />
               )}
             </button>
           );
