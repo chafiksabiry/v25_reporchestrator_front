@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { User as UserIcon, Globe as GlobeIcon, Zap as ZapIcon, Clock as ClockIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
@@ -121,7 +121,7 @@ export const ProfileView: React.FC<{
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
   // One-page layout: tabs became anchored sections. Navigating = scrolling.
-  const SECTION_IDS = ['profile', 'experience', 'languages', 'skills', 'specialization', 'availability'];
+  const SECTION_IDS = ['profile', 'experience', 'specialization', 'languages', 'skills', 'availability'];
   const scrollToSection = useCallback((id: string) => {
     const target = id === 'onboarding' ? 'availability' : id;
     setActiveTab(target);
@@ -1283,7 +1283,7 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
+      <div className="profile-onepage max-w-7xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -1371,11 +1371,13 @@ export const ProfileView: React.FC<{
         {(
           <div id="profile-section-identity" className="bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/60 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
+              <div className="profile-id-pattern pointer-events-none absolute inset-0 opacity-70" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-amber-300 via-white/70 to-cyan-300 opacity-80" />
               <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-1/3 -bottom-20 h-48 w-48 rounded-full bg-white/10" />
               <div className="pointer-events-none absolute left-10 top-6 h-16 w-16 rounded-full bg-white/10" />
               <div className="relative flex items-start justify-between px-6 sm:px-8 lg:px-10 pt-4">
-                <img src={harxLogo} alt="HARX" className="h-7 sm:h-8 w-auto drop-shadow" />
+                <img src={harxLogo} alt="HARX" className="h-11 sm:h-14 w-auto drop-shadow-md" />
                 <div className="text-right">
                   <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.25em] text-white">{t('profile.header.idCardTitle')}</p>
                   <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/70">
@@ -1431,6 +1433,26 @@ export const ProfileView: React.FC<{
                   <div>
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
                     <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
+                    {(() => {
+                      const langs = (profile.personalInfo?.languages || []).length;
+                      const skillCount = ['technical', 'professional', 'soft'].reduce((n, k) => n + ((profile.skills?.[k] || []).length), 0);
+                      const years = String(profile.professionalSummary?.yearsOfExperience || '').trim();
+                      const chips = [
+                        years ? { icon: Briefcase, label: t('profile.header.chipYears', { years }) } : null,
+                        langs ? { icon: LanguagesIcon, label: t('profile.header.chipLanguages', { count: langs }) } : null,
+                        skillCount ? { icon: ZapIcon, label: t('profile.header.chipSkills', { count: skillCount }) } : null,
+                      ].filter(Boolean) as { icon: any; label: string }[];
+                      return chips.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {chips.map((c) => (
+                            <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white shadow-sm">
+                              <c.icon className="h-3 w-3 text-amber-300" />
+                              {c.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   {profile.status === 'completed' && (
                     <div className="flex items-center gap-3">
@@ -1632,7 +1654,7 @@ export const ProfileView: React.FC<{
         {/* One-page profile: every former tab is a section of the same screen */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
           {SECTION_IDS.map((id) => {
-            const wide = id === 'profile' || id === 'availability';
+            const wide = id === 'profile' || id === 'languages';
             const scrolls = !wide;
             return (
               <section
@@ -1641,7 +1663,20 @@ export const ProfileView: React.FC<{
                 data-section-id={id}
                 className={`scroll-mt-20 min-w-0 ${wide ? 'xl:col-span-2' : ''}`}
               >
-                <div className={scrolls ? 'xl:max-h-[34rem] xl:overflow-y-auto xl:pr-1 [scrollbar-width:thin]' : ''}>
+                <div className="mb-2.5 flex items-center gap-3 px-1">
+                  <span className="profile-chapter-num text-2xl font-black tabular-nums tracking-tighter">
+                    {String(SECTION_IDS.indexOf(id) + 1).padStart(2, '0')}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    {(() => {
+                      const Icon = { profile: UserIcon, experience: Briefcase, languages: GlobeIcon, skills: ZapIcon, specialization: Target, availability: ClockIcon }[id] || UserIcon;
+                      return <Icon className="h-3.5 w-3.5" />;
+                    })()}
+                    {t(`profile.nav.${id}`)}
+                  </span>
+                  <span className="profile-chapter-line h-px flex-1" />
+                </div>
+                <div className={scrolls ? 'xl:max-h-[44rem] xl:overflow-y-auto xl:pr-1 [scrollbar-width:thin]' : ''}>
                   {renderTab(id)}
                 </div>
               </section>
