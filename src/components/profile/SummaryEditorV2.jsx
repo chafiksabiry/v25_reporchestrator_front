@@ -3396,7 +3396,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               {/* Photo card — same interaction as Profile page */}
               <div className="relative group shrink-0">
                 <div
-                  className={`w-28 h-28 sm:w-36 sm:h-36 rounded-[28px] shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
+                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
                     hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
                   }`}
                   onClick={() => {
@@ -3443,64 +3443,101 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           </div>
 
-          {/* Guidance: re-read and edit extracted CV data */}
-          <div className="mb-4 relative overflow-hidden rounded-2xl border border-violet-300/70 bg-gradient-to-r from-violet-50 via-indigo-50 to-fuchsia-50 p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 ring-4 ring-violet-200/60">
-                <Info className="h-6 w-6" />
-              </div>
-              <div className="flex-1">
-                <p className="text-base font-black uppercase tracking-wide text-violet-800">
-                  {t('reviewHintTitle')}
-                </p>
-                <p className="mt-1 text-sm font-medium text-violet-700/90 leading-relaxed">
-                  {t('reviewHintBody')}
-                </p>
+          {/* Guidance + checklist of what is still required to continue */}
+          <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-start gap-3 bg-gradient-to-r from-violet-50 via-indigo-50 to-fuchsia-50 px-5 py-4">
+              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-violet-600 shadow-sm">
+                <Info className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-violet-900">{t('reviewHintTitle')}</p>
+                <p className="mt-0.5 text-sm text-violet-800/80 leading-relaxed">{t('reviewHintBody')}</p>
               </div>
             </div>
-          </div>
-
-          {/* Mandatory: add / take a profile photo */}
-          {!hasProfilePhoto && (
-            <div className="mb-4 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-rose-50 to-red-50 p-5 shadow-lg shadow-red-200/40">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
-                    <Camera className="h-6 w-6" />
+            {(() => {
+              const items = [
+                {
+                  key: 'photo',
+                  done: hasProfilePhoto,
+                  icon: Camera,
+                  title: t('checkPhoto'),
+                  desc: t('checkPhotoDesc'),
+                  action: (
+                    <button
+                      type="button"
+                      disabled={isUploadingPhoto}
+                      onClick={openPhotoSourceModal}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 disabled:opacity-60"
+                    >
+                      {isUploadingPhoto ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                      {t('addPhoto')}
+                    </button>
+                  ),
+                  extra: photoError ? <p className="mt-1 text-xs font-semibold text-red-600">{photoError}</p> : null,
+                },
+                {
+                  key: 'video',
+                  done: hasExperienceVideo,
+                  icon: Video,
+                  title: t('checkVideo'),
+                  desc: experienceList.length === 0
+                    ? t('warnAddExp')
+                    : t('missingVideos', { count: missingVideosCount, total: experienceList.length }),
+                },
+                {
+                  key: 'avail',
+                  done: hasAvailabilitySet,
+                  icon: Info,
+                  title: t('checkAvail'),
+                  desc: t('warnBottomAvail'),
+                },
+              ];
+              const doneCount = items.filter((i) => i.done).length;
+              return (
+                <div className="px-5 py-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('checklistTitle')}</p>
+                    <span className="text-xs font-semibold text-gray-500">{t('checklistProgress', { done: doneCount, total: items.length })}</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-base font-black uppercase tracking-wide text-red-700 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      {t('warnPhotoTitle')}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-red-600 leading-relaxed">
-                      {t('warnPhotoBody')}
-                    </p>
-                    {photoError && (
-                      <p className="mt-2 text-xs font-semibold text-red-700">{photoError}</p>
-                    )}
-                    {isUploadingPhoto && (
-                      <p className="mt-2 text-xs font-semibold text-red-700 flex items-center gap-2">
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        {t('photoUploading')}
-                      </p>
-              )}
-            </div>
-          </div>
-                <div className="flex flex-wrap gap-2 sm:pl-16">
-                  <button
-                    type="button"
-                    disabled={isUploadingPhoto}
-                    onClick={openPhotoSourceModal}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-harx-500/25 hover:opacity-95 disabled:opacity-60"
-                  >
-                    <Camera className="h-4 w-4" />
-                    {t('addPhoto')}
-                  </button>
+                  <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
+                      style={{ width: `${(doneCount / items.length) * 100}%` }}
+                    />
+                  </div>
+                  <ul className="space-y-2">
+                    {items.map((it) => {
+                      const Icon = it.icon;
+                      return (
+                        <li
+                          key={it.key}
+                          className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${it.done ? 'border-green-100 bg-green-50/60' : 'border-red-100 bg-red-50/50'}`}
+                        >
+                          <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${it.done ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+                            {it.done ? (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            ) : (
+                              <Icon className="h-4 w-4" />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm font-semibold ${it.done ? 'text-green-800' : 'text-gray-900'}`}>{it.title}</p>
+                            {!it.done && <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">{it.desc}</p>}
+                            {!it.done && it.extra}
+                          </div>
+                          {it.done ? (
+                            <span className="text-xs font-semibold text-green-600">{t('checkDone')}</span>
+                          ) : (
+                            it.action || null
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-              </div>
-            </div>
-          )}
+              );
+            })()}
+          </div>
 
           <input
             ref={photoInputRef}
@@ -3509,32 +3546,6 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             className="hidden"
             onChange={handlePhotoSelect}
           />
-
-          {/* Loud warning: record a video for at least one experience before continuing */}
-          {!hasExperienceVideo && (
-            <div className="mb-8 relative overflow-hidden rounded-2xl border-2 border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 p-5 shadow-lg shadow-red-200/50 animate-pulse">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 ring-4 ring-red-200">
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-base font-black uppercase tracking-wide text-red-700 flex items-center gap-2">
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {t('warnVideoTitle')}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-red-600">
-                    {experienceList.length === 0
-                      ? t('warnAddExp')
-                      : t('missingVideos', { count: missingVideosCount, total: experienceList.length })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Fullscreen photo preview — same as ProfileView */}
           {showImageModal && editedProfile?.personalInfo?.photo?.url && (
