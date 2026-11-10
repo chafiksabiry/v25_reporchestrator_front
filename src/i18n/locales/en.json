@@ -25,6 +25,15 @@
     "title": "Finish your onboarding",
     "description": "The dashboard, wallet, and planning unlock once your profile is created and your onboarding is complete.",
     "cta": "Continue onboarding",
+    "progress": "{{done}} of {{total}} steps done",
+    "step1": "Sign-up",
+    "step2": "Profile",
+    "step3": "Assessments",
+    "step4": "Subscription",
+    "hint1": "Confirm your account details.",
+    "hint2": "Import your CV, add a photo, a video and your availability.",
+    "hint3": "Take the language and skills assessments.",
+    "hint4": "Choose your plan: your profile is then published automatically.",
     "tooltip": "Complete all four phases (sign-up, profile, assessments, and subscription) to unlock every feature."
   },
   "topbar": {
