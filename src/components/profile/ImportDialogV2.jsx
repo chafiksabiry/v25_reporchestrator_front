@@ -33,6 +33,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   const [showGuidance, setShowGuidance] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState('');
   const [analysisSteps, setAnalysisSteps] = useState([]);
   // Flag used to abort the in-flight analysis flow when the user cancels.
   const cancelledRef = useRef(false);
@@ -75,9 +77,10 @@ function ImportDialog({ isOpen, onClose, onImport }) {
     }
   ];
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = async (eventOrFile) => {
+    const file = eventOrFile?.target ? eventOrFile.target.files[0] : eventOrFile;
     if (!file) return;
+    setFileName(file.name);
 
     // A new upload attempt always starts from a clean slate — otherwise a
     // failed re-upload after an earlier success left the stale green
@@ -560,11 +563,23 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
             <div className="space-y-5">
               <div
-                className={`rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
-                    ? 'bg-green-50'
-                    : 'bg-gray-50 hover:bg-harx-50'
+                role="button"
+                tabIndex={0}
+                className={`rounded-2xl border-2 border-dashed p-9 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
+                    ? 'border-green-300 bg-green-50'
+                    : dragOver
+                      ? 'border-harx-500 bg-harx-50 scale-[1.01]'
+                      : 'border-gray-200 bg-gray-50 hover:border-harx-400 hover:bg-harx-50/60'
                   }`}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  if (!loading) handleFileUpload(e.dataTransfer.files?.[0]);
+                }}
               >
                 <input
                   type="file"
@@ -581,18 +596,26 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       </svg>
                     </span>
                     <p className="mt-3 text-lg font-semibold">{t('profileImportDialog.success')}</p>
-                    <p className="text-sm text-green-500 mt-0.5">{t('profileImportDialog.uploadDifferent')}</p>
+                    {fileName && (
+                      <p className="mt-1 mx-auto max-w-xs truncate rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm">{fileName}</p>
+                    )}
+                    <p className="text-sm text-green-500 mt-2">{t('profileImportDialog.uploadDifferent')}</p>
                   </div>
                 ) : (
                   <>
-                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-sm">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-md shadow-harx-500/10 ring-4 ring-harx-50">
                       <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </span>
                     <p className="mt-4 text-lg font-semibold text-gray-900">{t('profileImportDialog.dropCV')}</p>
                     <p className="mt-1 text-sm text-gray-500">{t('profileImportDialog.browseFiles')}</p>
-                    <p className="text-xs text-gray-400 mt-2">{t('profileImportDialog.supports')}</p>
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {['PDF', 'DOC', 'DOCX'].map((f) => (
+                        <span key={f} className="rounded-md bg-white px-2 py-0.5 text-[11px] font-bold tracking-wide text-gray-500 ring-1 ring-gray-200">{f}</span>
+                      ))}
+                      <span className="text-[11px] text-gray-400">{t('profileImportDialog.sizeLimit')}</span>
+                    </div>
                   </>
                 )}
               </div>

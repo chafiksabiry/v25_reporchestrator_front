@@ -1184,6 +1184,7 @@
     "step3Desc": "Our AI will analyze your CV to create a compelling professional summary and highlight your key skills.",
     "dropCV": "Drop your CV here",
     "browseFiles": "or click to browse your files",
+    "sizeLimit": "· max 5 MB",
     "supports": "Supports PDF, DOC, DOCX (max 5MB)",
     "success": "CV successfully uploaded!",
     "uploadDifferent": "Click to upload a different file",
