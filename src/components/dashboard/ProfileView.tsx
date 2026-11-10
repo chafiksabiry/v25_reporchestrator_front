@@ -1256,14 +1256,17 @@ export const ProfileView: React.FC<{
           profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
           isRepPhase2Ready(profile) ||
           isRepCoreOnboardingDone(profile) ? (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
-              <div className="flex items-start gap-3 min-w-0">
-                <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
+              <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
+              <div className="relative flex items-start gap-3 min-w-0">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
+                  <ClipboardCheck className="w-5 h-5 text-white" />
+                </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-emerald-800">
+                  <p className="text-base font-extrabold text-white">
                     {t('profile.header.phase2Complete')}
                   </p>
-                  <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
+                  <p className="text-sm font-medium text-white/90 mt-0.5 leading-relaxed">
                     {t('profile.header.phase2CompleteDescription')}
                   </p>
                 </div>
@@ -1271,14 +1274,14 @@ export const ProfileView: React.FC<{
               <button
                 type="button"
                 onClick={() => navigate('/subscription')}
-                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
+                className="relative px-5 py-3 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 active:scale-95 whitespace-nowrap flex-shrink-0"
               >
                 {t('profile.header.continueOnboarding')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm">
               <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-black text-yellow-800">
@@ -1321,10 +1324,15 @@ export const ProfileView: React.FC<{
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
         {activeTab === 'profile' && (
-          <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-8 lg:p-10 shadow-sm border border-harx-100/70 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex flex-col md:flex-row gap-10 items-start">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-lg shadow-slate-200/60 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
+              <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute left-1/3 -bottom-20 h-48 w-48 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute left-10 top-6 h-16 w-16 rounded-full bg-white/10" />
+            </div>
+            <div className="flex flex-col md:flex-row gap-8 lg:gap-10 items-start px-6 sm:px-8 lg:px-10 pb-8">
               {/* Photo management */}
-              <div className="relative group shrink-0">
+              <div className="relative group shrink-0 md:-mt-16 self-center md:self-start">
                 <input
                   ref={photoInputRef}
                   type="file"
@@ -1333,7 +1341,7 @@ export const ProfileView: React.FC<{
                   className="hidden"
                 />
                 <div
-                  className="w-40 h-40 rounded-[32px] shadow-xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
+                  className="w-40 h-40 rounded-[32px] shadow-2xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
                   onClick={() => profile.personalInfo?.photo?.url && setShowImageModal(true)}
                 >
                   {profile.personalInfo?.photo?.url ? (
@@ -1365,7 +1373,7 @@ export const ProfileView: React.FC<{
               {/* Properties Grid */}
               <div className="flex-1 w-full relative">
                 {/* Action Buttons Top Right */}
-                <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
+                <div className="flex flex-wrap gap-3 mb-6 pb-6 pt-1 md:pt-5 border-b border-slate-100 justify-between items-center">
                   <div>
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
                     <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
@@ -1417,7 +1425,7 @@ export const ProfileView: React.FC<{
                   {/* Location */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.currentCountry')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-200 transition-colors">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-200 transition-colors">
                       <MapPin className="w-3.5 h-3.5 text-harx-400" />
                       {isEditingPublicInfo ? (
                         <div className="relative w-full">
@@ -1478,7 +1486,7 @@ export const ProfileView: React.FC<{
                   {/* Email */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.directContact')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
                         <input
@@ -1488,7 +1496,7 @@ export const ProfileView: React.FC<{
                           className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
                         />
                       ) : (
-                        <span className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{profile.personalInfo?.email || 'N/A'}</span>
+                        <span className="min-w-0 truncate text-sm font-bold text-slate-900" title={profile.personalInfo?.email}>{profile.personalInfo?.email || 'N/A'}</span>
                       )}
                     </div>
                   </div>
@@ -1496,7 +1504,7 @@ export const ProfileView: React.FC<{
                   {/* Phone */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.phoneLine')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Phone className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
                         <input
@@ -1513,11 +1521,20 @@ export const ProfileView: React.FC<{
                 </div>
 
                 {/* Quick Stats Grid (Score & Plan) */}
-                <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-harx-50/40 rounded-2xl border border-harx-100/70 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-harx-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-100/40 transition-colors"></div>
-                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-500 relative z-10">
-                      <Target size={24} className="animate-pulse" />
+                    <div className="relative z-10 h-14 w-14 flex-shrink-0">
+                      <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90">
+                        <circle cx="28" cy="28" r="24" fill="none" strokeWidth="6" className="stroke-slate-200" />
+                        <circle
+                          cx="28" cy="28" r="24" fill="none" strokeWidth="6" strokeLinecap="round"
+                          className="stroke-harx-500 transition-all duration-700"
+                          strokeDasharray={2 * Math.PI * 24}
+                          strokeDashoffset={2 * Math.PI * 24 * (1 - Math.min(100, Math.max(0, Number(calculateOverallScore()) || 0)) / 100)}
+                        />
+                      </svg>
+                      <Target size={18} className="absolute inset-0 m-auto text-harx-500" />
                     </div>
                     <div className="relative z-10">
                       <div className="text-[10px] font-black text-harx-400 uppercase tracking-widest">{t('profile.header.scoreOverall')}</div>
@@ -1525,7 +1542,7 @@ export const ProfileView: React.FC<{
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-harx-50/40 rounded-2xl border border-harx-100/70 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-harx-alt-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-alt-100/40 transition-colors"></div>
                     <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-alt-500 relative z-10">
                       <Briefcase size={24} />
