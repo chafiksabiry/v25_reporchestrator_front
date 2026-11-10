@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { getTimezones, getSkillsGrouped, getIndustries, getActivities, generateSummary, translateText } from '../../lib/api/profiles';
 import { localizeText, localizeList, normalizeBilingualText } from '../../utils/i18nText';
@@ -559,6 +560,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // New state for country mismatch detection
   const [firstLoginLocation, setFirstLoginLocation] = useState(null);
   const [videoModalExp, setVideoModalExp] = useState(null);
+  // Barre « prochaine étape » : visible dès que la liste de contrôle n'est plus à l'écran, pour ne pas obliger à défiler jusqu'en bas.
+  const [checklistEl, setChecklistEl] = useState(null);
+  const [checklistVisible, setChecklistVisible] = useState(true);
+  // Horaires : créneaux types enregistrés en un clic depuis la liste du haut de page.
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [presetError, setPresetError] = useState('');
+  useEffect(() => {
+    if (!checklistEl || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(([entry]) => setChecklistVisible(entry.isIntersecting), { threshold: 0.15 });
+    observer.observe(checklistEl);
+    return () => observer.disconnect();
+  }, [checklistEl]);
 
   const proficiencyLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((value) => ({
     value,
@@ -2552,17 +2565,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
                     <button
                       type="button"
-                      onClick={() => setVideoModalExp({
-                        title: String(role.title || role.role || ''),
-                        company: String(role.company || ''),
-                        description: String(role.description || ''),
-                        responsibilities: Array.isArray(role.responsibilities)
-                          ? role.responsibilities
-                          : (localizeList(role.responsibilities_i18n, uiLang).length
-                            ? localizeList(role.responsibilities_i18n, uiLang)
-                            : []),
-                        index,
-                      })}
+                      onClick={() => setVideoModalExp(videoModalPayload(role, index))}
                       className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-dashed transition-all text-xs font-black uppercase tracking-widest ${
                         role.videoUrl || role.videoAnalysis
                           ? 'border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50'
@@ -3347,6 +3350,65 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     ? t('warnBottomAvail')
     : '';
 
+  // Données de la fenêtre d'enregistrement d'une expérience (la même pour le bouton de l'expérience et pour les raccourcis du haut de page).
+  const videoModalPayload = (role, index) => ({
+    title: String(role?.title || role?.role || ''),
+    company: String(role?.company || ''),
+    description: String(role?.description || ''),
+    responsibilities: Array.isArray(role?.responsibilities)
+      ? role.responsibilities
+      : (localizeList(role?.responsibilities_i18n, uiLang).length ? localizeList(role.responsibilities_i18n, uiLang) : []),
+    index,
+  });
+  // Raccourci : ouvre tout de suite l'enregistrement de la première expérience qui n'a pas encore de vidéo (plus besoin de défiler).
+  const openVideoForFirstMissing = () => {
+    const idx = experienceList.findIndex((exp) => exp && !(exp.videoUrl || exp.videoAnalysis));
+    if (idx >= 0) setVideoModalExp(videoModalPayload(experienceList[idx], idx));
+  };
+  const scrollToAvailability = () => {
+    const el = document.getElementById('onboarding-availability');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const scrollToChecklist = () => {
+    if (checklistEl) checklistEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const AVAIL_PRESETS = [
+    { id: 'weekdays', label: t('availPresetWeekdays'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], start: '09:00', end: '17:00' },
+    { id: 'weekdays-late', label: t('availPresetWeekdays'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], start: '10:00', end: '18:00' },
+    { id: 'six-days', label: t('availPresetSixDays'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], start: '09:00', end: '18:00' },
+    { id: 'every-day', label: t('availPresetEveryDay'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], start: '10:00', end: '18:00' },
+  ];
+  // Enregistre tout de suite le créneau choisi (mêmes champs que la section « Horaires » du bas, qui permet ensuite de l'affiner).
+  const applyAvailabilityPreset = async (preset) => {
+    if (presetSaving || !editedProfile?._id) return;
+    setPresetSaving(true);
+    setPresetError('');
+    try {
+      const previous = editedProfile.availability || {};
+      const schedule = preset.days.map((day) => ({ day, hours: { start: preset.start, end: preset.end } }));
+      const rawTimeZone = previous.timeZone;
+      const timeZoneId = rawTimeZone && typeof rawTimeZone === 'object' ? rawTimeZone._id : rawTimeZone;
+      await updateProfileData(editedProfile._id, {
+        availability: { schedule, timeZone: timeZoneId || null, flexibility: previous.flexibility || [] },
+      });
+      const next = { ...editedProfile, availability: { ...previous, schedule } };
+      setEditedProfile(next);
+      if (onProfileUpdate) onProfileUpdate(next);
+    } catch (error) {
+      console.error('Quick availability save failed:', error);
+      setPresetError(t('availPresetError'));
+    } finally {
+      setPresetSaving(false);
+    }
+  };
+  const nextStep = !hasProfilePhoto
+    ? { key: 'photo', icon: Camera, label: t('nextPhoto'), cta: t('addPhoto'), run: openPhotoSourceModal }
+    : !hasExperienceVideo
+      ? (experienceList.length > 0 ? { key: 'video', icon: Video, label: t('nextVideo'), cta: t('ctaRecordVideo'), run: openVideoForFirstMissing } : null)
+      : !hasAvailabilitySet
+        ? { key: 'avail', icon: CalendarClock, label: t('nextAvail'), cta: t('ctaPickSlot'), run: scrollToChecklist }
+        : null;
+
   const confirmContinueButton = (variant = 'header') => (
     <button
       type="button"
@@ -3374,8 +3436,42 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     </button>
   );
 
+  // Barre fixe « prochaine étape » : suit l'utilisateur quand la liste de contrôle est hors de l'écran.
+  const stickyBar = !checklistVisible && typeof document !== 'undefined'
+    ? createPortal(
+        <div
+          data-testid="next-step-bar"
+          className="fixed bottom-4 left-1/2 z-40 flex w-[min(92vw,680px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-slate-900/95 px-4 py-3 text-white shadow-2xl shadow-black/30 ring-1 ring-white/10 backdrop-blur lg:left-[calc(50%+8rem)]"
+        >
+          {(() => {
+            const Icon = nextStep ? nextStep.icon : Rocket;
+            return (
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${nextStep ? 'bg-gradient-to-br from-harx-500 to-harx-alt-500' : 'bg-emerald-500'}`}>
+                <Icon className="h-5 w-5" />
+              </span>
+            );
+          })()}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">{nextStep ? t('nextStepLabel') : t('readyLabel')}</p>
+            <p className="truncate text-sm font-bold">{nextStep ? nextStep.label : t('coachDoneTitle')}</p>
+          </div>
+          {nextStep ? (
+            <button type="button" onClick={nextStep.run} className="shrink-0 rounded-xl bg-gradient-to-r from-harx-500 to-harx-alt-500 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-white shadow-lg hover:opacity-95">
+              {nextStep.cta}
+            </button>
+          ) : canContinue ? (
+            <button type="button" onClick={pushToRepsProfile} className="shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-white shadow-lg hover:bg-emerald-400">
+              {t('confirmContinue')}
+            </button>
+          ) : null}
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      {stickyBar}
       <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
       <div className="p-6 sm:p-8">
         <div className="mb-8">
@@ -3444,7 +3540,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Guidance + checklist of what is still required to continue */}
-          <div className="mb-8">
+          <div className="mb-8" ref={setChecklistEl}>
             {(() => {
               const items = [
                 {
@@ -3474,13 +3570,54 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   desc: experienceList.length === 0
                     ? t('warnAddExp')
                     : t('missingVideos', { count: missingVideosCount, total: experienceList.length }),
+                  action: experienceList.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={openVideoForFirstMissing}
+                      data-testid="record-video-now"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      {t('ctaRecordVideo')}
+                    </button>
+                  ) : null,
                 },
                 {
                   key: 'avail',
                   done: hasAvailabilitySet,
                   icon: CalendarClock,
                   title: t('checkAvail'),
-                  desc: t('warnBottomAvail'),
+                  desc: t('availQuickDesc'),
+                  extra: (
+                    <div className="mt-2" data-testid="avail-presets">
+                      <div className="flex flex-wrap gap-1.5">
+                        {AVAIL_PRESETS.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            disabled={presetSaving}
+                            onClick={() => void applyAvailabilityPreset(preset)}
+                            data-testid={`avail-preset-${preset.id}`}
+                            className="rounded-full border border-harx-200 bg-white px-3 py-1 text-xs font-bold text-harx-700 shadow-sm transition hover:border-harx-400 hover:bg-harx-50 disabled:opacity-60"
+                          >
+                            {preset.label} · {preset.start.replace(':00', ' h')} – {preset.end.replace(':00', ' h')}
+                          </button>
+                        ))}
+                      </div>
+                      {presetSaving ? <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><RefreshCw className="h-3 w-3 animate-spin" /> {t('availPresetSaving')}</p> : null}
+                      {presetError ? <p className="mt-1 text-xs font-semibold text-red-600">{presetError}</p> : null}
+                    </div>
+                  ),
+                  action: (
+                    <button
+                      type="button"
+                      onClick={scrollToAvailability}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      {t('ctaCustomHours')}
+                    </button>
+                  ),
                 },
               ];
               const doneCount = items.filter((i) => i.done).length;
@@ -4221,7 +4358,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Availability Section */}
-          <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div id="onboarding-availability" className="mt-8 scroll-mt-24 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">{t('workingHours')}</h3>
               {renderSectionControls('availability')}
