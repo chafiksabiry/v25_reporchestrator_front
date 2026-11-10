@@ -10,7 +10,7 @@ import { EmbeddedRepSubscriptionFlow } from '../dashboard/EmbeddedRepSubscriptio
 import { localizeRepPlan } from '../../utils/repPlanI18n';
 import { fetchProfileFromAPI, updateProfileData } from '../../utils/profileUtils';
 import { getRepOnboardingStep, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
-import { OnboardingSatisfactionModal } from './OnboardingSatisfactionModal';
+import { OnboardingSatisfactionModal, clearSatisfactionPending, isSatisfactionPending, markSatisfactionPending } from './OnboardingSatisfactionModal';
 
 function Subscription() {
   const navigate = useNavigate();
@@ -56,6 +56,8 @@ function Subscription() {
 
   const handlePublishProfile = useCallback(async () => {
     setPublishing(true);
+    // Posé avant la publication : le profil publié déclenche une redirection vers /marketplace qui ferait disparaître la fenêtre.
+    markSatisfactionPending();
     try {
       const profile = await fetchProfileFromAPI();
       if (profile?._id && !isRepProfilePublished(profile)) {
@@ -66,6 +68,7 @@ function Subscription() {
       setShowSatisfaction(true);
     } catch (err) {
       console.error('Profile publish failed:', err);
+      clearSatisfactionPending();
       toast.error(t('profile.errors.publish'));
     } finally {
       setPublishing(false);
@@ -73,6 +76,7 @@ function Subscription() {
   }, [t]);
 
   const handleSatisfactionClose = useCallback(() => {
+    clearSatisfactionPending();
     setShowSatisfaction(false);
     void fetchProfileFromAPI()
       .catch(() => null)
@@ -108,6 +112,11 @@ function Subscription() {
             fetchProfileFromAPI().catch(() => null),
           ]);
           const live = profile || agentData;
+          if (isRepProfilePublished(live) && isSatisfactionPending()) {
+            // Rechargement pendant la fenêtre de satisfaction : on la réaffiche au lieu de renvoyer le rep vers /marketplace.
+            setShowSatisfaction(true);
+            return;
+          }
           if (isRepProfilePublished(live)) {
             navigate('/marketplace', { replace: true });
             return;

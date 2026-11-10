@@ -6,6 +6,21 @@ import { updateOnboardingSatisfaction } from '../../lib/api/profiles';
 
 export const ONBOARDING_SATISFACTION_KEY = 'harx_onboarding_satisfaction_done';
 
+/**
+ * Pendant que la fenêtre de satisfaction est affichée, le rep ne doit pas être redirigé : dès que le profil est publié,
+ * le shell d'onboarding l'envoyait vers /marketplace, ce qui démontait la page et faisait disparaître la fenêtre aussitôt.
+ */
+const SATISFACTION_PENDING_KEY = 'harx_onboarding_satisfaction_pending';
+export function markSatisfactionPending(): void {
+  try { sessionStorage.setItem(SATISFACTION_PENDING_KEY, '1'); } catch { /* stockage indisponible */ }
+}
+export function clearSatisfactionPending(): void {
+  try { sessionStorage.removeItem(SATISFACTION_PENDING_KEY); } catch { /* stockage indisponible */ }
+}
+export function isSatisfactionPending(): boolean {
+  try { return sessionStorage.getItem(SATISFACTION_PENDING_KEY) === '1'; } catch { return false; }
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
