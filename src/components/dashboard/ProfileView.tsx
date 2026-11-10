@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { User as UserIcon, Globe as GlobeIcon, Zap as ZapIcon, Clock as ClockIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
@@ -120,50 +120,6 @@ export const ProfileView: React.FC<{
     return 'profile';
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  // One-page layout: tabs became anchored sections. Navigating = scrolling.
-  const SECTION_IDS = ['profile', 'experience', 'specialization', 'languages', 'skills', 'availability'];
-  const scrollToSection = useCallback((id: string) => {
-    const target = id === 'onboarding' ? 'availability' : id;
-    setActiveTab(target);
-    const el = document.getElementById(`profile-section-${target}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
-  useEffect(() => {
-    const initial = getInitialTab();
-    if (initial === 'profile') return;
-    const timer = window.setTimeout(() => scrollToSection(initial), 600);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const visible = new Map<string, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const id = (entry.target as HTMLElement).dataset.sectionId || '';
-          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect.top);
-          else visible.delete(id);
-        });
-        if (visible.size > 0) {
-          const [first] = [...visible.entries()].sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]))[0];
-          setActiveTab(first);
-        }
-      },
-      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
-    );
-    const timer = window.setTimeout(() => {
-      SECTION_IDS.forEach((id) => {
-        const el = document.getElementById(`profile-section-${id}`);
-        if (el) observer.observe(el);
-      });
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-      observer.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [inlineAssessment, setInlineAssessment] = useState<
     | { type: 'contact-center'; skillId: string; category: string; skillName: string }
     | null
@@ -1183,7 +1139,7 @@ export const ProfileView: React.FC<{
           profile={profile}
           onDeleteItemClick={(section, index) => onDeleteSpecializationItem?.(section, index)}
           onAddItemClick={(section, value) => onAddSpecializationItem?.(section, value)}
-          onGoToExperience={() => scrollToSection('experience')}
+          onGoToExperience={() => setActiveTab('experience')}
         />
       );
       case 'availability': return (
@@ -1235,7 +1191,7 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const currentHeader = headerContentMap.profile;
+  const currentHeader = headerContentMap[activeTab] || headerContentMap.profile;
   const filteredCountries = countries
     .filter((country) =>
       String(country.countryName || '')
@@ -1283,7 +1239,7 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="profile-onepage max-w-7xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
+      <div className="profile-onepage max-w-6xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -1341,10 +1297,10 @@ export const ProfileView: React.FC<{
         )}
 
         {/* Navigation Tabs at the Top */}
-        <div className="w-full sticky top-0 z-20 -mx-3 sm:-mx-4 lg:-mx-10 px-3 sm:px-4 lg:px-10 bg-[#f8fafc]/90 backdrop-blur [&>div]:mb-0">
+        <div className="w-full">
           <ProfileNavbar
             activeTab={activeTab}
-            onTabChange={scrollToSection}
+            onTabChange={setActiveTab}
             warningTabs={[
               ...((profile?.personalInfo?.languages || []).some((l: any) => {
                 const enriched = enrichLanguageFromExperience(l, profile);
@@ -1368,7 +1324,7 @@ export const ProfileView: React.FC<{
         </div>
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
-        {(
+        {activeTab === 'profile' && (
           <div id="profile-section-identity" className="bg-gradient-to-b from-white to-slate-50/70 rounded-3xl overflow-hidden shadow-xl shadow-slate-300/40 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
               <div className="profile-id-pattern pointer-events-none absolute inset-0 opacity-70" />
@@ -1664,37 +1620,15 @@ export const ProfileView: React.FC<{
           </div>
         )}
 
-        {/* One-page profile: every former tab is a section of the same screen */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
-          {SECTION_IDS.map((id) => {
-            const wide = id === 'profile' || id === 'languages';
-            const scrolls = !wide;
-            return (
-              <section
-                key={id}
-                id={`profile-section-${id}`}
-                data-section-id={id}
-                className={`scroll-mt-20 min-w-0 ${wide ? 'xl:col-span-2' : ''}`}
-              >
-                <div className="mb-2.5 flex items-center gap-3 px-1">
-                  <span className="profile-chapter-num text-2xl font-black tabular-nums tracking-tighter">
-                    {String(SECTION_IDS.indexOf(id) + 1).padStart(2, '0')}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    {(() => {
-                      const Icon = { profile: UserIcon, experience: Briefcase, languages: GlobeIcon, skills: ZapIcon, specialization: Target, availability: ClockIcon }[id] || UserIcon;
-                      return <Icon className="h-3.5 w-3.5" />;
-                    })()}
-                    {t(`profile.nav.${id}`)}
-                  </span>
-                  <span className="profile-chapter-line h-px flex-1" />
-                </div>
-                <div className={scrolls ? 'xl:max-h-[44rem] xl:overflow-y-auto xl:p-2 xl:-m-2 [scrollbar-width:thin]' : ''}>
-                  {renderTab(id)}
-                </div>
-              </section>
-            );
-          })}
+        {/* One section per tab, as before (styled via [data-section-id]) */}
+        <div className="w-full">
+          <section
+            key={activeTab}
+            data-section-id={activeTab === 'onboarding' ? 'availability' : activeTab}
+            className="min-h-[600px] min-w-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          >
+            {renderTab(activeTab)}
+          </section>
         </div>
       </div>
 
