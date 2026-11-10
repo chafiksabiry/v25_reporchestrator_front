@@ -1456,7 +1456,8 @@ export function GigsMarketplace() {
     const fetchGigs = async () => {
       try {
         const gigsApi = getGigsApiBase();
-        const url = `${gigsApi}/gigs/active`;
+        // Place de marché des REPS : uniquement les opérations des clients TaaS (pas celles des clients Téléphonie).
+        const url = `${gigsApi}/gigs/active?audience=reps`;
         console.log('🌐 Fetching active gigs from:', url);
         console.log('🔧 Environment variables:', {
           VITE_BACKEND_URL_GIGS: import.meta.env.VITE_BACKEND_URL_GIGS,
