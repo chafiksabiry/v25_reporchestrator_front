@@ -1761,5 +1761,27 @@
         "6": "7 jours d’essai gratuit"
       }
     }
+  },
+
+  "share": {
+    "button": "Inviter",
+    "title": "Inviter à rejoindre HARX",
+    "subtitle": "Partagez votre lien ou faites scanner le QR code : la personne arrive directement sur la bonne page d'inscription.",
+    "audience": "Qui souhaitez-vous inviter ?",
+    "audienceRep": "Un REP",
+    "audienceRepDesc": "Un professionnel du service client qui cherche des missions.",
+    "audienceCompany": "Une entreprise",
+    "audienceCompanyDesc": "Une entreprise qui a besoin de professionnels du service client ou de téléphonie.",
+    "linkLabel": "Lien d'invitation",
+    "copy": "Copier",
+    "copied": "Copié",
+    "share": "Partager",
+    "email": "E-mail",
+    "downloadQr": "Télécharger le QR",
+    "qrHint": "À scanner avec l'appareil photo d'un téléphone pour ouvrir la page d'inscription.",
+    "close": "Fermer",
+    "mailSubject": "Rejoignez-moi sur HARX",
+    "messageRep": "Je suis sur HARX, où les professionnels du service client trouvent des missions. Créez votre profil REP en quelques minutes :",
+    "messageCompany": "HARX met en relation les entreprises et des professionnels du service client, et leur donne une ligne de téléphonie. Créez le compte de votre entreprise ici :"
   }
 }

@@ -1761,5 +1761,27 @@
         "6": "7 days free trial"
       }
     }
+  },
+
+  "share": {
+    "button": "Invite",
+    "title": "Invite people to join HARX",
+    "subtitle": "Share your link or let someone scan the QR code: they land straight on the right sign-up page.",
+    "audience": "Who do you want to invite?",
+    "audienceRep": "A REP",
+    "audienceRepDesc": "A customer-service professional who wants to find missions.",
+    "audienceCompany": "A company",
+    "audienceCompanyDesc": "A business that needs customer-service professionals or telephony.",
+    "linkLabel": "Invitation link",
+    "copy": "Copy",
+    "copied": "Copied",
+    "share": "Share",
+    "email": "E-mail",
+    "downloadQr": "Download the QR",
+    "qrHint": "Scan with a phone camera to open the sign-up page.",
+    "close": "Close",
+    "mailSubject": "Join me on HARX",
+    "messageRep": "I'm on HARX, where customer-service professionals find missions. Create your REP profile in a few minutes:",
+    "messageCompany": "HARX connects companies with customer-service professionals and gives them a telephony line. Create your company account here:"
   }
 }

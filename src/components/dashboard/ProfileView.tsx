@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { Share2, Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
+import { InviteShareModal } from '../share/InviteShareModal';
 import { OnboardingSatisfactionModal, clearSatisfactionPending, markSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
 import { refreshOnboardingStatus } from '../../services/apiConfig';
 import progressService from '../../services/progressService';
@@ -155,6 +156,7 @@ export const ProfileView: React.FC<{
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showSatisfaction, setShowSatisfaction] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [finalizingPlan, setFinalizingPlan] = useState(false);
 
@@ -1434,6 +1436,15 @@ export const ProfileView: React.FC<{
                     </div>
                   )}
                 <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsShareOpen(true)}
+                    data-testid="open-invite"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-harx-200 bg-white px-3 py-1.5 text-xs font-bold text-harx-700 shadow-sm transition hover:bg-harx-50"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {t('share.button')}
+                  </button>
                   {!isEditingPublicInfo ? (
                     <button
                       type="button"
@@ -1733,6 +1744,7 @@ export const ProfileView: React.FC<{
       )}
 
       <OnboardingSatisfactionModal open={showSatisfaction} onClose={handleSatisfactionClose} />
+      <InviteShareModal open={isShareOpen} onClose={() => setIsShareOpen(false)} referrerId={profile?._id ? String(profile._id) : null} />
 
       {/* Photo source chooser */}
       {showPhotoSourceModal && (
