@@ -17,9 +17,9 @@ export const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ activeTab, onTabCh
   const tabs = [
     { id: 'profile', label: t('profile.nav.profile'), icon: User },
     { id: 'experience', label: t('profile.nav.experience'), icon: Briefcase },
-    { id: 'specialization', label: t('profile.nav.specialization'), icon: Target },
     { id: 'languages', label: t('profile.nav.languages'), icon: Globe },
     { id: 'skills', label: t('profile.nav.skills'), icon: Zap },
+    { id: 'specialization', label: t('profile.nav.specialization'), icon: Target },
     { id: 'availability', label: t('profile.nav.availability'), icon: Clock },
   ];
 
