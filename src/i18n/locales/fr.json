@@ -1142,6 +1142,32 @@
       "importDescription": "Importez votre CV pour créer votre profil de représentant HARX.",
       "editorTitle": "Éditeur de profil",
       "editorDescription": "Affinez votre profil de représentant HARX."
+    },
+    "duration": "≈ 2 min",
+    "benefit1Title": "Un profil construit pour vous",
+    "benefit1Desc": "Notre IA rédige votre résumé professionnel et extrait vos compétences et vos langues : vous n’avez qu’à relire.",
+    "benefit2Title": "Des missions qui vous correspondent",
+    "benefit2Desc": "Vos compétences et vos langues servent à vous proposer les missions d’appels qui vous conviennent le mieux.",
+    "benefit3Title": "Gagnez selon vos résultats",
+    "benefit3Desc": "Travaillez depuis votre navigateur, téléphonie incluse, et suivez vos gains dans votre portefeuille.",
+    "trust": "Votre CV ne sert qu’à construire votre profil. Vos données restent protégées.",
+    "stepsLabel": "Étapes de l’inscription",
+    "preview": {
+      "title": "Votre profil, construit par l’IA",
+      "example": "Exemple",
+      "name": "Alex Morgan",
+      "role": "Relation client · 6 ans d’expérience",
+      "summary": "Conseiller orienté client, six ans d’expérience en support entrant et en vente sortante, bilingue anglais et français.",
+      "skills": "Compétences",
+      "skill1": "Service client",
+      "skill2": "Négociation",
+      "skill3": "Écoute active",
+      "skill4": "Outils CRM",
+      "missions": "Missions qui vous correspondent",
+      "mission1": "Support entrant · anglais",
+      "mission1Meta": "À distance · Téléphonie incluse",
+      "mission2": "Prospection commerciale · français",
+      "mission2Meta": "À distance · Commission au résultat"
     }
   },
   "profileImportDialog": {

@@ -1142,6 +1142,32 @@
       "importDescription": "Import your CV to create your HARX representative profile.",
       "editorTitle": "Profile editor",
       "editorDescription": "Refine your HARX representative profile."
+    },
+    "duration": "≈ 2 min",
+    "benefit1Title": "A profile built for you",
+    "benefit1Desc": "Our AI writes your professional summary and extracts your skills and languages — you just review it.",
+    "benefit2Title": "Matched to the right missions",
+    "benefit2Desc": "Your skills and languages are used to suggest the calling missions that fit you best.",
+    "benefit3Title": "Earn on your results",
+    "benefit3Desc": "Work from your browser, telephony included, and follow your earnings in your wallet.",
+    "trust": "Your CV is only used to build your profile. Your data stays protected.",
+    "stepsLabel": "Onboarding steps",
+    "preview": {
+      "title": "Your profile, built by AI",
+      "example": "Example",
+      "name": "Alex Morgan",
+      "role": "Customer care · 6 years of experience",
+      "summary": "Customer-focused advisor with six years in inbound support and outbound sales, fluent in English and French.",
+      "skills": "Skills",
+      "skill1": "Customer service",
+      "skill2": "Negotiation",
+      "skill3": "Active listening",
+      "skill4": "CRM tools",
+      "missions": "Missions that match you",
+      "mission1": "Inbound support · English",
+      "mission1Meta": "Remote · Telephony included",
+      "mission2": "Sales outreach · French",
+      "mission2Meta": "Remote · Commission per result"
     }
   },
   "profileImportDialog": {
