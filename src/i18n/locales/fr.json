@@ -1184,6 +1184,7 @@
     "step3Desc": "Notre IA analysera votre CV pour créer un résumé professionnel attrayant et mettre en valeur vos compétences clés.",
     "dropCV": "Déposez votre CV ici",
     "browseFiles": "ou cliquez pour parcourir vos fichiers",
+    "sizeLimit": "· max 5 Mo",
     "supports": "Supporte PDF, DOC, DOCX (max 5 Mo)",
     "success": "CV téléchargé avec succès !",
     "uploadDifferent": "Cliquez pour télécharger un autre fichier",
