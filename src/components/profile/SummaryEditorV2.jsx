@@ -6,7 +6,7 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sparkles, Lightbulb, CalendarClock, Rocket } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
@@ -3444,16 +3444,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Guidance + checklist of what is still required to continue */}
-          <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-            <div className="flex items-start gap-3 bg-gradient-to-r from-violet-50 via-indigo-50 to-fuchsia-50 px-5 py-4">
-              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-violet-600 shadow-sm">
-                <Info className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-violet-900">{t('reviewHintTitle')}</p>
-                <p className="mt-0.5 text-sm text-violet-800/80 leading-relaxed">{t('reviewHintBody')}</p>
-              </div>
-            </div>
+          <div className="mb-8">
             {(() => {
               const items = [
                 {
@@ -3487,53 +3478,116 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 {
                   key: 'avail',
                   done: hasAvailabilitySet,
-                  icon: Info,
+                  icon: CalendarClock,
                   title: t('checkAvail'),
                   desc: t('warnBottomAvail'),
                 },
               ];
               const doneCount = items.filter((i) => i.done).length;
+              const nextItem = items.find((i) => !i.done);
+              const allDone = !nextItem;
+              const coachTitle = allDone ? t('coachDoneTitle') : t(`coach_${nextItem.key}_title`);
+              const coachBody = allDone ? t('coachDoneBody') : t(`coach_${nextItem.key}_body`);
+              const tips = [
+                { icon: Camera, text: t('tipPhoto') },
+                { icon: Video, text: t('tipVideo') },
+                { icon: Lightbulb, text: t('tipReview') },
+              ];
+              const roadmap = [
+                { label: t('roadProfile'), state: allDone ? 'done' : 'current' },
+                { label: t('roadPlan'), state: allDone ? 'current' : 'todo' },
+                { label: t('roadLive'), state: 'todo' },
+              ];
               return (
-                <div className="px-5 py-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('checklistTitle')}</p>
-                    <span className="text-xs font-semibold text-gray-500">{t('checklistProgress', { done: doneCount, total: items.length })}</span>
+                <div className="space-y-4">
+                  {/* Coach */}
+                  <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${allDone ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-harx-600 via-harx-alt-600 to-violet-600 shadow-harx-500/25'}`}>
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+                    <div className="pointer-events-none absolute -bottom-12 right-24 h-28 w-28 rounded-full bg-white/10" />
+                    <div className="relative flex items-start gap-4">
+                      <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
+                        {allDone ? <Rocket className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">{t('coachLabel')}</p>
+                        <p className="mt-0.5 text-lg font-extrabold leading-snug">{coachTitle}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-white/90">{coachBody}</p>
+                      </div>
+                    </div>
+                    <ol className="relative mt-5 flex items-center gap-2 text-xs font-semibold">
+                      {roadmap.map((r, i) => (
+                        <React.Fragment key={r.label}>
+                          <li className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${r.state === 'done' ? 'bg-white text-emerald-700' : r.state === 'current' ? 'bg-white/90 text-harx-700' : 'bg-white/15 text-white/80'}`}>
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px] font-bold">
+                              {r.state === 'done' ? '✓' : i + 1}
+                            </span>
+                            {r.label}
+                          </li>
+                          {i < roadmap.length - 1 && <span className="h-px w-4 bg-white/40" />}
+                        </React.Fragment>
+                      ))}
+                    </ol>
                   </div>
-                  <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
-                      style={{ width: `${(doneCount / items.length) * 100}%` }}
-                    />
-                  </div>
-                  <ul className="space-y-2">
-                    {items.map((it) => {
-                      const Icon = it.icon;
-                      return (
-                        <li
-                          key={it.key}
-                          className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${it.done ? 'border-green-100 bg-green-50/60' : 'border-red-100 bg-red-50/50'}`}
-                        >
-                          <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${it.done ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+
+                  {/* Checklist */}
+                  <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('checklistTitle')}</p>
+                      <span className="text-xs font-semibold text-gray-500">{t('checklistProgress', { done: doneCount, total: items.length })}</span>
+                    </div>
+                    <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
+                        style={{ width: `${(doneCount / items.length) * 100}%` }}
+                      />
+                    </div>
+                    <ul className="space-y-2">
+                      {items.map((it) => {
+                        const Icon = it.icon;
+                        const isNext = nextItem && nextItem.key === it.key;
+                        return (
+                          <li
+                            key={it.key}
+                            className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-shadow ${it.done ? 'border-green-100 bg-green-50/60' : isNext ? 'border-harx-300 bg-harx-50/60 ring-2 ring-harx-100 shadow-sm' : 'border-gray-100 bg-gray-50/60'}`}
+                          >
+                            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${it.done ? 'bg-green-100 text-green-600' : isNext ? 'bg-harx-100 text-harx-600' : 'bg-gray-100 text-gray-400'}`}>
+                              {it.done ? (
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                              ) : (
+                                <Icon className="h-4 w-4" />
+                              )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className={`flex items-center gap-2 text-sm font-semibold ${it.done ? 'text-green-800' : 'text-gray-900'}`}>
+                                {it.title}
+                                {isNext && <span className="rounded-full bg-harx-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('nextBadge')}</span>}
+                              </p>
+                              {!it.done && <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">{it.desc}</p>}
+                              {!it.done && it.extra}
+                            </div>
                             {it.done ? (
-                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                              <span className="text-xs font-semibold text-green-600">{t('checkDone')}</span>
                             ) : (
-                              <Icon className="h-4 w-4" />
+                              it.action || null
                             )}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-sm font-semibold ${it.done ? 'text-green-800' : 'text-gray-900'}`}>{it.title}</p>
-                            {!it.done && <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">{it.desc}</p>}
-                            {!it.done && it.extra}
-                          </div>
-                          {it.done ? (
-                            <span className="text-xs font-semibold text-green-600">{t('checkDone')}</span>
-                          ) : (
-                            it.action || null
-                          )}
-                        </li>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+
+                  {/* Tips */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {tips.map((tip) => {
+                      const TipIcon = tip.icon;
+                      return (
+                        <div key={tip.text} className="flex items-start gap-2.5 rounded-xl bg-amber-50/70 px-3.5 py-3 ring-1 ring-amber-100">
+                          <TipIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+                          <p className="text-xs leading-relaxed text-amber-900/80">{tip.text}</p>
+                        </div>
                       );
                     })}
-                  </ul>
+                  </div>
                 </div>
               );
             })()}
