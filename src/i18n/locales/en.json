@@ -1953,5 +1953,6 @@
       "retry": "Try again",
       "tipSupport": "Still stuck? Contact support from the menu — we reply quickly."
     }
-  }
+  },
+  "repOnboardingGuide": {"close": "Close", "gotIt": "Got it"}
 }

@@ -6,7 +6,6 @@ import {
   Circle,
   Square,
   RotateCcw,
-  Sparkles,
   X,
   CheckCircle,
   AlertCircle,
@@ -70,6 +69,9 @@ export interface LanguageVideoModalProps {
 
 const MAX_DURATION = 180; // 3 min max
 const MIN_DURATION = 30; // 30 s minimum
+// Analyse automatique : réessais automatiques avant d'afficher un message humain.
+const AUTO_ANALYZE_RETRIES = 2;
+const AUTO_ANALYZE_RETRY_DELAY_MS = 2500;
 const ABSENCE_THREAT_TICKS = 2;
 const ABSENCE_CUT_TICKS = 4;
 
@@ -126,6 +128,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [savedFlag, setSavedFlag] = useState(false);
   const [faceAbsenceInvalid, setFaceAbsenceInvalid] = useState(false);
+  const [analyzeAttempt, setAnalyzeAttempt] = useState(0);
+  const autoAnalyzeStartedRef = useRef(false);
 
   const startCamera = useCallback(async () => {
     try {
@@ -158,6 +162,8 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     setSavedFlag(false);
     setFaceAbsenceInvalid(false);
     setElapsed(0);
+    autoAnalyzeStartedRef.current = false;
+    setAnalyzeAttempt(0);
     if (videoRef.current) {
       videoRef.current.src = '';
       videoRef.current.controls = false;
@@ -260,11 +266,14 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     setAnalyzing(true);
     setAnalyzeError(null);
     setAnalyzeElapsed(0);
+    setAnalyzeAttempt(0);
     if (analyzeTimerRef.current) clearInterval(analyzeTimerRef.current);
     analyzeTimerRef.current = setInterval(() => {
       setAnalyzeElapsed((s) => s + 1);
     }, 1000);
 
+    // Une tentative d'analyse : renvoie null en cas de succès, sinon { message, aborted }.
+    const runAttempt = async (): Promise<null | { message: string; aborted: boolean }> => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 8 * 60 * 1000);
     const token = localStorage.getItem('token');
@@ -328,6 +337,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
         setSavedFlag(true);
         onAnalysisComplete?.();
       }
+      return null;
     } catch (err: unknown) {
       const aborted = err instanceof Error && err.name === 'AbortError';
       let message = aborted
@@ -346,16 +356,49 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
           ? 'Connexion interrompue par le serveur (timeout). L’analyse peut continuer côté serveur — réessayez dans 1 minute ou rafraîchissez la page.'
           : 'Connection interrupted by the server (timeout). Analysis may still be running — retry in 1 minute or refresh the page.';
       }
-      setAnalyzeError(message);
+      return { message, aborted };
     } finally {
       window.clearTimeout(timeoutId);
-      if (analyzeTimerRef.current) {
-        clearInterval(analyzeTimerRef.current);
-        analyzeTimerRef.current = null;
-      }
-      setAnalyzing(false);
     }
+    };
+
+    // Analyse automatique : 2 réessais automatiques, puis message humain. L'enregistrement
+    // n'est jamais perdu (bouton « Réessayer » + « Refaire »).
+    let failure: null | { message: string; aborted: boolean } = null;
+    for (let attempt = 0; attempt <= AUTO_ANALYZE_RETRIES; attempt += 1) {
+      setAnalyzeAttempt(attempt);
+      failure = await runAttempt();
+      if (!failure) break;
+      // Un dépassement de délai n'est pas relancé tel quel : on le signale tout de suite.
+      if (failure.aborted || attempt === AUTO_ANALYZE_RETRIES) break;
+      await new Promise((resolve) => window.setTimeout(resolve, AUTO_ANALYZE_RETRY_DELAY_MS));
+    }
+    if (failure) {
+      setAnalyzeError(
+        failure.aborted
+          ? failure.message
+          : isFr
+            ? 'Nous n’avons pas pu terminer l’analyse de votre vidéo après plusieurs essais. Votre enregistrement n’est pas perdu : réessayez dans un instant.'
+            : 'We could not complete the analysis of your video after several attempts. Your recording is not lost — please try again in a moment.'
+      );
+    }
+    if (analyzeTimerRef.current) {
+      clearInterval(analyzeTimerRef.current);
+      analyzeTimerRef.current = null;
+    }
+    setAnalyzing(false);
   };
+
+  // Lancement automatique dès la fin de l'enregistrement (aucun bouton « Analyser »).
+  useEffect(() => {
+    if (!isOpen || isRecording || !recordedBlob || faceAbsenceInvalid) return;
+    if (result || analyzing || autoAnalyzeStartedRef.current) return;
+    if (elapsed < MIN_DURATION) return;
+    autoAnalyzeStartedRef.current = true;
+    void analyzeVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isRecording, recordedBlob, faceAbsenceInvalid, elapsed]);
+
 
   const faceMatchActive = isOpen && isRecording && !!stream && !cameraError;
   const { status: faceMatchStatus, noFaceStreak } = useLiveFaceMatch({
@@ -518,14 +561,12 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                         <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
                         {isFr ? 'Refaire' : 'Retake'}
                       </button>
-                      <button
-                        onClick={analyzeVideo}
-                        disabled={!!result && savedFlag}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg disabled:opacity-50"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        {result ? (isFr ? 'Analyse terminée' : 'Analysis done') : isFr ? 'Analyser avec l’IA' : 'Analyze with AI'}
-                      </button>
+                      {result && (
+                        <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-500">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {isFr ? 'Analyse terminée' : 'Analysis done'}
+                        </p>
+                      )}
                     </>
                   )}
                 </div>
@@ -550,6 +591,13 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                     ? 'Étapes : envoi vidéo → transcription audio → analyse IA (langue + identité). Comptez en général 1 à 4 minutes.'
                     : 'Steps: upload → audio transcription → AI analysis (language + identity). Usually 1–4 minutes.'}
                 </p>
+                <p className="text-xs font-bold text-harx-600">
+                  {analyzeAttempt > 0
+                    ? (isFr
+                        ? `Petit contretemps — nouvel essai automatique (essai ${analyzeAttempt + 1}/${AUTO_ANALYZE_RETRIES + 1})…`
+                        : `Temporary hiccup — retrying automatically (attempt ${analyzeAttempt + 1}/${AUTO_ANALYZE_RETRIES + 1})…`)
+                    : (isFr ? 'Analyse lancée automatiquement' : 'Analysis started automatically')}
+                </p>
                 {analyzeElapsed > 0 && (
                   <p className="text-[11px] font-semibold text-harx-600">
                     {isFr ? `Temps écoulé : ${formatTime(analyzeElapsed)}` : `Elapsed: ${formatTime(analyzeElapsed)}`}
@@ -564,6 +612,11 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
                 <div>
                   <p className="text-sm font-black text-red-700">{isFr ? 'Échec' : 'Failed'}</p>
                   <p className="text-xs text-red-500 mt-1">{analyzeError}</p>
+                  {recordedBlob && !faceAbsenceInvalid && (
+                    <button onClick={() => void analyzeVideo()} className="mt-2 text-xs font-black text-red-600 underline">
+                      {isFr ? 'Réessayer' : 'Retry'}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
