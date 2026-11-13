@@ -3,13 +3,15 @@ import { Dialog } from '@headlessui/react';
 import { CVParser } from '../../lib/parsers/cvParser';
 import { useProfile } from '../../hooks/useProfile';
 import { getLanguageByCode, getAllLanguages } from '../../lib/api/languages';
+import { fetchAllSkills } from '../../services/api/skills';
 import {
   extractBasicInfo,
   analyzeExperience,
   analyzeSkills,
   analyzeAchievements,
   analyzeAvailability,
-  generateSummary
+  generateSummary,
+  getTimezones
 } from '../../lib/api/profiles';
 
 import Cookies from 'js-cookie';
@@ -31,6 +33,8 @@ function ImportDialog({ isOpen, onClose, onImport }) {
   const [showGuidance, setShowGuidance] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState('');
   const [analysisSteps, setAnalysisSteps] = useState([]);
   // Flag used to abort the in-flight analysis flow when the user cancels.
   const cancelledRef = useRef(false);
@@ -73,9 +77,17 @@ function ImportDialog({ isOpen, onClose, onImport }) {
     }
   ];
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = async (eventOrFile) => {
+    const file = eventOrFile?.target ? eventOrFile.target.files[0] : eventOrFile;
     if (!file) return;
+    setFileName(file.name);
+
+    // A new upload attempt always starts from a clean slate — otherwise a
+    // failed re-upload after an earlier success left the stale green
+    // "uploaded successfully" box showing next to the new red error.
+    setUploadSuccess(false);
+    setText('');
+    setError('');
 
     if (file.size > 5 * 1024 * 1024) {
       setError(t('profileImportDialog.errors.fileTooLarge'));
@@ -286,19 +298,76 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return found || [];
       };
 
+      // The Agent schema stores skills as DB refs ({ skill: ObjectId, level }),
+      // but the AI returns free-text names ({ name, confidence, context }) — the
+      // same free-text-vs-DB-ref gap already solved for languages above. Resolve
+      // each AI skill name against this rep's own skill catalog by name; a skill
+      // the AI mentions but the catalog doesn't have is dropped rather than
+      // failing the whole import (skills aren't mandatory, unlike languages).
+      addAnalysisStep(t('profileImportDialog.analysis.matchingSkills', 'Correspondance des compétences…'));
+      let dbSkillsByType = { technical: {}, professional: {}, soft: {} };
+      try {
+        dbSkillsByType = await fetchAllSkills();
+      } catch (error) {
+        console.warn('Could not load skill catalog for name matching:', error);
+      }
+      const resolveSkillList = (rawList, skillType) => {
+        const grouped = dbSkillsByType[skillType] || {};
+        const flat = Object.values(grouped).flat();
+        const normName = (v) => String(v || '').trim().toLowerCase();
+        const resolved = [];
+        for (const item of Array.isArray(rawList) ? rawList : []) {
+          const aiName = normName(item?.name || item);
+          if (!aiName) continue;
+          const dbSkill = flat.find((s) => normName(s.name) === aiName) ||
+            flat.find((s) => normName(s.name).includes(aiName) || aiName.includes(normName(s.name)));
+          if (!dbSkill) continue;
+          const confidence = Number(item?.confidence);
+          const level = Number.isFinite(confidence) ? Math.min(5, Math.max(0, Math.round(confidence))) : 3;
+          resolved.push({ skill: dbSkill._id, level, details: item?.context || '' });
+        }
+        return resolved;
+      };
+
       // keyAreas may come back bilingual ({ en, fr }[]) from analyzeExperience — flatten
       // to string[] for Mongoose keyExpertise while keeping the _i18n mirror.
       const keyAreasN = normalizeBilingualList(experience.keyAreas || [], activeLang);
 
+      // Agent.availability.timeZone AND personalInfo.country (despite its name)
+      // are both ObjectId refs into the Timezone collection, not free strings —
+      // analyzeAvailability/extractBasicInfo return raw values ("Europe/Paris",
+      // "FR") straight from the AI, which Mongoose can't cast to an ObjectId.
+      // Same free-text-vs-DB-ref gap as languages/skills above.
+      let timezones = [];
+      try {
+        timezones = await getTimezones();
+      } catch (error) {
+        console.warn('Could not load timezone catalog for name matching:', error);
+      }
+
       const rawTimeZone = availability?.timeZone;
-      const safeTimeZone =
-        rawTimeZone && String(rawTimeZone).trim() ? rawTimeZone : defaultAvailability.timeZone;
+      let safeTimeZone = defaultAvailability.timeZone;
+      if (rawTimeZone && String(rawTimeZone).trim() && rawTimeZone !== 'unknown') {
+        const match = (timezones || []).find(
+          (tz) => String(tz.zoneName || '').toLowerCase() === String(rawTimeZone).trim().toLowerCase()
+        );
+        if (match) safeTimeZone = match._id;
+      }
+
+      let safeCountry = '';
+      const rawCountry = basicInfo.country;
+      if (rawCountry && String(rawCountry).trim()) {
+        const match = (timezones || []).find(
+          (tz) => String(tz.countryCode || '').toLowerCase() === String(rawCountry).trim().toLowerCase()
+        );
+        if (match) safeCountry = match._id;
+      }
 
       // Combine all data with proper error handling and defaults
       const combinedData = {
         personalInfo: {
           name: basicInfo.name || '',
-          country: basicInfo.country || '',
+          country: safeCountry,
           email: basicInfo.email || '',
           phone: basicInfo.phone || '',
           languages: matchedLanguages || defaultArrays.languages
@@ -320,10 +389,11 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         // Categorized skills come from analyzeSkills (the dedicated skills
         // analyzer); fall back to analyzeExperience for backwards-compat. Both
         // naming conventions (`technical` / `technicalSkills`) are supported.
+        // Resolved against the DB skill catalog — the schema stores refs, not names.
         skills: {
-          technical: pickSkillList('technical'),
-          professional: pickSkillList('professional'),
-          soft: pickSkillList('soft')
+          technical: resolveSkillList(pickSkillList('technical'), 'technical'),
+          professional: resolveSkillList(pickSkillList('professional'), 'professional'),
+          soft: resolveSkillList(pickSkillList('soft'), 'soft')
         },
         experience: (experience.roles || defaultArrays.roles).map(role => {
           const startDate = new Date(role.startDate);
@@ -404,7 +474,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         return;
       }
       console.error('Profile parsing error:', err);
-      const displayError = err.message || t('profileImportDialog.errors.parseFailed');
+      // The backend's generic "Validation error" (Mongoose schema rejection)
+      // carries the actual failing field(s) in `errors`, which was previously
+      // discarded — surface it so a future mismatch is diagnosable from the
+      // UI instead of showing a bare "Impossible d'analyser votre CV".
+      const detail = Array.isArray(err.errors) && err.errors.length > 0 ? `: ${err.errors.join(', ')}` : '';
+      const displayError = (err.message ? `${err.message}${detail}` : '') || t('profileImportDialog.errors.parseFailed');
       setError(displayError);
       addAnalysisStep(t('profileImportDialog.analysis.error', { message: displayError }), true);
     } finally {
@@ -488,11 +563,23 @@ function ImportDialog({ isOpen, onClose, onImport }) {
 
             <div className="space-y-5">
               <div
-                className={`rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
-                    ? 'bg-green-50'
-                    : 'bg-gray-50 hover:bg-harx-50'
+                role="button"
+                tabIndex={0}
+                className={`rounded-2xl border-2 border-dashed p-9 text-center cursor-pointer transition-all duration-200 ${uploadSuccess
+                    ? 'border-green-300 bg-green-50'
+                    : dragOver
+                      ? 'border-harx-500 bg-harx-50 scale-[1.01]'
+                      : 'border-gray-200 bg-gray-50 hover:border-harx-400 hover:bg-harx-50/60'
                   }`}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  if (!loading) handleFileUpload(e.dataTransfer.files?.[0]);
+                }}
               >
                 <input
                   type="file"
@@ -509,18 +596,26 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                       </svg>
                     </span>
                     <p className="mt-3 text-lg font-semibold">{t('profileImportDialog.success')}</p>
-                    <p className="text-sm text-green-500 mt-0.5">{t('profileImportDialog.uploadDifferent')}</p>
+                    {fileName && (
+                      <p className="mt-1 mx-auto max-w-xs truncate rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm">{fileName}</p>
+                    )}
+                    <p className="text-sm text-green-500 mt-2">{t('profileImportDialog.uploadDifferent')}</p>
                   </div>
                 ) : (
                   <>
-                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-sm">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-harx-500 shadow-md shadow-harx-500/10 ring-4 ring-harx-50">
                       <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </span>
                     <p className="mt-4 text-lg font-semibold text-gray-900">{t('profileImportDialog.dropCV')}</p>
                     <p className="mt-1 text-sm text-gray-500">{t('profileImportDialog.browseFiles')}</p>
-                    <p className="text-xs text-gray-400 mt-2">{t('profileImportDialog.supports')}</p>
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {['PDF', 'DOC', 'DOCX'].map((f) => (
+                        <span key={f} className="rounded-md bg-white px-2 py-0.5 text-[11px] font-bold tracking-wide text-gray-500 ring-1 ring-gray-200">{f}</span>
+                      ))}
+                      <span className="text-[11px] text-gray-400">{t('profileImportDialog.sizeLimit')}</span>
+                    </div>
                   </>
                 )}
               </div>

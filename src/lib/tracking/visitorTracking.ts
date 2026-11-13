@@ -1,3 +1,4 @@
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 import { GA_MEASUREMENT_ID } from './constants';
 import { buildTrackingPath, resolvePageMeta, type PageMeta } from './pageMeta';
 
@@ -60,6 +61,8 @@ function isTrackablePageTitle(title: string): boolean {
 }
 
 export function trackPageView(path?: string): void {
+  // Sous qiankun, le shell (v25_process_connections) envoie le page_view : éviter le doublon.
+  if (qiankunWindow.__POWERED_BY_QIANKUN__) return;
   const pagePath = path ?? buildTrackingPath();
   if (!isTrackablePageTitle(document.title)) return;
 

@@ -20,6 +20,7 @@ import {
 import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
 import { usePageTitle } from '../../lib/tracking/usePageTitle';
 import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../onboarding/RepOnboardingHelpModal';
+import { isSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
 
 /** Maps the current onboarding route to the matching on-demand help content. */
 function guideKeyForPath(pathname: string): RepOnboardingGuideKey | null {
@@ -51,8 +52,14 @@ function OnboardingShellContent() {
   // Keep profile fresh after CV import / editor saves — a stale empty profile
   // used to bounce editor ↔ import in a loop.
   //
-  // fetchProfileFromAPI() dispatches PROFILE_UPDATE_EVENT on every successful
-  // read. Reloading on that event would retrigger itself and flood GET /users/:id.
+  // fetchProfileFromAPI() unconditionally dispatches PROFILE_UPDATE_EVENT on
+  // every successful read, not just on an actual change — so a naive
+  // "reload on PROFILE_UPDATE_EVENT" listener here re-triggers its own
+  // event on every load, flooding the auth backend (GET /users/:id, fired by
+  // TopBar's own listener on the same event) and exhausting its global
+  // rate limit within seconds. isSelfTriggeredUpdate suppresses the event
+  // this effect's own load() causes, while still reacting to a genuine
+  // PROFILE_UPDATE_EVENT dispatched elsewhere (e.g. a real save).
   const isSelfTriggeredUpdate = useRef(false);
 
   useEffect(() => {
@@ -86,6 +93,8 @@ function OnboardingShellContent() {
       } catch {
         // ignore profile errors; shell still renders
       } finally {
+        // Deferred: fetchProfileFromAPI's own PROFILE_UPDATE_EVENT dispatch
+        // (synchronous, inside the await above) must still see this as true.
         setTimeout(() => {
           isSelfTriggeredUpdate.current = false;
         }, 0);
@@ -110,6 +119,8 @@ function OnboardingShellContent() {
     if (!userProfile || isCallCenterStaff()) return;
 
     const path = location.pathname;
+    // Fenêtre de satisfaction en cours (fin de l'onboarding) : on reste sur la page jusqu'à ce que le rep la ferme.
+    if (isSatisfactionPending()) return;
     if (
       path === '/onboarding/continue' ||
       path === '/orchestrator' ||

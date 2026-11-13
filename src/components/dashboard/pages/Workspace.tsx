@@ -380,7 +380,7 @@ export function WorkspaceContent() {
     let cancelled = false;
     const baseUrl = (
       import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
-      'https://v25dashboardbackend-development.up.railway.app/api'
+      'https://v25dashboardbackend-recette.up.railway.app/api'
     ).replace(/\/$/, '');
     (async () => {
       try {
@@ -886,7 +886,7 @@ export function WorkspaceContent() {
     }
 
     console.log("🔍 Workspace: fetching leads", { activeGigId, page, query });
-    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-development.up.railway.app/api').replace(/\/$/, '');
+    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-recette.up.railway.app/api').replace(/\/$/, '');
     const limit = 50;
     const agentId = getAgentId();
     const shuffleParams = agentId ? `&shuffle=1&agentId=${encodeURIComponent(agentId)}` : '';
@@ -948,7 +948,7 @@ export function WorkspaceContent() {
 
   const setLeadDisposition = useCallback(async (leadId: string, disposition: string) => {
     const agentId = getAgentId();
-    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-development.up.railway.app/api').replace(/\/$/, '');
+    const baseUrl = (import.meta.env.VITE_DASHBOARD_COMPANY_API_URL || 'https://v25dashboardbackend-recette.up.railway.app/api').replace(/\/$/, '');
     setDispositionSaving(true);
     try {
       const resp = await fetch(`${baseUrl}/leads/${leadId}/disposition`, {

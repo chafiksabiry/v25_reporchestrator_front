@@ -7,7 +7,7 @@
  * so edits in the `harx` Mongo DB appear in the UI.
  */
 const PROD_GIGS_API =
-  'https://v25gigsmanualcreationbackend-production.up.railway.app/api';
+  'https://v25gigsmanualcreationbackend-recette.up.railway.app/api';
 
 const PROD_HOSTS = new Set(['harx.ai', 'www.harx.ai']);
 

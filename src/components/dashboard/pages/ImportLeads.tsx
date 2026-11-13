@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getAgentId, getAuthToken } from '../../../utils/authUtils';
 
 interface ZohoConfig {
@@ -14,6 +15,7 @@ interface ZohoConfig {
 }
 
 export function ImportLeads() {
+  const { t } = useTranslation();
   const [zohoConfig, setZohoConfig] = useState<ZohoConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -76,7 +78,7 @@ export function ImportLeads() {
       window.location.href = redirectUrl;
     } catch (error) {
       console.error('❌ Error connecting to Zoho:', error);
-      setMessage({ text: 'Failed to connect to Zoho', type: 'error' });
+      setMessage({ text: t('importLeads.connectFailed'), type: 'error' });
       setActionLoading(false);
     }
   };
@@ -86,7 +88,7 @@ export function ImportLeads() {
     const token = getAuthToken();
 
     if (!userId || !token || !zohoConfig) {
-      setMessage({ text: 'Unable to disconnect', type: 'error' });
+      setMessage({ text: t('importLeads.disconnectUnavailable'), type: 'error' });
       return;
     }
 
@@ -107,14 +109,14 @@ export function ImportLeads() {
 
       if (response.ok) {
         console.log('✅ Zoho config deleted');
-        setMessage({ text: 'Successfully disconnected from Zoho CRM', type: 'success' });
+        setMessage({ text: t('importLeads.disconnectSuccess'), type: 'success' });
         setZohoConfig(null);
       } else {
         throw new Error('Failed to disconnect');
       }
     } catch (error) {
       console.error('❌ Error disconnecting Zoho:', error);
-      setMessage({ text: 'Failed to disconnect from Zoho', type: 'error' });
+      setMessage({ text: t('importLeads.disconnectFailed'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -126,7 +128,7 @@ export function ImportLeads() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <p className="mt-4 text-gray-600">{t('importLeads.loading')}</p>
           </div>
         </div>
       </div>
@@ -140,10 +142,10 @@ export function ImportLeads() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Upload className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Import Leads</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('importLeads.title')}</h1>
           </div>
           <p className="text-gray-600">
-            Choose your preferred method to import leads into your selected gig.
+            {t('importLeads.subtitle')}
           </p>
         </div>
 
@@ -174,12 +176,12 @@ export function ImportLeads() {
               </div>
               <div>
                 <h3 className="text-xl font-semibold text-gray-900">Zoho CRM</h3>
-                <p className="text-sm text-gray-600">Integration</p>
+                <p className="text-sm text-gray-600">{t('importLeads.integration')}</p>
               </div>
             </div>
 
             <p className="text-gray-600 mb-6">
-              Connect and sync with your Zoho CRM
+              {t('importLeads.zohoDescription')}
             </p>
 
             {/* Status */}
@@ -187,12 +189,12 @@ export function ImportLeads() {
               {zohoConfig ? (
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="w-5 h-5" />
-                  <span className="font-medium">Connected</span>
+                  <span className="font-medium">{t('importLeads.connected')}</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-orange-600">
                   <AlertCircle className="w-5 h-5" />
-                  <span className="font-medium">Not connected</span>
+                  <span className="font-medium">{t('importLeads.notConnected')}</span>
                 </div>
               )}
             </div>
@@ -207,7 +209,7 @@ export function ImportLeads() {
                     : 'bg-red-600 text-white hover:bg-red-700'
                   }`}
               >
-                {actionLoading ? 'Disconnecting...' : 'Disconnect'}
+                {actionLoading ? t('importLeads.disconnecting') : t('importLeads.disconnect')}
               </button>
             ) : (
               <button
@@ -218,15 +220,15 @@ export function ImportLeads() {
                     : 'bg-green-600 text-white hover:bg-green-700'
                   }`}
               >
-                {actionLoading ? 'Connecting...' : 'Connect'}
+                {actionLoading ? t('importLeads.connecting') : t('importLeads.connect')}
               </button>
             )}
 
             {zohoConfig && (
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Connected User ID:</p>
+                <p className="text-xs text-gray-500 mb-1">{t('importLeads.connectedUserId')}</p>
                 <p className="text-sm font-mono text-gray-700 truncate">{zohoConfig.userId}</p>
-                <p className="text-xs text-gray-500 mt-2">Last Updated:</p>
+                <p className="text-xs text-gray-500 mt-2">{t('importLeads.lastUpdated')}</p>
                 <p className="text-sm text-gray-700">
                   {new Date(zohoConfig.updatedAt).toLocaleString()}
                 </p>
@@ -241,32 +243,42 @@ export function ImportLeads() {
                 <Upload className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">File Upload</h3>
-                <p className="text-sm text-gray-600">Upload and process contact files</p>
+                <h3 className="text-xl font-semibold text-gray-900">{t('importLeads.fileUpload')}</h3>
+                <p className="text-sm text-gray-600">{t('importLeads.fileUploadDesc')}</p>
               </div>
             </div>
 
             <p className="text-gray-600 mb-6">
-              📄 Supported: CSV, Excel
+              📄 {t('importLeads.supportedFormats')}
             </p>
 
             <button
-              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              disabled
+              title={t('importLeads.comingSoon')}
+              className="w-full py-3 px-4 bg-gray-200 text-gray-500 rounded-lg font-medium cursor-not-allowed"
             >
-              Click to upload or drag and drop
+              {t('importLeads.uploadCta')} — {t('importLeads.comingSoon')}
             </button>
           </div>
         </div>
 
         {/* Channel Filter */}
         <div className="mt-8 bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Channel Filter</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('importLeads.channelFilter')}</h2>
           <div className="flex gap-4">
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              🌐 All Channels
+            <button
+              disabled
+              title={t('importLeads.comingSoon')}
+              className="px-6 py-2 bg-blue-200 text-blue-500 rounded-lg font-medium cursor-not-allowed"
+            >
+              🌐 {t('importLeads.allChannels')}
             </button>
-            <button className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-              📞 Voice Calls
+            <button
+              disabled
+              title={t('importLeads.comingSoon')}
+              className="px-6 py-2 bg-gray-100 text-gray-400 rounded-lg font-medium cursor-not-allowed"
+            >
+              📞 {t('importLeads.voiceCalls')}
             </button>
           </div>
         </div>
