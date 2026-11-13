@@ -300,3 +300,38 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .harx-hint-bubble, .harx-hint-bubble-inner, .harx-hint-ping { animation: none; }
 }
+
+/* ── Palette commune du parcours REP (miroir de src/utils/repPalette.ts) ── */
+:root {
+  --rep-night: #0C1C2E;
+  --rep-night-soft: #14304D;
+  --rep-magenta: #F90080;
+  --rep-magenta-deep: #C2186F;
+  --rep-success: #10B981;
+  --rep-success-ink: #047857;
+  --rep-attention: #F59E0B;
+  --rep-attention-ink: #92400E;
+  --rep-info: #38BDF8;
+  --rep-info-ink: #0369A1;
+  --rep-ai: #A78BFA;
+  --rep-ai-ink: #6D28D9;
+  --rep-warm-paper: #FFF7F2;
+  --rep-page-bg: linear-gradient(135deg, #FFF7F2 0%, #FFF1F7 55%, #F6F2FF 100%);
+}
+
+@keyframes rep-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+@keyframes rep-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.rep-float { animation: rep-float 3.4s ease-in-out infinite; }
+.rep-shimmer {
+  background-size: 200% 100%;
+  animation: rep-shimmer 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rep-float, .rep-shimmer { animation: none; }
+}
