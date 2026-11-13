@@ -27,6 +27,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl, repApiUrl } from '../../../utils/repApiUrl';
 import { INTRO_VIDEO_MAX_SECONDS, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
+import { buildDetectedGroups, detectedSkillCount, localizedText, normalizePresentationResult, type PresentationResult } from '../../../utils/presentationResult';
 import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage, withRetryAfterOnce } from '../../../utils/videoErrors';
 import { recorderOptions } from '../../../utils/videoLimits';
 import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../../utils/taxonomyI18n';
@@ -159,26 +160,6 @@ interface AnalysisResult {
 }
 
 /** Réponse de POST /profiles/:id/presentation/analyze-video (analyse de la vidéo de présentation). */
-interface DetectedItem { id?: string; name?: LocalizedText | string; score?: number }
-interface DetectedLanguage { id?: string; name?: LocalizedText | string; level?: string; score?: number }
-interface PresentationResult {
-  saved?: boolean;
-  insightsApplied?: boolean;
-  videoUrl?: string;
-  duration?: number;
-  transcription?: string;
-  summary?: LocalizedText;
-  detected?: {
-    technicalSkills?: DetectedItem[];
-    professionalSkills?: DetectedItem[];
-    softSkills?: DetectedItem[];
-    industries?: DetectedItem[];
-    activities?: DetectedItem[];
-    languages?: DetectedLanguage[];
-    isEmpty?: boolean;
-  };
-}
-
 interface SavedVideoData {
   videoUrl?: string;
   videoDuration?: number;
@@ -1181,12 +1162,18 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       } catch {
         throw toVideoApiError(0, { code: 'ANALYSIS_FAILED' });
       }
+      // 404/405 SANS code d'erreur = la route n'existe pas encore (ancien serveur) → repli.
+      // Un 404 PROFILE_NOT_FOUND (avec code) est une vraie erreur : pas de repli.
+      let routeMissing = false;
       if (response.status === 404 || response.status === 405) {
-        presentationRouteMissingRef.current = true;
-      } else {
+        const body = await response.clone().json().catch(() => undefined);
+        routeMissing = !(body && typeof body.code === 'string');
+        if (routeMissing) presentationRouteMissingRef.current = true;
+      }
+      if (!routeMissing) {
         if (!response.ok) throw await videoErrorFromResponse(response);
         const json = await response.json();
-        return { presentation: (json?.data || {}) as PresentationResult };
+        return { presentation: normalizePresentationResult(json) };
       }
     }
     try {
@@ -1230,7 +1217,6 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       if ('presentation' in outcome) {
         setPresentation(outcome.presentation);
         if (outcome.presentation.saved) setSavedFlag(true);
-        if (outcome.presentation.videoUrl) showSavedVideo(outcome.presentation.videoUrl);
         // Le parent recharge le profil (secteurs, activités, langues, compétences suggérées).
         onAnalysisComplete?.(outcome.presentation as any);
       } else {
@@ -1641,15 +1627,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
             )}
 
             {presentation && (() => {
-              const d = presentation.detected || {};
-              const label = (x: { name?: LocalizedText | string } | undefined) => localize(x?.name as LocalizedText, uiLang);
-              const skills = [...(d.technicalSkills || []), ...(d.professionalSkills || []), ...(d.softSkills || [])];
-              const groups: Array<{ title: string; items: Array<{ name?: LocalizedText | string }> }> = [
-                { title: t('detectedSkills'), items: skills },
-                { title: t('detectedIndustries'), items: d.industries || [] },
-                { title: t('detectedActivities'), items: d.activities || [] },
-                { title: t('detectedLanguages'), items: (d.languages || []).map((l) => ({ name: l.level ? `${label(l)} (${l.level})` : label(l) })) },
-              ].filter((g) => g.items.length > 0);
+              const groups = buildDetectedGroups(presentation, uiLang);
+              const groupTitle = { skills: t('detectedSkills'), industries: t('detectedIndustries'), activities: t('detectedActivities'), languages: t('detectedLanguages') };
               return (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="presentation-detected">
                   <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
@@ -1657,29 +1636,34 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     {t('detectedTitle')}
                   </div>
                   {presentation.summary && (
-                    <p className="text-sm text-slate-700 leading-relaxed">{localize(presentation.summary, uiLang)}</p>
+                    <p className="text-sm text-slate-700 leading-relaxed">{localizedText(presentation.summary, uiLang)}</p>
                   )}
-                  {d.isEmpty || groups.length === 0 ? (
+                  {presentation.detected.isEmpty || groups.length === 0 ? (
                     <p className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
                       <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                       {t('detectedEmpty')}
                     </p>
                   ) : (
                     groups.map((g) => (
-                      <div key={g.title}>
-                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 mb-1.5">{g.title}</p>
+                      <div key={g.key}>
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 mb-1.5">{groupTitle[g.key]}</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {g.items.map((item, i) => (
-                            <span key={`${g.title}-${i}`} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
-                              {typeof item.name === 'string' ? item.name : label(item)}
+                          {g.labels.map((label, i) => (
+                            <span key={`${g.key}-${i}`} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
+                              {label}
                             </span>
                           ))}
                         </div>
                       </div>
                     ))
                   )}
-                  {skills.length > 0 && <p className="text-xs text-slate-500 leading-relaxed">{t('detectedSkillsNote')}</p>}
-                  {presentation.saved === false && (
+                  {detectedSkillCount(presentation) > 0 && <p className="text-xs text-slate-500 leading-relaxed">{t('detectedSkillsNote')}</p>}
+                  {presentation.relevance?.onTopic === false && (
+                    <p className="text-xs font-bold text-amber-700">
+                      {localizedText(presentation.relevance.reason, uiLang) || t('offTopicReasonFallback')}
+                    </p>
+                  )}
+                  {!presentation.saved && (
                     <p className="text-xs font-bold text-amber-700">{t('detectedNotSaved')}</p>
                   )}
                 </div>
