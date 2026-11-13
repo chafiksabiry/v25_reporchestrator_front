@@ -25,7 +25,7 @@ const FINAL = {
 describe('réponse de l’analyse de présentation (format final)', () => {
   it('ne retient que les champs du format final', () => {
     const r = normalizePresentationResult(FINAL);
-    expect(Object.keys(r).sort()).toEqual(['detected', 'insightsApplied', 'relevance', 'saved', 'summary']);
+    expect(Object.keys(r).sort()).toEqual(['detected', 'insightsApplied', 'relevance', 'saved', 'stale', 'summary']);
     expect(r).not.toHaveProperty('videoUrl');
     expect(r).not.toHaveProperty('duration');
     expect(r).not.toHaveProperty('transcription');
@@ -70,5 +70,38 @@ describe('réponse de l’analyse de présentation (format final)', () => {
     expect(normalizePresentationResult(null).detected.isEmpty).toBe(true);
     expect(normalizePresentationResult(undefined).saved).toBe(false);
     expect(normalizePresentationResult({ data: { detected: { technicalSkills: 'oops' } } }).detected.technicalSkills).toEqual([]);
+  });
+});
+
+describe('analyse devenue obsolète (stale)', () => {
+  const STALE = {
+    data: {
+      saved: false,
+      insightsApplied: false,
+      stale: true,
+      summary: { en: 'x', fr: 'x' },
+      detected: { technicalSkills: [{ id: 't1', name: 'CRM' }], industries: [], activities: [], languages: [], professionalSkills: [], softSkills: [], isEmpty: false },
+    },
+  };
+
+  it('stale:true est reconnu ; detected reste présent mais rien n’est appliqué', () => {
+    const r = normalizePresentationResult(STALE);
+    expect(r.stale).toBe(true);
+    expect(r.saved).toBe(false);
+    expect(r.insightsApplied).toBe(false);
+    expect(detectedSkillCount(r)).toBe(1);
+  });
+
+  it('ancien format sans `stale` : stale = false, comportement inchangé', () => {
+    const r = normalizePresentationResult(FINAL);
+    expect(r.stale).toBe(false);
+    expect(r.saved).toBe(true);
+    expect(buildDetectedGroups(r, 'fr').length).toBe(4);
+  });
+
+  it('stale n’est vrai que pour la valeur booléenne true', () => {
+    expect(normalizePresentationResult({ data: { stale: 'true' } }).stale).toBe(false);
+    expect(normalizePresentationResult({ data: { stale: 1 } }).stale).toBe(false);
+    expect(normalizePresentationResult({ data: { stale: false } }).stale).toBe(false);
   });
 });

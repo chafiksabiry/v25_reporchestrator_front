@@ -5,7 +5,10 @@
  *                             languages[] : {id,name,level,score}, isEmpty },
  *                 summary:{en,fr}, relevance:{onTopic,score,reason:{en,fr}} } }
  * Champs SUPPRIMÉS côté serveur et jamais lus : transcription, analysis, languageAssessment, fraudCheck,
- * videoUrl, duration. Les compétences détectées vont dans `proposedSkills` (suggestions) ; secteurs,
+ * videoUrl, duration. `stale:true` (avec saved:false et insightsApplied:false) = la vidéo du wizard a
+ * changé pendant l'analyse : `detected` est renvoyé mais RIEN n'est appliqué au profil → le front demande
+ * de réessayer, sans afficher de résultat ni recharger. L'ancien format (sans `stale`) reste valide.
+ * Les compétences détectées vont dans `proposedSkills` (suggestions) ; secteurs,
  * activités et langues sont écrits directement dans le profil ; `saved:false` = non bloquant.
  */
 
@@ -17,6 +20,8 @@ export interface DetectedLanguage extends DetectedItem { level?: string }
 export interface PresentationResult {
   saved: boolean;
   insightsApplied: boolean;
+  /** La vidéo du wizard a changé pendant l'analyse : rien n'a été appliqué, il faut réessayer. */
+  stale: boolean;
   summary?: Localized;
   relevance?: { onTopic?: boolean; score?: number; reason?: Localized };
   detected: {
@@ -53,6 +58,7 @@ export const normalizePresentationResult = (json: any): PresentationResult => {
   return {
     saved: d?.saved === true,
     insightsApplied: d?.insightsApplied === true,
+    stale: d?.stale === true,
     summary: d?.summary,
     relevance: d?.relevance && typeof d.relevance === 'object' ? d.relevance : undefined,
     detected,

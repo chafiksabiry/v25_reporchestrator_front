@@ -527,6 +527,10 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
     en: 'We could not detect enough usable speech. Record again, speaking clearly about who you are and your career path.',
     fr: 'Nous n’avons pas détecté assez de parole exploitable. Refaites la vidéo en parlant clairement de qui vous êtes et de votre parcours.',
   },
+  detectedStale: {
+    en: 'Your video changed while it was being analysed, so nothing was added to your profile. Please try again.',
+    fr: 'La vidéo a changé pendant l’analyse, rien n’a été ajouté à votre profil. Réessayez.',
+  },
   detectedNotSaved: {
     en: 'The analysis was done but could not be saved automatically to your profile — your video itself is saved.',
     fr: 'L’analyse est faite mais n’a pas pu être enregistrée automatiquement dans votre profil — votre vidéo, elle, est bien enregistrée.',
@@ -1214,7 +1218,13 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         onVideoSaved?.({ url });
       }
       const outcome = await withAutoRetry(() => runPresentationAnalysisOnce(recordedBlob));
-      if ('presentation' in outcome) {
+      if ('presentation' in outcome && outcome.presentation.stale) {
+        // La vidéo du wizard a changé pendant l'analyse : rien n'a été appliqué au profil.
+        // Pas de résultat affiché ni de rechargement ; on invite à réessayer (nouvel envoi puis analyse).
+        setVideoSavedOnServer(false);
+        setAnalyzeRetryable(true);
+        setAnalyzeError(t('detectedStale'));
+      } else if ('presentation' in outcome) {
         setPresentation(outcome.presentation);
         if (outcome.presentation.saved) setSavedFlag(true);
         // Le parent recharge le profil (secteurs, activités, langues, compétences suggérées).
