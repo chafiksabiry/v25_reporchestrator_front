@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjacentTab,
+  computeFrameHeight,
+  getEditorTabs,
+  getTabsOverall,
   editorSectionAnchor,
   getOverallCompletion,
   getSectionCompletions,
@@ -89,5 +93,55 @@ describe('isScheduleComplete', () => {
 describe('editorSectionAnchor', () => {
   it('construit un identifiant stable', () => {
     expect(editorSectionAnchor('photo')).toBe('editor-section-photo');
+  });
+});
+
+describe('getEditorTabs', () => {
+  const withVideo = { ...full, personalInfo: { ...full.personalInfo, presentationVideo: { url: 'https://x/v.mp4', uploaded: true } } };
+
+  it('5 onglets dans l’ordre attendu ; identité = identité + photo + langues', () => {
+    const tabs = getEditorTabs(full);
+    expect(tabs.map((t) => t.id)).toEqual(['identity', 'experience', 'summary', 'availability', 'video']);
+    const identity = tabs[0];
+    expect(identity.total).toBe(5);
+    expect(identity.complete).toBe(true);
+  });
+
+  it('identité incomplète : cumule les manques de photo et de langues', () => {
+    const tabs = getEditorTabs({ personalInfo: { name: 'Awa' } });
+    expect(tabs[0].missing).toEqual(['country', 'phone', 'photo', 'languages']);
+    expect(tabs[0].complete).toBe(false);
+  });
+
+  it('onglet vidéo : suit la règle de la vidéo de présentation', () => {
+    expect(getEditorTabs(full)[4].complete).toBe(false);
+    expect(getEditorTabs(full)[4].missing).toEqual(['video']);
+    expect(getEditorTabs(withVideo)[4].complete).toBe(true);
+  });
+
+  it('progression globale en nombre d’onglets complets', () => {
+    expect(getTabsOverall(getEditorTabs({}))).toEqual({ done: 0, total: 5, percent: 0 });
+    expect(getTabsOverall(getEditorTabs(withVideo))).toEqual({ done: 5, total: 5, percent: 100 });
+  });
+});
+
+describe('adjacentTab', () => {
+  it('avance et recule sans boucler', () => {
+    expect(adjacentTab('identity', 1)).toBe('experience');
+    expect(adjacentTab('identity', -1)).toBe('identity');
+    expect(adjacentTab('video', 1)).toBe('video');
+    expect(adjacentTab('availability', -1)).toBe('summary');
+  });
+});
+
+describe('computeFrameHeight', () => {
+  it('remplit l’espace restant sans dépasser la zone de page', () => {
+    expect(computeFrameHeight({ frameTop: 200, scrollTop: 0, containerBottom: 800, bottomPadding: 32 })).toBe(568);
+  });
+  it('compense le défilement déjà effectué', () => {
+    expect(computeFrameHeight({ frameTop: 150, scrollTop: 50, containerBottom: 800, bottomPadding: 32 })).toBe(568);
+  });
+  it('applique un plancher quand l’écran est trop petit', () => {
+    expect(computeFrameHeight({ frameTop: 500, scrollTop: 0, containerBottom: 700, bottomPadding: 32 })).toBe(420);
   });
 });

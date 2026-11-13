@@ -20,6 +20,17 @@ const fr = {
     autosaveSaved: 'Enregistré automatiquement',
     autosaveError: 'Échec de l’enregistrement — vos données restent à l’écran, réessayez avec « Enregistrer ».',
   },
+  tabs: {
+    identity: 'Identité & photo',
+    experience: 'Expériences',
+    summary: 'Résumé',
+    availability: 'Disponibilités',
+    video: 'Vidéo',
+    step: 'Étape {{n}} sur {{total}}',
+    prev: 'Précédent',
+    next: 'Suivant',
+    listLabel: 'Sections du profil',
+  },
   sections: {
     identity: 'Identité',
     photo: 'Photo',
@@ -43,6 +54,7 @@ const fr = {
     experienceDetails: 'un intitulé et une entreprise pour chaque expérience',
     summary: 'un résumé d’au moins {{min}} caractères',
     schedule: 'au moins un créneau horaire complet',
+    video: 'votre vidéo de présentation',
   },
   missingPrefix: 'Il manque : {{list}}.',
   help: {
@@ -130,6 +142,17 @@ const en: typeof fr = {
     autosaveSaved: 'Saved automatically',
     autosaveError: 'Saving failed — your data is still on screen, try again with “Save”.',
   },
+  tabs: {
+    identity: 'Identity & photo',
+    experience: 'Experience',
+    summary: 'Summary',
+    availability: 'Availability',
+    video: 'Video',
+    step: 'Step {{n}} of {{total}}',
+    prev: 'Previous',
+    next: 'Next',
+    listLabel: 'Profile sections',
+  },
   sections: {
     identity: 'Identity',
     photo: 'Photo',
@@ -153,6 +176,7 @@ const en: typeof fr = {
     experienceDetails: 'a job title and a company for each experience',
     summary: 'a summary of at least {{min}} characters',
     schedule: 'at least one complete time slot',
+    video: 'your introduction video',
   },
   missingPrefix: 'Missing: {{list}}.',
   help: {

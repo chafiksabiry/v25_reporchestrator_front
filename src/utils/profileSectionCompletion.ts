@@ -1,3 +1,5 @@
+import { isIntroVideoRequirementMet } from './introVideo';
+
 /**
  * Complétion par section de l'éditeur de profil REP (logique pure, sans React).
  * Sert uniquement à l'affichage (pastilles, barre globale, états vides) : les règles
@@ -110,3 +112,67 @@ export function getOverallCompletion(sections: SectionCompletion[]): {
 
 /** Anchor DOM utilisée par la barre de progression pour faire défiler vers la section. */
 export const editorSectionAnchor = (id: EditorSectionId): string => `editor-section-${id}`;
+
+/* ───────────── Onglets de l'éditeur (une section affichée à la fois) ───────────── */
+
+export type EditorTabId = 'identity' | 'experience' | 'summary' | 'availability' | 'video';
+
+export const EDITOR_TAB_ORDER: readonly EditorTabId[] = ['identity', 'experience', 'summary', 'availability', 'video'];
+
+export interface EditorTab {
+  id: EditorTabId;
+  done: number;
+  total: number;
+  complete: boolean;
+  missing: string[];
+}
+
+/**
+ * Regroupe les sections en onglets : identité = identité + photo + langues.
+ * L'onglet vidéo reprend la règle unifiée (introVideo.ts) sans la modifier.
+ */
+export function getEditorTabs(profile: any, summaryText?: unknown): EditorTab[] {
+  const sections = getSectionCompletions(profile, summaryText);
+  const pick = (...ids: EditorSectionId[]) => sections.filter((s) => ids.includes(s.id));
+  const merge = (id: EditorTabId, parts: SectionCompletion[]): EditorTab => {
+    const done = parts.reduce((n, p) => n + p.done, 0);
+    const total = parts.reduce((n, p) => n + p.total, 0);
+    return { id, done, total, complete: done === total, missing: parts.flatMap((p) => p.missing) };
+  };
+  const videoOk = Boolean(isIntroVideoRequirementMet(profile));
+  return [
+    merge('identity', pick('identity', 'photo', 'languages')),
+    merge('experience', pick('experience')),
+    merge('summary', pick('summary')),
+    merge('availability', pick('availability')),
+    { id: 'video', done: videoOk ? 1 : 0, total: 1, complete: videoOk, missing: videoOk ? [] : ['video'] },
+  ];
+}
+
+export function getTabsOverall(tabs: EditorTab[]): { done: number; total: number; percent: number } {
+  const done = tabs.filter((t) => t.complete).length;
+  return { done, total: tabs.length, percent: tabs.length ? Math.round((done / tabs.length) * 100) : 0 };
+}
+
+/** Onglet voisin (borné aux extrémités, jamais de bouclage). */
+export function adjacentTab(current: EditorTabId, delta: 1 | -1): EditorTabId {
+  const i = EDITOR_TAB_ORDER.indexOf(current);
+  const next = Math.min(EDITOR_TAB_ORDER.length - 1, Math.max(0, (i < 0 ? 0 : i) + delta));
+  return EDITOR_TAB_ORDER[next];
+}
+
+/**
+ * Hauteur disponible pour le cadre de l'éditeur : du haut du cadre (défilement à 0) jusqu'au bas
+ * de la zone défilante de la page, moins la marge basse, avec un plancher.
+ */
+export function computeFrameHeight(args: {
+  frameTop: number;
+  scrollTop: number;
+  containerBottom: number;
+  bottomPadding: number;
+  minHeight?: number;
+}): number {
+  const { frameTop, scrollTop, containerBottom, bottomPadding, minHeight = 420 } = args;
+  const available = containerBottom - (frameTop + scrollTop) - bottomPadding;
+  return Math.max(minHeight, Math.floor(available));
+}
