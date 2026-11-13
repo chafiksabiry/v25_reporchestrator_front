@@ -24,6 +24,7 @@ import {
 import config from '../../config';
 import progressService, { UserProgress } from '../../services/progressService';
 import { getAgentData, refreshOnboardingStatus } from '../../services/apiConfig';
+import { isIntroVideoRequirementMetFromParts } from '../../utils/introVideo';
 
 // Define the phase interface
 interface Phase {
@@ -429,17 +430,21 @@ function Dashboard() {
           // For phase 2
           else if (phase.id === 2 && phaseKey === 'phase2') {
             const phase2Actions = apiPhase.requiredActions as ApiPhase2RequiredActions;
-            // 0: work experience added, 1: a video recorded for at least one experience.
+            // 0: work experience added, 1: intro video (presentation + career path) recorded.
+            // Legacy profiles that already have an experience video are not blocked.
             // Availability is now OPTIONAL (rarely present in a CV) and is mapped
-            // in the optional-actions block below. Skills/industries/activities and
-            // the standalone 1-minute intro video are not shown as required actions.
+            // in the optional-actions block below. Skills/industries/activities
+            // are not shown as required actions.
             if (phase2Actions.experienceAdded) completedActions.push(0);
 
-            const experiences = (apiData as any).experience;
-            const hasExperienceVideo =
-              Array.isArray(experiences) &&
-              experiences.some((exp: any) => exp && (exp.videoUrl || exp.videoAnalysis));
-            if (hasExperienceVideo) completedActions.push(1);
+            if (
+              isIntroVideoRequirementMetFromParts(
+                (apiData as any).personalInfo,
+                (apiData as any).experience
+              )
+            ) {
+              completedActions.push(1);
+            }
 
             // Log the completed required actions for phase 2
             console.log('🔍 Phase 2 - Mapped required actions:', completedActions);

@@ -25,7 +25,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { dashRepApiUrl, repApiUrl } from '../../../utils/repApiUrl';
+import { INTRO_VIDEO_MAX_SECONDS, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
 import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../../utils/taxonomyI18n';
 import { getIndustries, getActivities, getSkillsGrouped } from '../../../lib/api/profiles';
 import { getAllLanguages } from '../../../lib/api/languages';
@@ -180,12 +181,22 @@ interface ExperienceVideoModalProps {
   savedData?: SavedVideoData | null;
   onAnalysisComplete?: (data?: AnalysisResult) => void;
   referencePhotoUrl?: string | null;
+  /**
+   * 'experience' (défaut) : vidéo optionnelle d'une expérience.
+   * 'intro' : vidéo de présentation + parcours, obligatoire (une seule).
+   */
+  mode?: 'experience' | 'intro';
+  /** Mode 'intro' : appelé dès que la vidéo est enregistrée côté serveur (avant même l'analyse). */
+  onVideoSaved?: (info: { url?: string }) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MAX_DURATION = 120; // 2 minutes in seconds
-const MIN_DURATION = 30; // minimum required recording length in seconds
+const MAX_DURATION = 120; // 2 minutes in seconds (vidéo d'expérience)
+// Analyse automatique : nombre de tentatives supplémentaires avant d'afficher un message humain.
+const AUTO_ANALYZE_RETRIES = 2;
+const AUTO_ANALYZE_RETRY_DELAY_MS = 2500;
+const MIN_DURATION = 30; // minimum required recording length in seconds (INTRO_VIDEO_MIN_SECONDS en mode intro)
 // Face-absence escalation (counts of consecutive ~2s samples with no face):
 const ABSENCE_THREAT_TICKS = 2; // ~4s absent → strong "you'll be cut" warning
 const ABSENCE_CUT_TICKS = 4; // ~8s absent → auto-stop + block analysis
@@ -495,6 +506,33 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   stepActivities: { en: 'Activities', fr: 'Activités' },
   stepContactCenter: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
   analysisFailed: { en: 'Analysis failed', fr: 'L’analyse a échoué' },
+  analysisFailedHuman: {
+    en: 'We could not finish the AI analysis of your video after several attempts. Your recording is not lost — please try again in a moment.',
+    fr: 'Nous n’avons pas pu terminer l’analyse IA de votre vidéo après plusieurs essais. Votre enregistrement n’est pas perdu — réessayez dans un instant.',
+  },
+  introUploadFailed: {
+    en: 'We could not save your video (connection problem?). Check your connection and try again — nothing is lost on your side.',
+    fr: 'Nous n’avons pas pu enregistrer votre vidéo (problème de connexion ?). Vérifiez votre connexion et réessayez — rien n’est perdu de votre côté.',
+  },
+  introHeaderTitle: { en: 'Your introduction video', fr: 'Votre vidéo de présentation' },
+  introHeaderSubtitle: { en: 'Introduce yourself and your career path', fr: 'Présentez-vous et présentez votre parcours' },
+  introRecordHint: {
+    en: 'Record between 30 seconds and {max} minutes: introduce yourself and walk us through your career path. The AI analysis starts automatically when you stop.',
+    fr: 'Enregistrez entre 30 secondes et {max} minutes : présentez-vous et présentez votre parcours. L’analyse IA démarre automatiquement dès que vous arrêtez.',
+  },
+  introEmptyTitle: { en: 'Introduce yourself', fr: 'Présentez-vous' },
+  introEmptyDesc: {
+    en: 'Tell us who you are, your career path and what you are good at. Only this one video is required — it takes a few minutes at most.',
+    fr: 'Dites-nous qui vous êtes, quel est votre parcours et vos points forts. Cette seule vidéo est obligatoire — quelques minutes suffisent.',
+  },
+  analyzingAuto: {
+    en: 'Analysis started automatically',
+    fr: 'Analyse lancée automatiquement',
+  },
+  analyzingRetry: {
+    en: 'Temporary hiccup — retrying automatically (attempt {n}/{total})…',
+    fr: 'Petit contretemps — nouvel essai automatique (essai {n}/{total})…',
+  },
   savedToProfile: { en: 'Analysis saved to your profile', fr: 'Analyse enregistrée dans votre profil' },
   aiSummary: { en: 'AI Summary', fr: 'Résumé IA' },
   relevance: { en: 'Relevance', fr: 'Pertinence' },
@@ -757,10 +795,15 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete, referencePhotoUrl,
+  mode = 'experience', onVideoSaved,
 }) => {
   const { i18n } = useTranslation();
   const uiLang = (i18n.language || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
   const t = makeTr(uiLang);
+  const isIntro = mode === 'intro';
+  const maxDuration = isIntro ? INTRO_VIDEO_MAX_SECONDS : MAX_DURATION;
+  const minDuration = isIntro ? INTRO_VIDEO_MIN_SECONDS : MIN_DURATION;
+  const maxMinutesLabel = Math.round(maxDuration / 60);
 
   const [industryCatalog, setIndustryCatalog] = useState<TaxonomyCatalog>(() => new Map());
   const [activityCatalog, setActivityCatalog] = useState<TaxonomyCatalog>(() => new Map());
@@ -829,6 +872,10 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // Set when the person left the frame for too long → recording is discarded and
   // cannot be analyzed (the user must record again).
   const [faceAbsenceInvalid, setFaceAbsenceInvalid] = useState(false);
+  // Analyse automatique : un enregistrement n'est analysé qu'une fois (réessais compris).
+  const autoAnalyzeStartedRef = useRef(false);
+  const [analyzeAttempt, setAnalyzeAttempt] = useState(0);
+  const [videoSavedOnServer, setVideoSavedOnServer] = useState(false);
 
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -873,6 +920,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     setSavedFlag(false);
     setFaceAbsenceInvalid(false);
     setElapsed(0);
+    autoAnalyzeStartedRef.current = false;
+    setAnalyzeAttempt(0);
+    setVideoSavedOnServer(false);
     if (videoRef.current) {
       videoRef.current.src = '';
       videoRef.current.controls = false;
@@ -971,8 +1021,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     startTimeRef.current = Date.now();
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      if (secs >= MAX_DURATION) {
-        setElapsed(MAX_DURATION);
+      if (secs >= maxDuration) {
+        setElapsed(maxDuration);
         stopRecording();
         return;
       }
@@ -986,7 +1036,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     }
     if (timerRef.current) clearInterval(timerRef.current);
     if (startTimeRef.current) {
-      const secs = Math.min(MAX_DURATION, Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const secs = Math.min(maxDuration, Math.floor((Date.now() - startTimeRef.current) / 1000));
       setElapsed(secs);
     }
     setIsRecording(false);
@@ -997,64 +1047,131 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   };
 
   // ── Analysis ───────────────────────────────────────────────────────────────
+  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  // Mode « intro » : la vidéo est d'abord enregistrée sur le profil (route existante
+  // PUT /profiles/:id/video). Ainsi l'obligation est remplie même si l'analyse IA échoue.
+  const uploadIntroVideo = async (blob: Blob, token: string | null): Promise<string | undefined> => {
+    const formData = new FormData();
+    formData.append('video', new File([blob], 'presentation-video.webm', { type: 'video/webm' }));
+    const response = await fetch(repApiUrl(`/profiles/${profileId}/video`), {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Server error ${response.status}`);
+    }
+    const json = await response.json().catch(() => ({}));
+    return (
+      json?.data?.url || json?.url || json?.data?.videoUrl || json?.videoUrl ||
+      json?.data?.presentationVideo?.url || json?.presentationVideo?.url || undefined
+    );
+  };
+
+  const runAnalysisOnce = async (blob: Blob): Promise<AnalysisResult> => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('video', new File([blob], isIntro ? 'presentation-video.webm' : 'experience-video.webm', { type: 'video/webm' }));
+    formData.append('title', experience.title);
+    formData.append('company', experience.company);
+    if (experience.description) {
+      formData.append('description', experience.description);
+    }
+    const responsibilities = Array.isArray(experience.responsibilities)
+      ? experience.responsibilities.map((r) => String(r || '').trim()).filter(Boolean)
+      : [];
+    if (responsibilities.length) {
+      formData.append('responsibilities', JSON.stringify(responsibilities));
+    }
+    if (!isIntro && experienceIndex !== undefined && experienceIndex >= 0) {
+      formData.append('experienceIndex', String(experienceIndex));
+    }
+
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Server error ${response.status}`);
+    }
+    const json = await response.json();
+    const data = json.data;
+    if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
+    return data;
+  };
+
+  // Lancée automatiquement à la fin de l'enregistrement (aucun bouton). Réessaie
+  // automatiquement, puis affiche un message humain avec un bouton de nouvel essai manuel.
   const analyzeVideo = async () => {
     if (!recordedBlob || !profileId) return;
     setAnalyzing(true);
     setAnalyzeError(null);
+    setAnalyzeAttempt(0);
     try {
       const token = localStorage.getItem('token');
-      const formData = new FormData();
-      formData.append('video', new File([recordedBlob], 'experience-video.webm', { type: 'video/webm' }));
-      formData.append('title', experience.title);
-      formData.append('company', experience.company);
-      if (experience.description) {
-        formData.append('description', experience.description);
-      }
-      const responsibilities = Array.isArray(experience.responsibilities)
-        ? experience.responsibilities.map((r) => String(r || '').trim()).filter(Boolean)
-        : [];
-      if (responsibilities.length) {
-        formData.append('responsibilities', JSON.stringify(responsibilities));
-      }
-      if (experienceIndex !== undefined && experienceIndex >= 0) {
-        formData.append('experienceIndex', String(experienceIndex));
+
+      if (isIntro && !videoSavedOnServer) {
+        const url = await uploadIntroVideo(recordedBlob, token);
+        setVideoSavedOnServer(true);
+        onVideoSaved?.({ url });
       }
 
-      const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || `Server error ${response.status}`);
+      let data: AnalysisResult | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt <= AUTO_ANALYZE_RETRIES; attempt += 1) {
+        setAnalyzeAttempt(attempt);
+        try {
+          data = await runAnalysisOnce(recordedBlob);
+          lastError = null;
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (attempt < AUTO_ANALYZE_RETRIES) await sleep(AUTO_ANALYZE_RETRY_DELAY_MS);
+        }
       }
+      if (lastError) throw lastError;
 
-      const json = await response.json();
-      const data = json.data;
-      if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
         onAnalysisComplete?.(data);
-      } else {
+      } else if (!isIntro) {
         setAnalyzeError(t('saveFailedRetry'));
       }
       if (data?.videoUrl) {
         showSavedVideo(data.videoUrl);
       }
     } catch (err: any) {
-      setAnalyzeError(err.message || t('analysisFailedRetry'));
+      setAnalyzeError(
+        isIntro && !videoSavedOnServer && err?.message
+          ? t('introUploadFailed')
+          : t('analysisFailedHuman')
+      );
     } finally {
       setAnalyzing(false);
     }
   };
 
+  // Déclenchement automatique dès que l'enregistrement est terminé et valide.
+  useEffect(() => {
+    if (!isOpen || isRecording || !recordedBlob || faceAbsenceInvalid) return;
+    if (viewMode !== 'record' || result || analyzing) return;
+    if (elapsed < minDuration) return;
+    if (autoAnalyzeStartedRef.current) return;
+    autoAnalyzeStartedRef.current = true;
+    void analyzeVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isRecording, recordedBlob, faceAbsenceInvalid, viewMode, elapsed]);
+
   if (!isOpen) return null;
 
-  const timeRemaining = MAX_DURATION - elapsed;
-  const progressPct = (elapsed / MAX_DURATION) * 100;
+  const timeRemaining = maxDuration - elapsed;
+  const progressPct = (elapsed / maxDuration) * 100;
   const showVideoControls =
     viewMode === 'saved' || !!result?.videoUrl || (!!recordedBlob && !isRecording);
 
@@ -1092,9 +1209,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
             <div className="min-w-0 flex-1 pr-2">
-              <h2 className="text-base font-black text-white">{t('headerTitle')}</h2>
+              <h2 className="text-base font-black text-white">{isIntro ? t('introHeaderTitle') : t('headerTitle')}</h2>
               <p className="text-xs text-slate-400 font-medium break-words whitespace-normal leading-relaxed">
-                {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
+                {isIntro ? t('introHeaderSubtitle') : `${experience.title}${experience.company ? ` @ ${experience.company}` : ''}`}
               </p>
             </div>
           </div>
@@ -1234,7 +1351,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
               {viewMode === 'record' && !recordedBlob && !isRecording && (
                 <div className="text-center">
-                  <p className="text-xs text-slate-400 mb-3">{t('recordHint')}</p>
+                  <p className="text-xs text-slate-400 mb-3">{isIntro ? t('introRecordHint').replace('{max}', String(maxMinutesLabel)) : t('recordHint')}</p>
                   <button
                     onClick={startRecording}
                     disabled={!!cameraError || !stream}
@@ -1274,20 +1391,18 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     </>
                   ) : (
                     <>
-                      {!result && elapsed < MIN_DURATION && (
+                      {!result && elapsed < minDuration && (
                         <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
                           <AlertCircle className="w-3.5 h-3.5" />
                           {t('minDurationWarn')}
                         </p>
                       )}
-                      <button
-                        onClick={analyzeVideo}
-                        disabled={!!result || elapsed < MIN_DURATION}
-                        className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
-                      >
-                        {result ? <CheckCircle className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                        {result ? t('analysisComplete') : t('analyzeWithAI')}
-                      </button>
+                      {result && (
+                        <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-400">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {t('analysisComplete')}
+                        </p>
+                      )}
                       {result ? (
                         <button
                           onClick={retake}
@@ -1321,8 +1436,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                   <Sparkles className="w-10 h-10 text-harx-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-800 mb-2">{t('emptyTitle')}</h3>
-                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{t('emptyDesc')}</p>
+                  <h3 className="text-lg font-black text-slate-800 mb-2">{isIntro ? t('introEmptyTitle') : t('emptyTitle')}</h3>
+                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{isIntro ? t('introEmptyDesc') : t('emptyDesc')}</p>
                 </div>
                 <div className="flex gap-3 flex-wrap justify-center">
                   {[t('tagSkills'), t('tagLanguages'), t('tagIndustries'), t('tagContactCenter')].map((tag) => (
@@ -1346,6 +1461,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 <div className="text-center space-y-1">
                   <p className="text-base font-black text-slate-800">{t('analyzingTitle')}</p>
                   <p className="text-sm text-slate-500">{t('analyzingSteps')}</p>
+                  <p className="text-xs font-bold text-harx-600">
+                    {analyzeAttempt > 0
+                      ? t('analyzingRetry').replace('{n}', String(analyzeAttempt + 1)).replace('{total}', String(AUTO_ANALYZE_RETRIES + 1))
+                      : t('analyzingAuto')}
+                  </p>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-center max-w-xs">
                   {[t('stepTechnical'), t('stepLanguages'), t('stepIndustries'), t('stepActivities'), t('stepContactCenter')].map((step, i) => (
