@@ -96,6 +96,108 @@ describe('WebSocket /notification-updates : authentification', () => {
     expect(got[0].notification.id).toBe('n1');
   });
 
+  it('nouveau serveur : « authenticated » → rattrapage (onConnect) une seule fois, aucun subscribe', () => {
+    const onConnect = vi.fn();
+    connectNotificationSocketWith(deps, () => {}, { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    expect(onConnect).not.toHaveBeenCalled(); // pas à l'ouverture : l'auth n'est pas terminée
+    ws.receive({ type: 'authenticated' });
+    ws.receive({ type: 'authenticated' });
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    expect(ws.sent).toEqual([{ type: 'auth', token: 'jwt-1' }]); // abonnement implicite
+  });
+
+  it('nouveau serveur : « subscribed » n’est jamais nécessaire (ni ne déclenche le rattrapage)', () => {
+    const onConnect = vi.fn();
+    const got: any[] = [];
+    connectNotificationSocketWith(deps, (d) => got.push(d), { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    ws.receive({ type: 'authenticated' });
+    ws.receive(NOTIF); // livré sans aucun « subscribed »
+    expect(got).toHaveLength(1);
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('ancien serveur : « connected » seul → subscribe, puis rattrapage après le repli (1,5 s), une seule fois', () => {
+    const onConnect = vi.fn();
+    const got: any[] = [];
+    connectNotificationSocketWith(deps, (d) => got.push(d), { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    expect(onConnect).not.toHaveBeenCalled();
+    ws.receive({ type: 'connected' });
+    expect(ws.sent).toEqual([{ type: 'auth', token: 'jwt-1' }, { type: 'subscribe', repId: 'rep-1' }]);
+    expect(onConnect).not.toHaveBeenCalled(); // on attend « authenticated » avant de conclure à un ancien serveur
+    vi.advanceTimersByTime(1500);
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60000);
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    ws.receive(NOTIF);
+    expect(got).toHaveLength(1);
+  });
+
+  it('nouveau serveur : connected → (retard) → authenticated : rattrapage UNE fois, après authenticated, pas à connected', () => {
+    const onConnect = vi.fn();
+    connectNotificationSocketWith(deps, () => {}, { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    ws.receive({ type: 'connected' }); // statique, avant toute vérification du jeton
+    expect(onConnect).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000); // vérification du jeton en cours (< repli)
+    expect(onConnect).not.toHaveBeenCalled();
+    ws.receive({ type: 'authenticated' });
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60000); // le repli a été annulé
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('coupure entre connected et le repli : pas de rattrapage tardif, repli annulé', () => {
+    const onConnect = vi.fn();
+    connectNotificationSocketWith(deps, () => {}, { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    ws.receive({ type: 'connected' });
+    ws.closeWith(WS_AUTH_FAILED_CLOSE_CODE);
+    vi.advanceTimersByTime(60000);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it('désinscription pendant le repli : aucun rattrapage', () => {
+    const onConnect = vi.fn();
+    const dispose = connectNotificationSocketWith(deps, () => {}, { onConnect });
+    const ws = FakeSocket.instances[0];
+    ws.open();
+    ws.receive({ type: 'connected' });
+    dispose();
+    vi.advanceTimersByTime(60000);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it('notification manquée pendant la coupure : chaque reconnexion authentifiée relance le rattrapage', () => {
+    const onConnect = vi.fn();
+    connectNotificationSocketWith(deps, () => {}, { onConnect });
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].receive({ type: 'authenticated' });
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    FakeSocket.instances[0].closeWith(1006); // coupure : une notification émise ici est perdue côté WS
+    vi.advanceTimersByTime(3000);
+    const ws2 = FakeSocket.instances[1];
+    ws2.open();
+    expect(onConnect).toHaveBeenCalledTimes(1); // pas encore authentifié : pas de rattrapage prématuré
+    ws2.receive({ type: 'authenticated' });
+    expect(onConnect).toHaveBeenCalledTimes(2); // le GET récupère la notification manquée
+  });
+
+  it('connexion fermée avant « authenticated » (4401) : aucun rattrapage', () => {
+    const onConnect = vi.fn();
+    connectNotificationSocketWith(deps, () => {}, { onConnect });
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].closeWith(WS_AUTH_FAILED_CLOSE_CODE);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
   it('coupure réseau : reconnexion avec ré-authentification (jeton relu)', () => {
     connectNotificationSocketWith(deps, () => {});
     FakeSocket.instances[0].open();
