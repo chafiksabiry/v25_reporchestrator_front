@@ -87,6 +87,7 @@ export function EmbeddedRepSubscriptionFlow({
   const [confirming, setConfirming] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [activatingFreePlanId, setActivatingFreePlanId] = useState<string | null>(null);
+  const [detailPlan, setDetailPlan] = useState<ApiPlan | null>(null);
 
   const stripePromise = useMemo(() => loadStripe(publishableKey), [publishableKey]);
 
@@ -129,6 +130,15 @@ export function EmbeddedRepSubscriptionFlow({
       cancelled = true;
     };
   }, [t]);
+
+  useEffect(() => {
+    if (!detailPlan) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDetailPlan(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailPlan]);
 
   const closeModal = useCallback(() => {
     if (confirming) return;
@@ -316,7 +326,7 @@ export function EmbeddedRepSubscriptionFlow({
       <div
         role="list"
         aria-label={tx('plan.plansRegion')}
-        className="grid grid-cols-1 gap-5 pt-3 md:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4"
       >
         {plans.map((plan) => {
           const isCurrent = String(activePlanId) === String(plan._id);
@@ -338,7 +348,7 @@ export function EmbeddedRepSubscriptionFlow({
               key={plan._id}
               role="listitem"
               aria-current={isCurrent ? 'true' : undefined}
-              className={`relative flex flex-col rounded-3xl border-2 bg-white p-5 shadow-sm transition-all duration-300 sm:p-6 ${
+              className={`relative flex flex-col rounded-3xl border-2 bg-white p-3.5 shadow-sm transition-all duration-300 ${
                 isCurrent
                   ? 'border-emerald-500 bg-emerald-50/30 shadow-lg ring-4 ring-emerald-500/15'
                   : 'border-slate-100 hover:-translate-y-1 hover:border-[#F90080]/40 hover:shadow-lg'
@@ -351,10 +361,10 @@ export function EmbeddedRepSubscriptionFlow({
               )}
 
               {/* Identité + prix */}
-              <div className="rounded-2xl bg-[#0C1C2E] px-4 py-4 text-white">
+              <div className="rounded-2xl bg-[#0C1C2E] px-3.5 py-3 text-white">
                 <h3 className="text-base font-black uppercase leading-tight tracking-tight">{copy.name}</h3>
                 <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-3xl font-black tracking-tight">
+                  <span className="text-2xl font-black tracking-tight">
                     {isPaid ? formatPrice(plan.price, plan.currency, uiLang) : tx('plan.free')}
                   </span>
                   {isPaid && (
@@ -362,34 +372,39 @@ export function EmbeddedRepSubscriptionFlow({
                   )}
                 </div>
                 {isPaid && (
-                  <p className="mt-1.5 inline-flex rounded-full bg-[#F90080] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                  <p className="mt-1.5 inline-flex whitespace-nowrap rounded-full bg-[#F90080] px-2 py-0.5 text-[9px] font-black uppercase text-white">
                     {t('subscriptionFlow.freeTrial')}
                   </p>
                 )}
               </div>
 
               {copy.description && (
-                <p className="mt-3 text-xs font-medium leading-relaxed text-slate-600">{copy.description}</p>
+                <p className="mt-2.5 line-clamp-1 text-xs font-medium text-slate-600" title={copy.description}>{copy.description}</p>
               )}
 
               {copy.features.length > 0 && (
-                <div className="mt-4 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                    {tx('plan.included')}
-                  </p>
-                  <ul className="mt-2 space-y-2">
-                    {copy.features.map((feat, i) => (
+                <div className="mt-3 flex-1">
+                  <ul className="mt-1.5 space-y-1.5">
+                    {copy.features.slice(0, 3).map((feat, i) => (
                       <li
                         key={`${plan._id}-feat-${i}`}
+                        title={feat}
                         className={`flex items-start gap-2 text-xs leading-snug text-slate-700 ${
                           i === 0 ? 'font-black text-[#0C1C2E]' : 'font-medium'
                         }`}
                       >
                         <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F90080]" strokeWidth={3} aria-hidden="true" />
-                        <span>{feat}</span>
+                        <span className="line-clamp-1">{feat}</span>
                       </li>
                     ))}
                   </ul>
+                  <button
+                    type="button"
+                    onClick={() => setDetailPlan(plan)}
+                    className="mt-2 text-xs font-black text-[#F90080] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F90080]/40"
+                  >
+                    {tx('plan.details')}
+                  </button>
                 </div>
               )}
 
@@ -402,7 +417,7 @@ export function EmbeddedRepSubscriptionFlow({
                     ? tx('plan.currentAria', { name: copy.name })
                     : tx('plan.chooseAria', { action: actionLabel, name: copy.name })
                 }
-                className={`mt-6 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black tracking-tight transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F90080]/30 ${
+                className={`mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black tracking-tight transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F90080]/30 ${
                   isCurrent
                     ? 'cursor-default border-2 border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'bg-gradient-harx text-white shadow-md shadow-harx-500/20 hover:opacity-90 active:scale-[0.98]'
@@ -416,6 +431,73 @@ export function EmbeddedRepSubscriptionFlow({
           );
         })}
       </div>
+
+      {detailPlan &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[2147482000] flex items-center justify-center bg-[#0a0b14]/70 p-4 backdrop-blur-sm"
+            onClick={() => setDetailPlan(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={tx('plan.detailsTitle')}
+              className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const dc = localizeRepPlan(detailPlan, t);
+                const isCur = String(activePlanId) === String(detailPlan._id);
+                const paid = isPaidPlan(detailPlan);
+                return (
+                  <>
+                    <div className="rounded-2xl bg-[#0C1C2E] px-4 py-3 text-white">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">{tx('plan.detailsTitle')}</p>
+                      <h3 className="mt-0.5 text-lg font-black uppercase leading-tight">{dc.name}</h3>
+                      <p className="mt-1 text-2xl font-black">
+                        {paid ? formatPrice(detailPlan.price, detailPlan.currency, uiLang) : tx('plan.free')}
+                        {paid && <span className="ml-1.5 text-xs font-bold text-white/60">{t('subscriptionFlow.perMonth')}</span>}
+                      </p>
+                    </div>
+                    {dc.description && <p className="mt-3 text-sm font-medium text-slate-600">{dc.description}</p>}
+                    <ul className="mt-3 space-y-2">
+                      {dc.features.map((feat, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm font-medium text-slate-700">
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F90080]" strokeWidth={3} aria-hidden="true" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDetailPlan(null)}
+                        className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-600 hover:bg-slate-50"
+                      >
+                        {tx('plan.detailsClose')}
+                      </button>
+                      {!isCur && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = detailPlan;
+                            setDetailPlan(null);
+                            void handlePlanAction(target);
+                          }}
+                          className="flex-1 rounded-xl bg-gradient-harx px-4 py-2.5 text-sm font-black text-white shadow-md hover:opacity-90"
+                        >
+                          {paid ? t('subscriptionFlow.startTrial') : t('subscriptionFlow.subscribe')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>,
+          document.body
+        )}
 
       {selectedPlan &&
         typeof document !== 'undefined' &&

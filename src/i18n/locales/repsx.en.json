@@ -14,8 +14,16 @@
       "ctaComplete": "Complete my profile",
       "ctaPlan": "Choose my plan",
       "readyTitle": "Your profile is complete",
-      "readyBody": "Review the tabs below if you like, then choose your plan.",
+      "readyBody": "Click a section to review it if you like, then choose your plan.",
       "saved": "Everything is saved automatically: you can come back later."
+    },
+    "overview": {
+      "sectionsTitle": "Your profile sections",
+      "sectionsHint": "Click a section to review or edit it.",
+      "backToOverview": "Overview",
+      "editInfo": "Edit my information",
+      "presentation": "Introduction",
+      "warn": "To check"
     }
   },
   "plan": {
@@ -32,6 +40,12 @@
     "securePayment": "Paid plans go through a secure payment (Stripe).",
     "chooseAria": "{{action}} — {{name}}",
     "currentAria": "Current plan: {{name}}",
-    "plansRegion": "Available plans"
+    "plansRegion": "Available plans",
+    "details": "See details",
+    "detailsClose": "Close",
+    "detailsTitle": "Plan details",
+    "afterShort1": "Plan activated",
+    "afterShort2": "Profile published",
+    "afterShort3": "Your feedback, then missions"
   }
 }

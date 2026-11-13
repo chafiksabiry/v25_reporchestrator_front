@@ -8,6 +8,8 @@ interface Props {
   profile: any;
   /** Appelé avec le chemin de l'étape suivante (/profile-editor ou /subscription). */
   onNavigate: (path: string) => void;
+  /** Variante tenant dans un seul écran : une colonne, textes resserrés. */
+  compact?: boolean;
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * et un bouton vers l'étape suivante. Remplace les anciens bandeaux d'onboarding du profil
  * sans changer les destinations (/profile-editor, /subscription).
  */
-export const ProfileProgressCard: React.FC<Props> = ({ profile, onNavigate }) => {
+export const ProfileProgressCard: React.FC<Props> = ({ profile, onNavigate, compact = false }) => {
   const { t } = useTranslation('repsx');
   const { t: tg } = useTranslation();
   const action = getProfileNextAction(profile);
@@ -66,24 +68,24 @@ export const ProfileProgressCard: React.FC<Props> = ({ profile, onNavigate }) =>
         </div>
       </div>
 
-      <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-8">
+      <div className={compact ? 'grid gap-3 p-4' : 'grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-8'}>
         {/* Prochaine étape : quoi, pourquoi, durée, bouton */}
         <div className="flex flex-col">
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#F90080]">
             {t('profile.progress.nextStep')}
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[#0C1C2E]">
+          <h2 className={`mt-1 ${compact ? 'text-lg' : 'text-xl'} font-black tracking-tight text-[#0C1C2E]`}>
             {ready ? t('profile.progress.readyTitle') : tg(`repJourney.steps.${stepKey}.title`)}
           </h2>
 
-          <dl className="mt-3 space-y-2.5 text-sm">
+          <dl className={compact ? 'mt-2 space-y-1.5 text-sm' : 'mt-3 space-y-2.5 text-sm'}>
             <div>
               <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">{tg('repJourney.what')}</dt>
               <dd className="font-medium text-slate-700">
                 {ready ? t('profile.progress.readyBody') : tg(`repJourney.steps.${stepKey}.what`)}
               </dd>
             </div>
-            <div>
+            <div className={compact && ready ? 'hidden' : undefined}>
               <dt className="text-[11px] font-black uppercase tracking-widest text-slate-400">{tg('repJourney.why')}</dt>
               <dd className="font-medium text-slate-700">{tg(`repJourney.steps.${stepKey}.why`)}</dd>
             </div>
@@ -101,30 +103,30 @@ export const ProfileProgressCard: React.FC<Props> = ({ profile, onNavigate }) =>
           <button
             type="button"
             onClick={() => onNavigate(action.path)}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-harx px-6 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/25 transition hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F90080]/30 active:scale-[0.98] sm:w-auto sm:self-start"
+            className={`${compact ? 'mt-3' : 'mt-5'} inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-harx px-6 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/25 transition hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F90080]/30 active:scale-[0.98] sm:w-auto sm:self-start`}
           >
             {ready ? t('profile.progress.ctaPlan') : t('profile.progress.ctaComplete')}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          <p className="mt-3 flex items-start gap-1.5 text-xs font-medium text-slate-500">
+          <p className={`${compact ? 'hidden' : 'mt-3 flex'} items-start gap-1.5 text-xs font-medium text-slate-500`}>
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
             {t('profile.progress.saved')}
           </p>
         </div>
 
         {/* Éléments obligatoires */}
-        <div>
+        <div className={compact && ready ? 'hidden' : undefined}>
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
             {t('profile.progress.itemsTitle')}
           </p>
-          <ul className="mt-2 space-y-2">
+          <ul className={compact ? 'mt-1.5 space-y-1.5' : 'mt-2 space-y-2'}>
             {action.items.map((item) => {
               const isNext = !ready && item.id === action.nextItemId;
               return (
                 <li
                   key={item.id}
-                  className={`flex items-start gap-3 rounded-2xl border px-3.5 py-3 ${
+                  className={`flex items-start gap-3 rounded-2xl border ${compact ? 'px-3 py-2' : 'px-3.5 py-3'} ${
                     item.done
                       ? 'border-emerald-100 bg-emerald-50/60'
                       : isNext
@@ -157,7 +159,7 @@ export const ProfileProgressCard: React.FC<Props> = ({ profile, onNavigate }) =>
                             : t('profile.progress.itemTodo')}
                       </span>
                     </div>
-                    {!item.done && (
+                    {!item.done && (!compact || isNext) && (
                       <p className="mt-0.5 flex items-start gap-1 text-xs font-medium text-slate-600">
                         <HelpCircle className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />
                         {itemHint(item.id)}
