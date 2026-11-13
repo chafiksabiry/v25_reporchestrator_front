@@ -46,6 +46,7 @@
     "detailsTitle": "Détail de la formule",
     "afterShort1": "Formule activée",
     "afterShort2": "Publication du profil",
-    "afterShort3": "Votre avis, puis les missions"
+    "afterShort3": "Votre avis, puis les missions",
+    "backAria": "Retour à l’étape précédente de l’onboarding"
   }
 }

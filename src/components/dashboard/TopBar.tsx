@@ -1,3 +1,4 @@
+import { SafeAvatar } from '../common/SafeAvatar';
 import { useEffect, useState, useRef } from 'react';
 import { Menu, UserPlus, Wallet, ChevronDown, UserCircle, LogOut, Calendar, Settings, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -347,17 +348,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
             className="flex items-center space-x-3 p-2 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/10"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
-            {profileData?.personalInfo?.photo?.url ? (
-              <img
-                src={profileData.personalInfo.photo.url}
-                alt={userName}
-                className="w-10 h-10 rounded-xl object-cover shadow-sm"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black shadow-sm border border-white/20">
-                {initials}
-              </div>
-            )}
+            <SafeAvatar
+              url={profileData?.personalInfo?.photo?.url}
+              name={userName}
+              initials={initials}
+              alt={userName}
+              imgClassName="w-10 h-10 rounded-xl object-cover shadow-sm"
+              fallbackClassName="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black shadow-sm border border-white/20"
+            />
             <div className="hidden md:block text-right">
               <p className="text-sm font-black tracking-tight text-white">{userName}</p>
               {planName && (
@@ -377,17 +375,14 @@ export function TopBar({ isSidebarOpen, setIsSidebarOpen }: TopBarProps) {
 
               {/* ── Header: Photo + Name + Role ── */}
               <div className="relative px-4 py-4 flex items-center gap-3 border-b border-white/20 bg-white/10 backdrop-blur-sm">
-                {profileData?.personalInfo?.photo?.url ? (
-                  <img
-                    src={profileData.personalInfo.photo.url}
-                    alt={userName}
-                    className="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-white/40 shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ring-1 ring-white/30">
-                    {initials}
-                  </div>
-                )}
+                <SafeAvatar
+                  url={profileData?.personalInfo?.photo?.url}
+                  name={userName}
+                  initials={initials}
+                  alt={userName}
+                  imgClassName="w-12 h-12 rounded-xl object-cover shadow-md ring-2 ring-white/40 shrink-0"
+                  fallbackClassName="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ring-1 ring-white/30"
+                />
                 <div className="min-w-0">
                   <p className="text-sm font-black text-white truncate">{userName}</p>
                   <p className="text-[10px] text-white/70 font-medium truncate mt-0.5">
