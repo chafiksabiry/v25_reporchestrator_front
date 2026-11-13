@@ -4,6 +4,7 @@ import { CVParser } from '../../lib/parsers/cvParser';
 import { useProfile } from '../../hooks/useProfile';
 import { getLanguageByCode, getAllLanguages } from '../../lib/api/languages';
 import { fetchAllSkills } from '../../services/api/skills';
+import { resolveSkillRefs } from '../../utils/skillMatching';
 import {
   extractBasicInfo,
   analyzeExperience,
@@ -312,20 +313,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       } catch (error) {
         console.warn('Could not load skill catalog for name matching:', error);
       }
+      // Rapprochement par nom (EN/FR, sans accents, nom bilingue accepté) via skillMatching.ts ;
+      // une compétence inconnue du catalogue est écartée (comptée dans la console), jamais inventée.
       const resolveSkillList = (rawList, skillType) => {
-        const grouped = dbSkillsByType[skillType] || {};
-        const flat = Object.values(grouped).flat();
-        const normName = (v) => String(v || '').trim().toLowerCase();
-        const resolved = [];
-        for (const item of Array.isArray(rawList) ? rawList : []) {
-          const aiName = normName(item?.name || item);
-          if (!aiName) continue;
-          const dbSkill = flat.find((s) => normName(s.name) === aiName) ||
-            flat.find((s) => normName(s.name).includes(aiName) || aiName.includes(normName(s.name)));
-          if (!dbSkill) continue;
-          const confidence = Number(item?.confidence);
-          const level = Number.isFinite(confidence) ? Math.min(5, Math.max(0, Math.round(confidence))) : 3;
-          resolved.push({ skill: dbSkill._id, level, details: item?.context || '' });
+        const { resolved, unmatched } = resolveSkillRefs(rawList, dbSkillsByType[skillType]);
+        if (unmatched > 0) {
+          console.info(`CV import: ${unmatched} ${skillType} skill(s) not found in the catalog and skipped.`);
         }
         return resolved;
       };
