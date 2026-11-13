@@ -15,6 +15,8 @@ export const REP_PALETTE = {
   successInk: '#047857', // même teinte, texte sur fond clair
   attention: '#F59E0B', // ambre, sur fond sombre
   attentionInk: '#92400E', // ambre foncé, texte sur fond clair
+  info: '#38BDF8', // bleu ciel, sur fond sombre
+  infoInk: '#0369A1', // bleu foncé, texte sur fond clair
   ai: '#A78BFA', // violet IA, sur fond sombre
   aiInk: '#6D28D9', // violet foncé, texte sur fond clair
   /** Surfaces */
@@ -56,5 +58,7 @@ export const REP_CONTRAST_PAIRS: Array<{ fg: string; bg: string; label: string; 
   { fg: REP_PALETTE.successInk, bg: REP_PALETTE.white, label: 'vert foncé sur blanc' },
   { fg: REP_PALETTE.attentionInk, bg: REP_PALETTE.white, label: 'ambre foncé sur blanc' },
   { fg: REP_PALETTE.aiInk, bg: REP_PALETTE.white, label: 'violet foncé sur blanc' },
+  { fg: REP_PALETTE.infoInk, bg: REP_PALETTE.white, label: 'bleu foncé sur blanc' },
+  { fg: REP_PALETTE.info, bg: REP_PALETTE.night, label: 'bleu ciel sur bleu nuit (graphique)', large: true },
   { fg: REP_PALETTE.night, bg: REP_PALETTE.warmPaper, label: 'bleu nuit sur fond chaud' },
 ];
