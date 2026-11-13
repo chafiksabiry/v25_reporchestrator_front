@@ -1696,7 +1696,11 @@
     "publishAfterPlanHint": "Après le choix de la formule, vous pourrez publier votre profil puis donner votre avis avant d’accéder à la marketplace.",
     "publish": "Publier",
     "publishSuccess": "Profil publié — bienvenue sur la marketplace !",
-    "updating": "Mise à jour…"
+    "updating": "Mise à jour…",
+    "errors": {
+      "profileNotFound": "Nous ne retrouvons pas votre profil. Reconnectez-vous, puis réessayez.",
+      "plansLoad": "Impossible d’afficher les formules pour le moment. Réessayez dans un instant : votre profil est enregistré."
+    }
   },
   "onboardingSatisfaction": {
     "title": "Comment s’est passé votre onboarding ?",
@@ -1848,5 +1852,102 @@
     "mkt-heart": "Touchez le cœur pour mettre un gig de côté et le comparer plus tard.",
     "mkt-favorites": "Retrouvez ici tous les gigs que vous avez mis en favori.",
     "mkt-requested": "Vos demandes d’inscription en attente de réponse de l’entreprise sont ici."
+  },
+  "repJourney": {
+    "regionLabel": "Votre parcours d’inscription",
+    "progressLabel": "Avancement de votre inscription",
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "remaining_one": "≈ {{count}} min restante",
+    "remaining_other": "≈ {{count}} min restantes",
+    "minutes_one": "≈ {{count}} minute",
+    "minutes_other": "≈ {{count}} minutes",
+    "what": "À faire",
+    "why": "Pourquoi",
+    "howLong": "Durée",
+    "showGuide": "Afficher la consigne",
+    "hideGuide": "Masquer la consigne",
+    "revisitHint": "Revenir à cette étape : rien n’est perdu, tout est enregistré.",
+    "autosaveEditor": "Vos modifications sont enregistrées automatiquement. Vous pouvez quitter et reprendre plus tard.",
+    "autosaveGeneric": "Rien n’est perdu : vous pouvez quitter et reprendre là où vous en étiez.",
+    "needHelp": "Besoin d’aide ?",
+    "steps": {
+      "import": {
+        "short": "CV",
+        "title": "Importez votre CV",
+        "cheer": "Le plus dur, c’est de commencer : ça ne prend que quelques secondes.",
+        "what": "Déposez votre CV (PDF, DOC ou DOCX, 5 Mo max).",
+        "why": "Notre IA pré-remplit votre profil : vous n’aurez qu’à relire.",
+        "timeNote": "L’analyse prend environ 30 secondes."
+      },
+      "editor": {
+        "short": "Profil",
+        "title": "Complétez votre profil",
+        "cheer": "Vous y êtes presque : chaque élément ajouté vous rend plus visible des entreprises.",
+        "what": "Ajoutez votre photo, une courte vidéo par expérience et vos disponibilités.",
+        "why": "Un profil complet reçoit davantage de propositions de missions.",
+        "timeNote": "Prévoyez un endroit calme et un bon éclairage pour les vidéos."
+      },
+      "profile": {
+        "short": "Vérification",
+        "title": "Relisez votre profil",
+        "cheer": "Dernier coup d’œil avant de choisir votre formule.",
+        "what": "Vérifiez vos informations, puis cliquez sur « Continuer ».",
+        "why": "C’est ce que les entreprises verront de vous.",
+        "timeNote": "Vous pourrez toujours modifier votre profil ensuite."
+      },
+      "plan": {
+        "short": "Formule",
+        "title": "Choisissez votre formule",
+        "cheer": "Dernière étape avant les missions : plus que quelques clics.",
+        "what": "Comparez les formules et sélectionnez celle qui vous convient.",
+        "why": "Ce choix active votre compte et publie votre profil.",
+        "timeNote": "Vous pourrez changer de formule plus tard."
+      },
+      "marketplace": {
+        "short": "Missions",
+        "title": "Trouvez votre première mission",
+        "cheer": "Bravo, votre profil est en ligne !",
+        "what": "Parcourez les missions et postulez.",
+        "why": "Les entreprises vous découvrent ici.",
+        "timeNote": ""
+      }
+    },
+    "checklist": {
+      "title": "Plus que {{left}} à faire ({{done}} sur {{total}} terminés)",
+      "allDone": "Tout est prêt : vous pouvez continuer ! 🎉",
+      "videosCount": "({{current}} sur {{total}})",
+      "items": {
+        "photo": {
+          "label": "Photo de profil",
+          "hint": "Un visage souriant, fond neutre : c’est le premier critère de confiance."
+        },
+        "experiences": {
+          "label": "Expériences",
+          "hint": "Ajoutez au moins une expérience (importée depuis votre CV ou saisie à la main)."
+        },
+        "videos": {
+          "label": "Vidéo par expérience",
+          "hint": "30 secondes suffisent : présentez ce que vous avez fait, avec vos mots."
+        },
+        "availability": {
+          "label": "Disponibilités",
+          "hint": "Indiquez vos jours et horaires de travail habituels."
+        }
+      }
+    },
+    "errors": {
+      "title": "Un petit contretemps",
+      "network": "Votre connexion semble interrompue. Vérifiez-la, puis réessayez : votre fichier n’a pas été perdu.",
+      "timeout": "L’analyse a pris plus de temps que prévu. Réessayez dans un instant.",
+      "rateLimit": "Beaucoup de personnes s’inscrivent en ce moment. Patientez une minute puis réessayez.",
+      "auth": "Votre session a expiré. Reconnectez-vous, puis relancez l’import.",
+      "serverBusy": "Nos serveurs sont momentanément occupés. Réessayez dans quelques instants, vos données sont en sécurité.",
+      "validation": "Nous n’avons pas pu enregistrer certaines informations de votre CV. Réessayez, ou essayez un autre fichier.",
+      "languages": "Il manque une rubrique Langues dans votre CV. Ajoutez-y vos langues (ex. « Français : natif · Anglais : courant »), puis réessayez.",
+      "unreadable": "Ce fichier semble illisible ou protégé. Essayez de l’enregistrer à nouveau en PDF, sans mot de passe.",
+      "generic": "Impossible d’analyser votre CV pour le moment. Réessayez, ou utilisez un autre fichier.",
+      "retry": "Réessayer",
+      "tipSupport": "Toujours bloqué ? Contactez le support depuis le menu : nous vous répondons vite."
+    }
   }
 }
