@@ -69,7 +69,7 @@ export const useLead = (leadId: string | null): UseLeadResult => {
       let apiUrl =
         import.meta.env.VITE_DASHBOARD_COMPANY_API_URL ||
         import.meta.env.VITE_DASH_COMPANY_BACKEND ||
-        'https://v25dashboardbackend-development.up.railway.app/api';
+        'https://v25dashboardbackend-recette.up.railway.app/api';
 
       // Normalize all URLs to include /api if missing (all backend services use /api prefix)
       if (!apiUrl.includes('/api')) {

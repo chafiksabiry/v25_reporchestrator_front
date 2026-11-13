@@ -44,6 +44,10 @@ export function CompanyProfile() {
   const [company, setCompany] = useState<CompanyProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Some companies' logo URL was auto-generated from a third-party service
+  // (e.g. Clearbit's now-discontinued free logo API) and no longer resolves —
+  // fall back to the initials placeholder instead of a broken image icon.
+  const [logoFailed, setLogoFailed] = useState(false);
 
   const uiLang = (i18n.language || 'fr').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr';
 
@@ -54,6 +58,7 @@ export function CompanyProfile() {
 
     async function resolve() {
       setLoadError(null);
+      setLogoFailed(false);
       try {
         const locState = location.state as CompanyLocationState | null;
         const fromState = locState?.company;
@@ -248,8 +253,13 @@ export function CompanyProfile() {
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-6">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/95 border border-white/30 shadow-xl flex items-center justify-center overflow-hidden shrink-0">
-              {company.logo ? (
-                <img src={company.logo} alt="" className="w-full h-full object-contain p-2" />
+              {company.logo && !logoFailed ? (
+                <img
+                  src={company.logo}
+                  alt=""
+                  className="w-full h-full object-contain p-2"
+                  onError={() => setLogoFailed(true)}
+                />
               ) : (
                 <span className="text-3xl font-black text-indigo-600">{company.name?.[0] || '?'}</span>
               )}
