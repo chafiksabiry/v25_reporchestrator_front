@@ -6,6 +6,7 @@ describe('isUsablePhotoUrl', () => {
     expect(isUsablePhotoUrl('https://res.cloudinary.com/x/image/upload/a.jpg')).toBe(true);
     expect(isUsablePhotoUrl('http://x/y.png')).toBe(true);
     expect(isUsablePhotoUrl('data:image/png;base64,AAA')).toBe(true);
+    expect(isUsablePhotoUrl('blob:https://app.example/1234-abcd')).toBe(true);
   });
   it('refuse vide, espaces, non-chaîne et schémas dangereux', () => {
     expect(isUsablePhotoUrl('')).toBe(false);
