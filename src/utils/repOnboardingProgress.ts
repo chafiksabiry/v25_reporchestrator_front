@@ -1,4 +1,5 @@
 import { stripRepsPrefix } from '../lib/repSections';
+import { isIntroVideoRequirementMet } from './introVideo';
 
 /**
  * Logique pure du parcours d'accueil REP (barre de progression, consignes,
@@ -70,14 +71,11 @@ export function canRevisitStep(fromPath: string, targetPath: string): boolean {
 
 /* ───────────── Checklist de l'éditeur (lecture seule, mêmes critères que la porte de sortie) ───────────── */
 
-export type EditorChecklistId = 'photo' | 'experiences' | 'videos' | 'availability';
+export type EditorChecklistId = 'photo' | 'experiences' | 'video' | 'availability';
 
 export interface EditorChecklistItem {
   id: EditorChecklistId;
   done: boolean;
-  /** Ex. « 2 sur 3 » pour les vidéos. */
-  current?: number;
-  total?: number;
 }
 
 const experiencesOf = (profile: any): any[] =>
@@ -88,12 +86,11 @@ const experiencesOf = (profile: any): any[] =>
       : [];
 
 /**
- * Reflète exactement les conditions de `isRepPhase2Ready` (photo + vidéo par expérience
- * + disponibilités) en les détaillant, sans les modifier. Ne touche pas à la logique vidéo.
+ * Reflète exactement les conditions de `isRepPhase2Ready` (photo + expérience + vidéo de
+ * présentation + disponibilités) en les détaillant, sans les modifier. Ne touche pas à la logique vidéo.
  */
 export function getEditorChecklist(profile: any): EditorChecklistItem[] {
   const exps = experiencesOf(profile);
-  const withVideo = exps.filter((e) => e && (e.videoUrl || e.videoAnalysis)).length;
   const schedule = profile?.availability?.schedule;
   const hasSchedule =
     Array.isArray(schedule) &&
@@ -102,13 +99,9 @@ export function getEditorChecklist(profile: any): EditorChecklistItem[] {
 
   return [
     { id: 'photo', done: Boolean(profile?.personalInfo?.photo?.url) },
-    { id: 'experiences', done: exps.length > 0, current: exps.length, total: exps.length },
-    {
-      id: 'videos',
-      done: exps.length > 0 && withVideo === exps.length,
-      current: withVideo,
-      total: exps.length,
-    },
+    { id: 'experiences', done: exps.length > 0 },
+    // Règle unifiée (introVideo.ts) : une vidéo de présentation ; vidéos d'expérience facultatives.
+    { id: 'video', done: isIntroVideoRequirementMet(profile) },
     { id: 'availability', done: hasSchedule },
   ];
 }

@@ -1888,7 +1888,7 @@
         "short": "Profile",
         "title": "Complete your profile",
         "cheer": "Almost there — every item you add makes you more visible to companies.",
-        "what": "Add your photo, a short video per experience and your availability.",
+        "what": "Add your photo, an introduction video and your availability.",
         "why": "A complete profile receives more mission offers.",
         "timeNote": "Find a quiet spot with good lighting for the videos."
       },
@@ -1920,7 +1920,6 @@
     "checklist": {
       "title": "{{left}} left to do ({{done}} of {{total}} done)",
       "allDone": "All set — you can continue! 🎉",
-      "videosCount": "({{current}} of {{total}})",
       "items": {
         "photo": {
           "label": "Profile photo",
@@ -1930,13 +1929,13 @@
           "label": "Experiences",
           "hint": "Add at least one experience (imported from your CV or typed in)."
         },
-        "videos": {
-          "label": "Video per experience",
-          "hint": "30 seconds is enough: tell what you did, in your own words."
-        },
         "availability": {
           "label": "Availability",
           "hint": "Set your usual working days and hours."
+        },
+        "video": {
+          "label": "Introduction video",
+          "hint": "A single video (3 min max): introduce yourself and your background, in your own words."
         }
       }
     },

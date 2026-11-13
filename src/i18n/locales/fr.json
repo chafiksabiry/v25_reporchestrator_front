@@ -1888,7 +1888,7 @@
         "short": "Profil",
         "title": "Complétez votre profil",
         "cheer": "Vous y êtes presque : chaque élément ajouté vous rend plus visible des entreprises.",
-        "what": "Ajoutez votre photo, une courte vidéo par expérience et vos disponibilités.",
+        "what": "Ajoutez votre photo, une vidéo de présentation et vos disponibilités.",
         "why": "Un profil complet reçoit davantage de propositions de missions.",
         "timeNote": "Prévoyez un endroit calme et un bon éclairage pour les vidéos."
       },
@@ -1920,7 +1920,6 @@
     "checklist": {
       "title": "Plus que {{left}} à faire ({{done}} sur {{total}} terminés)",
       "allDone": "Tout est prêt : vous pouvez continuer ! 🎉",
-      "videosCount": "({{current}} sur {{total}})",
       "items": {
         "photo": {
           "label": "Photo de profil",
@@ -1930,13 +1929,13 @@
           "label": "Expériences",
           "hint": "Ajoutez au moins une expérience (importée depuis votre CV ou saisie à la main)."
         },
-        "videos": {
-          "label": "Vidéo par expérience",
-          "hint": "30 secondes suffisent : présentez ce que vous avez fait, avec vos mots."
-        },
         "availability": {
           "label": "Disponibilités",
           "hint": "Indiquez vos jours et horaires de travail habituels."
+        },
+        "video": {
+          "label": "Vidéo de présentation",
+          "hint": "Une seule vidéo (3 min max) : présentez-vous et votre parcours, avec vos mots."
         }
       }
     },

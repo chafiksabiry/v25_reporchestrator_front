@@ -56,7 +56,7 @@ describe('retour en arrière sans perte', () => {
 describe("checklist de l'éditeur", () => {
   const full = {
     personalInfo: { photo: { url: 'https://x/p.jpg' } },
-    experience: [{ videoUrl: 'a' }, { videoAnalysis: { ok: true } }],
+    experience: [{ videoUrl: 'a' }, {}],
     availability: { schedule: [{ day: 'Monday', hours: { start: '09:00', end: '17:00' } }] },
   };
 
@@ -66,11 +66,14 @@ describe("checklist de l'éditeur", () => {
     expect(getEditorCompletion(items)).toEqual({ done: 0, total: 4, percent: 0 });
   });
 
-  it('compte les vidéos par expérience', () => {
-    const items = getEditorChecklist({ ...full, experience: [{ videoUrl: 'a' }, {}, {}] });
-    const videos = items.find((i) => i.id === 'videos')!;
-    expect(videos).toMatchObject({ done: false, current: 1, total: 3 });
+  it("vidéo : la vidéo de présentation suffit, les vidéos d'expérience sont facultatives", () => {
+    const base = { ...full, experience: [{}, {}, {}] };
+    expect(getEditorChecklist(base).find((i) => i.id === 'video')!.done).toBe(false);
+    const withIntro = { ...base, personalInfo: { ...base.personalInfo, presentationVideo: { url: 'https://x/v.mp4' } } };
+    const items = getEditorChecklist(withIntro);
+    expect(items.find((i) => i.id === 'video')!.done).toBe(true);
     expect(items.find((i) => i.id === 'experiences')!.done).toBe(true);
+    expect(getEditorChecklist({ ...base, experience: [{ videoUrl: 'a' }, {}, {}] }).find((i) => i.id === 'video')!.done).toBe(true);
   });
 
   it('accepte la clé « experiences » et refuse un horaire incomplet', () => {
@@ -80,7 +83,7 @@ describe("checklist de l'éditeur", () => {
       experiences: [{ videoUrl: 'a' }],
       availability: { schedule: [{ day: 'Monday', hours: { start: '09:00' } }] },
     });
-    expect(items.find((i) => i.id === 'videos')!.done).toBe(true);
+    expect(items.find((i) => i.id === 'video')!.done).toBe(true);
     expect(items.find((i) => i.id === 'availability')!.done).toBe(false);
   });
 
@@ -91,7 +94,8 @@ describe("checklist de l'éditeur", () => {
       full,
       { ...full, personalInfo: {} },
       { ...full, experience: [] },
-      { ...full, experience: [{ videoUrl: 'a' }, {}] },
+      { ...full, experience: [{}, {}] },
+      { ...full, experience: [{}, {}], personalInfo: { photo: { url: 'x' }, presentationVideo: 'https://v' } },
       { ...full, availability: { schedule: [] } },
     ];
     for (const c of cases) {

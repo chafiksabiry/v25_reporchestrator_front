@@ -196,11 +196,6 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
                           )}
                           <span>
                             <span className="font-semibold">{t(`repJourney.checklist.items.${item.id}.label`)}</span>
-                            {item.id === 'videos' && (item.total ?? 0) > 0 && (
-                              <span className="ml-1 text-white/70">
-                                {t('repJourney.checklist.videosCount', { current: item.current, total: item.total })}
-                              </span>
-                            )}
                             {!item.done && (
                               <span className="block text-white/65">{t(`repJourney.checklist.items.${item.id}.hint`)}</span>
                             )}
