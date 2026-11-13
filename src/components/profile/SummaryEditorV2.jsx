@@ -2701,7 +2701,33 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 return updated;
               });
             }}
-            onAnalysisComplete={() => {}}
+            onAnalysisComplete={async () => {
+              // Le backend a écrit secteurs, activités, langues (et compétences en suggestions) :
+              // on RECHARGE le profil et on ne fusionne que ces champs, sans écraser les
+              // modifications locales non enregistrées du reste de l'éditeur.
+              try {
+                const refreshed = await fetchProfileFromAPI();
+                if (!refreshed) return;
+                setEditedProfile((prev) => ({
+                  ...prev,
+                  proposedSkills: refreshed.proposedSkills ?? prev.proposedSkills,
+                  professionalSummary: {
+                    ...(prev.professionalSummary || {}),
+                    industries: refreshed.professionalSummary?.industries ?? prev.professionalSummary?.industries,
+                    activities: refreshed.professionalSummary?.activities ?? prev.professionalSummary?.activities,
+                  },
+                  personalInfo: {
+                    ...(prev.personalInfo || {}),
+                    languages: refreshed.personalInfo?.languages ?? prev.personalInfo?.languages,
+                    presentationVideo: refreshed.personalInfo?.presentationVideo ?? prev.personalInfo?.presentationVideo,
+                  },
+                }));
+                setProfileData(refreshed);
+                window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+              } catch (err) {
+                console.error('Could not reload the profile after the presentation analysis:', err);
+              }
+            }}
           />
         )}
       </div>
