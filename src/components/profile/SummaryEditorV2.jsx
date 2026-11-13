@@ -3212,6 +3212,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   // Edit / optional Save. Saving on click is not required; autosave still keeps the draft.
   const renderSectionControls = (section) => {
+    const canUndo = (sectionUndoStacks[section] || []).length > 0;
     const showStatus = autoSaveSection === section && autoSaveStatus !== 'idle';
 
     if (!isSectionEditing(section)) {
@@ -3247,13 +3248,40 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 : t('autoSaving')}
           </span>
         )}
+      <button
+          type="button"
+          onClick={() => undoSection(section)}
+          disabled={!canUndo}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+          title={t('undo')}
+      >
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4" />
+        </svg>
+          {t('undo')}
+      </button>
         <button
           type="button"
-          onClick={() => saveSection(section)}
+          onClick={() => {
+            if (autoSaveTimerRef.current) {
+              clearTimeout(autoSaveTimerRef.current);
+              autoSaveTimerRef.current = null;
+            }
+            if (persistSectionRef.current) {
+              void persistSectionRef.current(section, { keepEditing: false, silent: false });
+            }
+          }}
           disabled={isSaving}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-harx-600 hover:bg-harx-700 disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-harx-200 text-white bg-harx-600 hover:bg-harx-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          {isSaving ? t('saving') : t('save')}
+          {t('save')}
+        </button>
+        <button
+          type="button"
+          onClick={() => cancelSection(section)}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+        >
+          {t('cancel')}
         </button>
       </div>
     );
