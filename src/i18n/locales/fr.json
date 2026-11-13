@@ -1,4 +1,18 @@
 {
+  "videoErrors": {
+    "VIDEO_TOO_LARGE": "Votre vidéo est trop volumineuse ({{maxMb}} Mo maximum). Refaites-la un peu plus courte ou choisissez un fichier plus léger : rien n’a été envoyé.",
+    "NOT_A_VIDEO": "Ce fichier n’est pas une vidéo reconnue. Choisissez une vidéo ou refaites l’enregistrement avec la caméra.",
+    "VIDEO_TOO_SHORT": "Votre vidéo est trop courte ({{minSeconds}} secondes minimum). Refaites-la un peu plus longue.",
+    "VIDEO_TOO_LONG": "Votre vidéo est trop longue ({{maxMinutes}} minutes maximum). Refaites-la plus brièvement.",
+    "NO_VIDEO": "Aucune vidéo n’a été reçue. Refaites l’enregistrement.",
+    "UPLOAD_BUSY": "Le service est très sollicité en ce moment. Réessayez dans un instant : votre enregistrement n’est pas perdu.",
+    "VIDEO_STORAGE_ERROR": "Le service de stockage vidéo est momentanément indisponible. Réessayez dans un instant : votre enregistrement n’est pas perdu.",
+    "UPLOAD_FAILED": "L’envoi de votre vidéo a échoué (connexion ?). Vérifiez votre connexion et réessayez : votre enregistrement n’est pas perdu.",
+    "ANALYSIS_FAILED": "L’analyse IA de votre vidéo n’a pas abouti. Votre vidéo est bien enregistrée : réessayez dans un instant.",
+    "INTERNAL_ERROR": "Un incident technique est survenu. Votre enregistrement n’est pas perdu : réessayez dans un instant.",
+    "UNAUTHORIZED": "Votre session a expiré. Reconnectez-vous puis réessayez.",
+    "UNKNOWN": "Une erreur est survenue. Votre enregistrement n’est pas perdu : réessayez dans un instant."
+  },
   "sidebar": {
     "dashboard": "Tableau de Bord",
     "profile": "Profil",

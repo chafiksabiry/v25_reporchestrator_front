@@ -27,7 +27,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl, repApiUrl } from '../../../utils/repApiUrl';
 import { INTRO_VIDEO_MAX_SECONDS, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
-import { isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage } from '../../../utils/videoErrors';
+import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage, withRetryAfterOnce } from '../../../utils/videoErrors';
+import { recorderOptions } from '../../../utils/videoLimits';
 import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../../utils/taxonomyI18n';
 import { getIndustries, getActivities, getSkillsGrouped } from '../../../lib/api/profiles';
 import { getAllLanguages } from '../../../lib/api/languages';
@@ -1046,7 +1047,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const startRecording = () => {
     if (!stream) return;
     chunksRef.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    const recorder = new MediaRecorder(stream, recorderOptions('video/webm;codecs=vp8,opus'));
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
@@ -1100,6 +1101,13 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // Mode « intro » : la vidéo est d'abord enregistrée sur le profil (route existante
   // PUT /profiles/:id/video). Ainsi l'obligation est remplie même si l'analyse IA échoue.
   const uploadIntroVideo = async (blob: Blob, token: string | null): Promise<string | undefined> => {
+    // Trop volumineux (> 100 Mo) : message clair, RIEN n'est envoyé.
+    const tooLarge = checkVideoBeforeUpload(blob);
+    if (tooLarge) throw tooLarge;
+    return withRetryAfterOnce(() => uploadIntroVideoOnce(blob, token));
+  };
+
+  const uploadIntroVideoOnce = async (blob: Blob, token: string | null): Promise<string | undefined> => {
     const formData = new FormData();
     formData.append('video', new File([blob], 'presentation-video.webm', { type: 'video/webm' }));
     let response: Response;
