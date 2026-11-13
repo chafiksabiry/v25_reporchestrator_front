@@ -181,13 +181,11 @@ function Subscription() {
 
   if (loading || finalizing) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3">
-        <Loader className="h-8 w-8 animate-spin text-harx-500" />
-        {finalizing && (
-          <p className="text-sm font-bold text-slate-500">
-            {t('subscriptionFlow.finalizing')}
-          </p>
-        )}
+      <div role="status" aria-live="polite" className="flex h-64 flex-col items-center justify-center gap-3">
+        <Loader className="h-8 w-8 animate-spin text-harx-500" aria-hidden="true" />
+        <p className="text-sm font-bold text-slate-500">
+          {finalizing ? t('subscriptionFlow.finalizing') : t('subscriptionFlow.loadingPlans')}
+        </p>
       </div>
     );
   }
@@ -258,6 +256,7 @@ function Subscription() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="publish-profile-title"
+            aria-describedby="publish-profile-desc"
             className="relative w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-harx text-white shadow-lg shadow-harx-500/25">
@@ -269,7 +268,7 @@ function Subscription() {
             >
               {t('profile.header.publishReady')}
             </h2>
-            <p className="mt-2 text-sm font-medium text-slate-500 leading-relaxed">
+            <p id="publish-profile-desc" className="mt-2 text-sm font-medium text-slate-500 leading-relaxed">
               {activePlanName
                 ? t('subscriptionFlow.planActiveBanner', { name: activePlanName })
                 : t('subscriptionFlow.onboardingCompletePublish')}
@@ -278,6 +277,7 @@ function Subscription() {
               type="button"
               onClick={() => void handlePublishProfile()}
               disabled={publishing}
+              autoFocus
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-harx px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-harx-500/20 transition hover:opacity-90 disabled:opacity-60"
             >
               {publishing ? (
