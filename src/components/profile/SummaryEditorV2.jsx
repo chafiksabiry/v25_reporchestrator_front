@@ -7,7 +7,7 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sparkles, Lightbulb, CalendarClock, Rocket } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sparkles, Lightbulb, CalendarClock, Rocket, Briefcase, Languages as LanguagesIcon, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
@@ -17,6 +17,11 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
 import { setProfileData, getProfileData } from '../../utils/authUtils';
+import { EDITOR_UX_NS } from '../../i18n/editorUx';
+import EditorSectionCard, { CompletionPill } from './editor/EditorSectionCard';
+import EditorEmptyState from './editor/EditorEmptyState';
+import EditorOverview from './editor/EditorOverview';
+import { getSectionCompletions, getOverallCompletion, getSummaryQuality, SUMMARY_MIN_CHARS, SUMMARY_MAX_CHARS } from '../../utils/profileSectionCompletion';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -408,6 +413,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [editedSummary, setEditedSummary] = useState(generatedSummary);
   const [loading, setLoading] = useState(false);
   const { t: i18nT, i18n } = useTranslation();
+  const { t: ux } = useTranslation(EDITOR_UX_NS);
   const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const otherLang = uiLang === 'fr' ? 'en' : 'fr';
   const t = (key, options) => i18nT(`profileImportReview.${key}`, options);
@@ -1948,11 +1954,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const renderError = (error, id) => {
     if (!error) return null;
     return (
-      <div id={`error-${id}`} className="text-red-600 text-sm mt-1 flex items-center gap-1">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div id={`error-${id}`} role="alert" className="text-red-700 text-sm mt-1 flex items-start gap-1">
+        <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        {error}
+        <span>
+          {error}
+          {id && ['name', 'country', 'phone', 'email', 'languages'].includes(id) ? (
+            <span className="block text-xs font-normal text-slate-600">{ux(`hints.${id}`)}</span>
+          ) : null}
+        </span>
       </div>
     );
   };
@@ -2440,25 +2451,26 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     return (
       <div className="mb-8 space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-900">{t('professionalExperience')}</h3>
-            <div className="flex items-center gap-2">
-              {isSectionEditing('experience') && (
-                <button
-                  onClick={() => setShowNewExperienceForm(true)}
-                  className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 transition-colors duration-200 flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  {t('addExperience')}
-                </button>
-              )}
-              {renderSectionControls('experience')}
-            </div>
-          </div>
-
+        <EditorSectionCard
+          id="experience"
+          title={t('professionalExperience')}
+          help={ux('help.experience')}
+          completion={sectionCompletions.find((c) => c.id === 'experience')}
+          controls={renderSectionControls('experience')}
+          actions={
+            isSectionEditing('experience') ? (
+              <button
+                onClick={() => setShowNewExperienceForm(true)}
+                className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 transition-colors duration-200 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                {t('addExperience')}
+              </button>
+            ) : null
+          }
+        >
           {showNewExperienceForm && (
             <div className="mb-6">
               <ExperienceForm
@@ -2467,6 +2479,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 isNew={true}
               />
             </div>
+          )}
+
+          {!(editedProfile.experience?.length) && !showNewExperienceForm && (
+            <EditorEmptyState
+              kind="experience"
+              Icon={Briefcase}
+              onAction={() => { if (!isSectionEditing('experience')) startSectionEdit('experience'); setShowNewExperienceForm(true); }}
+              actionLabel={ux('empty.experience.cta')}
+            />
           )}
 
           <div className="space-y-6">
@@ -2567,7 +2588,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             ))}
           </div>
-        </div>
+        </EditorSectionCard>
 
         {videoModalExp && (
           <ExperienceVideoModal
@@ -3340,6 +3361,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     );
   }
 
+  const summaryShown = isSectionEditing('summary')
+    ? editedSummary
+    : localizeText(editedProfile.professionalSummary?.profileDescription_i18n, uiLang) ||
+      editedProfile.professionalSummary?.profileDescription ||
+      '';
+  const sectionCompletions = getSectionCompletions(editedProfile, summaryShown);
+  const overallCompletion = getOverallCompletion(sectionCompletions);
+  const completionOf = (id) => sectionCompletions.find((c) => c.id === id);
+  const summaryQuality = getSummaryQuality(summaryShown);
+
   const countryDisplay =
     typeof editedProfile.personalInfo.country === 'object'
       ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
@@ -3511,7 +3542,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-start">
               {/* Photo card — same interaction as Profile page */}
-              <div className="relative group shrink-0">
+              <div id="editor-section-photo" className="relative group shrink-0 scroll-mt-24">
                 <div
                   className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
                     hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
@@ -3552,9 +3583,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   disabled={isUploadingPhoto}
                   className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white shadow-lg hover:opacity-90 disabled:opacity-60"
                   title={i18nT('profile.header.changePhoto')}
+                  aria-label={i18nT('profile.header.changePhoto')}
                 >
                   {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 </button>
+                <p className={`mt-3 max-w-[7.5rem] text-center text-[11px] font-medium leading-snug sm:max-w-[8.5rem] ${hasProfilePhoto ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {hasProfilePhoto ? ux('photoHint.ok') : ux('photoHint.missing')}
+                </p>
               </div>
               {confirmContinueButton('header')}
             </div>
@@ -3957,12 +3992,18 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           )}
 
+          <EditorOverview sections={sectionCompletions} overall={overallCompletion} autoSaveStatus={autoSaveStatus} />
+
           {/* Profile Overview */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('personalInfo')}</h3>
-            {renderSectionControls('basic')}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 items-start">
+          <EditorSectionCard
+            id="identity"
+            title={t('personalInfo')}
+            help={ux('help.identity')}
+            completion={completionOf('identity')}
+            controls={renderSectionControls('basic')}
+            className="mb-8"
+          >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             {isSectionEditing('basic') ? (
               <>
                 <div className="space-y-4 min-w-0">
@@ -4067,7 +4108,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   {renderError(validationErrors.phone, 'phone')}
                 </div>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl md:col-span-2">
+                <div id="editor-section-languages" className="scroll-mt-24 p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl md:col-span-2">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('languages')}</h3>
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -4327,7 +4368,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   }
                 />
                 </div>
-                <div className="md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div id="editor-section-languages" className="scroll-mt-24 md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-harx-50 text-harx-600">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4335,7 +4376,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       </svg>
                     </span>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t('languages')}</h3>
+                    <CompletionPill completion={completionOf('languages')} />
                   </div>
+                  {!editedProfile.personalInfo.languages?.length && (
+                    <EditorEmptyState kind="languages" Icon={LanguagesIcon} />
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {editedProfile.personalInfo.languages.map((lang, index) => {
                       const languageName = typeof lang.language === 'object' ? lang.language.name : lang.language;
@@ -4360,6 +4405,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </>
             )}
           </div>
+          </EditorSectionCard>
 
           {/* Experience Section */}
           {renderExperienceSection()}
@@ -4379,11 +4425,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
           </div>
 
           {/* Availability Section */}
-          <div id="onboarding-availability" className="mt-8 scroll-mt-24 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">{t('workingHours')}</h3>
-              {renderSectionControls('availability')}
-            </div>
+          <div id="onboarding-availability" className="mt-8 scroll-mt-24">
+          <EditorSectionCard
+            id="availability"
+            title={t('workingHours')}
+            help={ux('help.availability')}
+            completion={completionOf('availability')}
+            controls={renderSectionControls('availability')}
+          >
 
             {isSectionEditing('availability') ? (
               <div className="space-y-6">
@@ -4684,6 +4733,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   </div>
                 )}
 
+                {!(editedProfile.availability?.schedule?.length) && (
+                  <EditorEmptyState kind="availability" Icon={CalendarClock} />
+                )}
+
                 {/* Schedule Display */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-2">{t('availability.schedule')}</h4>
@@ -4746,48 +4799,61 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 </div>
               </div>
             )}
+          </EditorSectionCard>
           </div>
 
           {/* Summary Section */}
-          <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">{t('professionalSummary')}</h3>
-                <p className="text-sm text-gray-500 mt-0.5">{t('summarySubtitle')}</p>
-              </div>
-              <div className="flex items-center gap-2 self-start">
-                {isSectionEditing('summary') && (
-                  <button
-                    onClick={regenerateSummary}
-                    disabled={loading}
-                    className="px-4 py-2 text-sm font-medium text-harx-700 bg-white border border-harx-100 rounded-xl hover:bg-harx-50 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
-                  >
-                    <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    {loading ? t('generating') : t('regenerate')}
-                  </button>
-                )}
-                {renderSectionControls('summary')}
-              </div>
-            </div>
+          <EditorSectionCard
+            id="summary"
+            title={t('professionalSummary')}
+            subtitle={t('summarySubtitle')}
+            help={ux('help.summary')}
+            completion={completionOf('summary')}
+            controls={renderSectionControls('summary')}
+            actions={
+              isSectionEditing('summary') ? (
+                <button
+                  onClick={regenerateSummary}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-harx-700 bg-white border border-harx-100 rounded-xl hover:bg-harx-50 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+                >
+                  <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {loading ? t('generating') : t('regenerate')}
+                </button>
+              ) : null
+            }
+            className="mt-8"
+          >
             {isSectionEditing('summary') ? (
-              <textarea
-                value={editedSummary}
-                onChange={(e) => handleSummaryChange(e.target.value)}
-                className="w-full h-64 p-4 border rounded-xl focus:ring-2 focus:ring-harx-500 focus:border-harx-500"
-                placeholder={t('summaryPlaceholder')}
-              />
-            ) : (
-              <div className="bg-white/80 backdrop-blur-sm border border-white p-6 rounded-2xl shadow-inner">
-                <p className="text-gray-800 whitespace-pre-line text-base sm:text-lg leading-relaxed">
-                  {localizeText(editedProfile.professionalSummary?.profileDescription_i18n, uiLang) ||
-                    editedProfile.professionalSummary?.profileDescription ||
-                    t('noSummary')}
+              <div>
+                <label htmlFor="editor-summary-textarea" className="sr-only">{t('professionalSummary')}</label>
+                <textarea
+                  id="editor-summary-textarea"
+                  value={editedSummary}
+                  onChange={(e) => handleSummaryChange(e.target.value)}
+                  aria-describedby="editor-summary-hint"
+                  className="w-full h-64 p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-harx-500 focus:border-harx-500"
+                  placeholder={ux('placeholders.summary')}
+                />
+                <p
+                  id="editor-summary-hint"
+                  className={`mt-2 text-sm ${
+                    summaryQuality.quality === 'good' ? 'text-emerald-700' : summaryQuality.quality === 'empty' ? 'text-slate-600' : 'text-amber-800'
+                  }`}
+                >
+                  {ux(`summaryHint.${summaryQuality.quality}`, { chars: summaryQuality.chars, min: SUMMARY_MIN_CHARS, max: SUMMARY_MAX_CHARS })}
                 </p>
               </div>
+            ) : summaryQuality.quality === 'empty' ? (
+              <EditorEmptyState kind="summary" Icon={FileText} />
+            ) : (
+              <div className="bg-gradient-to-br from-harx-50/70 to-white border border-harx-100 p-5 sm:p-6 rounded-2xl">
+                <p className="text-gray-800 whitespace-pre-line text-base leading-relaxed">{summaryShown}</p>
+              </div>
             )}
-          </div>
+          </EditorSectionCard>
 
           {/* Action Buttons — always visible; grayed until requirements are met */}
           <div
