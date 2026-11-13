@@ -53,6 +53,14 @@ function formatPrice(amount: number, currency: string | undefined, locale: strin
   }
 }
 
+/** Accent de couleur par formule (palette HARX + teintes déjà utilisées dans l'app) : position dans la liste. */
+const PLAN_ACCENTS = [
+  { bar: 'from-sky-400 to-cyan-400', glow: 'bg-sky-400/30', check: 'text-sky-600', link: 'text-sky-700', ring: 'hover:border-sky-300' },
+  { bar: 'from-violet-500 to-fuchsia-500', glow: 'bg-violet-500/30', check: 'text-violet-600', link: 'text-violet-700', ring: 'hover:border-violet-300' },
+  { bar: 'from-[#F90080] to-[#ff4d4d]', glow: 'bg-[#F90080]/30', check: 'text-[#F90080]', link: 'text-[#c4006a]', ring: 'hover:border-[#F90080]/40' },
+  { bar: 'from-amber-400 to-orange-500', glow: 'bg-amber-400/30', check: 'text-amber-600', link: 'text-amber-800', ring: 'hover:border-amber-300' },
+] as const;
+
 function requiresStripeCheckout(plan: ApiPlan): boolean {
   return Boolean(plan.stripePriceId?.trim());
 }
@@ -328,7 +336,8 @@ export function EmbeddedRepSubscriptionFlow({
         aria-label={tx('plan.plansRegion')}
         className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {plans.map((plan) => {
+        {plans.map((plan, planIndex) => {
+          const accent = PLAN_ACCENTS[planIndex % PLAN_ACCENTS.length];
           const isCurrent = String(activePlanId) === String(plan._id);
           const isPaid = isPaidPlan(plan);
           const isBusy =
@@ -351,7 +360,7 @@ export function EmbeddedRepSubscriptionFlow({
               className={`relative flex flex-col rounded-3xl border-2 bg-white p-3.5 shadow-sm transition-all duration-300 ${
                 isCurrent
                   ? 'border-emerald-500 bg-emerald-50/30 shadow-lg ring-4 ring-emerald-500/15'
-                  : 'border-slate-100 hover:-translate-y-1 hover:border-[#F90080]/40 hover:shadow-lg'
+                  : `border-slate-100 hover:-translate-y-1 hover:shadow-lg ${accent.ring}`
               }`}
             >
               {isCurrent && (
@@ -361,7 +370,9 @@ export function EmbeddedRepSubscriptionFlow({
               )}
 
               {/* Identité + prix */}
-              <div className="rounded-2xl bg-[#0C1C2E] px-3.5 py-3 text-white">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0C1C2E] to-[#14304d] px-3.5 py-3 text-white">
+                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent.bar}`} aria-hidden="true" />
+                <div className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-xl ${accent.glow}`} aria-hidden="true" />
                 <h3 className="text-base font-black uppercase leading-tight tracking-tight">{copy.name}</h3>
                 <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
                   <span className="text-2xl font-black tracking-tight">
@@ -393,7 +404,7 @@ export function EmbeddedRepSubscriptionFlow({
                           i === 0 ? 'font-black text-[#0C1C2E]' : 'font-medium'
                         }`}
                       >
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F90080]" strokeWidth={3} aria-hidden="true" />
+                        <Check className={`mt-0.5 h-4 w-4 shrink-0 ${accent.check}`} strokeWidth={3} aria-hidden="true" />
                         <span className="line-clamp-1">{feat}</span>
                       </li>
                     ))}
@@ -401,7 +412,7 @@ export function EmbeddedRepSubscriptionFlow({
                   <button
                     type="button"
                     onClick={() => setDetailPlan(plan)}
-                    className="mt-2 text-xs font-black text-[#F90080] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F90080]/40"
+                    className={`mt-2 text-xs font-black underline-offset-2 hover:underline ${accent.link} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F90080]/40`}
                   >
                     {tx('plan.details')}
                   </button>
