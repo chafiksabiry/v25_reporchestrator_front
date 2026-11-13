@@ -11,6 +11,8 @@ import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sp
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
+import { flexibilityLabel, hasFlexibility, toggleFlexibility } from '../../utils/flexibilityOptions';
+import { formatCountryLabel, resolveCountryCode, resolveCountryName } from '../../utils/countryDisplay';
 import { INTRO_VIDEO_MAX_SECONDS, hasPresentationVideo, isIntroVideoRequirementMet } from '../../utils/introVideo';
 import { repApiUrl } from '../../utils/repApiUrl';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
@@ -1046,12 +1048,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     if (!currentTimezone || !selectedCountry) return { matches: true, message: '' };
 
-    const selectedCountryCode = typeof selectedCountry === 'object' ? selectedCountry.countryCode : selectedCountry;
+    // Le pays peut arriver en objet, en code ISO ou en identifiant : on compare toujours des codes.
+    const selectedCountryCode = resolveCountryCode(selectedCountry, countries);
+    if (!selectedCountryCode) return { matches: true, message: '' };
     const timezoneCountryCode = currentTimezone.countryCode;
 
     if (selectedCountryCode !== timezoneCountryCode) {
       const timezoneCountryName = countries.find(c => c.countryCode === timezoneCountryCode)?.countryName || t('unknown');
-      const selectedCountryName = typeof selectedCountry === 'object' ? selectedCountry.countryName : selectedCountry;
+      const selectedCountryName = resolveCountryName(selectedCountry, countries, uiLang) || selectedCountryCode;
 
       return {
         matches: false,
@@ -1068,16 +1072,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       return null;
     }
 
-    const currentCountryCode = typeof currentCountry === 'object'
-      ? currentCountry.countryCode
-      : currentCountry;
+    const currentCountryCode = resolveCountryCode(currentCountry, countries);
+    if (!currentCountryCode) return null;
 
     const firstLoginCountryCode = firstLoginLocation.countryCode;
 
     if (currentCountryCode !== firstLoginCountryCode) {
-      const currentCountryName = typeof currentCountry === 'object'
-        ? currentCountry.countryName
-        : countries.find(c => c.countryCode === currentCountryCode)?.countryName || currentCountryCode;
+      const currentCountryName = resolveCountryName(currentCountry, countries, uiLang) || currentCountryCode;
 
       return {
         profileCountry: {
@@ -3399,10 +3400,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const completionOf = (id) => sectionCompletions.find((c) => c.id === id);
   const summaryQuality = getSummaryQuality(summaryShown);
 
+  // Jamais d'identifiant brut : nom résolu (objet, code ISO ou _id dans la liste chargée), sinon « Non renseigné ».
   const countryDisplay =
-    typeof editedProfile.personalInfo.country === 'object'
-      ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
-      : editedProfile.personalInfo.country || '—';
+    formatCountryLabel(editedProfile.personalInfo.country, countries, uiLang) || t('notSpecified');
 
   // Règle vidéo : UNE vidéo de présentation (le/la REP se présente et présente son parcours)
   // est obligatoire. Les vidéos par expérience sont optionnelles. Compatibilité : un profil
@@ -3834,9 +3834,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <div className="relative country-selector">
                     <input
                       type="text"
-                      value={isSearching ? countrySearch : (typeof editedProfile.personalInfo.country === 'object'
-                        ? `${editedProfile.personalInfo.country?.countryName} (${editedProfile.personalInfo.country?.countryCode})`
-                        : editedProfile.personalInfo.country || '')}
+                      value={isSearching ? countrySearch : formatCountryLabel(editedProfile.personalInfo.country, countries, uiLang)}
                       onChange={handleCountryInputChange}
                       onFocus={handleCountryInputFocus}
                       className="w-full p-2 pr-8 border rounded-md bg-white/50"
@@ -4570,18 +4568,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       <button
                         key={option}
                         onClick={() => {
-                          const currentFlexibility = editedProfile.availability?.flexibility || [];
-                          const updatedFlexibility = currentFlexibility.includes(option)
-                            ? currentFlexibility.filter(f => f !== option)
-                            : [...currentFlexibility, option];
+                          // Comparaison sur la forme canonique : « remote work » (import) = « Remote Work Available ».
+                          const updatedFlexibility = toggleFlexibility(editedProfile.availability?.flexibility, option);
                           handleAvailabilityChangeLocal('flexibility', updatedFlexibility);
                         }}
-                        className={`px-4 py-2 rounded text-sm ${editedProfile.availability?.flexibility?.includes(option)
+                        className={`px-4 py-2 rounded text-sm ${hasFlexibility(editedProfile.availability?.flexibility, option)
                           ? 'bg-harx-600 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </button>
                     ))}
                   </div>
@@ -4657,7 +4653,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         key={option}
                         className="px-4 py-2 bg-gray-50 text-gray-700 rounded"
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </span>
                     ))}
                   </div>

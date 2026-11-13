@@ -7,6 +7,7 @@ import {
 import i18n from '../../i18n';
 import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorMessage, withRetryAfterOnce } from '../../utils/videoErrors';
 import { PROFILE_RECORDING_MAX_SECONDS, recorderOptions } from '../../utils/videoLimits';
+import { resolveCountryName, resolveGeoRef } from '../../utils/countryDisplay';
 import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch, updateUserFullName, recheckExperienceIdentity } from '../../utils/profileUtils';
 import config from '../../config';
 import { repApiUrl } from '../../utils/repApiUrl';
@@ -474,6 +475,19 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
       setIsLanguageDropdownOpen(true);
     }
   }, [activeTab]);
+
+  // Pays reçu sous forme d'identifiant ou de code : on retrouve son nom dans la liste chargée
+  // (jamais d'identifiant brut dans le champ).
+  useEffect(() => {
+    const raw = profile?.personalInfo?.country as unknown;
+    if (!raw || typeof raw === 'object' || countries.length === 0 || countrySearchTerm) return;
+    const ref = resolveGeoRef(raw, countries as any[]);
+    const name = resolveCountryName(raw, countries as any[]);
+    if (name) {
+      setCountrySearchTerm(name);
+      if (ref?.countryCode) setSelectedCountry(ref.countryCode);
+    }
+  }, [countries, profile?.personalInfo?.country]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load countries and all timezones on component mount
   useEffect(() => {

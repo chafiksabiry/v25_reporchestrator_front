@@ -1968,5 +1968,6 @@
       "retry": "Réessayer",
       "tipSupport": "Toujours bloqué ? Contactez le support depuis le menu : nous vous répondons vite."
     }
-  }
+  },
+  "repOnboardingGuide": {"close": "Fermer", "gotIt": "Compris"}
 }
