@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CreditCard, ArrowLeft, Loader, CheckCircle2, Rocket } from 'lucide-react';
+import { CreditCard, ArrowLeft, Loader, CheckCircle2, Rocket, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import { OnboardingSatisfactionModal, clearSatisfactionPending, isSatisfactionPe
 function Subscription() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { t: tx } = useTranslation('repsx');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
@@ -218,31 +219,56 @@ function Subscription() {
         </div>
       )}
 
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-harx-50 text-harx-500">
-            <CreditCard className="h-6 w-6" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-900">
-              {t('subscriptionFlow.choosePlan')}
-            </h2>
-            {activePlanName && (
-              <p className="mt-1 text-sm font-bold text-green-600">
-                {t('subscriptionFlow.yourPlan')} : {activePlanName}
+      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
+        <div className="relative mb-6 overflow-hidden rounded-2xl bg-[#0C1C2E] px-5 py-5 text-white sm:px-6">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-[#F90080]/25 blur-2xl" />
+          <div className="relative flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+              <CreditCard className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-300">
+                {tx('plan.heroKicker')}
               </p>
-            )}
+              <h2 className="mt-0.5 text-2xl font-black tracking-tight">
+                {t('subscriptionFlow.choosePlan')}
+              </h2>
+              <p className="mt-1 text-sm font-medium text-white/80">
+                {t('repJourney.steps.plan.what')} {t('repJourney.steps.plan.why')}
+              </p>
+              {activePlanName && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-black text-emerald-200">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('subscriptionFlow.yourPlan')} : {activePlanName}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {currentPlanId && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
-            <p className="text-sm font-bold text-green-800 leading-relaxed">
-              {t('subscriptionFlow.publishAfterPlanHint')}
-            </p>
-          </div>
-        )}
+        {/* Rassurance : ce qui se passe après le choix (reflète le flux réel : activation, publication, avis, marketplace) */}
+        <section aria-label={tx('plan.afterTitle')} className="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
+            {tx('plan.afterTitle')}
+          </p>
+          <ol className="mt-3 grid gap-3 sm:grid-cols-3">
+            {[1, 2, 3].map((n) => (
+              <li key={n} className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-harx text-xs font-black text-white" aria-hidden="true">
+                  {n}
+                </span>
+                <div>
+                  <p className="text-sm font-black text-[#0C1C2E]">{tx(`plan.after${n}Title`)}</p>
+                  <p className="text-xs font-medium text-slate-600">{tx(`plan.after${n}Body`)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+            {tx('plan.securePayment')}
+          </p>
+        </section>
 
         <EmbeddedRepSubscriptionFlow
           agentId={agentId}

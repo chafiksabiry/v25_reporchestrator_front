@@ -1,0 +1,37 @@
+{
+  "profile": {
+    "progress": {
+      "regionLabel": "Your progress",
+      "title": "Your progress",
+      "stateIncomplete": "Profile to complete",
+      "stateReady": "Profile ready",
+      "count": "{{done}} of {{total}} required items completed",
+      "nextStep": "Next step",
+      "itemsTitle": "Required items",
+      "itemDone": "Done",
+      "itemTodo": "To do",
+      "itemNext": "Do this now",
+      "ctaComplete": "Complete my profile",
+      "ctaPlan": "Choose my plan",
+      "readyTitle": "Your profile is complete",
+      "readyBody": "Review the tabs below if you like, then choose your plan.",
+      "saved": "Everything is saved automatically: you can come back later."
+    }
+  },
+  "plan": {
+    "heroKicker": "Last step of your sign-up",
+    "included": "Included",
+    "free": "Free",
+    "afterTitle": "What happens after you choose",
+    "after1Title": "Your plan is activated",
+    "after1Body": "You can find it at any time in your workspace.",
+    "after2Title": "You publish your profile",
+    "after2Body": "It becomes visible to companies.",
+    "after3Title": "You share your feedback",
+    "after3Body": "Then the missions marketplace opens.",
+    "securePayment": "Paid plans go through a secure payment (Stripe).",
+    "chooseAria": "{{action}} — {{name}}",
+    "currentAria": "Current plan: {{name}}",
+    "plansRegion": "Available plans"
+  }
+}

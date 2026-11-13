@@ -18,6 +18,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 
 // Components
 import harxLogo from '../../assets/logo-harx.png';
+import { ProfileProgressCard } from './profile/ProfileProgressCard';
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
@@ -1257,46 +1258,14 @@ export const ProfileView: React.FC<{
             on every profile section, never buried inside one tab.
             Publish is automatic after plan choice — no Publier button here. */}
         {!isRepProfilePublished(profile) && (
-          profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
-          isRepPhase2Ready(profile) ||
-          isRepCoreOnboardingDone(profile) ? (
-            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
-              <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
-              <div className="relative flex items-start gap-3 min-w-0">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
-                  <ClipboardCheck className="w-5 h-5 text-white" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-white">
-                    {t('profile.header.phase2Complete')}
-                  </p>
-                  <p className="text-xs font-medium text-white/90 mt-0.5 leading-relaxed">
-                    {t('profile.header.phase2CompleteDescription')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/subscription')}
-                className="relative px-5 py-3 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 active:scale-95 whitespace-nowrap flex-shrink-0"
-              >
-                {t('profile.header.continueOnboarding')}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-black text-yellow-800">
-                  {t('profile.header.completePhase2')}
-                </p>
-                <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                  {t('profile.header.completePhase2Description')}
-                </p>
-              </div>
-            </div>
-          )
+          <ProfileProgressCard
+            profile={profile}
+            onNavigate={(path) =>
+              path === '/profile-editor'
+                ? navigate(path, { state: { allowBack: true } })
+                : navigate(path)
+            }
+          />
         )}
 
         {/* Navigation Tabs at the Top */}
