@@ -9,7 +9,6 @@ import { repApiUrl } from '../../../utils/repApiUrl';
 import { fetchPendingRequests as fetchPendingRequestsUtil, fetchEnrolledGigsFromProfile } from '../../../utils/gigStatusUtils';
 import { persistCompanyProfile, persistCompanyReturnGig, type CompanyProfileData } from '../../../utils/companyProfileStorage';
 import { fetchProfileFromAPI } from '../../../utils/profileUtils';
-import { OnboardingSatisfactionModal, ONBOARDING_SATISFACTION_KEY } from '../../onboarding/OnboardingSatisfactionModal';
 import { hasRepGigEngagement } from '../../../utils/repOnboardingNextStep';
 import { connectRepEnrollmentSocket } from '../../../lib/enrollmentSocket';
 import { useNotifications } from '../../../contexts/NotificationsContext';
@@ -625,8 +624,6 @@ export function GigsMarketplace() {
       return false;
     }
   });
-  const [showSatisfaction, setShowSatisfaction] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -640,19 +637,6 @@ export function GigsMarketplace() {
         if (!published) {
           navigate('/subscription', { replace: true });
           return;
-        }
-        const serverDone = Boolean(profile?.onboardingSatisfaction?.done);
-        try {
-          const localDone = localStorage.getItem(ONBOARDING_SATISFACTION_KEY);
-          if (!serverDone && !localDone) setShowSatisfaction(true);
-          if (serverDone && !localDone) {
-            localStorage.setItem(
-              ONBOARDING_SATISFACTION_KEY,
-              JSON.stringify({ done: true, at: new Date().toISOString(), synced: true })
-            );
-          }
-        } catch {
-          if (!serverDone) setShowSatisfaction(true);
         }
       } catch {
         // keep the cached value on failure
@@ -774,16 +758,15 @@ export function GigsMarketplace() {
       console.log('Favorites response:', data);
 
       // Assurons-nous que nous avons un tableau de favoris
+      // Accepts raw ids (current API) or populated gig objects (legacy API).
+      const toIds = (list: Array<string | { _id?: string }>) =>
+        list
+          .map((fav) => (typeof fav === 'string' ? fav : fav?._id))
+          .filter((id): id is string => !!id);
       if (Array.isArray(data)) {
-        // Si la réponse est un tableau direct
-        const favoriteIds = data.map((fav: { _id: string }) => fav._id);
-        console.log('Favorite IDs:', favoriteIds);
-        setFavoriteGigs(favoriteIds);
+        setFavoriteGigs(toIds(data));
       } else if (data.data && Array.isArray(data.data)) {
-        // Si la réponse a une propriété data qui est un tableau
-        const favoriteIds = data.data.map((fav: { _id: string }) => fav._id);
-        console.log('Favorite IDs:', favoriteIds);
-        setFavoriteGigs(favoriteIds);
+        setFavoriteGigs(toIds(data.data));
       } else {
         console.error('Unexpected favorites data structure:', data);
       }
@@ -1472,7 +1455,8 @@ export function GigsMarketplace() {
     const fetchGigs = async () => {
       try {
         const gigsApi = getGigsApiBase();
-        const url = `${gigsApi}/gigs/active`;
+        // Place de marché des REPS : uniquement les opérations des clients TaaS (pas celles des clients Téléphonie).
+        const url = `${gigsApi}/gigs/active?audience=reps`;
         console.log('🌐 Fetching active gigs from:', url);
         console.log('🔧 Environment variables:', {
           VITE_BACKEND_URL_GIGS: import.meta.env.VITE_BACKEND_URL_GIGS,
@@ -2007,7 +1991,7 @@ export function GigsMarketplace() {
             </p>
             <p className="text-xs font-medium text-yellow-700 mt-0.5">
               {isFrMarket
-                ? 'Choisissez un gig ci-dessous et cliquez sur « Apply Now ». Postuler suffit — l’enrôlement complet viendra après validation.'
+                ? 'Choisissez un gig ci-dessous et cliquez sur « Postuler ». Postuler suffit — l’enrôlement complet viendra après validation.'
                 : 'Pick a gig below and click « Apply Now ». Applying is enough — full enrollment comes after approval.'}
             </p>
           </div>
@@ -2036,6 +2020,7 @@ export function GigsMarketplace() {
           {activeTab === 'enrolled' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
+          data-hint="tab-requested"
           onClick={() => setActiveTab('requested')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 ${activeTab === 'requested'
             ? 'text-harx-600'
@@ -2051,6 +2036,7 @@ export function GigsMarketplace() {
           {activeTab === 'requested' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-harx-500 rounded-full"></div>}
         </button>
         <button
+          data-hint="tab-favorite"
           onClick={() => setActiveTab('favorite')}
           className={`px-1 py-4 text-xs sm:text-sm font-bold transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'favorite'
             ? 'text-harx-600'
@@ -2166,6 +2152,7 @@ export function GigsMarketplace() {
                       )}
 
                       <button
+                        data-hint="gig-heart"
                         onClick={(e) => {
                           e.preventDefault();
                           favoriteGigs.includes(gig._id)
@@ -3172,11 +3159,6 @@ export function GigsMarketplace() {
           </button>
         </div>
       )}
-
-      <OnboardingSatisfactionModal
-        open={showSatisfaction}
-        onClose={() => setShowSatisfaction(false)}
-      />
     </div>
   );
 }

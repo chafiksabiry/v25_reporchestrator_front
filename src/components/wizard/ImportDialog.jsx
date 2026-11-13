@@ -48,6 +48,13 @@ function ImportDialog({ isOpen, onClose, onImport }) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // A new upload attempt always starts from a clean slate — otherwise a
+    // failed re-upload after an earlier success left the stale green
+    // "uploaded successfully" box showing next to the new red error.
+    setUploadSuccess(false);
+    setText('');
+    setError('');
+
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB');
       return;

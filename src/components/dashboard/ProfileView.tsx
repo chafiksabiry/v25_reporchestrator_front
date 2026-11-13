@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
-import { OnboardingSatisfactionModal } from '../onboarding/OnboardingSatisfactionModal';
+import { OnboardingSatisfactionModal, clearSatisfactionPending, markSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
 import { refreshOnboardingStatus } from '../../services/apiConfig';
 import progressService from '../../services/progressService';
 import { toast, Toaster } from 'react-hot-toast';
@@ -17,6 +17,7 @@ import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-im
 import 'react-image-crop/dist/ReactCrop.css';
 
 // Components
+import harxLogo from '../../assets/logo-harx.png';
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
@@ -180,6 +181,7 @@ export const ProfileView: React.FC<{
   const handlePublishProfile = useCallback(async () => {
     if (!profile?._id) return;
     setPublishing(true);
+    markSatisfactionPending();
     try {
       if (!isRepProfilePublished(profile)) {
         await updateProfileData(profile._id, { status: 'completed' });
@@ -190,6 +192,7 @@ export const ProfileView: React.FC<{
       onProfileUpdate?.({ ...profile, status: 'completed' });
     } catch (err) {
       console.error('Profile publish failed:', err);
+      clearSatisfactionPending();
       toast.error(t('profile.errors.publish'));
     } finally {
       setPublishing(false);
@@ -197,6 +200,7 @@ export const ProfileView: React.FC<{
   }, [profile, onProfileUpdate, t]);
 
   const handleSatisfactionClose = useCallback(() => {
+    clearSatisfactionPending();
     setShowSatisfaction(false);
     // Ensure dashboard shell sees published status before marketplace nav.
     void fetchProfileFromAPI()
@@ -1074,8 +1078,8 @@ export const ProfileView: React.FC<{
     }
   };
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
+  const renderTab = (tabId: string) => {
+    switch (tabId) {
       case 'profile': return <ProfileTab profile={profile} onSaveAbout={handleSaveAbout} onReplaceVideo={handleReplaceVideo} isUploadingVideo={isUploadingVideo} onAddNotableCompany={(value) => onAddSpecializationItem?.('notableCompanies', value)} onDeleteNotableCompany={(index) => onDeleteSpecializationItem?.('notableCompanies', index)} />;
       case 'skills': return (
         <SkillsTab
@@ -1238,10 +1242,10 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="profile-onepage max-w-6xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2 animate-in fade-in slide-in-from-left-4 duration-500">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1 animate-in fade-in slide-in-from-left-4 duration-500">
             {currentHeader.title}
           </h1>
           <p className="text-slate-500 font-medium tracking-tight animate-in fade-in slide-in-from-left-6 duration-700">
@@ -1256,14 +1260,17 @@ export const ProfileView: React.FC<{
           profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
           isRepPhase2Ready(profile) ||
           isRepCoreOnboardingDone(profile) ? (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in fade-in slide-in-from-top-2 duration-400">
-              <div className="flex items-start gap-3 min-w-0">
-                <ClipboardCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
+              <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
+              <div className="relative flex items-start gap-3 min-w-0">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
+                  <ClipboardCheck className="w-5 h-5 text-white" />
+                </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-emerald-800">
+                  <p className="text-sm font-extrabold text-white">
                     {t('profile.header.phase2Complete')}
                   </p>
-                  <p className="text-xs font-medium text-emerald-700 mt-0.5 leading-relaxed">
+                  <p className="text-xs font-medium text-white/90 mt-0.5 leading-relaxed">
                     {t('profile.header.phase2CompleteDescription')}
                   </p>
                 </div>
@@ -1271,14 +1278,14 @@ export const ProfileView: React.FC<{
               <button
                 type="button"
                 onClick={() => navigate('/subscription')}
-                className="px-5 py-2.5 rounded-2xl bg-gradient-harx text-white hover:opacity-90 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-harx-500/20 active:scale-95 whitespace-nowrap flex-shrink-0"
+                className="relative px-5 py-3 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 active:scale-95 whitespace-nowrap flex-shrink-0"
               >
                 {t('profile.header.continueOnboarding')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-50 border-2 border-yellow-300 animate-pulse">
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm">
               <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-black text-yellow-800">
@@ -1321,10 +1328,35 @@ export const ProfileView: React.FC<{
 
         {/* Header / Identity Section (Twilio Style) - Only visible on 'Profile' tab */}
         {activeTab === 'profile' && (
-          <div className="bg-harx-50/30 backdrop-blur-md rounded-3xl p-8 lg:p-10 shadow-sm border border-harx-100/70 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex flex-col md:flex-row gap-10 items-start">
+          <div id="profile-section-identity" className="bg-gradient-to-b from-white to-slate-50/70 rounded-3xl overflow-hidden shadow-xl shadow-slate-300/40 border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="relative h-28 sm:h-32 bg-gradient-harx overflow-hidden">
+              <div className="profile-id-pattern pointer-events-none absolute inset-0 opacity-70" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-amber-300 via-white/70 to-cyan-300 opacity-80" />
+              <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute left-1/3 -bottom-20 h-48 w-48 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute left-10 top-6 h-16 w-16 rounded-full bg-white/10" />
+              <svg viewBox="0 0 44 32" className="pointer-events-none absolute bottom-4 right-6 sm:right-8 lg:right-10 h-8 w-11 drop-shadow" aria-hidden="true">
+                <defs>
+                  <linearGradient id="idchip" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#fde68a" /><stop offset="0.5" stopColor="#fbbf24" /><stop offset="1" stopColor="#d97706" />
+                  </linearGradient>
+                </defs>
+                <rect x="1" y="1" width="42" height="30" rx="6" fill="url(#idchip)" stroke="#b45309" strokeOpacity="0.45" />
+                <path d="M1 11h14M1 21h14M29 11h14M29 21h14M15 1v30M29 1v30M15 11h14M15 21h14" stroke="#92400e" strokeOpacity="0.4" fill="none" />
+              </svg>
+              <div className="relative flex items-start justify-between px-6 sm:px-8 lg:px-10 pt-4">
+                <img src={harxLogo} alt="HARX" className="h-11 sm:h-14 w-auto drop-shadow-md" />
+                <div className="text-right">
+                  <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.25em] text-white">{t('profile.header.idCardTitle')}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/70">
+                    {t('profile.header.idCardNumber', { id: String(profile?._id || '').slice(-6).toUpperCase() || '——' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-8 lg:gap-10 items-start px-6 sm:px-8 lg:px-10 pb-8">
               {/* Photo management */}
-              <div className="relative group shrink-0">
+              <div className="relative group shrink-0 md:-mt-16 self-center md:self-start">
                 <input
                   ref={photoInputRef}
                   type="file"
@@ -1333,7 +1365,7 @@ export const ProfileView: React.FC<{
                   className="hidden"
                 />
                 <div
-                  className="w-40 h-40 rounded-[32px] shadow-xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
+                  className="w-40 h-40 rounded-[32px] shadow-2xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
                   onClick={() => profile.personalInfo?.photo?.url && setShowImageModal(true)}
                 >
                   {profile.personalInfo?.photo?.url ? (
@@ -1363,12 +1395,33 @@ export const ProfileView: React.FC<{
               </div>
 
               {/* Properties Grid */}
-              <div className="flex-1 w-full relative">
-                {/* Action Buttons Top Right */}
-                <div className="flex flex-wrap gap-3 mb-8 pb-6 border-b border-slate-200/50 justify-between items-center">
+              <div className="flex-1 w-full relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_17.5rem] items-start">
+                <div className="min-w-0">
+                <div className="flex flex-wrap gap-3 mb-5 md:pt-5 justify-between items-start">
                   <div>
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{profile.personalInfo?.name}</h2>
                     <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-harx uppercase tracking-widest italic">{profile.professionalSummary?.currentRole || t('profile.header.defaultRole')}</p>
+                    {(() => {
+                      const langs = (profile.personalInfo?.languages || []).length;
+                      const skillCount = ['technical', 'professional', 'soft'].reduce((n, k) => n + ((profile.skills?.[k] || []).length), 0);
+                      const yearsRaw = String(profile.professionalSummary?.yearsOfExperience || '').trim();
+                      const years = /^\d+\+?$/.test(yearsRaw) ? `${yearsRaw} ${t('profile.header.yearsUnit')}` : yearsRaw;
+                      const chips = [
+                        years ? { icon: Briefcase, label: t('profile.header.chipYears', { years }) } : null,
+                        langs ? { icon: LanguagesIcon, label: t('profile.header.chipLanguages', { count: langs }) } : null,
+                        skillCount ? { icon: ZapIcon, label: t('profile.header.chipSkills', { count: skillCount }) } : null,
+                      ].filter(Boolean) as { icon: any; label: string }[];
+                      return chips.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {chips.map((c) => (
+                            <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white shadow-sm">
+                              <c.icon className="h-3 w-3 text-amber-300" />
+                              {c.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   {profile.status === 'completed' && (
                     <div className="flex items-center gap-3">
@@ -1380,9 +1433,7 @@ export const ProfileView: React.FC<{
                       </div>
                     </div>
                   )}
-                </div>
-
-                <div className="flex items-center justify-end mb-3">
+                <div className="flex items-center gap-2 ml-auto">
                   {!isEditingPublicInfo ? (
                     <button
                       type="button"
@@ -1413,11 +1464,13 @@ export const ProfileView: React.FC<{
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   {/* Location */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.currentCountry')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-200 transition-colors">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-200 transition-colors">
                       <MapPin className="w-3.5 h-3.5 text-harx-400" />
                       {isEditingPublicInfo ? (
                         <div className="relative w-full">
@@ -1476,9 +1529,9 @@ export const ProfileView: React.FC<{
                   </div>
 
                   {/* Email */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:col-span-2 sm:order-3">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.directContact')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
                         <input
@@ -1488,15 +1541,15 @@ export const ProfileView: React.FC<{
                           className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
                         />
                       ) : (
-                        <span className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{profile.personalInfo?.email || 'N/A'}</span>
+                        <span className="min-w-0 truncate text-sm font-bold text-slate-900" title={profile.personalInfo?.email}>{profile.personalInfo?.email || 'N/A'}</span>
                       )}
                     </div>
                   </div>
 
                   {/* Phone */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:order-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('profile.header.phoneLine')}</label>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-200/50 rounded-xl border border-slate-200/30 group hover:border-harx-500 hover:text-harx-600 transition-all">
+                    <div className="flex items-center gap-2 py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-harx-500 hover:text-harx-600 transition-all">
                       <Phone className="w-3.5 h-3.5 text-slate-400 group-hover:text-harx-500" />
                       {isEditingPublicInfo ? (
                         <input
@@ -1512,12 +1565,23 @@ export const ProfileView: React.FC<{
                   </div>
                 </div>
 
+                </div>
+                <div className="xl:pt-5">
                 {/* Quick Stats Grid (Score & Plan) */}
-                <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-harx-50/40 rounded-2xl border border-harx-100/70 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-harx-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-100/40 transition-colors"></div>
-                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-500 relative z-10">
-                      <Target size={24} className="animate-pulse" />
+                    <div className="relative z-10 h-14 w-14 flex-shrink-0">
+                      <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90">
+                        <circle cx="28" cy="28" r="24" fill="none" strokeWidth="6" className="stroke-slate-200" />
+                        <circle
+                          cx="28" cy="28" r="24" fill="none" strokeWidth="6" strokeLinecap="round"
+                          className="stroke-harx-500 transition-all duration-700"
+                          strokeDasharray={2 * Math.PI * 24}
+                          strokeDashoffset={2 * Math.PI * 24 * (1 - Math.min(100, Math.max(0, Number(calculateOverallScore()) || 0)) / 100)}
+                        />
+                      </svg>
+                      <Target size={18} className="absolute inset-0 m-auto text-harx-500" />
                     </div>
                     <div className="relative z-10">
                       <div className="text-[10px] font-black text-harx-400 uppercase tracking-widest">{t('profile.header.scoreOverall')}</div>
@@ -1525,7 +1589,7 @@ export const ProfileView: React.FC<{
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-harx-50/40 rounded-2xl border border-harx-100/70 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-harx-alt-100/20 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-harx-alt-100/40 transition-colors"></div>
                     <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-harx-alt-500 relative z-10">
                       <Briefcase size={24} />
@@ -1544,7 +1608,7 @@ export const ProfileView: React.FC<{
                         <button
                           type="button"
                           onClick={() => setIsPlanModalOpen(true)}
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-harx px-3 py-2 text-[11px] font-black uppercase tracking-widest text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
+                          className="mt-1.5 inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-harx px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-md shadow-harx-500/20 transition hover:opacity-90"
                         >
                           {t('profile.header.choosePlanCta')}
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -1553,15 +1617,21 @@ export const ProfileView: React.FC<{
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* One section per tab, as before (styled via [data-section-id]) */}
         <div className="w-full">
-          <div className="flex-1 min-h-[600px]">
-            {renderActiveTab()}
-          </div>
+          <section
+            key={activeTab}
+            data-section-id={activeTab === 'onboarding' ? 'availability' : activeTab}
+            className="min-h-[600px] min-w-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          >
+            {renderTab(activeTab)}
+          </section>
         </div>
       </div>
 

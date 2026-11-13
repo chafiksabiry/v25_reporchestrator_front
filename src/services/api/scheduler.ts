@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { TimeSlot } from '../../types/scheduler';
 
-const MATCHING_API_URL = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api';
+const MATCHING_API_URL = import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api';
 
 export const schedulerApi = {
     /**

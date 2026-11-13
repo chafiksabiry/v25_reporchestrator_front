@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Settings, Monitor, Calendar, X, ChevronDown, Phone, User, PhoneOutgoing, GraduationCap, AlertTriangle, Info, Lock, Check } from 'lucide-react';
 import { useRepTrainingNav } from '../../contexts/RepTrainingNavContext';
 import { useTranslation } from 'react-i18next';
 import harxLogo from '../../assets/logo-harx.png';
@@ -383,9 +383,53 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     {t('onboardingGuide.title')}
                   </h3>
                 </div>
-                <p className="text-[11px] font-medium leading-snug text-white/95">
-                  {t('onboardingGuide.description')}
-                </p>
+                {(() => {
+                  // Parcours d'onboarding en 4 phases : inscription, profil, évaluations, abonnement.
+                  const steps = [1, 2, 3, 4].map((n) => ({ n, done: isPhaseCompleted(n) }));
+                  const doneCount = steps.filter((x) => x.done).length;
+                  const current = steps.find((x) => !x.done)?.n ?? 4;
+                  const pct = Math.round((doneCount / steps.length) * 100);
+                  return (
+                    <div data-testid="onboarding-steps">
+                      <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-white/95">
+                        <span>{t('onboardingGuide.progress', { done: doneCount, total: steps.length })}</span>
+                        <span className="tabular-nums">{pct}%</span>
+                      </div>
+                      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-black/25" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                        <div className="h-full rounded-full bg-amber-300 transition-all duration-500" style={{ width: `${pct}%` }} />
+                      </div>
+                      <ol className="space-y-1.5">
+                        {steps.map((x) => {
+                          const isCurrent = x.n === current && !x.done;
+                          return (
+                            <li
+                              key={x.n}
+                              aria-current={isCurrent ? 'step' : undefined}
+                              className={`flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-colors ${isCurrent ? 'bg-white/15 ring-1 ring-amber-300/60' : ''}`}
+                            >
+                              <span
+                                className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                                  x.done ? 'bg-emerald-400 text-slate-900' : isCurrent ? 'bg-amber-300 text-slate-900' : 'bg-black/25 text-white/70'
+                                }`}
+                              >
+                                {x.done ? <Check className="h-3 w-3" strokeWidth={3.5} /> : x.n}
+                              </span>
+                              <span className="min-w-0">
+                                <span className={`block text-[11px] font-black leading-tight ${x.done ? 'text-white/80 line-through decoration-white/40' : isCurrent ? 'text-white' : 'text-white/70'}`}>
+                                  {t(`onboardingGuide.step${x.n}`)}
+                                </span>
+                                {isCurrent ? (
+                                  <span className="mt-0.5 block text-[10.5px] font-medium leading-snug text-white/90">{t(`onboardingGuide.hint${x.n}`)}</span>
+                                ) : null}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="mt-2.5 text-[10px] font-medium leading-snug text-white/80">{t('onboardingGuide.description')}</p>
+                    </div>
+                  );
+                })()}
                 <button
                   type="button"
                   onClick={() => {
@@ -430,7 +474,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             <p className={sectionLabelClass}>{t('sidebar.sectionMain')}</p>
           )}
           {group1.map((item) => (
-            <div key={item.path} className="space-y-1">
+            <div key={item.path} data-tour={`nav-${item.path.slice(1)}`} className="space-y-1">
               {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                 <>
                   <button
@@ -499,7 +543,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                 />
                                 {slideList.length === 0 ? (
                                   <div className={`${slideRow(false)} opacity-70`}>
-                                    <p className={slideTitle(false)}>No slides</p>
+                                    <p className={slideTitle(false)}>{t('sidebar.noSlides')}</p>
                                   </div>
                                 ) : (
                                   slideList.map((slide, slideIdx) => {
@@ -688,7 +732,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
               <p className={sectionLabelClass}>{t('sidebar.sectionTraining')}</p>
             )}
             {group2.map((item) => (
-              <div key={item.path} className="space-y-1">
+              <div key={item.path} data-tour={`nav-${item.path.slice(1)}`} className="space-y-1">
                 {item.label === t('sidebar.training') && Array.isArray(item.subItems) && item.subItems.length > 0 && !isCollapsed ? (
                   <>
                     <button
@@ -731,7 +775,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                                   <div className="pointer-events-none absolute left-0 top-1 bottom-1 w-px bg-gradient-to-b from-harx-500/35 via-white/12 to-transparent" aria-hidden />
                                   {slideList.length === 0 ? (
                                     <div className="flex w-full items-start gap-2 rounded-md py-1.5 pl-2.5 pr-2 opacity-70">
-                                      <p className="text-[9.5px] text-gray-500">No slides</p>
+                                      <p className="text-[9.5px] text-gray-500">{t('sidebar.noSlides')}</p>
                                     </div>
                                   ) : (
                                     slideList.map((slide, slideIdx) => {
@@ -802,6 +846,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
             {group3.map((item) => (
               <NavLink
                 key={item.path}
+                data-tour={`nav-${item.path.slice(1)}`}
                 to={withActiveGig(item.path)}
                 className={({ isActive }) =>
                   `flex w-full items-center rounded-2xl transition-all duration-300 group relative ${isCollapsed ? 'justify-center p-3' : 'space-x-3 py-3 px-5'

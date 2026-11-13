@@ -2830,7 +2830,7 @@ export function Training() {
                 style={{ background: viewerThemeTokens.contentBg }}
               >
                 {(() => {
-                  if (!currentFormationViewerSlide) return <p className="text-sm text-slate-300">Aucun module.</p>;
+                  if (!currentFormationViewerSlide) return <p className="text-sm text-slate-300">{t('trainingPage.noModule')}</p>;
                   return (
                     <div className="mx-auto w-full max-w-5xl">
                       {currentFormationViewerSlide.kind === 'overview' ? (
@@ -3069,7 +3069,7 @@ export function Training() {
                                   </div>
                                 </>
                               ) : (
-                                <p className="text-sm text-slate-300">Pas de description pour ce module.</p>
+                                <p className="text-sm text-slate-300">{t('trainingPage.noModuleDescription')}</p>
                               )}
                             </div>
                           );
@@ -3184,7 +3184,7 @@ export function Training() {
                                   </ReactMarkdown>
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-300">Contenu vide.</p>
+                                <p className="text-sm text-slate-300">{t('trainingPage.emptyContent')}</p>
                               )}
                             </div>
                           );
@@ -3446,24 +3446,24 @@ export function Training() {
                                     }`}
                                   >
                                     {qState.answerMissing
-                                      ? 'Réponse non enregistrée pour cette question (soumission antérieure).'
+                                      ? t('trainingPage.quizAnswerMissing')
                                       : qState.timedOut
-                                        ? 'Réponse enregistrée comme incorrecte.'
+                                        ? t('trainingPage.quizTimedOut')
                                         : isCorrect
-                                          ? 'Bonne réponse !'
+                                          ? t('trainingPage.quizCorrect')
                                           : isWrong
-                                            ? 'Ce n’était pas la bonne réponse.'
-                                            : 'Revue de la question'}
+                                            ? t('trainingPage.quizWrong')
+                                            : t('trainingPage.quizReview')}
                                   </p>
                                   <div className="space-y-1.5 text-sm">
                                     <p className="text-slate-200">
-                                      <span className="font-semibold text-rose-200">Votre réponse : </span>
+                                      <span className="font-semibold text-rose-200">{t('trainingPage.quizYourAnswer')}</span>
                                       {qState.selected !== null && opts[qState.selected] != null
                                         ? String(opts[qState.selected])
                                         : '— (non disponible)'}
                                     </p>
                                     <p className="text-slate-200">
-                                      <span className="font-semibold text-emerald-200">Bonne réponse : </span>
+                                      <span className="font-semibold text-emerald-200">{t('trainingPage.quizCorrectAnswer')}</span>
                                       {opts[correctIdx] != null ? String(opts[correctIdx]) : '—'}
                                     </p>
                                   </div>

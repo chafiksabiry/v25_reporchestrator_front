@@ -202,3 +202,101 @@ body {
   --harx-flash-b: rgba(34, 211, 238, 0.48);
 }
 
+
+
+/* ───────── HARX REP profile — one-page creative identity ───────── */
+.profile-onepage [data-section-id] { --a1: #ff4d4d; --a2: #ec4899; }
+.profile-onepage [data-section-id="experience"] { --a1: #7c3aed; --a2: #ec4899; }
+.profile-onepage [data-section-id="languages"] { --a1: #0ea5e9; --a2: #7c3aed; }
+.profile-onepage [data-section-id="skills"] { --a1: #ff4d4d; --a2: #f59e0b; }
+.profile-onepage [data-section-id="specialization"] { --a1: #ec4899; --a2: #7c3aed; }
+.profile-onepage [data-section-id="availability"] { --a1: #10b981; --a2: #0ea5e9; }
+
+.profile-onepage [data-section-id] .rounded-3xl.backdrop-blur-md {
+  position: relative;
+  background: #fff;
+  border: 1px solid #eef0f6;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 36px -18px rgba(15, 23, 42, 0.16);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.profile-onepage [data-section-id] .rounded-3xl.backdrop-blur-md:hover {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 24px 44px -18px rgba(15, 23, 42, 0.22);
+}
+.profile-onepage [data-section-id] .rounded-3xl.backdrop-blur-md::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  border-radius: 1.5rem 1.5rem 0 0;
+  background: linear-gradient(90deg, var(--a1), var(--a2));
+  pointer-events: none;
+}
+.profile-onepage [data-section-id] .rounded-3xl.backdrop-blur-md::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto auto;
+  width: 220px;
+  height: 150px;
+  border-top-right-radius: 1.5rem;
+  background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--a2) 13%, transparent), transparent 68%);
+  pointer-events: none;
+}
+.profile-onepage [data-section-id] h2.font-black {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #0f172a;
+}
+.profile-onepage [data-section-id] h2.font-black::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 1.15em;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--a1), var(--a2));
+}
+.profile-onepage .profile-chapter-num {
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.profile-onepage .profile-chapter-line {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--a1) 45%, transparent), transparent);
+}
+.profile-id-pattern {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.28) 1px, transparent 0),
+    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  background-size: 14px 14px, 220% 100%;
+}
+@keyframes profile-holo {
+  0% { background-position: 0 0, 120% 0; }
+  100% { background-position: 0 0, -60% 0; }
+}
+.profile-id-pattern { animation: profile-holo 6s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) {
+  .profile-id-pattern { animation: none; }
+}
+
+/* ── Bulles d'aide (RepHintBubbles) ── */
+@keyframes harx-hint-pop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.92); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes harx-hint-ping {
+  0% { transform: scale(0.9); opacity: 0.85; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes harx-hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.harx-hint-bubble { animation: harx-hint-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.harx-hint-bubble-inner { animation: harx-hint-bob 3.2s ease-in-out 600ms infinite; }
+.harx-hint-bubble-inner:hover { animation-play-state: paused; }
+.harx-hint-ping { animation: harx-hint-ping 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .harx-hint-bubble, .harx-hint-bubble-inner, .harx-hint-ping { animation: none; }
+}

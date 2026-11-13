@@ -19,14 +19,14 @@ type SeenState = {
 };
 
 function matchingApi(): string {
-  return String(import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-production.up.railway.app/api').replace(/\/$/, '');
+  return String(import.meta.env.VITE_MATCHING_API_URL || 'https://v25matchingbackend-recette.up.railway.app/api').replace(/\/$/, '');
 }
 
 function kbApi(): string {
   const raw =
     import.meta.env.VITE_KNOWLEDGEBASE_API_URL ||
     import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API ||
-    'https://v25knowledgebasebackend-production.up.railway.app/api';
+    'https://v25knowledgebasebackend-recette.up.railway.app/api';
   const base = String(raw).replace(/\/$/, '');
   return base.endsWith('/api') ? base : `${base}/api`;
 }
