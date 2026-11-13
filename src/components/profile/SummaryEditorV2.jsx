@@ -11,6 +11,7 @@ import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sp
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
+import { flexibilityLabel, hasFlexibility, toggleFlexibility } from '../../utils/flexibilityOptions';
 import { formatCountryLabel, resolveCountryCode, resolveCountryName } from '../../utils/countryDisplay';
 import { INTRO_VIDEO_MAX_SECONDS, hasPresentationVideo, isIntroVideoRequirementMet } from '../../utils/introVideo';
 import { repApiUrl } from '../../utils/repApiUrl';
@@ -4653,18 +4654,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       <button
                         key={option}
                         onClick={() => {
-                          const currentFlexibility = editedProfile.availability?.flexibility || [];
-                          const updatedFlexibility = currentFlexibility.includes(option)
-                            ? currentFlexibility.filter(f => f !== option)
-                            : [...currentFlexibility, option];
+                          // Comparaison sur la forme canonique : « remote work » (import) = « Remote Work Available ».
+                          const updatedFlexibility = toggleFlexibility(editedProfile.availability?.flexibility, option);
                           handleAvailabilityChangeLocal('flexibility', updatedFlexibility);
                         }}
-                        className={`px-4 py-2 rounded text-sm ${editedProfile.availability?.flexibility?.includes(option)
+                        className={`px-4 py-2 rounded text-sm ${hasFlexibility(editedProfile.availability?.flexibility, option)
                           ? 'bg-harx-600 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </button>
                     ))}
                   </div>
@@ -4736,7 +4735,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         key={option}
                         className="px-4 py-2 bg-gray-50 text-gray-700 rounded"
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </span>
                     ))}
                   </div>
