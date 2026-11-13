@@ -972,9 +972,10 @@
       "noneAvailable": "Aucune autre compétence disponible dans cette section.",
       "delete": "Supprimer cette compétence",
       "deleteNamed": "Supprimer {{name}}",
-      "proposals": "Suggérées depuis vos vidéos",
-      "proposalsHint": "{{count}} suggestion(s) de compétences issues de vos vidéos d’expérience — confirmez pour les ajouter au profil, ou retirez-les. Le matching des missions s’appuie surtout sur vos secteurs et activités.",
+      "proposals": "Suggéré d’après votre vidéo / votre CV",
+      "proposalsHint": "{{count}} compétence(s) suggérée(s) d’après votre vidéo de présentation ou votre CV — ajoutez-les d’un clic (« Tout ajouter » ou une par une) ou retirez celles qui ne vous correspondent pas. Le matching des missions s’appuie surtout sur vos secteurs et activités.",
       "confirmProposal": "Confirmer cette compétence",
+      "confirmAll": "Tout ajouter",
       "confirmProposalNamed": "Confirmer {{name}}",
       "dismissProposal": "Retirer cette suggestion",
       "dismissProposalNamed": "Retirer la suggestion {{name}}"
