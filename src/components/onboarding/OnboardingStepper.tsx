@@ -22,8 +22,8 @@ function readCollapsed(): boolean {
   } catch {
     /* stockage indisponible */
   }
-  // Premier passage sur mobile : consigne repliée pour laisser la place au contenu.
-  return typeof window !== 'undefined' && window.innerWidth < 640;
+  // Premier passage sur mobile ou écran peu haut : consigne repliée pour que l'étape tienne dans un seul écran.
+  return typeof window !== 'undefined' && (window.innerWidth < 640 || window.innerHeight < 900);
 }
 
 type Props = {
@@ -65,7 +65,7 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
   return (
     <section
       aria-label={t('repJourney.regionLabel')}
-      className="mb-5 overflow-hidden rounded-3xl text-white shadow-lg shadow-slate-900/10"
+      className="mb-2 overflow-hidden rounded-3xl text-white shadow-lg shadow-slate-900/10"
       style={{ background: `linear-gradient(135deg, ${NIGHT} 0%, #14304d 100%)` }}
     >
       <div className="px-5 pt-4 sm:px-6">
@@ -135,13 +135,13 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
         </ol>
       </div>
 
-      <div className="mt-3 border-t border-white/10 bg-white/[0.04] px-5 py-3.5 sm:px-6">
+      <div className={`mt-2 border-t border-white/10 bg-white/[0.04] px-5 sm:px-6 ${collapsed ? 'py-2' : 'py-3.5'}`}>
         <div className="flex items-start gap-3">
           <img
             src={mascotte}
             alt=""
             aria-hidden="true"
-            className="h-12 w-12 shrink-0 rounded-2xl bg-white/90 object-contain p-1 shadow-md"
+            className={`h-12 w-12 shrink-0 rounded-2xl bg-white/90 object-contain p-1 shadow-md ${collapsed ? 'hidden' : ''}`}
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
@@ -157,7 +157,7 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden="true" />
               </button>
             </div>
-            <p className="mt-0.5 text-sm font-medium text-white/85">{t(`repJourney.steps.${id}.cheer`)}</p>
+            <p className={`mt-0.5 text-sm font-medium text-white/85 ${collapsed ? 'hidden' : ''}`}>{t(`repJourney.steps.${id}.cheer`)}</p>
 
             {!collapsed && (
               <div id="rep-journey-guide" className="mt-3 space-y-2.5">
