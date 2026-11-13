@@ -366,17 +366,6 @@ const ExperienceForm = ({ experience, onSubmit, isNew = false }) => {
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
         <button
           onClick={() => {
-            console.log('🔥 Cancel button clicked');
-            // Handle cancel logic here
-          }}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-          type="button"
-        >
-          {t('cancel')}
-        </button>
-        <button
-          onClick={() => {
-            console.log('🔥 Save button clicked');
             handleSubmit();
           }}
           className="px-4 py-2 text-sm font-medium text-white bg-harx-600 rounded-lg hover:bg-harx-700 transition-colors duration-200"
@@ -2430,19 +2419,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     const formatDate = (date) => {
       if (date === 'present') return t('present');
       if (!date) return '';
+      const raw = String(date).slice(0, 10);
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match) return `${match[3]}/${match[2]}/${match[1]}`;
       try {
         const dateObj = new Date(date);
-        if (isNaN(dateObj.getTime())) return date;
-
-        // Format as dd/mm/yyyy
+        if (isNaN(dateObj.getTime())) return String(date);
         const day = dateObj.getDate().toString().padStart(2, '0');
-        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0'); // +1 because months are 0-indexed
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
         const year = dateObj.getFullYear();
-
         return `${day}/${month}/${year}`;
       } catch (error) {
         console.error('Error formatting date:', error);
-        return date;
+        return String(date);
       }
     };
 
@@ -2524,14 +2513,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         </button>
                       </div>
                     )}
-                    <div className="flex justify-between items-start">
-                      <div>
+                    <div className={`flex justify-between items-start gap-4 ${isSectionEditing('experience') ? 'pr-20' : ''}`}>
+                      <div className="min-w-0">
                         <h4 className="text-lg font-semibold text-gray-800">
                           {localizeText(role.title_i18n, uiLang) || role.title}
                         </h4>
                         <p className="text-gray-600">{role.company}</p>
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="shrink-0 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(role.startDate)} - {formatDate(role.endDate)}
                       </div>
                     </div>
@@ -3221,7 +3210,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
   persistSectionRef.current = saveSection;
 
-  // Reusable Edit / Undo / Cancel controls for a section header (autosave — no Save button).
+  // Edit / optional Save. Saving on click is not required; autosave still keeps the draft.
   const renderSectionControls = (section) => {
     const canUndo = (sectionUndoStacks[section] || []).length > 0;
     const showStatus = autoSaveSection === section && autoSaveStatus !== 'idle';
