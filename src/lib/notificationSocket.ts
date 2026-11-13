@@ -1,4 +1,4 @@
-import { getAgentId } from '../utils/authUtils';
+import { getAgentId, getAuthToken } from '../utils/authUtils';
 import type { RepNotificationKind } from '../contexts/NotificationsContext';
 import { getDashRepApiHost } from '../utils/repApiUrl';
 
@@ -40,91 +40,191 @@ export type NotificationSocketOptions = {
   onConnect?: () => void;
 };
 
+/** Code de fermeture renvoyé par le serveur quand l'authentification échoue (jeton absent/invalide/expiré). */
+export const WS_AUTH_FAILED_CLOSE_CODE = 4401;
+const RECONNECT_BASE_MS = 3000;
+const RECONNECT_MAX_MS = 30000;
+const WAIT_FOR_TOKEN_MS = 15000;
+
+/** Dépendances injectables (tests) ; les valeurs par défaut sont celles du navigateur. */
+export interface NotificationSocketDeps {
+  wsUrl: string | null;
+  getToken: () => string | null;
+  getAgentId: () => string | null | undefined;
+  createSocket: (url: string) => WebSocket;
+  /** Appelle `cb` quand le jeton a pu changer (autre onglet, retour sur l'onglet) ; renvoie la désinscription. */
+  onTokenMayChange: (cb: () => void) => () => void;
+}
+
+const defaultDeps = (): NotificationSocketDeps => ({
+  wsUrl: getWsUrl(),
+  getToken: () => {
+    try {
+      return getAuthToken();
+    } catch {
+      return null;
+    }
+  },
+  getAgentId: () => getAgentId(),
+  createSocket: (url) => new WebSocket(url),
+  onTokenMayChange: (cb) => {
+    if (typeof window === 'undefined') return () => {};
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') cb();
+    };
+    window.addEventListener('storage', cb);
+    window.addEventListener('focus', cb);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('storage', cb);
+      window.removeEventListener('focus', cb);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  },
+});
+
 /**
- * Connect to dash_rep_back `/notification-updates` and receive durable
- * notification upserts in realtime (matching, teammate, training, KB, …).
+ * Connexion à dash_rep_back `/notification-updates` (notifications durables en temps réel).
+ *
+ * Authentification : après l'ouverture, le client envoie `{ type: 'auth', token }` (jamais de jeton
+ * dans l'URL) ; le serveur ferme la connexion s'il ne la reçoit pas dans les 5 s. Chaque
+ * reconnexion relit le jeton et se réauthentifie.
+ * - Fermeture 4401 (auth refusée) : aucune boucle — on ne se reconnecte que lorsque le jeton a changé.
+ * - Pas de jeton : pas de connexion ; elle s'ouvre dès qu'un jeton apparaît.
+ * - Ancien serveur : il envoie `connected` puis attend `{ type: 'subscribe', repId }` ; on ne l'envoie
+ *   que si ce message `connected` arrive (le nouveau serveur ne l'envoie plus). Les messages
+ *   `connected` / `subscribed` / `authenticated` ne sont jamais traités comme des notifications.
  */
-export function connectRepNotificationSocket(
+export function connectNotificationSocketWith(
+  deps: NotificationSocketDeps,
   onNotification: (data: NotificationSocketPayload) => void,
   options?: NotificationSocketOptions
 ): () => void {
-  const wsUrl = getWsUrl();
-  if (!wsUrl) return () => {};
+  if (!deps.wsUrl) return () => {};
+  const wsUrl = deps.wsUrl;
 
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
+  let attempts = 0;
+  /** Jeton avec lequel le serveur a refusé l'auth (4401) : on n'insiste pas avec le même. */
+  let rejectedToken: string | null = null;
 
-  const subscribe = () => {
-    const repId = getAgentId();
-    if (!socket || socket.readyState !== WebSocket.OPEN || !repId) return;
+  const clearTimer = () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
+  const schedule = (delayMs: number) => {
+    if (disposed || reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delayMs);
+  };
+
+  const send = (payload: unknown) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
     try {
-      socket.send(JSON.stringify({ type: 'subscribe', repId }));
+      socket.send(JSON.stringify(payload));
     } catch {
       /* ignore */
     }
   };
 
-  const scheduleReconnect = () => {
-    if (disposed || reconnectTimer) return;
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      connect();
-    }, 3000);
-  };
-
   const connect = () => {
-    if (disposed) return;
-    try {
-      socket = new WebSocket(wsUrl);
-    } catch {
-      scheduleReconnect();
+    if (disposed || socket) return;
+    const token = deps.getToken();
+    if (!token) {
+      // Pas de jeton : rien à authentifier. On revérifie lentement (sans réseau).
+      schedule(WAIT_FOR_TOKEN_MS);
       return;
     }
+    if (rejectedToken && token === rejectedToken) {
+      // Auth déjà refusée avec ce jeton : on attend qu'il change (pas de boucle de reconnexion).
+      return;
+    }
+    let ws: WebSocket;
+    try {
+      ws = deps.createSocket(wsUrl);
+    } catch {
+      attempts += 1;
+      schedule(Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** Math.min(attempts, 4)));
+      return;
+    }
+    socket = ws;
+    const usedToken = token;
 
-    socket.onopen = () => {
-      subscribe();
+    ws.onopen = () => {
+      attempts = 0;
+      send({ type: 'auth', token: usedToken });
       options?.onConnect?.();
     };
 
-    socket.onmessage = (event) => {
+    ws.onmessage = (event) => {
       let data: NotificationSocketPayload;
       try {
         data = JSON.parse(String(event.data));
       } catch {
         return;
       }
-      if (data?.type !== 'notification' || !data.notification) return;
-
-      const myAgentId = getAgentId();
-      if (data.repId && myAgentId && String(data.repId) !== String(myAgentId)) {
+      if (data?.type === 'connected') {
+        // Ancien serveur : l'abonnement par repId existe encore.
+        const repId = deps.getAgentId();
+        if (repId) send({ type: 'subscribe', repId });
         return;
       }
+      if (data?.type !== 'notification' || !data.notification) return; // subscribed, authenticated, …
+
+      const myAgentId = deps.getAgentId();
+      if (data.repId && myAgentId && String(data.repId) !== String(myAgentId)) return;
       onNotification(data);
     };
 
-    socket.onclose = () => {
-      socket = null;
-      scheduleReconnect();
+    ws.onclose = (event) => {
+      if (socket === ws) socket = null;
+      if (disposed) return;
+      if (event?.code === WS_AUTH_FAILED_CLOSE_CODE) {
+        rejectedToken = usedToken; // pas de reconnexion tant que le jeton n'a pas changé
+        return;
+      }
+      attempts += 1;
+      schedule(Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** Math.min(attempts - 1, 4)));
     };
 
-    socket.onerror = () => {
+    ws.onerror = () => {
       try {
-        socket?.close();
+        ws.close();
       } catch {
         /* ignore */
       }
     };
   };
 
+  // Le jeton a pu changer (nouvelle connexion dans un autre onglet…) : on retente si c'était bloqué.
+  const stopWatching = deps.onTokenMayChange(() => {
+    if (disposed) return;
+    const token = deps.getToken();
+    if (rejectedToken && token && token !== rejectedToken) {
+      rejectedToken = null;
+      attempts = 0;
+      clearTimer();
+      connect();
+    } else if (!socket && token && !(rejectedToken && token === rejectedToken)) {
+      // En attente d'un jeton (ou d'une reconnexion planifiée) : on connecte tout de suite.
+      clearTimer();
+      connect();
+    }
+  });
+
   connect();
 
   return () => {
     disposed = true;
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
+    stopWatching();
+    clearTimer();
     try {
       socket?.close();
     } catch {
@@ -132,4 +232,11 @@ export function connectRepNotificationSocket(
     }
     socket = null;
   };
+}
+
+export function connectRepNotificationSocket(
+  onNotification: (data: NotificationSocketPayload) => void,
+  options?: NotificationSocketOptions
+): () => void {
+  return connectNotificationSocketWith(defaultDeps(), onNotification, options);
 }
