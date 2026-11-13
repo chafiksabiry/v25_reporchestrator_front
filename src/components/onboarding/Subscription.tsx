@@ -197,7 +197,7 @@ function Subscription() {
       <button
         type="button"
         onClick={() => navigate('/profile-editor', { state: { allowBack: true } })}
-        className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
+        className="mb-2 flex items-center text-sm text-slate-600 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="mr-2 h-5 w-5" />
         {t('subscriptionFlow.backToOnboarding')}
@@ -216,13 +216,13 @@ function Subscription() {
         </div>
       )}
 
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
+      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-harx-50 text-harx-500">
             <CreditCard className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-900">
+            <h2 className="text-xl font-black tracking-tight text-slate-900">
               {t('subscriptionFlow.choosePlan')}
             </h2>
             {activePlanName && (
@@ -234,7 +234,7 @@ function Subscription() {
         </div>
 
         {currentPlanId && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
+          <div className="mb-3 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-3">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
             <p className="text-sm font-bold text-green-800 leading-relaxed">
               {t('subscriptionFlow.publishAfterPlanHint')}

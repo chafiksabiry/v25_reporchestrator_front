@@ -312,7 +312,7 @@ export function EmbeddedRepSubscriptionFlow({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
         {plans.map((plan) => {
           const isCurrent = String(activePlanId) === String(plan._id);
           const isPaid = isPaidPlan(plan);
@@ -324,7 +324,7 @@ export function EmbeddedRepSubscriptionFlow({
           return (
             <div
               key={plan._id}
-              className={`relative flex flex-col rounded-3xl border bg-white p-6 shadow-sm transition-all duration-300 ${
+              className={`relative flex flex-col rounded-3xl border bg-white p-4 shadow-sm transition-all duration-300 ${
                 isCurrent
                   ? 'scale-[1.02] border-green-500 shadow-md ring-2 ring-green-500/40'
                   : 'border-slate-100 hover:-translate-y-1 hover:shadow-lg'
@@ -341,7 +341,7 @@ export function EmbeddedRepSubscriptionFlow({
                 <p className="mt-1 text-xs font-medium text-slate-500">{copy.description}</p>
               )}
 
-              <div className="mt-4 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-3xl font-black tracking-tight text-slate-900">
                   {formatPrice(plan.price, plan.currency, uiLang)}
                 </span>
@@ -349,13 +349,13 @@ export function EmbeddedRepSubscriptionFlow({
               </div>
 
               {isPaid && (
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-harx-600">
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-harx-600">
                   {t('subscriptionFlow.freeTrial')}
                 </p>
               )}
 
               {copy.features.length > 0 && (
-                <ul className="mt-4 flex-1 space-y-2">
+                <ul className="mt-3 flex-1 space-y-1">
                   {copy.features.map((feat, i) => (
                     <li
                       key={`${plan._id}-feat-${i}`}
@@ -372,7 +372,7 @@ export function EmbeddedRepSubscriptionFlow({
                 type="button"
                 onClick={() => void handlePlanAction(plan)}
                 disabled={isCurrent || isBusy}
-                className={`mt-6 w-full rounded-xl px-4 py-2.5 text-sm font-black tracking-tight transition-all duration-300 ${
+                className={`mt-3 w-full rounded-xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300 ${
                   isCurrent
                     ? 'cursor-default border-2 border-green-200 bg-green-50 text-green-700'
                     : 'bg-harx-500 text-white shadow hover:bg-harx-600'
