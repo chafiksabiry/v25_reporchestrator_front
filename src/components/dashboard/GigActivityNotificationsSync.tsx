@@ -395,7 +395,7 @@ export function GigActivityNotificationsSync() {
         await Promise.all(
           enrolled.map(async ({ gigId, title }) => {
             try {
-              const docsRes = await axios.get(`${kbApi()}/documents`, { params: { gigId } });
+              const docsRes = await axios.get(`${kbApi()}/documents/gig/${encodeURIComponent(gigId)}`);
               const docs = asList(docsRes.data) as Record<string, any>[];
               for (const doc of docs) {
                 const did = nid(doc?._id || doc?.id);

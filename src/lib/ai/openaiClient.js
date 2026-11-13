@@ -36,7 +36,7 @@ class OpenAIClient {
     
     try {
       const response = await this.client.chat.completions.create({
-        model: options.model || "gpt-3.5-turbo",
+        model: options.model || "gpt-4o-mini",
         messages,
         temperature: options.temperature || 0.7,
         max_tokens: options.max_tokens || 1000,
@@ -70,7 +70,7 @@ class OpenAIClient {
     
     try {
       const response = await this.client.chat.completions.create({
-        model: options.model || "gpt-3.5-turbo",
+        model: options.model || "gpt-4o-mini",
         messages: modifiedMessages,
         temperature: options.temperature || 0.3,
         response_format: { type: "json_object" },
