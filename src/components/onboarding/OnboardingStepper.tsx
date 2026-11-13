@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Check, ChevronDown, Circle, Clock, HelpCircle, Save } from 'lucide-react';
+import { Check, ChevronDown, Circle, Clock, HelpCircle, Lightbulb, Save, Target } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import mascotte from '../../assets/mascotte2.png';
+import { REP_PALETTE, REP_SECTION_TINT, REP_STEP_ACCENT } from '../../utils/repPalette';
 import {
   canRevisitStep,
   getEditorChecklist,
@@ -11,8 +12,7 @@ import {
   REP_JOURNEY_STEPS,
 } from '../../utils/repOnboardingProgress';
 
-const NIGHT = '#0C1C2E';
-const MAGENTA = '#F90080';
+const NIGHT = REP_PALETTE.night;
 const EXPANDED_KEY = 'harx_rep_journey_guide_expanded';
 
 function readExpanded(): boolean {
@@ -58,6 +58,11 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
   const completion = getEditorCompletion(checklist);
   const allDone = showChecklist && completion.done === completion.total;
 
+  const accent = REP_STEP_ACCENT[id];
+  // Barre en dégradé : les couleurs des étapes franchies, puis celle de l'étape en cours.
+  const barColors = REP_JOURNEY_STEPS.slice(0, progress.index + 1).map((st) => REP_STEP_ACCENT[st.id]);
+  const barBackground = `linear-gradient(90deg, ${(barColors.length > 1 ? barColors : [barColors[0], barColors[0]]).join(', ')})`;
+
   const goBack = (path: string) => navigate(path, { state: { allowBack: true } });
 
   return (
@@ -72,11 +77,12 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
           src={mascotte}
           alt=""
           aria-hidden="true"
-          className="h-8 w-8 shrink-0 rounded-xl bg-white/90 object-contain p-0.5"
+          className="rep-float h-8 w-8 shrink-0 rounded-xl bg-white/90 object-contain p-0.5"
+          style={{ boxShadow: `0 0 0 2px ${accent}` }}
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-extrabold leading-tight text-white">
-            <span className="mr-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/65">
+            <span className="mr-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0C1C2E]" style={{ backgroundColor: accent }}>
               {t('repJourney.stepOf', { current: progress.index + 1, total: progress.total })}
             </span>
             {t(`repJourney.steps.${id}.title`)}
@@ -121,7 +127,7 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
       >
         <div
           className="h-full transition-[width] duration-700 ease-out"
-          style={{ width: `${progress.percent}%`, background: `linear-gradient(90deg, #ff4d4d, ${MAGENTA})` }}
+          style={{ width: `${progress.percent}%`, background: barBackground }}
         />
       </div>
 
@@ -139,9 +145,9 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
                 <>
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                      current ? 'text-white' : done ? 'bg-emerald-400 text-slate-900' : 'bg-white/15 text-white/60'
+                      current ? 'text-[#0C1C2E] motion-safe:animate-pulse' : done ? 'text-[#0C1C2E]' : 'bg-white/15 text-white/70'
                     }`}
-                    style={current ? { backgroundColor: MAGENTA } : undefined}
+                    style={current || done ? { backgroundColor: REP_STEP_ACCENT[s.id] } : undefined}
                   >
                     {done ? <Check className="h-3 w-3" aria-hidden="true" /> : i + 1}
                   </span>
@@ -169,21 +175,26 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
           </ol>
 
           <dl className="grid gap-2 text-sm sm:grid-cols-3">
-            <div className="rounded-xl bg-white/[0.08] px-3 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-white/60">{t('repJourney.what')}</dt>
-              <dd className="mt-0.5 font-medium text-white">{t(`repJourney.steps.${id}.what`)}</dd>
-            </div>
-            <div className="rounded-xl bg-white/[0.08] px-3 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-white/60">{t('repJourney.why')}</dt>
-              <dd className="mt-0.5 font-medium text-white">{t(`repJourney.steps.${id}.why`)}</dd>
-            </div>
-            <div className="rounded-xl bg-white/[0.08] px-3 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-white/60">{t('repJourney.howLong')}</dt>
-              <dd className="mt-0.5 font-medium text-white">
-                {t('repJourney.minutes', { count: progress.currentMinutes })}
-                <span className="block text-xs font-normal text-white/70">{t(`repJourney.steps.${id}.timeNote`)}</span>
-              </dd>
-            </div>
+            {([
+              { key: 'what', Icon: Target, tint: REP_SECTION_TINT.what, text: t(`repJourney.steps.${id}.what`), title: t('repJourney.what'), note: '' },
+              { key: 'why', Icon: Lightbulb, tint: REP_SECTION_TINT.why, text: t(`repJourney.steps.${id}.why`), title: t('repJourney.why'), note: '' },
+              { key: 'howLong', Icon: Clock, tint: REP_SECTION_TINT.howLong, text: t('repJourney.minutes', { count: progress.currentMinutes }), title: t('repJourney.howLong'), note: t(`repJourney.steps.${id}.timeNote`) },
+            ] as const).map(({ key, Icon, tint, text, title, note }) => (
+              <div
+                key={key}
+                className="rounded-xl px-3 py-2"
+                style={{ backgroundColor: `${tint.accent}24`, border: `1px solid ${tint.accent}55` }}
+              >
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: tint.label }}>
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {title}
+                </dt>
+                <dd className="mt-0.5 font-medium text-white">
+                  {text}
+                  {note ? <span className="block text-xs font-normal text-white/80">{note}</span> : null}
+                </dd>
+              </div>
+            ))}
           </dl>
 
           {showChecklist && (
@@ -199,7 +210,7 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
                     {item.done ? (
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
                     ) : (
-                      <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden="true" />
+                      <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" aria-hidden="true" />
                     )}
                     <span>
                       <span className="font-semibold">{t(`repJourney.checklist.items.${item.id}.label`)}</span>

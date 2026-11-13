@@ -210,7 +210,7 @@ function OnboardingShellContent() {
         style={{ backgroundImage: HARX_NAVBAR_BG }}
       >
         <TopBar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
+        <main className="flex-1 overflow-y-auto" style={{ background: 'var(--rep-page-bg, #F8FAFC)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <OnboardingStepper userProfile={userProfile} onOpenHelp={guideKey ? () => setIsHelpOpen(true) : undefined} />
             <Outlet />
