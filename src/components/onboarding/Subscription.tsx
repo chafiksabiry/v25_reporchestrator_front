@@ -166,6 +166,8 @@ function Subscription() {
     void initialize();
   }, [navigate, t, finalizeAfterPlan]);
 
+  const goBack = useCallback(() => navigate('/profile-editor', { state: { allowBack: true } }), [navigate]);
+
   const handlePlanSubscribed = useCallback(
     (plan?: { _id: string; name: string; description?: string; features?: string[]; stripePriceId?: string }) => {
       if (plan) {
@@ -211,35 +213,25 @@ function Subscription() {
       )}
 
       <div>
-        <div className="relative mb-2 overflow-hidden rounded-2xl bg-[#0C1C2E] px-4 py-2.5 text-white">
+        <div className="relative mb-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#0C1C2E] to-[#1b3a5c] px-4 py-2.5 text-white">
           <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-[#F90080]/25 blur-2xl" />
           <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                <CreditCard className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">
-                  {tx('plan.heroKicker')}
+              <button
+                type="button"
+                onClick={goBack}
+                aria-label={tx('plan.backAria')}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-black text-[#0C1C2E] shadow-md transition hover:bg-pink-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/50 active:scale-95"
+              >
+                <ArrowLeft className="h-4 w-4 text-[#F90080]" strokeWidth={3} aria-hidden="true" />
+                {t('subscriptionFlow.backToOnboarding')}
+              </button>
+              {activePlanName && (
+                <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-2.5 py-1 text-xs font-black text-emerald-200">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('subscriptionFlow.yourPlan')} : {activePlanName}
                 </p>
-                <h2 className="text-xl font-black leading-tight tracking-tight">
-                  {t('subscriptionFlow.choosePlan')}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => navigate('/profile-editor', { state: { allowBack: true } })}
-                  className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-white/70 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                >
-                  <ArrowLeft className="h-3 w-3" aria-hidden="true" />
-                  {t('subscriptionFlow.backToOnboarding')}
-                </button>
-                {activePlanName && (
-                  <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-xs font-black text-emerald-200">
-                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('subscriptionFlow.yourPlan')} : {activePlanName}
-                  </p>
-                )}
-              </div>
+              )}
             </div>
 
             {/* Rassurance : ce qui se passe après le choix (reflète le flux réel) */}
@@ -249,8 +241,8 @@ function Subscription() {
               </p>
               <ol className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {[1, 2, 3].map((n) => (
-                  <li key={n} className="flex items-center gap-1.5 text-xs font-bold" title={tx(`plan.after${n}Body`)}>
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-harx text-[10px] font-black" aria-hidden="true">
+                  <li key={n} className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold" title={tx(`plan.after${n}Body`)}>
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white ${n === 1 ? 'bg-emerald-500' : n === 2 ? 'bg-sky-500' : 'bg-[#F90080]'}`} aria-hidden="true">
                       {n}
                     </span>
                     {tx(`plan.afterShort${n}`)}
@@ -267,10 +259,21 @@ function Subscription() {
           currentPlanId={currentPlanId}
           onSubscribed={handlePlanSubscribed}
         />
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
-          {tx('plan.securePayment')}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label={tx('plan.backAria')}
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#0C1C2E]/15 bg-white px-3 py-1.5 text-xs font-black text-[#0C1C2E] transition hover:border-[#F90080]/50 hover:bg-pink-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F90080]/25"
+          >
+            <ArrowLeft className="h-4 w-4 text-[#F90080]" strokeWidth={3} aria-hidden="true" />
+            {t('subscriptionFlow.backToOnboarding')}
+          </button>
+          <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+            {tx('plan.securePayment')}
+          </p>
+        </div>
       </div>
 
       {showPublishModal && (

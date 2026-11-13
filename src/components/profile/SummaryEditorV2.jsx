@@ -7,7 +7,7 @@ import { localizeText, localizeList, normalizeBilingualText } from '../../utils/
 import { getAllLanguages, searchLanguages } from '../../lib/api/languages';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sparkles, Lightbulb, CalendarClock, Rocket } from 'lucide-react';
+import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sparkles, Lightbulb, CalendarClock, Rocket, Briefcase, Languages as LanguagesIcon, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
@@ -17,6 +17,12 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
 import { setProfileData, getProfileData } from '../../utils/authUtils';
+import { EDITOR_UX_NS } from '../../i18n/editorUx';
+import EditorSectionCard, { CompletionPill } from './editor/EditorSectionCard';
+import EditorEmptyState from './editor/EditorEmptyState';
+import EditorStepper, { editorPanelId, editorTabId } from './editor/EditorStepper';
+import useViewportFit from './editor/useViewportFit';
+import { getSectionCompletions, getSummaryQuality, getEditorTabs, getTabsOverall, adjacentTab, SUMMARY_MIN_CHARS, SUMMARY_MAX_CHARS } from '../../utils/profileSectionCompletion';
 
 // Temporarily hide the detailed sections (skills, industries, activities,
 // working hours/schedule) on the CV review page, and skip their requirements.
@@ -408,6 +414,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [editedSummary, setEditedSummary] = useState(generatedSummary);
   const [loading, setLoading] = useState(false);
   const { t: i18nT, i18n } = useTranslation();
+  const { t: ux } = useTranslation(EDITOR_UX_NS);
   const uiLang = (i18n.language || 'en').slice(0, 2) === 'fr' ? 'fr' : 'en';
   const otherLang = uiLang === 'fr' ? 'en' : 'fr';
   const t = (key, options) => i18nT(`profileImportReview.${key}`, options);
@@ -554,16 +561,12 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [introModalOpen, setIntroModalOpen] = useState(false);
   // Barre « prochaine étape » : visible dès que la liste de contrôle n'est plus à l'écran, pour ne pas obliger à défiler jusqu'en bas.
   const [checklistEl, setChecklistEl] = useState(null);
-  const [checklistVisible, setChecklistVisible] = useState(true);
+  const [activeTab, setActiveTab] = useState('identity');
+  const { ref: frameRef, height: frameHeight } = useViewportFit(300);
+  const panelScrollRef = useRef(null);
   // Horaires : créneaux types enregistrés en un clic depuis la liste du haut de page.
   const [presetSaving, setPresetSaving] = useState(false);
   const [presetError, setPresetError] = useState('');
-  useEffect(() => {
-    if (!checklistEl || typeof IntersectionObserver === 'undefined') return undefined;
-    const observer = new IntersectionObserver(([entry]) => setChecklistVisible(entry.isIntersecting), { threshold: 0.15 });
-    observer.observe(checklistEl);
-    return () => observer.disconnect();
-  }, [checklistEl]);
 
   const proficiencyLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((value) => ({
     value,
@@ -1948,11 +1951,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const renderError = (error, id) => {
     if (!error) return null;
     return (
-      <div id={`error-${id}`} className="text-red-600 text-sm mt-1 flex items-center gap-1">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div id={`error-${id}`} role="alert" className="text-red-700 text-sm mt-1 flex items-start gap-1">
+        <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        {error}
+        <span>
+          {error}
+          {id && ['name', 'country', 'phone', 'email', 'languages'].includes(id) ? (
+            <span className="block text-xs font-normal text-slate-600">{ux(`hints.${id}`)}</span>
+          ) : null}
+        </span>
       </div>
     );
   };
@@ -2440,25 +2448,26 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     return (
       <div className="mb-8 space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-900">{t('professionalExperience')}</h3>
-            <div className="flex items-center gap-2">
-              {isSectionEditing('experience') && (
-                <button
-                  onClick={() => setShowNewExperienceForm(true)}
-                  className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 transition-colors duration-200 flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  {t('addExperience')}
-                </button>
-              )}
-              {renderSectionControls('experience')}
-            </div>
-          </div>
-
+        <EditorSectionCard
+          id="experience"
+          title={t('professionalExperience')}
+          help={ux('help.experience')}
+          completion={sectionCompletions.find((c) => c.id === 'experience')}
+          controls={renderSectionControls('experience')}
+          actions={
+            isSectionEditing('experience') ? (
+              <button
+                onClick={() => setShowNewExperienceForm(true)}
+                className="px-4 py-2 text-sm font-medium text-harx-600 bg-harx-50 rounded-lg hover:bg-harx-100 transition-colors duration-200 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                {t('addExperience')}
+              </button>
+            ) : null
+          }
+        >
           {showNewExperienceForm && (
             <div className="mb-6">
               <ExperienceForm
@@ -2467,6 +2476,15 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 isNew={true}
               />
             </div>
+          )}
+
+          {!(editedProfile.experience?.length) && !showNewExperienceForm && (
+            <EditorEmptyState
+              kind="experience"
+              Icon={Briefcase}
+              onAction={() => { if (!isSectionEditing('experience')) startSectionEdit('experience'); setShowNewExperienceForm(true); }}
+              actionLabel={ux('empty.experience.cta')}
+            />
           )}
 
           <div className="space-y-6">
@@ -2567,7 +2585,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </div>
             ))}
           </div>
-        </div>
+        </EditorSectionCard>
 
         {videoModalExp && (
           <ExperienceVideoModal
@@ -3366,6 +3384,21 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     );
   }
 
+  const summaryShown = isSectionEditing('summary')
+    ? editedSummary
+    : localizeText(editedProfile.professionalSummary?.profileDescription_i18n, uiLang) ||
+      editedProfile.professionalSummary?.profileDescription ||
+      '';
+  const sectionCompletions = getSectionCompletions(editedProfile, summaryShown);
+  const editorTabs = getEditorTabs(editedProfile, summaryShown);
+  const tabsOverall = getTabsOverall(editorTabs);
+  const selectTab = (id) => {
+    setActiveTab(id);
+    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+  };
+  const completionOf = (id) => sectionCompletions.find((c) => c.id === id);
+  const summaryQuality = getSummaryQuality(summaryShown);
+
   const countryDisplay =
     typeof editedProfile.personalInfo.country === 'object'
       ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
@@ -3412,13 +3445,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   });
   // Raccourci : ouvre tout de suite l'enregistrement de la vidéo de présentation (plus besoin de défiler).
   const openIntroVideo = () => setIntroModalOpen(true);
-  const scrollToAvailability = () => {
-    const el = document.getElementById('onboarding-availability');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-  const scrollToChecklist = () => {
-    if (checklistEl) checklistEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+  const scrollToAvailability = () => setActiveTab('availability');
+  const scrollToChecklist = () => setActiveTab('video');
   const AVAIL_PRESETS = [
     { id: 'weekdays', label: t('availPresetWeekdays'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], start: '09:00', end: '17:00' },
     { id: 'weekdays-late', label: t('availPresetWeekdays'), days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], start: '10:00', end: '18:00' },
@@ -3483,300 +3511,24 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     </button>
   );
 
-  // Barre fixe « prochaine étape » : suit l'utilisateur quand la liste de contrôle est hors de l'écran.
-  const stickyBar = !checklistVisible && typeof document !== 'undefined'
-    ? createPortal(
-        <div
-          data-testid="next-step-bar"
-          className="fixed bottom-4 left-1/2 z-40 flex w-[min(92vw,680px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-slate-900/95 px-4 py-3 text-white shadow-2xl shadow-black/30 ring-1 ring-white/10 backdrop-blur lg:left-[calc(50%+8rem)]"
-        >
-          {(() => {
-            const Icon = nextStep ? nextStep.icon : Rocket;
-            return (
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${nextStep ? 'bg-gradient-to-br from-harx-500 to-harx-alt-500' : 'bg-emerald-500'}`}>
-                <Icon className="h-5 w-5" />
-              </span>
-            );
-          })()}
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">{nextStep ? t('nextStepLabel') : t('readyLabel')}</p>
-            <p className="truncate text-sm font-bold">{nextStep ? nextStep.label : t('coachDoneTitle')}</p>
-          </div>
-          {nextStep ? (
-            <button type="button" onClick={nextStep.run} className="shrink-0 rounded-xl bg-gradient-to-r from-harx-500 to-harx-alt-500 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-white shadow-lg hover:opacity-95">
-              {nextStep.cta}
-            </button>
-          ) : canContinue ? (
-            <button type="button" onClick={pushToRepsProfile} className="shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-white shadow-lg hover:bg-emerald-400">
-              {t('confirmContinue')}
-            </button>
-          ) : null}
-        </div>,
-        document.body
-      )
-    : null;
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-      {stickyBar}
-      <div className="h-1.5 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
-      <div className="p-6 sm:p-8">
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-harx-50 text-harx-700 text-xs font-semibold tracking-wide uppercase">
-                <span className="h-1.5 w-1.5 rounded-full bg-harx-500" />
-                {t('stepBadge')}
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-                {t('pageTitle')}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500 max-w-lg">
-                {t('pageSubtitle')}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 flex-shrink-0 self-start">
-              {/* Photo card — same interaction as Profile page */}
-              <div className="relative group shrink-0">
-                <div
-                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
-                    hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
-                  }`}
-                  onClick={() => {
-                    if (hasProfilePhoto) {
-                      setShowImageModal(true);
-                      return;
-                    }
-                    openPhotoSourceModal();
-                  }}
-                >
-                  {hasProfilePhoto ? (
-                    <img
-                      src={editedProfile.personalInfo.photo.url}
-                      alt={i18nT('profile.header.profilePhotoAlt')}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl font-black text-red-200 bg-red-50 uppercase tracking-tighter">
-                      {(editedProfile.personalInfo?.name || '?').charAt(0)}
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
-                    <div className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full border border-white/30 truncate">
-                      {hasProfilePhoto
-                        ? i18nT('profile.header.viewPhoto')
-                        : t('addPhoto')}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openPhotoSourceModal();
-                  }}
-                  disabled={isUploadingPhoto}
-                  className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white shadow-lg hover:opacity-90 disabled:opacity-60"
-                  title={i18nT('profile.header.changePhoto')}
-                >
-                  {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                </button>
-              </div>
-              {confirmContinueButton('header')}
-            </div>
-          </div>
-
-          {/* Guidance + checklist of what is still required to continue */}
-          <div className="mb-8" ref={setChecklistEl}>
-            {(() => {
-              const items = [
-                {
-                  key: 'photo',
-                  done: hasProfilePhoto,
-                  icon: Camera,
-                  title: t('checkPhoto'),
-                  desc: t('checkPhotoDesc'),
-                  action: (
-                    <button
-                      type="button"
-                      disabled={isUploadingPhoto}
-                      onClick={openPhotoSourceModal}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 disabled:opacity-60"
-                    >
-                      {isUploadingPhoto ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-                      {t('addPhoto')}
-                    </button>
-                  ),
-                  extra: photoError ? <p className="mt-1 text-xs font-semibold text-red-600">{photoError}</p> : null,
-                },
-                {
-                  key: 'video',
-                  done: hasIntroVideo,
-                  icon: Video,
-                  title: t('checkVideo'),
-                  desc: hasIntroVideo
-                    ? t('introVideoDoneDesc')
-                    : t('introVideoMissingDesc', { max: Math.round(INTRO_VIDEO_MAX_SECONDS / 60) }),
-                  action: (
-                    <button
-                      type="button"
-                      onClick={openIntroVideo}
-                      data-testid="record-video-now"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
-                    >
-                      <Video className="h-3.5 w-3.5" />
-                      {hasIntroVideo ? t('introVideoRedo') : t('ctaRecordVideo')}
-                    </button>
-                  ),
-                },
-                {
-                  key: 'avail',
-                  done: hasAvailabilitySet,
-                  icon: CalendarClock,
-                  title: t('checkAvail'),
-                  desc: t('availQuickDesc'),
-                  extra: (
-                    <div className="mt-2" data-testid="avail-presets">
-                      <div className="flex flex-wrap gap-1.5">
-                        {AVAIL_PRESETS.map((preset) => (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            disabled={presetSaving}
-                            onClick={() => void applyAvailabilityPreset(preset)}
-                            data-testid={`avail-preset-${preset.id}`}
-                            className="rounded-full border border-harx-200 bg-white px-3 py-1 text-xs font-bold text-harx-700 shadow-sm transition hover:border-harx-400 hover:bg-harx-50 disabled:opacity-60"
-                          >
-                            {preset.label} · {preset.start.replace(':00', ' h')} – {preset.end.replace(':00', ' h')}
-                          </button>
-                        ))}
-                      </div>
-                      {presetSaving ? <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><RefreshCw className="h-3 w-3 animate-spin" /> {t('availPresetSaving')}</p> : null}
-                      {presetError ? <p className="mt-1 text-xs font-semibold text-red-600">{presetError}</p> : null}
-                    </div>
-                  ),
-                  action: (
-                    <button
-                      type="button"
-                      onClick={scrollToAvailability}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
-                    >
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      {t('ctaCustomHours')}
-                    </button>
-                  ),
-                },
-              ];
-              const doneCount = items.filter((i) => i.done).length;
-              const nextItem = items.find((i) => !i.done);
-              const allDone = !nextItem;
-              const coachTitle = allDone ? t('coachDoneTitle') : t(`coach_${nextItem.key}_title`);
-              const coachBody = allDone ? t('coachDoneBody') : t(`coach_${nextItem.key}_body`);
-              const tips = [
-                { icon: Camera, text: t('tipPhoto') },
-                { icon: Video, text: t('tipVideo') },
-                { icon: Lightbulb, text: t('tipReview') },
-              ];
-              const roadmap = [
-                { label: t('roadProfile'), state: allDone ? 'done' : 'current' },
-                { label: t('roadPlan'), state: allDone ? 'current' : 'todo' },
-                { label: t('roadLive'), state: 'todo' },
-              ];
-              return (
-                <div className="space-y-4">
-                  {/* Coach */}
-                  <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${allDone ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-harx-600 via-harx-alt-600 to-violet-600 shadow-harx-500/25'}`}>
-                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
-                    <div className="pointer-events-none absolute -bottom-12 right-24 h-28 w-28 rounded-full bg-white/10" />
-                    <div className="relative flex items-start gap-4">
-                      <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
-                        {allDone ? <Rocket className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">{t('coachLabel')}</p>
-                        <p className="mt-0.5 text-lg font-extrabold leading-snug">{coachTitle}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-white/90">{coachBody}</p>
-                      </div>
-                    </div>
-                    <ol className="relative mt-5 flex items-center gap-2 text-xs font-semibold">
-                      {roadmap.map((r, i) => (
-                        <React.Fragment key={r.label}>
-                          <li className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${r.state === 'done' ? 'bg-white text-emerald-700' : r.state === 'current' ? 'bg-white/90 text-harx-700' : 'bg-white/15 text-white/80'}`}>
-                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px] font-bold">
-                              {r.state === 'done' ? '✓' : i + 1}
-                            </span>
-                            {r.label}
-                          </li>
-                          {i < roadmap.length - 1 && <span className="h-px w-4 bg-white/40" />}
-                        </React.Fragment>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {/* Checklist */}
-                  <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('checklistTitle')}</p>
-                      <span className="text-xs font-semibold text-gray-500">{t('checklistProgress', { done: doneCount, total: items.length })}</span>
-                    </div>
-                    <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
-                        style={{ width: `${(doneCount / items.length) * 100}%` }}
-                      />
-                    </div>
-                    <ul className="space-y-2">
-                      {items.map((it) => {
-                        const Icon = it.icon;
-                        const isNext = nextItem && nextItem.key === it.key;
-                        return (
-                          <li
-                            key={it.key}
-                            className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-shadow ${it.done ? 'border-green-100 bg-green-50/60' : isNext ? 'border-harx-300 bg-harx-50/60 ring-2 ring-harx-100 shadow-sm' : 'border-gray-100 bg-gray-50/60'}`}
-                          >
-                            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${it.done ? 'bg-green-100 text-green-600' : isNext ? 'bg-harx-100 text-harx-600' : 'bg-gray-100 text-gray-400'}`}>
-                              {it.done ? (
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                              ) : (
-                                <Icon className="h-4 w-4" />
-                              )}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className={`flex items-center gap-2 text-sm font-semibold ${it.done ? 'text-green-800' : 'text-gray-900'}`}>
-                                {it.title}
-                                {isNext && <span className="rounded-full bg-harx-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('nextBadge')}</span>}
-                              </p>
-                              {!it.done && <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">{it.desc}</p>}
-                              {!it.done && it.extra}
-                            </div>
-                            {it.done ? (
-                              <span className="text-xs font-semibold text-green-600">{t('checkDone')}</span>
-                            ) : (
-                              it.action || null
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-
-                  {/* Tips */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {tips.map((tip) => {
-                      const TipIcon = tip.icon;
-                      return (
-                        <div key={tip.text} className="flex items-start gap-2.5 rounded-xl bg-amber-50/70 px-3.5 py-3 ring-1 ring-amber-100">
-                          <TipIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
-                          <p className="text-xs leading-relaxed text-amber-900/80">{tip.text}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-
+    <div
+      ref={frameRef}
+      style={frameHeight ? { height: frameHeight } : undefined}
+      className="flex flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm"
+      data-testid="profile-editor-frame"
+    >
+      <div className="h-1.5 shrink-0 bg-gradient-to-r from-harx-500 via-harx-alt-500 to-harx-600" />
+      <EditorStepper
+        title={t('pageTitle')}
+        tabs={editorTabs}
+        overall={tabsOverall}
+        activeId={activeTab}
+        onSelect={selectTab}
+        autoSaveStatus={autoSaveStatus}
+      />
+      <div ref={panelScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white px-4 py-4 sm:px-6 sm:py-5" data-testid="profile-editor-panel">
           <input
             ref={photoInputRef}
             type="file"
@@ -3983,12 +3735,73 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             </div>
           )}
 
+
+        {/* ── Panneau 1 : identité + photo + langues ── */}
+        <div id={editorPanelId('identity')} role="tabpanel" aria-labelledby={editorTabId('identity')} className={activeTab === 'identity' ? '' : 'hidden'}>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start">
+            <div className="flex shrink-0 items-start justify-center md:justify-start">
+              {/* Photo card — same interaction as Profile page */}
+              <div id="editor-section-photo" className="relative group shrink-0 scroll-mt-24">
+                <div
+                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl shadow-xl border-4 border-white overflow-hidden relative cursor-pointer ring-4 transition-transform group-hover:scale-[1.02] ${
+                    hasProfilePhoto ? 'bg-slate-200/50 ring-harx-50' : 'bg-red-50 ring-red-100'
+                  }`}
+                  onClick={() => {
+                    if (hasProfilePhoto) {
+                      setShowImageModal(true);
+                      return;
+                    }
+                    openPhotoSourceModal();
+                  }}
+                >
+                  {hasProfilePhoto ? (
+                    <img
+                      src={editedProfile.personalInfo.photo.url}
+                      alt={i18nT('profile.header.profilePhotoAlt')}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl font-black text-red-200 bg-red-50 uppercase tracking-tighter">
+                      {(editedProfile.personalInfo?.name || '?').charAt(0)}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
+                    <div className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full border border-white/30 truncate">
+                      {hasProfilePhoto
+                        ? i18nT('profile.header.viewPhoto')
+                        : t('addPhoto')}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPhotoSourceModal();
+                  }}
+                  disabled={isUploadingPhoto}
+                  className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white shadow-lg hover:opacity-90 disabled:opacity-60"
+                  title={i18nT('profile.header.changePhoto')}
+                  aria-label={i18nT('profile.header.changePhoto')}
+                >
+                  {isUploadingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                </button>
+                <p className={`mt-3 max-w-[7.5rem] text-center text-[11px] font-medium leading-snug sm:max-w-[8.5rem] ${hasProfilePhoto ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {hasProfilePhoto ? ux('photoHint.ok') : ux('photoHint.missing')}
+                </p>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
           {/* Profile Overview */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">{t('personalInfo')}</h3>
-            {renderSectionControls('basic')}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 items-start">
+          <EditorSectionCard
+            id="identity"
+            title={t('personalInfo')}
+            help={ux('help.identity')}
+            completion={completionOf('identity')}
+            controls={renderSectionControls('basic')}
+            className="mb-8"
+          >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             {isSectionEditing('basic') ? (
               <>
                 <div className="space-y-4 min-w-0">
@@ -4093,7 +3906,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   {renderError(validationErrors.phone, 'phone')}
                 </div>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl md:col-span-2">
+                <div id="editor-section-languages" className="scroll-mt-24 p-4 bg-gradient-to-br from-harx-50 to-harx-alt-50 rounded-xl md:col-span-2">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">🌍 {t('languages')}</h3>
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -4353,7 +4166,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   }
                 />
                 </div>
-                <div className="md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div id="editor-section-languages" className="scroll-mt-24 md:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-harx-50 text-harx-600">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4361,7 +4174,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       </svg>
                     </span>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t('languages')}</h3>
+                    <CompletionPill completion={completionOf('languages')} />
                   </div>
+                  {!editedProfile.personalInfo.languages?.length && (
+                    <EditorEmptyState kind="languages" Icon={LanguagesIcon} />
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {editedProfile.personalInfo.languages.map((lang, index) => {
                       const languageName = typeof lang.language === 'object' ? lang.language.name : lang.language;
@@ -4386,9 +4203,73 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               </>
             )}
           </div>
+          </EditorSectionCard>
 
+            </div>
+          </div>
+        </div>
+
+        {/* ── Panneau 2 : expériences ── */}
+        <div id={editorPanelId('experience')} role="tabpanel" aria-labelledby={editorTabId('experience')} className={activeTab === 'experience' ? '' : 'hidden'}>
           {/* Experience Section */}
           {renderExperienceSection()}
+
+        </div>
+
+        {/* ── Panneau 3 : résumé + entreprises notables ── */}
+        <div id={editorPanelId('summary')} role="tabpanel" aria-labelledby={editorTabId('summary')} className={activeTab === 'summary' ? '' : 'hidden'}>
+          {/* Summary Section */}
+          <EditorSectionCard
+            id="summary"
+            title={t('professionalSummary')}
+            subtitle={t('summarySubtitle')}
+            help={ux('help.summary')}
+            completion={completionOf('summary')}
+            controls={renderSectionControls('summary')}
+            actions={
+              isSectionEditing('summary') ? (
+                <button
+                  onClick={regenerateSummary}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-harx-700 bg-white border border-harx-100 rounded-xl hover:bg-harx-50 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+                >
+                  <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {loading ? t('generating') : t('regenerate')}
+                </button>
+              ) : null
+            }
+            className="mt-8"
+          >
+            {isSectionEditing('summary') ? (
+              <div>
+                <label htmlFor="editor-summary-textarea" className="sr-only">{t('professionalSummary')}</label>
+                <textarea
+                  id="editor-summary-textarea"
+                  value={editedSummary}
+                  onChange={(e) => handleSummaryChange(e.target.value)}
+                  aria-describedby="editor-summary-hint"
+                  className="w-full h-64 p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-harx-500 focus:border-harx-500"
+                  placeholder={ux('placeholders.summary')}
+                />
+                <p
+                  id="editor-summary-hint"
+                  className={`mt-2 text-sm ${
+                    summaryQuality.quality === 'good' ? 'text-emerald-700' : summaryQuality.quality === 'empty' ? 'text-slate-600' : 'text-amber-800'
+                  }`}
+                >
+                  {ux(`summaryHint.${summaryQuality.quality}`, { chars: summaryQuality.chars, min: SUMMARY_MIN_CHARS, max: SUMMARY_MAX_CHARS })}
+                </p>
+              </div>
+            ) : summaryQuality.quality === 'empty' ? (
+              <EditorEmptyState kind="summary" Icon={FileText} />
+            ) : (
+              <div className="bg-gradient-to-br from-harx-50/70 to-white border border-harx-100 p-5 sm:p-6 rounded-2xl">
+                <p className="text-gray-800 whitespace-pre-line text-base leading-relaxed">{summaryShown}</p>
+              </div>
+            )}
+          </EditorSectionCard>
 
           {/* Skills Sections */}
           <div className="space-y-6">
@@ -4404,12 +4285,19 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
             {renderSkillSection(t('notableCompanies'), editedProfile.professionalSummary?.notableCompanies || [], 'notableCompanies', isSectionEditing('companies'))}
           </div>
 
+        </div>
+
+        {/* ── Panneau 4 : disponibilités ── */}
+        <div id={editorPanelId('availability')} role="tabpanel" aria-labelledby={editorTabId('availability')} className={activeTab === 'availability' ? '' : 'hidden'}>
           {/* Availability Section */}
-          <div id="onboarding-availability" className="mt-8 scroll-mt-24 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">{t('workingHours')}</h3>
-              {renderSectionControls('availability')}
-            </div>
+          <div id="onboarding-availability" className="mt-8 scroll-mt-24">
+          <EditorSectionCard
+            id="availability"
+            title={t('workingHours')}
+            help={ux('help.availability')}
+            completion={completionOf('availability')}
+            controls={renderSectionControls('availability')}
+          >
 
             {isSectionEditing('availability') ? (
               <div className="space-y-6">
@@ -4710,6 +4598,10 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   </div>
                 )}
 
+                {!(editedProfile.availability?.schedule?.length) && (
+                  <EditorEmptyState kind="availability" Icon={CalendarClock} />
+                )}
+
                 {/* Schedule Display */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-2">{t('availability.schedule')}</h4>
@@ -4772,63 +4664,234 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 </div>
               </div>
             )}
+          </EditorSectionCard>
           </div>
 
-          {/* Summary Section */}
-          <div className="mt-8 rounded-2xl border border-gray-100 bg-gradient-to-br from-harx-50/80 via-white to-harx-alt-50/50 p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">{t('professionalSummary')}</h3>
-                <p className="text-sm text-gray-500 mt-0.5">{t('summarySubtitle')}</p>
-              </div>
-              <div className="flex items-center gap-2 self-start">
-                {isSectionEditing('summary') && (
-                  <button
-                    onClick={regenerateSummary}
-                    disabled={loading}
-                    className="px-4 py-2 text-sm font-medium text-harx-700 bg-white border border-harx-100 rounded-xl hover:bg-harx-50 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
-                  >
-                    <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    {loading ? t('generating') : t('regenerate')}
-                  </button>
-                )}
-                {renderSectionControls('summary')}
-              </div>
-            </div>
-            {isSectionEditing('summary') ? (
-              <textarea
-                value={editedSummary}
-                onChange={(e) => handleSummaryChange(e.target.value)}
-                className="w-full h-64 p-4 border rounded-xl focus:ring-2 focus:ring-harx-500 focus:border-harx-500"
-                placeholder={t('summaryPlaceholder')}
-              />
-            ) : (
-              <div className="bg-white/80 backdrop-blur-sm border border-white p-6 rounded-2xl shadow-inner">
-                <p className="text-gray-800 whitespace-pre-line text-base sm:text-lg leading-relaxed">
-                  {localizeText(editedProfile.professionalSummary?.profileDescription_i18n, uiLang) ||
-                    editedProfile.professionalSummary?.profileDescription ||
-                    t('noSummary')}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons — always visible; grayed until requirements are met */}
-          <div
-            className={`mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-2xl border ${
-              canContinue
-                ? 'bg-gray-50 border-gray-100'
-                : 'bg-slate-50 border-slate-200'
-            }`}
-          >
-            <p className={`text-sm ${canContinue ? 'text-gray-600' : 'text-slate-500 font-medium'}`}>
-              {canContinue ? t('everythingGood') : continueBlockedReason}
-            </p>
-            {confirmContinueButton('footer')}
-            </div>
         </div>
+
+        {/* ── Panneau 5 : vidéo de présentation + liste de contrôle ── */}
+        <div id={editorPanelId('video')} role="tabpanel" aria-labelledby={editorTabId('video')} className={activeTab === 'video' ? '' : 'hidden'}>
+          {/* Guidance + checklist of what is still required to continue */}
+          <div className="mb-8" ref={setChecklistEl}>
+            {(() => {
+              const items = [
+                {
+                  key: 'photo',
+                  done: hasProfilePhoto,
+                  icon: Camera,
+                  title: t('checkPhoto'),
+                  desc: t('checkPhotoDesc'),
+                  action: (
+                    <button
+                      type="button"
+                      disabled={isUploadingPhoto}
+                      onClick={openPhotoSourceModal}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95 disabled:opacity-60"
+                    >
+                      {isUploadingPhoto ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                      {t('addPhoto')}
+                    </button>
+                  ),
+                  extra: photoError ? <p className="mt-1 text-xs font-semibold text-red-600">{photoError}</p> : null,
+                },
+                {
+                  key: 'video',
+                  done: hasIntroVideo,
+                  icon: Video,
+                  title: t('checkVideo'),
+                  desc: hasIntroVideo
+                    ? t('introVideoDoneDesc')
+                    : t('introVideoMissingDesc', { max: Math.round(INTRO_VIDEO_MAX_SECONDS / 60) }),
+                  action: (
+                    <button
+                      type="button"
+                      onClick={openIntroVideo}
+                      data-testid="record-video-now"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      {hasIntroVideo ? t('introVideoRedo') : t('ctaRecordVideo')}
+                    </button>
+                  ),
+                },
+                {
+                  key: 'avail',
+                  done: hasAvailabilitySet,
+                  icon: CalendarClock,
+                  title: t('checkAvail'),
+                  desc: t('availQuickDesc'),
+                  extra: (
+                    <div className="mt-2" data-testid="avail-presets">
+                      <div className="flex flex-wrap gap-1.5">
+                        {AVAIL_PRESETS.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            disabled={presetSaving}
+                            onClick={() => void applyAvailabilityPreset(preset)}
+                            data-testid={`avail-preset-${preset.id}`}
+                            className="rounded-full border border-harx-200 bg-white px-3 py-1 text-xs font-bold text-harx-700 shadow-sm transition hover:border-harx-400 hover:bg-harx-50 disabled:opacity-60"
+                          >
+                            {preset.label} · {preset.start.replace(':00', ' h')} – {preset.end.replace(':00', ' h')}
+                          </button>
+                        ))}
+                      </div>
+                      {presetSaving ? <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><RefreshCw className="h-3 w-3 animate-spin" /> {t('availPresetSaving')}</p> : null}
+                      {presetError ? <p className="mt-1 text-xs font-semibold text-red-600">{presetError}</p> : null}
+                    </div>
+                  ),
+                  action: (
+                    <button
+                      type="button"
+                      onClick={scrollToAvailability}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      {t('ctaCustomHours')}
+                    </button>
+                  ),
+                },
+              ];
+              const doneCount = items.filter((i) => i.done).length;
+              const nextItem = items.find((i) => !i.done);
+              const allDone = !nextItem;
+              const coachTitle = allDone ? t('coachDoneTitle') : t(`coach_${nextItem.key}_title`);
+              const coachBody = allDone ? t('coachDoneBody') : t(`coach_${nextItem.key}_body`);
+              const tips = [
+                { icon: Camera, text: t('tipPhoto') },
+                { icon: Video, text: t('tipVideo') },
+                { icon: Lightbulb, text: t('tipReview') },
+              ];
+              const roadmap = [
+                { label: t('roadProfile'), state: allDone ? 'done' : 'current' },
+                { label: t('roadPlan'), state: allDone ? 'current' : 'todo' },
+                { label: t('roadLive'), state: 'todo' },
+              ];
+              return (
+                <div className="space-y-4">
+                  {/* Coach */}
+                  <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${allDone ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-harx-600 via-harx-alt-600 to-violet-600 shadow-harx-500/25'}`}>
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+                    <div className="pointer-events-none absolute -bottom-12 right-24 h-28 w-28 rounded-full bg-white/10" />
+                    <div className="relative flex items-start gap-4">
+                      <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
+                        {allDone ? <Rocket className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">{t('coachLabel')}</p>
+                        <p className="mt-0.5 text-lg font-extrabold leading-snug">{coachTitle}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-white/90">{coachBody}</p>
+                      </div>
+                    </div>
+                    <ol className="relative mt-5 flex items-center gap-2 text-xs font-semibold">
+                      {roadmap.map((r, i) => (
+                        <React.Fragment key={r.label}>
+                          <li className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${r.state === 'done' ? 'bg-white text-emerald-700' : r.state === 'current' ? 'bg-white/90 text-harx-700' : 'bg-white/15 text-white/80'}`}>
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[10px] font-bold">
+                              {r.state === 'done' ? '✓' : i + 1}
+                            </span>
+                            {r.label}
+                          </li>
+                          {i < roadmap.length - 1 && <span className="h-px w-4 bg-white/40" />}
+                        </React.Fragment>
+                      ))}
+                    </ol>
+                  </div>
+
+                  {/* Checklist */}
+                  <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('checklistTitle')}</p>
+                      <span className="text-xs font-semibold text-gray-500">{t('checklistProgress', { done: doneCount, total: items.length })}</span>
+                    </div>
+                    <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-harx-500 to-harx-alt-500 transition-all duration-500"
+                        style={{ width: `${(doneCount / items.length) * 100}%` }}
+                      />
+                    </div>
+                    <ul className="space-y-2">
+                      {items.map((it) => {
+                        const Icon = it.icon;
+                        const isNext = nextItem && nextItem.key === it.key;
+                        return (
+                          <li
+                            key={it.key}
+                            className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-shadow ${it.done ? 'border-green-100 bg-green-50/60' : isNext ? 'border-harx-300 bg-harx-50/60 ring-2 ring-harx-100 shadow-sm' : 'border-gray-100 bg-gray-50/60'}`}
+                          >
+                            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${it.done ? 'bg-green-100 text-green-600' : isNext ? 'bg-harx-100 text-harx-600' : 'bg-gray-100 text-gray-400'}`}>
+                              {it.done ? (
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                              ) : (
+                                <Icon className="h-4 w-4" />
+                              )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className={`flex items-center gap-2 text-sm font-semibold ${it.done ? 'text-green-800' : 'text-gray-900'}`}>
+                                {it.title}
+                                {isNext && <span className="rounded-full bg-harx-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('nextBadge')}</span>}
+                              </p>
+                              {!it.done && <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">{it.desc}</p>}
+                              {!it.done && it.extra}
+                            </div>
+                            {it.done ? (
+                              <span className="text-xs font-semibold text-green-600">{t('checkDone')}</span>
+                            ) : (
+                              it.action || null
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+
+                  {/* Tips */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {tips.map((tip) => {
+                      const TipIcon = tip.icon;
+                      return (
+                        <div key={tip.text} className="flex items-start gap-2.5 rounded-xl bg-amber-50/70 px-3.5 py-3 ring-1 ring-amber-100">
+                          <TipIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+                          <p className="text-xs leading-relaxed text-amber-900/80">{tip.text}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+        </div>
+      </div>
+
+      {/* Pied de page toujours visible : navigation entre sections + bouton Continuer */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-gray-100 bg-white px-4 py-3 sm:gap-3 sm:px-6" data-testid="profile-editor-footer">
+        <button
+          type="button"
+          onClick={() => selectTab(adjacentTab(activeTab, -1))}
+          disabled={activeTab === 'identity'}
+          aria-label={ux('tabs.prev')}
+          className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-harx-500"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden sm:inline">{ux('tabs.prev')}</span>
+        </button>
+        <p className={`min-w-0 flex-1 truncate text-xs sm:text-sm ${canContinue ? 'text-gray-600' : 'font-medium text-slate-600'}`} title={canContinue ? t('everythingGood') : continueBlockedReason}>
+          <span className="hidden sm:inline">{canContinue ? t('everythingGood') : continueBlockedReason}</span>
+          <span className="sm:hidden">{ux('tabs.step', { n: editorTabs.findIndex((x) => x.id === activeTab) + 1, total: editorTabs.length })}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => selectTab(adjacentTab(activeTab, 1))}
+          disabled={activeTab === 'video'}
+          aria-label={ux('tabs.next')}
+          className="inline-flex items-center gap-1 rounded-xl border border-harx-200 bg-harx-50 px-3 py-2.5 text-sm font-semibold text-harx-700 hover:bg-harx-100 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-harx-500"
+        >
+          <span className="hidden sm:inline">{ux('tabs.next')}</span>
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+        {confirmContinueButton('footer')}
       </div>
 
       {/* Add Toast Component */}

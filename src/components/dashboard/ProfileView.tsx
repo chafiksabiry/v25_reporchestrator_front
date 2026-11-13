@@ -20,6 +20,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import harxLogo from '../../assets/logo-harx.png';
 import { ProfileProgressCard } from './profile/ProfileProgressCard';
 import { ProfileOverview } from './profile/ProfileOverview';
+import { SafeAvatar } from '../common/SafeAvatar';
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
@@ -1378,17 +1379,13 @@ export const ProfileView: React.FC<{
                   className="w-40 h-40 rounded-[32px] shadow-2xl border-4 border-white bg-slate-200/50 overflow-hidden relative cursor-pointer ring-4 ring-harx-50 transition-transform group-hover:scale-[1.02]"
                   onClick={() => profile.personalInfo?.photo?.url && setShowImageModal(true)}
                 >
-                  {profile.personalInfo?.photo?.url ? (
-                    <img
-                      src={profile.personalInfo.photo.url}
-                      alt={t('profile.header.profilePhotoAlt')}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl font-black text-gray-200 bg-gray-50 uppercase tracking-tighter">
-                      {profile.personalInfo?.name?.charAt(0) || '?'}
-                    </div>
-                  )}
+                  <SafeAvatar
+                    url={profile.personalInfo?.photo?.url}
+                    name={profile.personalInfo?.name}
+                    alt={t('profile.header.profilePhotoAlt')}
+                    imgClassName="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    fallbackClassName="w-full h-full flex items-center justify-center text-5xl font-black text-slate-400 bg-slate-100 uppercase tracking-tighter"
+                  />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
                     <div className="text-white text-xs font-black uppercase tracking-widest bg-white/20 px-4 py-2 rounded-full border border-white/30 truncate">{t('profile.header.viewPhoto')}</div>
                   </div>
