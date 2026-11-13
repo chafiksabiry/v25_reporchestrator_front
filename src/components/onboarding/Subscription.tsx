@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CreditCard, ArrowLeft, Loader, CheckCircle2, Rocket } from 'lucide-react';
+import { CreditCard, ArrowLeft, Loader, CheckCircle2, Rocket, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import { OnboardingSatisfactionModal, clearSatisfactionPending, isSatisfactionPe
 function Subscription() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { t: tx } = useTranslation('repsx');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
@@ -196,15 +197,6 @@ function Subscription() {
     <div className="mx-auto max-w-6xl">
       <Toaster position="top-right" />
 
-      <button
-        type="button"
-        onClick={() => navigate('/profile-editor', { state: { allowBack: true } })}
-        className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
-      >
-        <ArrowLeft className="mr-2 h-5 w-5" />
-        {t('subscriptionFlow.backToOnboarding')}
-      </button>
-
       {error && (
         <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           <span>{error}</span>
@@ -218,31 +210,56 @@ function Subscription() {
         </div>
       )}
 
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-harx-50 text-harx-500">
-            <CreditCard className="h-6 w-6" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-900">
-              {t('subscriptionFlow.choosePlan')}
-            </h2>
-            {activePlanName && (
-              <p className="mt-1 text-sm font-bold text-green-600">
-                {t('subscriptionFlow.yourPlan')} : {activePlanName}
+      <div>
+        <div className="relative mb-2 overflow-hidden rounded-2xl bg-[#0C1C2E] px-4 py-2.5 text-white">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-[#F90080]/25 blur-2xl" />
+          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                <CreditCard className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">
+                  {tx('plan.heroKicker')}
+                </p>
+                <h2 className="text-xl font-black leading-tight tracking-tight">
+                  {t('subscriptionFlow.choosePlan')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile-editor', { state: { allowBack: true } })}
+                  className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-white/70 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+                  {t('subscriptionFlow.backToOnboarding')}
+                </button>
+                {activePlanName && (
+                  <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-xs font-black text-emerald-200">
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('subscriptionFlow.yourPlan')} : {activePlanName}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Rassurance : ce qui se passe après le choix (reflète le flux réel) */}
+            <div aria-label={tx('plan.afterTitle')} role="group" className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">
+                {tx('plan.afterTitle')}
               </p>
-            )}
+              <ol className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {[1, 2, 3].map((n) => (
+                  <li key={n} className="flex items-center gap-1.5 text-xs font-bold" title={tx(`plan.after${n}Body`)}>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-harx text-[10px] font-black" aria-hidden="true">
+                      {n}
+                    </span>
+                    {tx(`plan.afterShort${n}`)}
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
-
-        {currentPlanId && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
-            <p className="text-sm font-bold text-green-800 leading-relaxed">
-              {t('subscriptionFlow.publishAfterPlanHint')}
-            </p>
-          </div>
-        )}
 
         <EmbeddedRepSubscriptionFlow
           agentId={agentId}
@@ -250,6 +267,10 @@ function Subscription() {
           currentPlanId={currentPlanId}
           onSubscribed={handlePlanSubscribed}
         />
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+          {tx('plan.securePayment')}
+        </p>
       </div>
 
       {showPublishModal && (

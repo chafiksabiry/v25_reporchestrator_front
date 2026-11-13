@@ -1,0 +1,51 @@
+{
+  "profile": {
+    "progress": {
+      "regionLabel": "Votre avancement",
+      "title": "Votre avancement",
+      "stateIncomplete": "Profil à compléter",
+      "stateReady": "Profil prêt",
+      "count": "{{done}} sur {{total}} éléments obligatoires terminés",
+      "nextStep": "Prochaine étape",
+      "itemsTitle": "Éléments obligatoires",
+      "itemDone": "Fait",
+      "itemTodo": "À faire",
+      "itemNext": "À faire maintenant",
+      "ctaComplete": "Compléter mon profil",
+      "ctaPlan": "Choisir ma formule",
+      "readyTitle": "Votre profil est complet",
+      "readyBody": "Cliquez sur une rubrique pour la relire si vous le souhaitez, puis choisissez votre formule.",
+      "saved": "Tout est enregistré automatiquement : vous pouvez reprendre plus tard."
+    },
+    "overview": {
+      "sectionsTitle": "Rubriques de votre profil",
+      "sectionsHint": "Cliquez sur une rubrique pour la consulter ou la modifier.",
+      "backToOverview": "Vue d’ensemble",
+      "editInfo": "Modifier mes informations",
+      "presentation": "Présentation",
+      "warn": "À vérifier"
+    }
+  },
+  "plan": {
+    "heroKicker": "Dernière étape de votre inscription",
+    "included": "Inclus",
+    "free": "Gratuit",
+    "afterTitle": "Ce qui se passe après votre choix",
+    "after1Title": "Votre formule est activée",
+    "after1Body": "Vous la retrouvez à tout moment dans votre espace.",
+    "after2Title": "Vous publiez votre profil",
+    "after2Body": "Il devient visible des entreprises.",
+    "after3Title": "Vous donnez votre avis",
+    "after3Body": "Puis la marketplace des missions s’ouvre.",
+    "securePayment": "Les formules payantes passent par un paiement sécurisé (Stripe).",
+    "chooseAria": "{{action}} — {{name}}",
+    "currentAria": "Formule actuelle : {{name}}",
+    "plansRegion": "Formules disponibles",
+    "details": "Voir le détail",
+    "detailsClose": "Fermer",
+    "detailsTitle": "Détail de la formule",
+    "afterShort1": "Formule activée",
+    "afterShort2": "Publication du profil",
+    "afterShort3": "Votre avis, puis les missions"
+  }
+}

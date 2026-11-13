@@ -18,6 +18,8 @@ import 'react-image-crop/dist/ReactCrop.css';
 
 // Components
 import harxLogo from '../../assets/logo-harx.png';
+import { ProfileProgressCard } from './profile/ProfileProgressCard';
+import { ProfileOverview } from './profile/ProfileOverview';
 import { ProfileNavbar } from './profile/ProfileNavbar';
 import ContactCenterAssessment from '../assessments/ContactCenterAssessment';
 import { AssessmentProvider } from '../../contexts/AssessmentContext';
@@ -108,6 +110,7 @@ export const ProfileView: React.FC<{
   onVideoAnalysisComplete?: () => void
 }> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onConfirmProposedSkill, onDismissProposedSkill, onConfirmAllProposedSkills, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
   const { t, i18n } = useTranslation();
+  const { t: tx } = useTranslation('repsx');
   const navigate = useNavigate();
   const getInitialTab = () => {
     try {
@@ -154,6 +157,8 @@ export const ProfileView: React.FC<{
   const [isEditingPublicInfo, setIsEditingPublicInfo] = useState(false);
   const [isSavingPublicInfo, setIsSavingPublicInfo] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  /** Onboarding : vue d'ensemble « un écran » par défaut ; le détail (onglets, édition) s'ouvre à la demande. */
+  const [showDetail, setShowDetail] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showSatisfaction, setShowSatisfaction] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -1206,6 +1211,25 @@ export const ProfileView: React.FC<{
     .sort((a, b) => String(a.countryName || '').localeCompare(String(b.countryName || '')))
     .slice(0, 120);
 
+  const warningTabs: string[] = [
+              ...((profile?.personalInfo?.languages || []).some((l: any) => {
+                const enriched = enrichLanguageFromExperience(l, profile);
+                const ar = enriched?.assessmentResults;
+                if (!ar || ar.source === 'cv') return true;
+                const verified = String(ar.verifiedProficiency || enriched.proficiency || '').toUpperCase();
+                return String(enriched.proficiency || '').toUpperCase() !== verified;
+              })
+                ? ['languages']
+                : []),
+              ...(((profile?.professionalSummary?.industries?.length || 0) === 0 ||
+                (profile?.professionalSummary?.activities?.length || 0) === 0)
+                ? ['specialization']
+                : []),
+            
+  ];
+
+  const overviewMode = !isRepProfilePublished(profile) && !showDetail;
+
   if (inlineAssessment) {
     return (
       <div className="min-h-full bg-[#f8fafc]">
@@ -1244,7 +1268,37 @@ export const ProfileView: React.FC<{
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
-      <div className="profile-onepage max-w-6xl mx-auto px-3 sm:px-4 lg:px-10 py-4 sm:py-6 space-y-4 sm:space-y-5">
+      <div className={`profile-onepage max-w-6xl mx-auto px-3 sm:px-4 ${overviewMode ? 'lg:px-2 py-1 sm:py-2' : 'lg:px-10 py-4 sm:py-6'} space-y-4 sm:space-y-5`}>
+        {overviewMode ? (
+          <ProfileOverview
+            profile={profile}
+            countryName={getCountryDisplayName()}
+            warningTabs={warningTabs}
+            isUploadingPhoto={isUploadingPhoto}
+            onChangePhoto={openPhotoSourceModal}
+            onViewPhoto={() => profile.personalInfo?.photo?.url && setShowImageModal(true)}
+            onOpenTab={(tab) => {
+              setActiveTab(tab);
+              setShowDetail(true);
+            }}
+            onNavigate={(path) =>
+              path === '/profile-editor'
+                ? navigate(path, { state: { allowBack: true } })
+                : navigate(path)
+            }
+          />
+        ) : (
+        <>
+        {!isRepProfilePublished(profile) && (
+          <button
+            type="button"
+            onClick={() => setShowDetail(false)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-95"
+          >
+            <ArrowRight size={14} className="rotate-180" />
+            {tx('profile.overview.backToOverview')}
+          </button>
+        )}
         {/* Page Title & Phrase - Dynamic */}
         <div className="mb-2">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1 animate-in fade-in slide-in-from-left-4 duration-500">
@@ -1259,46 +1313,14 @@ export const ProfileView: React.FC<{
             on every profile section, never buried inside one tab.
             Publish is automatic after plan choice — no Publier button here. */}
         {!isRepProfilePublished(profile) && (
-          profile.onboardingProgress?.phases?.phase2?.status === 'completed' ||
-          isRepPhase2Ready(profile) ||
-          isRepCoreOnboardingDone(profile) ? (
-            <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/20 animate-in fade-in slide-in-from-top-2 duration-400">
-              <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
-              <div className="relative flex items-start gap-3 min-w-0">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
-                  <ClipboardCheck className="w-5 h-5 text-white" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-white">
-                    {t('profile.header.phase2Complete')}
-                  </p>
-                  <p className="text-xs font-medium text-white/90 mt-0.5 leading-relaxed">
-                    {t('profile.header.phase2CompleteDescription')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/subscription')}
-                className="relative px-5 py-3 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 active:scale-95 whitespace-nowrap flex-shrink-0"
-              >
-                {t('profile.header.continueOnboarding')}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-black text-yellow-800">
-                  {t('profile.header.completePhase2')}
-                </p>
-                <p className="text-xs font-medium text-yellow-700 mt-0.5">
-                  {t('profile.header.completePhase2Description')}
-                </p>
-              </div>
-            </div>
-          )
+          <ProfileProgressCard
+            profile={profile}
+            onNavigate={(path) =>
+              path === '/profile-editor'
+                ? navigate(path, { state: { allowBack: true } })
+                : navigate(path)
+            }
+          />
         )}
 
         {/* Navigation Tabs at the Top */}
@@ -1306,21 +1328,7 @@ export const ProfileView: React.FC<{
           <ProfileNavbar
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            warningTabs={[
-              ...((profile?.personalInfo?.languages || []).some((l: any) => {
-                const enriched = enrichLanguageFromExperience(l, profile);
-                const ar = enriched?.assessmentResults;
-                if (!ar || ar.source === 'cv') return true;
-                const verified = String(ar.verifiedProficiency || enriched.proficiency || '').toUpperCase();
-                return String(enriched.proficiency || '').toUpperCase() !== verified;
-              })
-                ? ['languages']
-                : []),
-              ...(((profile?.professionalSummary?.industries?.length || 0) === 0 ||
-                (profile?.professionalSummary?.activities?.length || 0) === 0)
-                ? ['specialization']
-                : []),
-            ]}
+            warningTabs={warningTabs}
             warningMessages={{
               languages: t('profile.nav.languageWarning'),
               specialization: t('profile.nav.specializationWarning'),
@@ -1635,6 +1643,8 @@ export const ProfileView: React.FC<{
             {renderTab(activeTab)}
           </section>
         </div>
+        </>
+        )}
       </div>
 
       <Toaster position="top-right" />
