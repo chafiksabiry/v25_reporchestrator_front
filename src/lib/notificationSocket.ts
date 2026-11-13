@@ -37,6 +37,11 @@ function getWsUrl(): string | null {
 }
 
 export type NotificationSocketOptions = {
+  /**
+   * Appelé une fois par connexion, quand le serveur est prêt à livrer (message `authenticated`, ou
+   * `connected` pour l'ancien serveur) — pas à l'ouverture du socket. Sert à rattraper par un GET
+   * les notifications émises pendant l'authentification ou une coupure (le serveur n'a pas de file).
+   */
   onConnect?: () => void;
 };
 
@@ -91,9 +96,13 @@ const defaultDeps = (): NotificationSocketDeps => ({
  * reconnexion relit le jeton et se réauthentifie.
  * - Fermeture 4401 (auth refusée) : aucune boucle — on ne se reconnecte que lorsque le jeton a changé.
  * - Pas de jeton : pas de connexion ; elle s'ouvre dès qu'un jeton apparaît.
- * - Ancien serveur : il envoie `connected` puis attend `{ type: 'subscribe', repId }` ; on ne l'envoie
- *   que si ce message `connected` arrive (le nouveau serveur ne l'envoie plus). Les messages
- *   `connected` / `subscribed` / `authenticated` ne sont jamais traités comme des notifications.
+ * - Nouveau serveur : il répond `authenticated` ; l'abonnement est implicite (par le jeton), aucun
+ *   `subscribe` n'est envoyé. L'état « prêt » ne dépend jamais de `subscribed`.
+ * - Ancien serveur : il envoie `connected` (pas `authenticated`) puis attend `{ type: 'subscribe',
+ *   repId }` ; on ne l'envoie que si ce message `connected` arrive.
+ * - `options.onConnect` (rattrapage par GET) est appelé une fois par connexion, à `authenticated` ou
+ *   `connected`, et non plus à l'ouverture : avant l'auth, une notification serait perdue.
+ * Les messages `connected` / `subscribed` / `authenticated` ne sont jamais traités comme des notifications.
  */
 export function connectNotificationSocketWith(
   deps: NotificationSocketDeps,
@@ -157,10 +166,16 @@ export function connectNotificationSocketWith(
     socket = ws;
     const usedToken = token;
 
+    let ready = false;
+    const markReady = () => {
+      if (ready) return;
+      ready = true;
+      options?.onConnect?.();
+    };
+
     ws.onopen = () => {
       attempts = 0;
       send({ type: 'auth', token: usedToken });
-      options?.onConnect?.();
     };
 
     ws.onmessage = (event) => {
@@ -174,6 +189,12 @@ export function connectNotificationSocketWith(
         // Ancien serveur : l'abonnement par repId existe encore.
         const repId = deps.getAgentId();
         if (repId) send({ type: 'subscribe', repId });
+        markReady();
+        return;
+      }
+      if (data?.type === 'authenticated') {
+        // Nouveau serveur : abonnement implicite ; on rattrape ce qui a pu être émis avant.
+        markReady();
         return;
       }
       if (data?.type !== 'notification' || !data.notification) return; // subscribed, authenticated, …
