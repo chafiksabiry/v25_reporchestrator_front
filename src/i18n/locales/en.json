@@ -1882,14 +1882,14 @@
         "cheer": "The hardest part is starting — and this only takes a few seconds.",
         "what": "Drop your CV (PDF, DOC or DOCX, 5 MB max).",
         "why": "Our AI pre-fills your profile so you only have to review it.",
-        "timeNote": "The analysis takes about 30 seconds."
+        "timeNote": "The analysis only takes a few seconds."
       },
       "editor": {
         "short": "Profile",
         "title": "Complete your profile",
         "cheer": "Almost there — every item you add makes you more visible to companies.",
         "what": "Add your photo, an introduction video and your availability.",
-        "why": "A complete profile receives more mission offers.",
+        "why": "A complete profile is showcased to companies.",
         "timeNote": "Find a quiet spot with good lighting for the videos."
       },
       "profile": {
@@ -1905,8 +1905,8 @@
         "title": "Choose your plan",
         "cheer": "Last step before missions — just a few clicks.",
         "what": "Compare the plans and pick the one that suits you.",
-        "why": "This activates your account and publishes your profile.",
-        "timeNote": "You can change plan later."
+        "why": "This choice activates your account; you can then publish your profile.",
+        "timeNote": "Each plan lists its benefits on screen."
       },
       "marketplace": {
         "short": "Missions",
@@ -1923,7 +1923,7 @@
       "items": {
         "photo": {
           "label": "Profile photo",
-          "hint": "A smiling face on a neutral background is the first trust signal."
+          "hint": "Pick a clear, front-facing photo on a neutral background."
         },
         "experiences": {
           "label": "Experiences",

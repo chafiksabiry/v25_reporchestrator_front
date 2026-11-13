@@ -1882,14 +1882,14 @@
         "cheer": "Le plus dur, c’est de commencer : ça ne prend que quelques secondes.",
         "what": "Déposez votre CV (PDF, DOC ou DOCX, 5 Mo max).",
         "why": "Notre IA pré-remplit votre profil : vous n’aurez qu’à relire.",
-        "timeNote": "L’analyse prend environ 30 secondes."
+        "timeNote": "L’analyse ne prend que quelques secondes."
       },
       "editor": {
         "short": "Profil",
         "title": "Complétez votre profil",
         "cheer": "Vous y êtes presque : chaque élément ajouté vous rend plus visible des entreprises.",
         "what": "Ajoutez votre photo, une vidéo de présentation et vos disponibilités.",
-        "why": "Un profil complet reçoit davantage de propositions de missions.",
+        "why": "Un profil complet est mis en avant auprès des entreprises.",
         "timeNote": "Prévoyez un endroit calme et un bon éclairage pour les vidéos."
       },
       "profile": {
@@ -1905,8 +1905,8 @@
         "title": "Choisissez votre formule",
         "cheer": "Dernière étape avant les missions : plus que quelques clics.",
         "what": "Comparez les formules et sélectionnez celle qui vous convient.",
-        "why": "Ce choix active votre compte et publie votre profil.",
-        "timeNote": "Vous pourrez changer de formule plus tard."
+        "why": "Ce choix active votre compte ; vous pourrez ensuite publier votre profil.",
+        "timeNote": "Chaque formule détaille ses avantages à l’écran."
       },
       "marketplace": {
         "short": "Missions",
@@ -1923,7 +1923,7 @@
       "items": {
         "photo": {
           "label": "Photo de profil",
-          "hint": "Un visage souriant, fond neutre : c’est le premier critère de confiance."
+          "hint": "Choisissez une photo nette, de face, sur fond neutre."
         },
         "experiences": {
           "label": "Expériences",
