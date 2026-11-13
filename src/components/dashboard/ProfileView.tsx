@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { resolveCountryName } from '../../utils/countryDisplay';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
 import { OnboardingSatisfactionModal, clearSatisfactionPending, markSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
@@ -639,13 +640,14 @@ export const ProfileView: React.FC<{
     }
   };
 
+  // Jamais d'identifiant brut : on résout le nom (objet, code ISO ou _id dans la liste chargée).
   const getCountryDisplayName = () => {
     if (countryData?.countryName) return countryData.countryName;
     const country = (profile as any)?.personalInfo?.country;
-    if (!country) return t('profile.common.notSpecified');
-    if (typeof country === 'string') return country;
-    if (typeof country === 'object') return country.countryName || country.zoneName || t('profile.common.notSpecified');
-    return t('profile.common.notSpecified');
+    return (
+      resolveCountryName(country, countries as any[], i18n.language) ||
+      t('profile.common.notSpecified')
+    );
   };
 
   const handleInlineUpdate = async (payload: any, buildNextProfile: (prev: any) => any) => {
