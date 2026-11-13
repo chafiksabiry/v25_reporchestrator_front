@@ -93,7 +93,7 @@ function Subscription() {
         setLoading(true);
         const userData = config.getUserData();
         if (!userData.agentId) {
-          setError('Profil représentant introuvable. Reconnectez-vous.');
+          setError(t('subscriptionFlow.errors.profileNotFound'));
           return;
         }
 
@@ -156,7 +156,7 @@ function Subscription() {
         }
       } catch (err) {
         console.error('Subscription onboarding init failed:', err);
-        setError('Impossible de charger les formules d’abonnement.');
+        setError(t('subscriptionFlow.errors.plansLoad'));
       } finally {
         setLoading(false);
       }
@@ -198,7 +198,7 @@ function Subscription() {
 
       <button
         type="button"
-        onClick={() => navigate('/profile-editor')}
+        onClick={() => navigate('/profile-editor', { state: { allowBack: true } })}
         className="mb-4 flex items-center text-slate-600 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="mr-2 h-5 w-5" />
@@ -206,8 +206,15 @@ function Subscription() {
       </button>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-          {error}
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-red-700"
+          >
+            {t('repJourney.errors.retry')}
+          </button>
         </div>
       )}
 

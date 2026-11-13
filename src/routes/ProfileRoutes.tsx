@@ -271,6 +271,8 @@ export default function ProfileRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const isEditor = location.pathname.includes('/profile-editor');
+  // Retour volontaire depuis la barre de parcours : on reste sur l'éditeur au lieu d'être renvoyé en avant.
+  const allowBack = (location.state as { allowBack?: boolean } | null)?.allowBack === true;
   const { t } = useTranslation();
 
   usePageTitle(
@@ -333,6 +335,7 @@ export default function ProfileRoutes() {
                 const next = getRepOnboardingStep(parsed);
                 // Stay on the editor to finish phase 2 — never bounce back to import.
                 if (
+                  !allowBack &&
                   next.path !== '/profile-editor' &&
                   next.path !== '/profile-import'
                 ) {
@@ -351,6 +354,7 @@ export default function ProfileRoutes() {
           applyProfileData(fromApi as ProfileRecord);
           const next = getRepOnboardingStep(fromApi);
           if (
+            !allowBack &&
             next.path !== '/profile-editor' &&
             next.path !== '/profile-import'
           ) {
@@ -374,7 +378,7 @@ export default function ProfileRoutes() {
     return () => {
       cancelled = true;
     };
-  }, [isEditor, profileData, applyProfileData, navigate]);
+  }, [isEditor, profileData, applyProfileData, navigate, allowBack]);
 
   return (
     <ProtectedRoute>

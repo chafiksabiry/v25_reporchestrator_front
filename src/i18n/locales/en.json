@@ -1701,7 +1701,11 @@
     "publishAfterPlanHint": "After choosing a plan, you can publish your profile and leave optional feedback before opening the marketplace.",
     "publish": "Publish",
     "publishSuccess": "Profile published — welcome to the marketplace!",
-    "updating": "Updating…"
+    "updating": "Updating…",
+    "errors": {
+      "profileNotFound": "We can’t find your profile. Sign in again, then retry.",
+      "plansLoad": "We can’t show the plans right now. Try again in a moment — your profile is saved."
+    }
   },
   "onboardingSatisfaction": {
     "title": "How was your onboarding?",
@@ -1853,5 +1857,101 @@
     "mkt-heart": "Tap the heart to set a gig aside and compare it later.",
     "mkt-favorites": "Find every gig you favorited here.",
     "mkt-requested": "Your join requests awaiting the company’s answer are here."
+  },
+  "repJourney": {
+    "regionLabel": "Your sign-up journey",
+    "progressLabel": "Sign-up progress",
+    "stepOf": "Step {{current}} of {{total}}",
+    "remaining_one": "≈ {{count}} min left",
+    "remaining_other": "≈ {{count}} min left",
+    "minutes_one": "≈ {{count}} minute",
+    "minutes_other": "≈ {{count}} minutes",
+    "what": "To do",
+    "why": "Why",
+    "howLong": "Time",
+    "showGuide": "Show instructions",
+    "hideGuide": "Hide instructions",
+    "revisitHint": "Go back to this step: nothing is lost, everything is saved.",
+    "autosaveEditor": "Your changes are saved automatically. You can leave and pick up later.",
+    "autosaveGeneric": "Nothing is lost: you can leave and resume where you stopped.",
+    "needHelp": "Need help?",
+    "steps": {
+      "import": {
+        "short": "CV",
+        "title": "Import your CV",
+        "cheer": "The hardest part is starting — and this only takes a few seconds.",
+        "what": "Drop your CV (PDF, DOC or DOCX, 5 MB max).",
+        "why": "Our AI pre-fills your profile so you only have to review it.",
+        "timeNote": "The analysis only takes a few seconds."
+      },
+      "editor": {
+        "short": "Profile",
+        "title": "Complete your profile",
+        "cheer": "Almost there — every item you add makes you more visible to companies.",
+        "what": "Add your photo, an introduction video and your availability.",
+        "why": "A complete profile is showcased to companies.",
+        "timeNote": "Find a quiet spot with good lighting for the videos."
+      },
+      "profile": {
+        "short": "Review",
+        "title": "Review your profile",
+        "cheer": "One last look before choosing your plan.",
+        "what": "Check your details, then click “Continue”.",
+        "why": "This is what companies will see of you.",
+        "timeNote": "You can always edit your profile afterwards."
+      },
+      "plan": {
+        "short": "Plan",
+        "title": "Choose your plan",
+        "cheer": "Last step before missions — just a few clicks.",
+        "what": "Compare the plans and pick the one that suits you.",
+        "why": "This choice activates your account; you can then publish your profile.",
+        "timeNote": "Each plan lists its benefits on screen."
+      },
+      "marketplace": {
+        "short": "Missions",
+        "title": "Find your first mission",
+        "cheer": "Congrats, your profile is live!",
+        "what": "Browse missions and apply.",
+        "why": "Companies discover you here.",
+        "timeNote": ""
+      }
+    },
+    "checklist": {
+      "title": "{{left}} left to do ({{done}} of {{total}} done)",
+      "allDone": "All set — you can continue! 🎉",
+      "items": {
+        "photo": {
+          "label": "Profile photo",
+          "hint": "Pick a clear, front-facing photo on a neutral background."
+        },
+        "experiences": {
+          "label": "Experiences",
+          "hint": "Add at least one experience (imported from your CV or typed in)."
+        },
+        "availability": {
+          "label": "Availability",
+          "hint": "Set your usual working days and hours."
+        },
+        "video": {
+          "label": "Introduction video",
+          "hint": "A single video (3 min max): introduce yourself and your background, in your own words."
+        }
+      }
+    },
+    "errors": {
+      "title": "A small hiccup",
+      "network": "Your connection seems interrupted. Check it and try again — your file wasn’t lost.",
+      "timeout": "The analysis took longer than expected. Please try again in a moment.",
+      "rateLimit": "Many people are signing up right now. Wait a minute, then try again.",
+      "auth": "Your session has expired. Sign in again, then restart the import.",
+      "serverBusy": "Our servers are briefly busy. Try again shortly — your data is safe.",
+      "validation": "We couldn’t save some information from your CV. Try again, or use a different file.",
+      "languages": "Your CV has no Languages section. Add your languages (e.g. “French: native · English: fluent”), then try again.",
+      "unreadable": "This file looks unreadable or protected. Try saving it again as a PDF, without a password.",
+      "generic": "We couldn’t analyse your CV right now. Try again, or use a different file.",
+      "retry": "Try again",
+      "tipSupport": "Still stuck? Contact support from the menu — we reply quickly."
+    }
   }
 }

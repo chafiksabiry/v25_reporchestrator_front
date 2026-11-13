@@ -45,9 +45,9 @@ export function RepOnboardingHelpModal({ open, guideKey, onClose }: Props) {
     'profile-editor': {
       title: 'Compléter votre profil',
       description:
-        'Ajoutez votre photo, vos expériences (avec vidéo si possible) et vos disponibilités. Un profil complet est mis en avant auprès des entreprises.',
+        'Ajoutez votre photo, une courte vidéo de présentation et vos disponibilités. Un profil complet est mis en avant auprès des entreprises.',
       tips: [
-        'Une vidéo courte par expérience rassure bien plus qu’un texte seul.',
+        'Une vidéo de présentation (3 min max) rassure bien plus qu’un texte seul ; les vidéos par expérience sont facultatives.',
         'Vos disponibilités précises évitent les propositions de missions incompatibles avec votre emploi du temps.',
       ],
     },

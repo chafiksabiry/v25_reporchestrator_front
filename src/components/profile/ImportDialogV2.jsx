@@ -19,6 +19,7 @@ import Cookies from 'js-cookie';
 import { chunkText, safeJSONParse, retryOperation } from '../../lib/utils/textProcessing';
 import { useTranslation } from 'react-i18next';
 import { normalizeBilingualText, normalizeBilingualList } from '../../utils/i18nText';
+import { classifyImportError } from '../../utils/repOnboardingProgress';
 
 function ImportDialog({ isOpen, onClose, onImport }) {
   const { t, i18n } = useTranslation();
@@ -478,8 +479,13 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       // carries the actual failing field(s) in `errors`, which was previously
       // discarded — surface it so a future mismatch is diagnosable from the
       // UI instead of showing a bare "Impossible d'analyser votre CV".
-      const detail = Array.isArray(err.errors) && err.errors.length > 0 ? `: ${err.errors.join(', ')}` : '';
-      const displayError = (err.message ? `${err.message}${detail}` : '') || t('profileImportDialog.errors.parseFailed');
+      // Le détail technique reste dans la console (ci-dessus) ; le rep voit un message humain et actionnable.
+      // Les messages déjà rédigés pour le rep (fichier trop gros, langues manquantes…) sont conservés tels quels.
+      const ownMessages = ['fileTooLarge', 'unsupportedFormat', 'noText', 'readFailed', 'noContent', 'languagesRequired', 'languagesUnmatched', 'summaryFailed', 'parseFailed']
+        .map((k) => t(`profileImportDialog.errors.${k}`));
+      const displayError = ownMessages.includes(err.message)
+        ? err.message
+        : t(`repJourney.errors.${classifyImportError(err)}`);
       setError(displayError);
       addAnalysisStep(t('profileImportDialog.analysis.error', { message: displayError }), true);
     } finally {
@@ -626,9 +632,10 @@ function ImportDialog({ isOpen, onClose, onImport }) {
                     <svg className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
-                    <div>
-                      <h3 className="text-sm font-semibold text-red-800">{t('profileImportDialog.errorTitle')}</h3>
+                    <div role="alert">
+                      <h3 className="text-sm font-semibold text-red-800">{t('repJourney.errors.title')}</h3>
                       <p className="text-sm text-red-700 mt-0.5">{error}</p>
+                      <p className="text-xs text-red-600/80 mt-1.5">{t('repJourney.errors.tipSupport')}</p>
                     </div>
                   </div>
                 </div>
