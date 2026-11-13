@@ -50,6 +50,8 @@ export const WS_AUTH_FAILED_CLOSE_CODE = 4401;
 const RECONNECT_BASE_MS = 3000;
 const RECONNECT_MAX_MS = 30000;
 const WAIT_FOR_TOKEN_MS = 15000;
+/** Après `connected`, délai d'attente de `authenticated` avant de conclure à un ancien serveur (qui n'en envoie pas). */
+const LEGACY_READY_FALLBACK_MS = 1500;
 
 /** Dépendances injectables (tests) ; les valeurs par défaut sont celles du navigateur. */
 export interface NotificationSocketDeps {
@@ -98,10 +100,12 @@ const defaultDeps = (): NotificationSocketDeps => ({
  * - Pas de jeton : pas de connexion ; elle s'ouvre dès qu'un jeton apparaît.
  * - Nouveau serveur : il répond `authenticated` ; l'abonnement est implicite (par le jeton), aucun
  *   `subscribe` n'est envoyé. L'état « prêt » ne dépend jamais de `subscribed`.
- * - Ancien serveur : il envoie `connected` (pas `authenticated`) puis attend `{ type: 'subscribe',
- *   repId }` ; on ne l'envoie que si ce message `connected` arrive.
- * - `options.onConnect` (rattrapage par GET) est appelé une fois par connexion, à `authenticated` ou
- *   `connected`, et non plus à l'ouverture : avant l'auth, une notification serait perdue.
+ * - `connected` : envoyé à l'ouverture par l'ancien serveur ET par le nouveau (avant la vérification du
+ *   jeton). On y envoie `subscribe` (ancien serveur ; ignoré sans effet par le nouveau) mais on n'est
+ *   PAS prêt : si `authenticated` n'arrive pas dans LEGACY_READY_FALLBACK_MS, c'est un ancien serveur.
+ * - `options.onConnect` (rattrapage par GET) est appelé une fois par connexion, à `authenticated` ou,
+ *   à défaut, après ce repli — jamais à l'ouverture ni à `connected` : avant l'auth, une notification
+ *   émise pendant la vérification du jeton serait perdue.
  * Les messages `connected` / `subscribed` / `authenticated` ne sont jamais traités comme des notifications.
  */
 export function connectNotificationSocketWith(
@@ -118,6 +122,8 @@ export function connectNotificationSocketWith(
   let attempts = 0;
   /** Jeton avec lequel le serveur a refusé l'auth (4401) : on n'insiste pas avec le même. */
   let rejectedToken: string | null = null;
+  /** Annule le délai de repli « ancien serveur » de la connexion courante. */
+  let clearSocketTimer: (() => void) | null = null;
 
   const clearTimer = () => {
     if (reconnectTimer) {
@@ -167,8 +173,17 @@ export function connectNotificationSocketWith(
     const usedToken = token;
 
     let ready = false;
+    let legacyTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearLegacyTimer = () => {
+      if (legacyTimer) {
+        clearTimeout(legacyTimer);
+        legacyTimer = null;
+      }
+    };
+    clearSocketTimer = clearLegacyTimer;
     const markReady = () => {
-      if (ready) return;
+      clearLegacyTimer();
+      if (ready || disposed || socket !== ws) return;
       ready = true;
       options?.onConnect?.();
     };
@@ -189,7 +204,9 @@ export function connectNotificationSocketWith(
         // Ancien serveur : l'abonnement par repId existe encore.
         const repId = deps.getAgentId();
         if (repId) send({ type: 'subscribe', repId });
-        markReady();
+        // Le nouveau serveur envoie aussi `connected` à l'ouverture (avant l'auth) : on n'est PAS prêt.
+        // Sans `authenticated` dans le délai, c'est un ancien serveur : on conclut alors à « prêt ».
+        if (!ready && !legacyTimer) legacyTimer = setTimeout(markReady, LEGACY_READY_FALLBACK_MS);
         return;
       }
       if (data?.type === 'authenticated') {
@@ -205,6 +222,7 @@ export function connectNotificationSocketWith(
     };
 
     ws.onclose = (event) => {
+      clearLegacyTimer();
       if (socket === ws) socket = null;
       if (disposed) return;
       if (event?.code === WS_AUTH_FAILED_CLOSE_CODE) {
@@ -246,6 +264,7 @@ export function connectNotificationSocketWith(
     disposed = true;
     stopWatching();
     clearTimer();
+    clearSocketTimer?.();
     try {
       socket?.close();
     } catch {
