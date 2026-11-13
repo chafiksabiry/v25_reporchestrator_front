@@ -1,3 +1,4 @@
+import { confirmProposedSkills } from '../../../utils/proposedSkills';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Skeleton } from '../ui/Skeleton';
@@ -399,37 +400,18 @@ export function Profile() {
       }))
       .filter((entry: any) => !!entry.skill);
 
-  const handleConfirmProposedSkill = async (
+  // Confirme une ou plusieurs suggestions d'un type (bouton individuel ou « Tout ajouter »).
+  const handleConfirmProposedSkills = async (
     type: 'technical' | 'professional' | 'soft',
-    skillId: string
+    skillIds: string[]
   ) => {
-    if (!profile?._id || !skillId) return;
+    if (!profile?._id || !skillIds?.length) return;
 
-    const proposedLevel =
-      (profile.proposedSkills?.[type] || []).find(
-        (entry: any) => getSkillRefId(entry) === skillId
-      )?.level ?? 0;
-
-    const nextSkills = {
-      technical: [...(profile.skills?.technical || [])],
-      professional: [...(profile.skills?.professional || [])],
-      soft: [...(profile.skills?.soft || [])]
-    };
-    if (!nextSkills[type].some((entry: any) => getSkillRefId(entry) === skillId)) {
-      nextSkills[type].unshift({
-        skill: skillId,
-        level: typeof proposedLevel === 'number' ? proposedLevel : 0,
-        details: ''
-      });
-    }
-
-    const nextProposed = {
-      technical: [...(profile.proposedSkills?.technical || [])],
-      professional: [...(profile.proposedSkills?.professional || [])],
-      soft: [...(profile.proposedSkills?.soft || [])]
-    };
-    nextProposed[type] = nextProposed[type].filter(
-      (entry: any) => getSkillRefId(entry) !== skillId
+    const { nextSkills, nextProposed } = confirmProposedSkills(
+      profile.skills,
+      profile.proposedSkills,
+      type,
+      skillIds
     );
 
     const payload = {
@@ -469,6 +451,11 @@ export function Profile() {
       }
     }
   };
+
+  const handleConfirmProposedSkill = (
+    type: 'technical' | 'professional' | 'soft',
+    skillId: string
+  ) => handleConfirmProposedSkills(type, [skillId]);
 
   const handleDismissProposedSkill = async (
     type: 'technical' | 'professional' | 'soft',
@@ -887,6 +874,7 @@ export function Profile() {
             onAddSkill={handleAddSkill}
             onConfirmProposedSkill={handleConfirmProposedSkill}
             onDismissProposedSkill={handleDismissProposedSkill}
+            onConfirmAllProposedSkills={handleConfirmProposedSkills}
             onDeleteLanguage={handleDeleteLanguage}
             onAddLanguage={handleAddLanguage}
             onUpdateLanguageProficiency={handleUpdateLanguageProficiency}

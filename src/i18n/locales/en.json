@@ -1,4 +1,18 @@
 {
+  "videoErrors": {
+    "VIDEO_TOO_LARGE": "Your video is too large ({{maxMb}} MB maximum). Record a slightly shorter one or choose a lighter file — nothing was sent.",
+    "NOT_A_VIDEO": "This file is not a recognised video. Choose a video or record again with the camera.",
+    "VIDEO_TOO_SHORT": "Your video is too short ({{minSeconds}} seconds minimum). Record a slightly longer one.",
+    "VIDEO_TOO_LONG": "Your video is too long ({{maxMinutes}} minutes maximum). Please record a shorter one.",
+    "NO_VIDEO": "No video was received. Please record again.",
+    "UPLOAD_BUSY": "The service is very busy right now. Please try again in a moment — your recording is not lost.",
+    "VIDEO_STORAGE_ERROR": "The video storage service is temporarily unavailable. Please try again in a moment — your recording is not lost.",
+    "UPLOAD_FAILED": "Sending your video failed (connection?). Check your connection and try again — your recording is not lost.",
+    "ANALYSIS_FAILED": "The AI analysis of your video did not complete. Your video is saved — please try again in a moment.",
+    "INTERNAL_ERROR": "A technical issue occurred. Your recording is not lost — please try again in a moment.",
+    "UNAUTHORIZED": "Your session has expired. Please sign in again and retry.",
+    "UNKNOWN": "Something went wrong. Your recording is not lost — please try again in a moment."
+  },
   "sidebar": {
     "dashboard": "Dashboard",
     "profile": "Profile",
@@ -972,9 +986,10 @@
       "noneAvailable": "No more skills available for this section.",
       "delete": "Delete this skill",
       "deleteNamed": "Delete {{name}}",
-      "proposals": "Suggested from your videos",
-      "proposalsHint": "{{count}} skill suggestion(s) from your experience videos — confirm to add them to your profile, or remove them. Mission matching mainly uses your industries and activities.",
+      "proposals": "Suggested from your video / your CV",
+      "proposalsHint": "{{count}} suggested skill(s) from your introduction video or your CV — add them in one click (“Add all” or one by one) or remove the ones that do not fit. Mission matching mainly uses your industries and activities.",
       "confirmProposal": "Confirm this skill",
+      "confirmAll": "Add all",
       "confirmProposalNamed": "Confirm {{name}}",
       "dismissProposal": "Remove this suggestion",
       "dismissProposalNamed": "Remove suggestion {{name}}"

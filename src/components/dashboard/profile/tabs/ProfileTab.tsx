@@ -3,8 +3,10 @@ import { Calendar, Clock, Info, Loader2, Pencil, RefreshCw, RotateCcw, Sparkles,
 import { useTranslation } from 'react-i18next';
 import { generateSummary } from '../../../../lib/api/profiles';
 import { normalizeBilingualText } from '../../../../utils/i18nText';
+import { PROFILE_RECORDING_MAX_SECONDS, recorderOptions } from '../../../../utils/videoLimits';
 
-const MAX_RECORDING_MS = 10 * 60 * 1000;
+// 5 min maximum (≈ 56 Mo aux débits fixés) : reste sous la limite d'envoi de 100 Mo.
+const MAX_RECORDING_MS = PROFILE_RECORDING_MAX_SECONDS * 1000;
 
 const formatMmSs = (ms: number) => {
   const totalSec = Math.floor(Math.max(0, ms) / 1000);
@@ -190,7 +192,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onSaveAbout, on
     recordingStartedAtRef.current = Date.now();
 
     recordedChunksRef.current = [];
-    const recorder = new MediaRecorder(mediaStreamRef.current, { mimeType: 'video/webm' });
+    const recorder = new MediaRecorder(mediaStreamRef.current, recorderOptions('video/webm'));
     mediaRecorderRef.current = recorder;
 
     recorder.ondataavailable = (event) => {

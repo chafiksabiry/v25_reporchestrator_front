@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Zap as ZapIcon, Languages as LanguagesIcon, X, MapPin, Mail, Phone, Target, Briefcase, RefreshCw, Check, Pencil, Camera, ChevronDown, ClipboardCheck, ArrowRight, AlertTriangle, Upload, ImagePlus, Rocket, Loader as LoaderIcon } from 'lucide-react';
+import { checkVideoBeforeUpload, checkVideoDuration, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage, withRetryAfterOnce } from '../../utils/videoErrors';
+import { readVideoDuration } from '../../utils/videoLimits';
 import { resolveCountryName } from '../../utils/countryDisplay';
 import { getProfilePlan, checkCountryMismatch, updateProfileData, fetchProfileFromAPI, updateProfilePlan, recheckExperienceIdentity, recheckExperienceAccents } from '../../utils/profileUtils';
 import { isRepPhase2Ready, isRepCoreOnboardingDone, isRepProfilePublished } from '../../utils/repOnboardingNextStep';
@@ -87,6 +89,7 @@ export const ProfileView: React.FC<{
   onAddSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
   onConfirmProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
   onDismissProposedSkill?: (type: 'technical' | 'professional' | 'soft', skillId: string) => void,
+  onConfirmAllProposedSkills?: (type: 'technical' | 'professional' | 'soft', skillIds: string[]) => void,
   onDeleteLanguage?: (index: number) => void,
   onAddLanguage?: (item: { language: string; proficiency: string; languageId?: string; code?: string }) => void | Promise<void>,
   onUpdateLanguageProficiency?: (index: number, proficiency: string) => void | Promise<void>,
@@ -109,7 +112,7 @@ export const ProfileView: React.FC<{
   onAddSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', value: string) => void,
   onProfileUpdate?: (updatedProfile: any) => void,
   onVideoAnalysisComplete?: () => void
-}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onConfirmProposedSkill, onDismissProposedSkill, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
+}> = ({ profile, onEditClick, onDeleteSkill, onAddSkill, onConfirmProposedSkill, onDismissProposedSkill, onConfirmAllProposedSkills, onDeleteLanguage, onAddLanguage, onUpdateLanguageProficiency, onDeleteExperience, onAddExperience, onUpdateExperience, onDeleteSpecializationItem, onAddSpecializationItem, onProfileUpdate, onVideoAnalysisComplete }) => {
   const { t, i18n } = useTranslation();
   const { t: tx } = useTranslation('repsx');
   const navigate = useNavigate();
@@ -797,29 +800,53 @@ export const ProfileView: React.FC<{
       return;
     }
 
+    // Contrôles AVANT l'envoi : rien n'est envoyé si le fichier est manifestement refusé par le serveur.
+    const showVideoError = (error: unknown) =>
+      window.alert(
+        videoErrorMessage(isVideoApiError(error) ? error.code : 'UPLOAD_FAILED', i18n.language, { maxMinutes: 10 })
+      );
+    if (file.type && !file.type.startsWith('video/')) {
+      showVideoError(toVideoApiError(400, { code: 'NOT_A_VIDEO' }));
+      return;
+    }
+    const tooLarge = checkVideoBeforeUpload(file);
+    if (tooLarge) {
+      showVideoError(tooLarge);
+      return;
+    }
+    const badDuration = checkVideoDuration(await readVideoDuration(file));
+    if (badDuration) {
+      showVideoError(badDuration);
+      return;
+    }
+
     try {
       setIsUploadingVideo(true);
-      const formData = new FormData();
-      formData.append('video', file);
-
-      const response = await fetch(repApiUrl(`/profiles/${profile._id}/video`), {
-        method: 'PUT',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${token}`
+      await withRetryAfterOnce(async () => {
+        const formData = new FormData();
+        formData.append('video', file);
+        let response: Response;
+        try {
+          response = await fetch(repApiUrl(`/profiles/${profile._id}/video`), {
+            method: 'PUT',
+            body: formData,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        } catch {
+          throw toVideoApiError(0, { code: 'UPLOAD_FAILED' });
         }
+        if (!response.ok) throw await videoErrorFromResponse(response);
       });
-
-      if (!response.ok) {
-        throw new Error(`Video upload failed with status ${response.status}`);
-      }
 
       const refreshed = await fetchProfileFromAPI();
       onProfileUpdate?.(refreshed);
       window.dispatchEvent(new CustomEvent('PROFILE_UPDATED'));
     } catch (error) {
       console.error('Error uploading presentation video:', error);
-      window.alert(t('profile.errors.uploadVideo'));
+      // Message clair et traduit pour chaque code (jamais « Server error 400 » ni le texte brut du serveur).
+      showVideoError(error);
     } finally {
       setIsUploadingVideo(false);
     }
@@ -1100,6 +1127,7 @@ export const ProfileView: React.FC<{
           onAddSkill={(type, skillId) => onAddSkill?.(type, skillId)}
           onConfirmProposedSkill={(type, skillId) => onConfirmProposedSkill?.(type, skillId)}
           onDismissProposedSkill={(type, skillId) => onDismissProposedSkill?.(type, skillId)}
+          onConfirmAllProposedSkills={(type, skillIds) => onConfirmAllProposedSkills?.(type, skillIds)}
           onAddSpecializationItem={(section, value) => onAddSpecializationItem?.(section, value)}
           onDeleteSpecializationItem={(section, index) => onDeleteSpecializationItem?.(section, index)}
         />

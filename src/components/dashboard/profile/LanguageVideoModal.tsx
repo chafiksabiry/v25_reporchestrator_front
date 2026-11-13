@@ -17,6 +17,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl } from '../../../utils/repApiUrl';
 import { useLiveFaceMatch } from './useLiveFaceMatch';
+import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage } from '../../../utils/videoErrors';
+import { recorderOptions } from '../../../utils/videoLimits';
 
 type LocalizedText = string | { en?: string; fr?: string } | null;
 
@@ -198,7 +200,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
   const startRecording = () => {
     if (!stream) return;
     chunksRef.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    const recorder = new MediaRecorder(stream, recorderOptions('video/webm;codecs=vp8,opus'));
     mediaRecorderRef.current = recorder;
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -262,6 +264,12 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
       return;
     }
     if (faceAbsenceInvalid) return;
+    // > 100 Mo : message clair, rien n'est envoyé (l'enregistrement reste disponible : « Refaire »).
+    const tooLarge = checkVideoBeforeUpload(recordedBlob);
+    if (tooLarge) {
+      setAnalyzeError(videoErrorMessage(tooLarge.code, uiLang));
+      return;
+    }
 
     setAnalyzing(true);
     setAnalyzeError(null);
@@ -273,7 +281,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
     }, 1000);
 
     // Une tentative d'analyse : renvoie null en cas de succès, sinon { message, aborted }.
-    const runAttempt = async (): Promise<null | { message: string; aborted: boolean }> => {
+    const runAttempt = async (): Promise<null | { message: string; aborted: boolean; coded: boolean; retryable: boolean }> => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 8 * 60 * 1000);
     const token = localStorage.getItem('token');
@@ -288,14 +296,11 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
           dashRepApiUrl(`/profiles/${profileId}/language/analyze-video/jobs/${jobId}`),
           { headers: authHeaders, signal: controller.signal }
         );
-        if (!statusRes.ok) {
-          const err = await statusRes.json().catch(() => ({}));
-          throw new Error(err.message || `Server error ${statusRes.status}`);
-        }
+        if (!statusRes.ok) throw await videoErrorFromResponse(statusRes);
         const statusJson = await statusRes.json();
         if (statusJson.status === 'queued' || statusJson.status === 'processing') continue;
         if (statusJson.status === 'completed' && statusJson.data) return statusJson.data as AnalysisPayload;
-        throw new Error(statusJson.message || 'Analysis failed');
+        throw toVideoApiError(0, { code: 'ANALYSIS_FAILED' }); // jamais le texte brut du serveur
       }
       throw new Error(
         isFr
@@ -325,8 +330,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
         if (!queued?.jobId) throw new Error(isFr ? 'Réponse serveur invalide' : 'Invalid server response');
         data = await pollJobUntilDone(String(queued.jobId));
       } else if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || `Server error ${response.status}`);
+        throw await videoErrorFromResponse(response);
       } else {
         const json = await response.json();
         data = json.data;
@@ -339,6 +343,10 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
       }
       return null;
     } catch (err: unknown) {
+      // Erreur connue du serveur (codes vidéo, 429, 5xx) : message clair et traduit, jamais le texte brut.
+      if (isVideoApiError(err)) {
+        return { message: videoErrorMessage(err.code, uiLang), aborted: false, coded: true, retryable: err.retryable };
+      }
       const aborted = err instanceof Error && err.name === 'AbortError';
       let message = aborted
         ? (isFr
@@ -356,7 +364,7 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
           ? 'Connexion interrompue par le serveur (timeout). L’analyse peut continuer côté serveur — réessayez dans 1 minute ou rafraîchissez la page.'
           : 'Connection interrupted by the server (timeout). Analysis may still be running — retry in 1 minute or refresh the page.';
       }
-      return { message, aborted };
+      return { message, aborted, coded: false, retryable: true };
     } finally {
       window.clearTimeout(timeoutId);
     }
@@ -364,18 +372,19 @@ export const LanguageVideoModal: React.FC<LanguageVideoModalProps> = ({
 
     // Analyse automatique : 2 réessais automatiques, puis message humain. L'enregistrement
     // n'est jamais perdu (bouton « Réessayer » + « Refaire »).
-    let failure: null | { message: string; aborted: boolean } = null;
+    let failure: null | { message: string; aborted: boolean; coded: boolean; retryable: boolean } = null;
     for (let attempt = 0; attempt <= AUTO_ANALYZE_RETRIES; attempt += 1) {
       setAnalyzeAttempt(attempt);
       failure = await runAttempt();
       if (!failure) break;
       // Un dépassement de délai n'est pas relancé tel quel : on le signale tout de suite.
-      if (failure.aborted || attempt === AUTO_ANALYZE_RETRIES) break;
+      // Erreur de contenu (trop long, trop lourd…) : inutile de relancer, il faut refaire la vidéo.
+      if (failure.aborted || !failure.retryable || attempt === AUTO_ANALYZE_RETRIES) break;
       await new Promise((resolve) => window.setTimeout(resolve, AUTO_ANALYZE_RETRY_DELAY_MS));
     }
     if (failure) {
       setAnalyzeError(
-        failure.aborted
+        failure.aborted || failure.coded
           ? failure.message
           : isFr
             ? 'Nous n’avons pas pu terminer l’analyse de votre vidéo après plusieurs essais. Votre enregistrement n’est pas perdu : réessayez dans un instant.'
