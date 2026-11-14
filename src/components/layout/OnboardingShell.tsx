@@ -8,6 +8,7 @@ import { NotificationsProvider } from '../../contexts/NotificationsContext';
 import { Sidebar } from '../dashboard/Sidebar';
 import { TopBar } from '../dashboard/TopBar';
 import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { keepSavedPresentationVideo, PRESENTATION_VIDEO_SAVED_EVENT, withPresentationVideo } from '../../utils/introVideo';
 import { getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
@@ -63,6 +64,19 @@ function OnboardingShellContent() {
   // this effect's own load() causes, while still reacting to a genuine
   // PROFILE_UPDATE_EVENT dispatched elsewhere (e.g. a real save).
   const isSelfTriggeredUpdate = useRef(false);
+  // Vidéo de présentation tout juste enregistrée dans l'éditeur : le bandeau du parcours doit la voir
+  // immédiatement (même source que la liste « Avant de continuer »), sans attendre un rechargement.
+  const savedPresentationVideoRef = useRef<{ url?: string } | null>(null);
+
+  useEffect(() => {
+    const onVideoSaved = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: string }>).detail?.url;
+      savedPresentationVideoRef.current = { url };
+      setUserProfile((prev: any) => (prev ? withPresentationVideo(prev, url) : prev));
+    };
+    window.addEventListener(PRESENTATION_VIDEO_SAVED_EVENT, onVideoSaved);
+    return () => window.removeEventListener(PRESENTATION_VIDEO_SAVED_EVENT, onVideoSaved);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +86,8 @@ function OnboardingShellContent() {
       try {
         const profileData = await fetchProfileFromAPI();
         if (cancelled) return;
-        setUserProfile(profileData);
+        // Si le profil relu n'a pas encore la vidéo qu'on vient d'enregistrer, on la garde (pas de retour en arrière).
+        setUserProfile(keepSavedPresentationVideo(profileData, savedPresentationVideoRef.current));
 
         const agentId = profileData?._id || getAgentId();
         if (!agentId) return;

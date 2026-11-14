@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { dashRepApiUrl, repApiUrl } from '../../../utils/repApiUrl';
-import { INTRO_VIDEO_MAX_SECONDS, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
+import { INTRO_VIDEO_MAX_SECONDS, introAnalysisUi, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
 import { buildDetectedGroups, detectedSkillCount, localizedText, normalizePresentationResult, type PresentationResult } from '../../../utils/presentationResult';
 import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage, withRetryAfterOnce } from '../../../utils/videoErrors';
 import { recorderOptions } from '../../../utils/videoLimits';
@@ -192,6 +192,11 @@ interface ExperienceVideoModalProps {
   mode?: 'experience' | 'intro';
   /** Mode 'intro' : appelé dès que la vidéo est enregistrée côté serveur (avant même l'analyse). */
   onVideoSaved?: (info: { url?: string }) => void;
+  /**
+   * Mode 'intro' : appelé quand l'analyse en arrière-plan se termine (résultat, vidéo changée ou erreur),
+   * y compris si la fenêtre a été fermée entre-temps : le parent affiche alors une notification discrète.
+   */
+  onAnalysisSettled?: (info: { status: 'done' | 'stale' | 'error'; message?: string }) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -527,6 +532,15 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
     en: 'We could not detect enough usable speech. Record again, speaking clearly about who you are and your career path.',
     fr: 'Nous n’avons pas détecté assez de parole exploitable. Refaites la vidéo en parlant clairement de qui vous êtes et de votre parcours.',
   },
+  continueBackground: {
+    en: 'Continue — the analysis keeps running in the background',
+    fr: 'Continuer — l’analyse se poursuit en arrière-plan',
+  },
+  videoSavedChip: { en: 'Saved', fr: 'Enregistré' },
+  analysisSlow: {
+    en: 'The analysis is taking longer than expected. You can continue — it will finish in the background.',
+    fr: 'L’analyse prend plus de temps que prévu, vous pouvez continuer : elle se terminera en arrière-plan.',
+  },
   detectedStale: {
     en: 'Your video changed while it was being analysed, so nothing was added to your profile. Please try again.',
     fr: 'La vidéo a changé pendant l’analyse, rien n’a été ajouté à votre profil. Réessayez.',
@@ -824,7 +838,7 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete, referencePhotoUrl,
-  mode = 'experience', onVideoSaved,
+  mode = 'experience', onVideoSaved, onAnalysisSettled,
 }) => {
   const { i18n } = useTranslation();
   const uiLang = (i18n.language || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
@@ -1224,21 +1238,26 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
         setVideoSavedOnServer(false);
         setAnalyzeRetryable(true);
         setAnalyzeError(t('detectedStale'));
+        onAnalysisSettled?.({ status: 'stale', message: t('detectedStale') });
       } else if ('presentation' in outcome) {
         setPresentation(outcome.presentation);
         if (outcome.presentation.saved) setSavedFlag(true);
         // Le parent recharge le profil (secteurs, activités, langues, compétences suggérées).
         onAnalysisComplete?.(outcome.presentation as any);
+        onAnalysisSettled?.({ status: 'done' });
       } else {
         setResult(outcome.legacy);
         if (outcome.legacy?.saved) setSavedFlag(true);
         if (outcome.legacy?.videoUrl) showSavedVideo(outcome.legacy.videoUrl);
         onAnalysisComplete?.(outcome.legacy);
+        onAnalysisSettled?.({ status: 'done' });
       }
     } catch (err) {
       const apiErr = isVideoApiError(err) ? err : toVideoApiError(0, { code: 'UNKNOWN' });
+      const message = videoErrorMessage(apiErr.code, uiLang);
       setAnalyzeRetryable(apiErr.retryable);
-      setAnalyzeError(videoErrorMessage(apiErr.code, uiLang));
+      setAnalyzeError(message);
+      onAnalysisSettled?.({ status: 'error', message });
     } finally {
       setAnalyzing(false);
     }
@@ -1299,6 +1318,18 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
       setAnalyzing(false);
     }
   };
+
+  // Durée écoulée de l'analyse : au-delà de 3 min on prévient que c'est plus long que prévu.
+  const [analysisElapsedMs, setAnalysisElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!analyzing) {
+      setAnalysisElapsedMs(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => setAnalysisElapsedMs(Date.now() - startedAt), 5000);
+    return () => clearInterval(timer);
+  }, [analyzing]);
 
   // Déclenchement automatique dès que l'enregistrement est terminé et valide.
   useEffect(() => {
@@ -1610,6 +1641,35 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                       : t('analyzingAuto')}
                   </p>
                 </div>
+                {(() => {
+                  const ui = introAnalysisUi({ videoSaved: isIntro && videoSavedOnServer, analyzing, elapsedMs: analysisElapsedMs });
+                  if (!isIntro) return null;
+                  return (
+                    <div className="flex flex-col items-center gap-3 max-w-sm text-center" data-testid="intro-analysis-exit">
+                      {videoSavedOnServer && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-black text-emerald-700">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {t('videoSavedChip')}
+                        </span>
+                      )}
+                      {ui.showSlowNotice && (
+                        <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" role="status">
+                          {t('analysisSlow')}
+                        </p>
+                      )}
+                      {ui.showContinue && (
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          data-testid="intro-continue-background"
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white text-sm font-black shadow-sm hover:opacity-95"
+                        >
+                          {t('continueBackground')}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2 flex-wrap justify-center max-w-xs">
                   {[t('stepTechnical'), t('stepLanguages'), t('stepIndustries'), t('stepActivities'), t('stepContactCenter')].map((step, i) => (
                     <span key={step} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-full">

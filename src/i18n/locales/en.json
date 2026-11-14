@@ -1357,6 +1357,8 @@
     "expVideoOptional": "Video is optional for this experience.",
     "recordAnalyzeOptional": "Add a video (optional)",
     "introVideoDoneDesc": "Introduction video recorded. You can redo it at any time.",
+    "introAnalysisDoneToast": "Your video analysis is complete: your profile has been updated.",
+    "introAnalysisFailedToast": "Your video analysis could not be completed. Your video is saved: you can continue or try again later.",
     "introVideoMissingDesc": "Introduce yourself and your career path on video (up to {{max}} minutes). It is the only required video; per-experience videos are optional.",
     "introVideoRedo": "Redo my video",
     "availMissing": "Availability not set — click Edit to add your working schedule.",

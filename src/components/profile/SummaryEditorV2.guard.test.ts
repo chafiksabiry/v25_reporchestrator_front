@@ -53,3 +53,23 @@ describe('SummaryEditorV2 : corrections fonctionnelles conservées', () => {
     expect(src).toContain('const canContinue = hasExperienceVideo && hasProfilePhoto && hasAvailabilitySet;');
   });
 });
+
+const shellSrc = readFileSync(new URL('../layout/OnboardingShell.tsx', import.meta.url), 'utf8');
+
+describe('Vidéo de présentation : jamais bloqué, et bandeau cohérent avec la liste', () => {
+  it('la fenêtre propose « Continuer » dès « Enregistré » (analyse en arrière-plan) et prévient après 3 min', () => {
+    expect(videoModalSrc).toContain('data-testid="intro-continue-background"');
+    expect(videoModalSrc).toContain('introAnalysisUi(');
+    expect(videoModalSrc).toContain("t('analysisSlow')");
+    expect(videoModalSrc).toContain('onAnalysisSettled?.(');
+  });
+  it('l’éditeur prévient le bandeau du parcours dès l’enregistrement (événement), sans rechargement', () => {
+    expect(src).toContain('PRESENTATION_VIDEO_SAVED_EVENT');
+    expect(src).toContain('withPresentationVideo(prev, url)');
+    expect(src).toContain('onAnalysisSettled=');
+  });
+  it('le bandeau (shell) applique l’événement et ne perd pas la vidéo lors d’un rechargement du profil', () => {
+    expect(shellSrc).toContain('PRESENTATION_VIDEO_SAVED_EVENT');
+    expect(shellSrc).toContain('keepSavedPresentationVideo(profileData, savedPresentationVideoRef.current)');
+  });
+});
