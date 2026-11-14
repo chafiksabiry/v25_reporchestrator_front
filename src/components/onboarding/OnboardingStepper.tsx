@@ -9,17 +9,17 @@ import {
   getEditorChecklist,
   getEditorCompletion,
   getJourneyProgress,
+  JOURNEY_GUIDE_STORAGE_KEY,
   REP_JOURNEY_STEPS,
+  resolveGuideExpanded,
 } from '../../utils/repOnboardingProgress';
 
 const NIGHT = REP_PALETTE.night;
-const EXPANDED_KEY = 'harx_rep_journey_guide_expanded';
-
 function readExpanded(): boolean {
   try {
-    return localStorage.getItem(EXPANDED_KEY) === '1';
+    return resolveGuideExpanded(localStorage.getItem(JOURNEY_GUIDE_STORAGE_KEY));
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -44,7 +44,7 @@ export function OnboardingStepper({ userProfile, onOpenHelp }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(EXPANDED_KEY, expanded ? '1' : '0');
+      localStorage.setItem(JOURNEY_GUIDE_STORAGE_KEY, expanded ? '1' : '0');
     } catch {
       /* stockage indisponible */
     }

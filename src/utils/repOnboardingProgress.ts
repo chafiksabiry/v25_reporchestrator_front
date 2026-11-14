@@ -146,3 +146,17 @@ export function classifyImportError(err: unknown): HumanErrorKind {
   if (/internal server error|bad gateway|service unavailable/.test(msg)) return 'serverBusy';
   return 'generic';
 }
+
+/* ───────────── Bandeau de consigne : ouvert par défaut ───────────── */
+
+/**
+ * Clé de préférence versionnée (v2) : les anciennes clés (`…_collapsed`, `…_expanded`) sont
+ * ignorées, de sorte que tout le monde repart sur « ouvert », y compris celles et ceux qui
+ * avaient replié la consigne avant.
+ */
+export const JOURNEY_GUIDE_STORAGE_KEY = 'harx_rep_journey_guide_v2';
+
+/** Ouvert par défaut (aucune valeur, valeur inconnue ou stockage indisponible) ; replié seulement sur choix explicite « 0 ». */
+export function resolveGuideExpanded(stored: string | null | undefined): boolean {
+  return stored !== '0';
+}
