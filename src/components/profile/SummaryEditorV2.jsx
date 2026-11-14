@@ -11,6 +11,9 @@ import { Video, Camera, Upload, AlertTriangle, Info, X, ImagePlus, RefreshCw, Sp
 import { useTranslation } from 'react-i18next';
 import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal';
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
+import { flexibilityLabel, hasFlexibility, toggleFlexibility } from '../../utils/flexibilityOptions';
+import { formatCountryLabel, resolveCountryCode, resolveCountryName } from '../../utils/countryDisplay';
+import { INTRO_VIDEO_MAX_SECONDS, PRESENTATION_VIDEO_SAVED_EVENT, hasPresentationVideo, isIntroVideoRequirementMet, withPresentationVideo } from '../../utils/introVideo';
 import { repApiUrl } from '../../utils/repApiUrl';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -549,6 +552,11 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   // New state for country mismatch detection
   const [firstLoginLocation, setFirstLoginLocation] = useState(null);
   const [videoModalExp, setVideoModalExp] = useState(null);
+  // Vidéo de présentation (obligatoire, une seule) : fenêtre d'enregistrement + état local « enregistrée ».
+  const [introModalOpen, setIntroModalOpen] = useState(false);
+  // Lu par les rappels asynchrones de la fenêtre (fermée pendant que l'analyse se poursuit en arrière-plan).
+  const introModalOpenRef = useRef(false);
+  introModalOpenRef.current = introModalOpen;
   // Barre « prochaine étape » : visible dès que la liste de contrôle n'est plus à l'écran, pour ne pas obliger à défiler jusqu'en bas.
   const [checklistEl, setChecklistEl] = useState(null);
   const [checklistVisible, setChecklistVisible] = useState(true);
@@ -1040,12 +1048,14 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
 
     if (!currentTimezone || !selectedCountry) return { matches: true, message: '' };
 
-    const selectedCountryCode = typeof selectedCountry === 'object' ? selectedCountry.countryCode : selectedCountry;
+    // Le pays peut arriver en objet, en code ISO ou en identifiant : on compare toujours des codes.
+    const selectedCountryCode = resolveCountryCode(selectedCountry, countries);
+    if (!selectedCountryCode) return { matches: true, message: '' };
     const timezoneCountryCode = currentTimezone.countryCode;
 
     if (selectedCountryCode !== timezoneCountryCode) {
       const timezoneCountryName = countries.find(c => c.countryCode === timezoneCountryCode)?.countryName || t('unknown');
-      const selectedCountryName = typeof selectedCountry === 'object' ? selectedCountry.countryName : selectedCountry;
+      const selectedCountryName = resolveCountryName(selectedCountry, countries, uiLang) || selectedCountryCode;
 
       return {
         matches: false,
@@ -1062,16 +1072,13 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       return null;
     }
 
-    const currentCountryCode = typeof currentCountry === 'object'
-      ? currentCountry.countryCode
-      : currentCountry;
+    const currentCountryCode = resolveCountryCode(currentCountry, countries);
+    if (!currentCountryCode) return null;
 
     const firstLoginCountryCode = firstLoginLocation.countryCode;
 
     if (currentCountryCode !== firstLoginCountryCode) {
-      const currentCountryName = typeof currentCountry === 'object'
-        ? currentCountry.countryName
-        : countries.find(c => c.countryCode === currentCountryCode)?.countryName || currentCountryCode;
+      const currentCountryName = resolveCountryName(currentCountry, countries, uiLang) || currentCountryCode;
 
       return {
         profileCountry: {
@@ -1599,9 +1606,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     }
   };
 
-  const showToast = (message, type = 'success') => {
+  const showToast = (message, type = 'success', durationMs = 3000) => {
     setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), durationMs);
   };
 
   const regenerateSummary = async () => {
@@ -2544,12 +2551,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         <span className="text-xs font-bold text-emerald-700">{t('expVideoDone')}</span>
                       </div>
                     ) : (
-                      <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border-2 border-red-200 animate-pulse">
-                        <svg className="h-4 w-4 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-xs font-bold text-red-600">{t('expVideoMissing')}</span>
-                      </div>
+                      <p className="mt-4 text-xs text-gray-500">{t('expVideoOptional')}</p>
                     )}
 
                     <button
@@ -2562,7 +2564,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       }`}
                     >
                       <Video className="w-4 h-4" />
-                      {role.videoUrl || role.videoAnalysis ? t('viewAnalysis') : t('recordAnalyze')}
+                      {role.videoUrl || role.videoAnalysis ? t('viewAnalysis') : t('recordAnalyzeOptional')}
                     </button>
                   </div>
                 )}
@@ -2664,6 +2666,77 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 ).catch((err) => {
                   console.error('Failed to persist languages detected from video:', err);
                 });
+              }
+            }}
+          />
+        )}
+
+        {introModalOpen && (
+          <ExperienceVideoModal
+            isOpen={introModalOpen}
+            mode="intro"
+            onClose={() => setIntroModalOpen(false)}
+            experience={{
+              title: String(editedProfile?.personalInfo?.name || ''),
+              company: '',
+              description: String(editedProfile?.professionalSummary?.profileDescription || ''),
+              responsibilities: [],
+            }}
+            profileId={editedProfile._id || editedProfile.id || ''}
+            referencePhotoUrl={editedProfile?.personalInfo?.photo?.url || null}
+            savedData={(() => {
+              const pv = editedProfile?.personalInfo?.presentationVideo;
+              const url = typeof pv === 'string' ? pv : pv?.url;
+              return hasPresentationVideo(editedProfile) && url ? { videoUrl: url } : null;
+            })()}
+            onVideoSaved={({ url }) => {
+              // La vidéo est enregistrée côté serveur : l'obligation est remplie dès maintenant,
+              // même si l'analyse IA (non bloquante) échoue ensuite. `presentationVideo` est retiré
+              // de personalInfo à l'enregistrement du profil (profileUtils), donc sans risque.
+              setEditedProfile((prev) => {
+                const updated = withPresentationVideo(prev, url);
+                if (onProfileUpdate) onProfileUpdate(updated);
+                return updated;
+              });
+              // Le bandeau du parcours (en haut de page) lit le profil du « shell », pas cet état local :
+              // on l'informe tout de suite, sans attendre un rechargement ni la fin de l'analyse.
+              try {
+                window.dispatchEvent(new CustomEvent(PRESENTATION_VIDEO_SAVED_EVENT, { detail: { url: url || '' } }));
+              } catch {
+                /* environnement sans window.CustomEvent */
+              }
+            }}
+            onAnalysisSettled={({ status, message }) => {
+              // Fenêtre ouverte : elle affiche déjà le résultat ou l'erreur. Fermée : notification discrète.
+              if (introModalOpenRef.current) return;
+              if (status === 'done') showToast(t('introAnalysisDoneToast'), 'success', 6000);
+              else showToast(message || t('introAnalysisFailedToast'), 'error', 8000);
+            }}
+            onAnalysisComplete={async () => {
+              // Le backend a écrit secteurs, activités, langues (et compétences en suggestions) :
+              // on RECHARGE le profil et on ne fusionne que ces champs, sans écraser les
+              // modifications locales non enregistrées du reste de l'éditeur.
+              try {
+                const refreshed = await fetchProfileFromAPI();
+                if (!refreshed) return;
+                setEditedProfile((prev) => ({
+                  ...prev,
+                  proposedSkills: refreshed.proposedSkills ?? prev.proposedSkills,
+                  professionalSummary: {
+                    ...(prev.professionalSummary || {}),
+                    industries: refreshed.professionalSummary?.industries ?? prev.professionalSummary?.industries,
+                    activities: refreshed.professionalSummary?.activities ?? prev.professionalSummary?.activities,
+                  },
+                  personalInfo: {
+                    ...(prev.personalInfo || {}),
+                    languages: refreshed.personalInfo?.languages ?? prev.personalInfo?.languages,
+                    presentationVideo: refreshed.personalInfo?.presentationVideo ?? prev.personalInfo?.presentationVideo,
+                  },
+                }));
+                setProfileData(refreshed);
+                window.dispatchEvent(new Event(PROFILE_UPDATE_EVENT));
+              } catch (err) {
+                console.error('Could not reload the profile after the presentation analysis:', err);
               }
             }}
           />
@@ -3304,18 +3377,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     );
   }
 
+  // Jamais d'identifiant brut : nom résolu (objet, code ISO ou _id dans la liste chargée), sinon « Non renseigné ».
   const countryDisplay =
-    typeof editedProfile.personalInfo.country === 'object'
-      ? `${editedProfile.personalInfo.country?.countryName || ''} (${editedProfile.personalInfo.country?.countryCode || ''})`
-      : editedProfile.personalInfo.country || '—';
+    formatCountryLabel(editedProfile.personalInfo.country, countries, uiLang) || t('notSpecified');
 
-  // Continuing is only allowed once AT LEAST ONE experience has a recorded/analyzed
-  // video. Until then we lock the "Confirm to continue" buttons and show a loud
-  // warning prompting the user to record a video.
+  // Règle vidéo : UNE vidéo de présentation (le/la REP se présente et présente son parcours)
+  // est obligatoire. Les vidéos par expérience sont optionnelles. Compatibilité : un profil
+  // qui a déjà au moins une vidéo d'expérience n'est pas bloqué.
   const experienceList = Array.isArray(editedProfile.experience) ? editedProfile.experience : [];
-  const experiencesWithVideo = experienceList.filter((exp) => exp && (exp.videoUrl || exp.videoAnalysis)).length;
-  const hasExperienceVideo = experiencesWithVideo >= 1;
-  const missingVideosCount = experienceList.length - experiencesWithVideo;
+  const hasIntroVideo = isIntroVideoRequirementMet(editedProfile);
+  const hasExperienceVideo = hasIntroVideo; // alias conservé : critère d'avancement « vidéo »
   const hasProfilePhoto = Boolean(editedProfile?.personalInfo?.photo?.url);
 
   const hasAvailabilitySet = (() => {
@@ -3333,7 +3404,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const canContinue = hasExperienceVideo && hasProfilePhoto && hasAvailabilitySet;
   const continueBlockedReason = !hasProfilePhoto
     ? t('warnBottomPhoto')
-    : !hasExperienceVideo
+    : !hasIntroVideo
     ? t('warnBottom')
     : !hasAvailabilitySet
     ? t('warnBottomAvail')
@@ -3349,11 +3420,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
       : (localizeList(role?.responsibilities_i18n, uiLang).length ? localizeList(role.responsibilities_i18n, uiLang) : []),
     index,
   });
-  // Raccourci : ouvre tout de suite l'enregistrement de la première expérience qui n'a pas encore de vidéo (plus besoin de défiler).
-  const openVideoForFirstMissing = () => {
-    const idx = experienceList.findIndex((exp) => exp && !(exp.videoUrl || exp.videoAnalysis));
-    if (idx >= 0) setVideoModalExp(videoModalPayload(experienceList[idx], idx));
-  };
+  // Raccourci : ouvre tout de suite l'enregistrement de la vidéo de présentation (plus besoin de défiler).
+  const openIntroVideo = () => setIntroModalOpen(true);
   const scrollToAvailability = () => {
     const el = document.getElementById('onboarding-availability');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3392,8 +3460,8 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   };
   const nextStep = !hasProfilePhoto
     ? { key: 'photo', icon: Camera, label: t('nextPhoto'), cta: t('addPhoto'), run: openPhotoSourceModal }
-    : !hasExperienceVideo
-      ? (experienceList.length > 0 ? { key: 'video', icon: Video, label: t('nextVideo'), cta: t('ctaRecordVideo'), run: openVideoForFirstMissing } : null)
+    : !hasIntroVideo
+      ? { key: 'video', icon: Video, label: t('nextVideo'), cta: t('ctaRecordVideo'), run: openIntroVideo }
       : !hasAvailabilitySet
         ? { key: 'avail', icon: CalendarClock, label: t('nextAvail'), cta: t('ctaPickSlot'), run: scrollToChecklist }
         : null;
@@ -3553,23 +3621,23 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                 },
                 {
                   key: 'video',
-                  done: hasExperienceVideo,
+                  done: hasIntroVideo,
                   icon: Video,
                   title: t('checkVideo'),
-                  desc: experienceList.length === 0
-                    ? t('warnAddExp')
-                    : t('missingVideos', { count: missingVideosCount, total: experienceList.length }),
-                  action: experienceList.length > 0 ? (
+                  desc: hasIntroVideo
+                    ? t('introVideoDoneDesc')
+                    : t('introVideoMissingDesc', { max: Math.round(INTRO_VIDEO_MAX_SECONDS / 60) }),
+                  action: (
                     <button
                       type="button"
-                      onClick={openVideoForFirstMissing}
+                      onClick={openIntroVideo}
                       data-testid="record-video-now"
                       className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-harx-600 to-harx-alt-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
                     >
                       <Video className="h-3.5 w-3.5" />
-                      {t('ctaRecordVideo')}
+                      {hasIntroVideo ? t('introVideoRedo') : t('ctaRecordVideo')}
                     </button>
-                  ) : null,
+                  ),
                 },
                 {
                   key: 'avail',
@@ -3963,9 +4031,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                   <div className="relative country-selector">
                     <input
                       type="text"
-                      value={isSearching ? countrySearch : (typeof editedProfile.personalInfo.country === 'object'
-                        ? `${editedProfile.personalInfo.country?.countryName} (${editedProfile.personalInfo.country?.countryCode})`
-                        : editedProfile.personalInfo.country || '')}
+                      value={isSearching ? countrySearch : formatCountryLabel(editedProfile.personalInfo.country, countries, uiLang)}
                       onChange={handleCountryInputChange}
                       onFocus={handleCountryInputFocus}
                       className="w-full p-2 pr-8 border rounded-md bg-white/50"
@@ -4624,18 +4690,16 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                       <button
                         key={option}
                         onClick={() => {
-                          const currentFlexibility = editedProfile.availability?.flexibility || [];
-                          const updatedFlexibility = currentFlexibility.includes(option)
-                            ? currentFlexibility.filter(f => f !== option)
-                            : [...currentFlexibility, option];
+                          // Comparaison sur la forme canonique : « remote work » (import) = « Remote Work Available ».
+                          const updatedFlexibility = toggleFlexibility(editedProfile.availability?.flexibility, option);
                           handleAvailabilityChangeLocal('flexibility', updatedFlexibility);
                         }}
-                        className={`px-4 py-2 rounded text-sm ${editedProfile.availability?.flexibility?.includes(option)
+                        className={`px-4 py-2 rounded text-sm ${hasFlexibility(editedProfile.availability?.flexibility, option)
                           ? 'bg-harx-600 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </button>
                     ))}
                   </div>
@@ -4707,7 +4771,7 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
                         key={option}
                         className="px-4 py-2 bg-gray-50 text-gray-700 rounded"
                       >
-                        {t(`availability.options.${option}`)}
+                        {flexibilityLabel(option, t)}
                       </span>
                     ))}
                   </div>

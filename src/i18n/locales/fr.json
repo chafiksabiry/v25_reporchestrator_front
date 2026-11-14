@@ -1,4 +1,18 @@
 {
+  "videoErrors": {
+    "VIDEO_TOO_LARGE": "Votre vidéo est trop volumineuse ({{maxMb}} Mo maximum). Refaites-la un peu plus courte ou choisissez un fichier plus léger : rien n’a été envoyé.",
+    "NOT_A_VIDEO": "Ce fichier n’est pas une vidéo reconnue. Choisissez une vidéo ou refaites l’enregistrement avec la caméra.",
+    "VIDEO_TOO_SHORT": "Votre vidéo est trop courte ({{minSeconds}} secondes minimum). Refaites-la un peu plus longue.",
+    "VIDEO_TOO_LONG": "Votre vidéo est trop longue ({{maxMinutes}} minutes maximum). Refaites-la plus brièvement.",
+    "NO_VIDEO": "Aucune vidéo n’a été reçue. Refaites l’enregistrement.",
+    "UPLOAD_BUSY": "Le service est très sollicité en ce moment. Réessayez dans un instant : votre enregistrement n’est pas perdu.",
+    "VIDEO_STORAGE_ERROR": "Le service de stockage vidéo est momentanément indisponible. Réessayez dans un instant : votre enregistrement n’est pas perdu.",
+    "UPLOAD_FAILED": "L’envoi de votre vidéo a échoué (connexion ?). Vérifiez votre connexion et réessayez : votre enregistrement n’est pas perdu.",
+    "ANALYSIS_FAILED": "L’analyse IA de votre vidéo n’a pas abouti. Votre vidéo est bien enregistrée : réessayez dans un instant.",
+    "INTERNAL_ERROR": "Un incident technique est survenu. Votre enregistrement n’est pas perdu : réessayez dans un instant.",
+    "UNAUTHORIZED": "Votre session a expiré. Reconnectez-vous puis réessayez.",
+    "UNKNOWN": "Une erreur est survenue. Votre enregistrement n’est pas perdu : réessayez dans un instant."
+  },
   "sidebar": {
     "dashboard": "Tableau de Bord",
     "profile": "Profil",
@@ -972,9 +986,10 @@
       "noneAvailable": "Aucune autre compétence disponible dans cette section.",
       "delete": "Supprimer cette compétence",
       "deleteNamed": "Supprimer {{name}}",
-      "proposals": "Suggérées depuis vos vidéos",
-      "proposalsHint": "{{count}} suggestion(s) de compétences issues de vos vidéos d’expérience — confirmez pour les ajouter au profil, ou retirez-les. Le matching des missions s’appuie surtout sur vos secteurs et activités.",
+      "proposals": "Suggéré d’après votre vidéo / votre CV",
+      "proposalsHint": "{{count}} compétence(s) suggérée(s) d’après votre vidéo de présentation ou votre CV — ajoutez-les d’un clic (« Tout ajouter » ou une par une) ou retirez celles qui ne vous correspondent pas. Le matching des missions s’appuie surtout sur vos secteurs et activités.",
       "confirmProposal": "Confirmer cette compétence",
+      "confirmAll": "Tout ajouter",
       "confirmProposalNamed": "Confirmer {{name}}",
       "dismissProposal": "Retirer cette suggestion",
       "dismissProposalNamed": "Retirer la suggestion {{name}}"
@@ -1284,13 +1299,13 @@
     "coachDoneBody": "Cliquez sur « Continue Onboarding » pour choisir votre offre. Votre profil est ensuite publié automatiquement.",
     "coach_photo_title": "Commencez par votre plus belle photo",
     "coach_photo_body": "Une photo nette et bien éclairée de votre visage inspire confiance aux entreprises. Importez-en une ou prenez-la maintenant.",
-    "coach_video_title": "Faites entendre votre voix en vidéo",
-    "coach_video_body": "Utilisez « Record & Analyze with AI » sur une expérience. Une seule vidéo suffit : l'IA vérifie votre niveau à l'oral et vos langues.",
+    "coach_video_title": "Présentez-vous en vidéo",
+    "coach_video_body": "Une seule vidéo est obligatoire : présentez-vous et présentez votre parcours (quelques minutes). L'analyse IA démarre toute seule à la fin de l'enregistrement.",
     "coach_avail_title": "Indiquez quand vous pouvez travailler",
     "coach_avail_body": "Renseignez vos horaires hebdomadaires pour être associé à des missions compatibles avec votre emploi du temps.",
     "nextBadge": "Suivant",
     "tipPhoto": "Face à la lumière, fond neutre, sans lunettes de soleil.",
-    "tipVideo": "Parlez 1 à 2 minutes, au calme, d'une expérience réelle.",
+    "tipVideo": "Parlez 1 à 3 minutes, au calme : qui vous êtes et votre parcours.",
     "tipReview": "Relisez chaque section : corrigez ce que l'extraction du CV a mal compris.",
     "roadProfile": "Votre profil",
     "roadPlan": "Choisir votre offre",
@@ -1300,7 +1315,7 @@
     "nextStepLabel": "Prochaine étape",
     "readyLabel": "Tout est prêt",
     "nextPhoto": "Ajoutez votre photo de profil",
-    "nextVideo": "Enregistrez une courte vidéo (1 à 2 min)",
+    "nextVideo": "Enregistrez votre vidéo de présentation (3 min max)",
     "nextAvail": "Renseignez vos horaires de travail",
     "availPresetWeekdays": "Lun–Ven",
     "availPresetSixDays": "Lun–Sam",
@@ -1314,10 +1329,10 @@
     "checklistProgress": "{{done}} sur {{total}} terminé(s)",
     "checkPhoto": "Photo de profil",
     "checkPhotoDesc": "Obligatoire — ajoutez une photo ou prenez-en une.",
-    "checkVideo": "Vidéo d'expérience",
+    "checkVideo": "Vidéo de présentation",
     "checkAvail": "Disponibilités",
     "checkDone": "Fait",
-    "warnVideoTitle": "Une vidéo est requise pour continuer",
+    "warnVideoTitle": "Une vidéo de présentation est requise pour continuer",
     "warnAddExp": "Ajoutez au moins une expérience, puis enregistrez une vidéo pour celle-ci.",
     "reviewHintTitle": "Relisez les informations extraites",
     "reviewHintBody": "Vérifiez chaque section (identité, expériences, langues…). Corrigez ou complétez ce qui est inexact avant de continuer.",
@@ -1332,13 +1347,20 @@
     "photoCameraError": "Impossible d’accéder à la caméra. Autorisez l’accès ou importez une photo.",
     "missingVideos_one": "Votre expérience n’a pas encore de vidéo. Utilisez « Enregistrer et analyser avec l’IA » : une seule vidéo suffit pour continuer.",
     "missingVideos_other": "Aucune de vos {{total}} expériences n’a encore de vidéo. Utilisez « Enregistrer et analyser avec l’IA » sur au moins une expérience : une seule vidéo suffit pour continuer.",
-    "warnBottom": "Enregistrez une vidéo pour au moins une expérience ci-dessus afin de débloquer « Continuer Onboarding ».",
+    "warnBottom": "Enregistrez votre vidéo de présentation ci-dessus afin de débloquer « Continuer Onboarding ».",
     "warnBottomAvail": "Renseignez vos horaires de travail ci-dessus afin de débloquer « Continuer Onboarding ».",
     "warnBottomPhoto": "Ajoutez une photo de profil ci-dessus afin de débloquer « Continuer Onboarding ».",
     "recordAnalyze": "Enregistrer et analyser avec l’IA",
     "viewAnalysis": "Voir l’analyse IA",
     "expVideoMissing": "Vidéo requise — enregistrez une vidéo pour cette expérience afin de continuer.",
     "expVideoDone": "Vidéo enregistrée",
+    "expVideoOptional": "Vidéo facultative pour cette expérience.",
+    "recordAnalyzeOptional": "Ajouter une vidéo (facultatif)",
+    "introVideoDoneDesc": "Vidéo de présentation enregistrée. Vous pouvez la refaire à tout moment.",
+    "introAnalysisDoneToast": "Analyse de votre vidéo terminée : votre profil a été mis à jour.",
+    "introAnalysisFailedToast": "L’analyse de votre vidéo n’a pas pu aboutir. Votre vidéo est bien enregistrée : vous pouvez continuer ou réessayer plus tard.",
+    "introVideoMissingDesc": "Présentez-vous et présentez votre parcours en vidéo ({{max}} minutes maximum). C'est la seule vidéo obligatoire ; celles par expérience sont facultatives.",
+    "introVideoRedo": "Refaire ma vidéo",
     "availMissing": "Disponibilités non renseignées — cliquez sur Modifier pour ajouter vos horaires de travail.",
     "savedSuccess": "Enregistrement réussi !",
     "saveError": "Une erreur est survenue lors de l’enregistrement. Veuillez réessayer.",
@@ -1568,7 +1590,7 @@
       "verifyIdentity": "Effectuez la vérification de votre identité",
       "enableTwoFactor": "Activez l’authentification à deux facteurs",
       "addExperience": "Ajoutez vos expériences professionnelles",
-      "recordExperienceVideo": "Enregistrez une vidéo pour chaque expérience",
+      "recordExperienceVideo": "Enregistrez votre vidéo de présentation (3 min max)",
       "uploadPhoto": "Ajoutez une photo professionnelle",
       "completeBio": "Complétez votre biographie",
       "setAvailability": "Définissez vos horaires de disponibilité",
@@ -1696,7 +1718,11 @@
     "publishAfterPlanHint": "Après le choix de la formule, vous pourrez publier votre profil puis donner votre avis avant d’accéder à la marketplace.",
     "publish": "Publier",
     "publishSuccess": "Profil publié — bienvenue sur la marketplace !",
-    "updating": "Mise à jour…"
+    "updating": "Mise à jour…",
+    "errors": {
+      "profileNotFound": "Nous ne retrouvons pas votre profil. Reconnectez-vous, puis réessayez.",
+      "plansLoad": "Impossible d’afficher les formules pour le moment. Réessayez dans un instant : votre profil est enregistré."
+    }
   },
   "onboardingSatisfaction": {
     "title": "Comment s’est passé votre onboarding ?",
@@ -1848,5 +1874,102 @@
     "mkt-heart": "Touchez le cœur pour mettre un gig de côté et le comparer plus tard.",
     "mkt-favorites": "Retrouvez ici tous les gigs que vous avez mis en favori.",
     "mkt-requested": "Vos demandes d’inscription en attente de réponse de l’entreprise sont ici."
-  }
+  },
+  "repJourney": {
+    "regionLabel": "Votre parcours d’inscription",
+    "progressLabel": "Avancement de votre inscription",
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "remaining_one": "≈ {{count}} min restante",
+    "remaining_other": "≈ {{count}} min restantes",
+    "minutes_one": "≈ {{count}} minute",
+    "minutes_other": "≈ {{count}} minutes",
+    "what": "À faire",
+    "why": "Pourquoi",
+    "howLong": "Durée",
+    "showGuide": "Afficher la consigne",
+    "hideGuide": "Masquer la consigne",
+    "revisitHint": "Revenir à cette étape : rien n’est perdu, tout est enregistré.",
+    "autosaveEditor": "Vos modifications sont enregistrées automatiquement. Vous pouvez quitter et reprendre plus tard.",
+    "autosaveGeneric": "Rien n’est perdu : vous pouvez quitter et reprendre là où vous en étiez.",
+    "needHelp": "Besoin d’aide ?",
+    "steps": {
+      "import": {
+        "short": "CV",
+        "title": "Importez votre CV",
+        "cheer": "Le plus dur, c’est de commencer : ça ne prend que quelques secondes.",
+        "what": "Déposez votre CV (PDF, DOC ou DOCX, 5 Mo max).",
+        "why": "Notre IA pré-remplit votre profil : vous n’aurez qu’à relire.",
+        "timeNote": "L’analyse ne prend que quelques secondes."
+      },
+      "editor": {
+        "short": "Profil",
+        "title": "Complétez votre profil",
+        "cheer": "Vous y êtes presque : chaque élément ajouté vous rend plus visible des entreprises.",
+        "what": "Ajoutez votre photo, une vidéo de présentation et vos disponibilités.",
+        "why": "Un profil complet est mis en avant auprès des entreprises.",
+        "timeNote": "Prévoyez un endroit calme et un bon éclairage pour les vidéos."
+      },
+      "profile": {
+        "short": "Vérification",
+        "title": "Relisez votre profil",
+        "cheer": "Dernier coup d’œil avant de choisir votre formule.",
+        "what": "Vérifiez vos informations, puis cliquez sur « Continuer ».",
+        "why": "C’est ce que les entreprises verront de vous.",
+        "timeNote": "Vous pourrez toujours modifier votre profil ensuite."
+      },
+      "plan": {
+        "short": "Formule",
+        "title": "Choisissez votre formule",
+        "cheer": "Dernière étape avant les missions : plus que quelques clics.",
+        "what": "Comparez les formules et sélectionnez celle qui vous convient.",
+        "why": "Ce choix active votre compte ; vous pourrez ensuite publier votre profil.",
+        "timeNote": "Chaque formule détaille ses avantages à l’écran."
+      },
+      "marketplace": {
+        "short": "Missions",
+        "title": "Trouvez votre première mission",
+        "cheer": "Bravo, votre profil est en ligne !",
+        "what": "Parcourez les missions et postulez.",
+        "why": "Les entreprises vous découvrent ici.",
+        "timeNote": ""
+      }
+    },
+    "checklist": {
+      "title": "Plus que {{left}} à faire ({{done}} sur {{total}} terminés)",
+      "allDone": "Tout est prêt : vous pouvez continuer ! 🎉",
+      "items": {
+        "photo": {
+          "label": "Photo de profil",
+          "hint": "Choisissez une photo nette, de face, sur fond neutre."
+        },
+        "experiences": {
+          "label": "Expériences",
+          "hint": "Ajoutez au moins une expérience (importée depuis votre CV ou saisie à la main)."
+        },
+        "availability": {
+          "label": "Disponibilités",
+          "hint": "Indiquez vos jours et horaires de travail habituels."
+        },
+        "video": {
+          "label": "Vidéo de présentation",
+          "hint": "Une seule vidéo (3 min max) : présentez-vous et votre parcours, avec vos mots."
+        }
+      }
+    },
+    "errors": {
+      "title": "Un petit contretemps",
+      "network": "Votre connexion semble interrompue. Vérifiez-la, puis réessayez : votre fichier n’a pas été perdu.",
+      "timeout": "L’analyse a pris plus de temps que prévu. Réessayez dans un instant.",
+      "rateLimit": "Beaucoup de personnes s’inscrivent en ce moment. Patientez une minute puis réessayez.",
+      "auth": "Votre session a expiré. Reconnectez-vous, puis relancez l’import.",
+      "serverBusy": "Nos serveurs sont momentanément occupés. Réessayez dans quelques instants, vos données sont en sécurité.",
+      "validation": "Nous n’avons pas pu enregistrer certaines informations de votre CV. Réessayez, ou essayez un autre fichier.",
+      "languages": "Il manque une rubrique Langues dans votre CV. Ajoutez-y vos langues (ex. « Français : natif · Anglais : courant »), puis réessayez.",
+      "unreadable": "Ce fichier semble illisible ou protégé. Essayez de l’enregistrer à nouveau en PDF, sans mot de passe.",
+      "generic": "Impossible d’analyser votre CV pour le moment. Réessayez, ou utilisez un autre fichier.",
+      "retry": "Réessayer",
+      "tipSupport": "Toujours bloqué ? Contactez le support depuis le menu : nous vous répondons vite."
+    }
+  },
+  "repOnboardingGuide": {"close": "Fermer", "gotIt": "Compris"}
 }

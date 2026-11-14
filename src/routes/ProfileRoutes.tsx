@@ -72,11 +72,6 @@ function ProfileLoading({ label }: { label?: string }) {
   );
 }
 
-const IMPORT_STEPS = [
-  { n: 1, labelKey: 'profileImport.step1Label' },
-  { n: 2, labelKey: 'profileImport.step2Label' },
-  { n: 3, labelKey: 'profileImport.step3Label' },
-];
 
 /** Exemples affichés dans l'aperçu : illustrent ce que l'IA construit à partir d'un CV (aucune donnée réelle). */
 const PREVIEW_SKILLS = ['profileImport.preview.skill1', 'profileImport.preview.skill2', 'profileImport.preview.skill3', 'profileImport.preview.skill4'];
@@ -99,7 +94,7 @@ export function ProfileImportPage({
   const { t } = useTranslation();
 
   return (
-    <div className="relative flex min-h-[calc(100vh-9.5rem)] flex-col justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-harx-50/50 to-harx-alt-50/50 shadow-sm">
+    <div className="relative flex flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-white via-harx-50/50 to-harx-alt-50/50 shadow-sm">
       {/* ── Fond aux couleurs HARX ── */}
       <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-harx-300/30 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 -left-24 h-96 w-96 rounded-full bg-harx-alt-300/25 blur-3xl" />
@@ -109,38 +104,25 @@ export function ProfileImportPage({
       />
       <img src={harxLogo} alt="" aria-hidden="true" className="pointer-events-none absolute -bottom-10 -right-6 w-72 rotate-[-8deg] select-none opacity-[0.05]" />
 
-      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-10 px-6 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:py-9">
+      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-6 px-5 py-5 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-6">
         {/* ── Pitch ── */}
         <div className="flex flex-col items-start text-left">
-          <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-harx-200 bg-white/80 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-harx-600 shadow-sm">
+          <span className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-harx-200 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-harx-600 shadow-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-harx-500" />
             {t('profileImport.step1')}
             <span className="rounded-full bg-harx-50 px-2 py-0.5 text-[10px] tracking-wider text-harx-700">{t('profileImport.duration')}</span>
           </span>
 
-          <h2 className="mb-3 text-3xl font-extrabold leading-tight text-gray-900 sm:text-4xl lg:text-[2.6rem]">
+          <h2 className="mb-2 text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl lg:text-[2.1rem]">
             {t('profileImport.title1')}{' '}
             <span className="bg-gradient-to-r from-harx-600 to-harx-alt-600 bg-clip-text text-transparent">{t('profileImport.title2')}</span>
           </h2>
-          <p className="mb-5 max-w-xl text-base text-gray-600">{t('profileImport.subtitle')}</p>
+          <p className="mb-4 max-w-xl text-sm text-gray-600 sm:text-base">{t('profileImport.subtitle')}</p>
 
-          <ul className="mb-6 w-full max-w-xl space-y-2.5">
-            {BENEFITS.map((b) => (
-              <li key={b.titleKey} className="flex items-start gap-3.5 rounded-2xl border border-white bg-white/70 p-3 shadow-sm backdrop-blur">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{b.icon}</svg>
-                </span>
-                <span>
-                  <span className="block text-sm font-bold text-gray-900">{t(b.titleKey)}</span>
-                  <span className="block text-sm text-gray-500">{t(b.descKey)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
 
           <button
             onClick={() => setIsImportOpen(true)}
-            className="group inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-harx-600 to-harx-alt-600 px-9 py-4 text-base font-bold text-white shadow-lg shadow-harx-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-harx-500/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-harx-300"
+            className="group inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-harx-600 to-harx-alt-600 px-8 py-3 text-base font-bold text-white shadow-lg shadow-harx-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-harx-500/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-harx-300"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -154,31 +136,30 @@ export function ProfileImportPage({
             <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
             {t('profileImport.trust')}
           </p>
-
-          {/* Étapes : cette page est toujours l'étape 1 ; les suivantes sont à venir. */}
-          <ol className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label={t('profileImport.stepsLabel')}>
-            {IMPORT_STEPS.map((s, i) => {
-              const isCurrent = s.n === 1;
-              return (
-                <li key={s.n} className="flex items-center gap-1.5" aria-current={isCurrent ? 'step' : undefined}>
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isCurrent ? 'bg-harx-600 text-white' : 'border border-gray-200 bg-gray-100 text-gray-400'}`}>{s.n}</span>
-                  <span className={`whitespace-nowrap text-xs font-medium ${isCurrent ? 'text-gray-900' : 'text-gray-400'}`}>{t(s.labelKey)}</span>
-                  {i < IMPORT_STEPS.length - 1 && <svg className="hidden h-3.5 w-3.5 text-gray-300 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>}
-                </li>
-              );
-            })}
-          </ol>
+          <ul className="mt-4 w-full max-w-xl space-y-2">
+            {BENEFITS.map((b) => (
+              <li key={b.titleKey} className="flex items-start gap-3 rounded-2xl border border-white bg-white/70 p-2.5 shadow-sm backdrop-blur">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{b.icon}</svg>
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-gray-900">{t(b.titleKey)}</span>
+                  <span className="block text-xs text-gray-500 sm:text-sm [@media(max-height:760px)]:hidden">{t(b.descKey)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* ── Aperçu : ce que l'IA construit à partir du CV (exemple) ── */}
         <div className="relative mx-auto w-full max-w-md lg:max-w-none">
           <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-harx-200/50 to-harx-alt-200/50 blur-xl" aria-hidden="true" />
           <div className="relative overflow-hidden rounded-3xl border border-white bg-white shadow-2xl shadow-harx-500/10">
-            <div className="flex items-center justify-between bg-gradient-to-r from-harx-600 to-harx-alt-600 px-5 py-3 text-white">
+            <div className="flex items-center justify-between bg-gradient-to-r from-harx-600 to-harx-alt-600 px-4 py-2 text-white">
               <span className="text-[11px] font-bold uppercase tracking-[0.18em]">{t('profileImport.preview.title')}</span>
               <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">{t('profileImport.preview.example')}</span>
             </div>
-            <div className="space-y-5 p-5">
+            <div className="space-y-3 p-4">
               <div className="flex items-center gap-4">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-harx-100 to-harx-alt-100 text-harx-600">
                   <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -189,7 +170,7 @@ export function ProfileImportPage({
                 </div>
               </div>
 
-              <p className="rounded-2xl bg-gray-50 p-3.5 text-sm italic leading-relaxed text-gray-600">« {t('profileImport.preview.summary')} »</p>
+              <p className="rounded-2xl bg-gray-50 p-3 text-sm italic leading-relaxed text-gray-600">« {t('profileImport.preview.summary')} »</p>
 
               <div>
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">{t('profileImport.preview.skills')}</p>
@@ -202,7 +183,7 @@ export function ProfileImportPage({
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">{t('profileImport.preview.missions')}</p>
                 <ul className="space-y-2">
                   {PREVIEW_MISSIONS.map((m) => (
-                    <li key={m.titleKey} className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 p-3">
+                    <li key={m.titleKey} className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 p-2.5">
                       <span>
                         <span className="block text-sm font-bold text-gray-900">{t(m.titleKey)}</span>
                         <span className="block text-xs text-gray-500">{t(m.metaKey)}</span>
@@ -221,7 +202,7 @@ export function ProfileImportPage({
       </div>
 
       {/* Propulsé par : capacités de la plateforme */}
-      <div className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-gray-100/80 px-6 pb-6 pt-5">
+      <div className="relative mx-auto hidden w-full max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-gray-100/80 px-6 pb-4 pt-3 [@media(min-height:900px)]:flex">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">{t('profileImport.poweredBy')}</p>
         {POWERED_BY_CAPABILITIES.map((cap) => (
           <span key={cap.nameKey} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500">
@@ -271,6 +252,8 @@ export default function ProfileRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
   const isEditor = location.pathname.includes('/profile-editor');
+  // Retour volontaire depuis la barre de parcours : on reste sur l'éditeur au lieu d'être renvoyé en avant.
+  const allowBack = (location.state as { allowBack?: boolean } | null)?.allowBack === true;
   const { t } = useTranslation();
 
   usePageTitle(
@@ -333,6 +316,7 @@ export default function ProfileRoutes() {
                 const next = getRepOnboardingStep(parsed);
                 // Stay on the editor to finish phase 2 — never bounce back to import.
                 if (
+                  !allowBack &&
                   next.path !== '/profile-editor' &&
                   next.path !== '/profile-import'
                 ) {
@@ -351,6 +335,7 @@ export default function ProfileRoutes() {
           applyProfileData(fromApi as ProfileRecord);
           const next = getRepOnboardingStep(fromApi);
           if (
+            !allowBack &&
             next.path !== '/profile-editor' &&
             next.path !== '/profile-import'
           ) {
@@ -374,7 +359,7 @@ export default function ProfileRoutes() {
     return () => {
       cancelled = true;
     };
-  }, [isEditor, profileData, applyProfileData, navigate]);
+  }, [isEditor, profileData, applyProfileData, navigate, allowBack]);
 
   return (
     <ProtectedRoute>

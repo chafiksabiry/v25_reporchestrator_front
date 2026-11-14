@@ -4,6 +4,10 @@ import 'react-image-crop/dist/ReactCrop.css';
 import {
   X, Save, RefreshCw, Trash2, ChevronLeft
 } from 'lucide-react';
+import i18n from '../../i18n';
+import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorMessage, withRetryAfterOnce } from '../../utils/videoErrors';
+import { PROFILE_RECORDING_MAX_SECONDS, recorderOptions } from '../../utils/videoLimits';
+import { resolveCountryName, resolveGeoRef } from '../../utils/countryDisplay';
 import { updateProfileData, updateBasicInfo, updateExperience, updateSkills, checkCountryMismatch, updateUserFullName, recheckExperienceIdentity } from '../../utils/profileUtils';
 import config from '../../config';
 import { repApiUrl } from '../../utils/repApiUrl';
@@ -178,58 +182,68 @@ const base64ToBlob = async (base64String: string): Promise<Blob> => {
   return new Blob([ab], { type: 'image/jpeg' });
 };
 
-// Function to upload presentation video with progress
+// Envoie la vidéo de présentation (PUT /profiles/:id/video) avec progression.
+// - > 100 Mo : refusé AVANT l'envoi (rien n'est envoyé) ;
+// - erreurs du serveur : converties en VideoApiError (code, Retry-After) pour un message clair et traduit ;
+// - 429 (UPLOAD_BUSY) : une seule relance automatique après Retry-After.
 const uploadPresentationVideo = async (
   agentId: string,
   videoBlob: Blob,
   onProgress?: (progress: number) => void
 ): Promise<any> => {
+  const tooLarge = checkVideoBeforeUpload(videoBlob);
+  if (tooLarge) throw tooLarge;
+
   const token = localStorage.getItem('token');
   if (!token) {
-    throw new Error('No authentication token found');
+    throw toVideoApiError(401);
   }
 
-  const formData = new FormData();
-  // Convert blob to file for proper upload
-  const videoFile = new File([videoBlob], 'presentation-video.webm', {
-    type: 'video/webm'
-  });
-  formData.append('video', videoFile);
+  return withRetryAfterOnce(
+    () =>
+      new Promise<any>((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('video', new File([videoBlob], 'presentation-video.webm', { type: 'video/webm' }));
+        const xhr = new XMLHttpRequest();
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable && onProgress) {
+            onProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        });
 
-    // Track upload progress
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable && onProgress) {
-        const percentComplete = Math.round((event.loaded / event.total) * 100);
-        onProgress(percentComplete);
-      }
-    });
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              // Réponse 2xx sans JSON exploitable : l'envoi a réussi, on ne le présente pas comme une erreur.
+              resolve({});
+            }
+          } else {
+            let body: any;
+            try {
+              body = JSON.parse(xhr.responseText);
+            } catch {
+              body = undefined;
+            }
+            reject(toVideoApiError(xhr.status, body, xhr.getResponseHeader('Retry-After')));
+          }
+        });
 
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const result = JSON.parse(xhr.responseText);
-          console.log('Video uploaded successfully:', result);
-          resolve(result);
-        } catch (error) {
-          reject(new Error('Invalid JSON response'));
-        }
-      } else {
-        reject(new Error(`HTTP error! status: ${xhr.status}`));
-      }
-    });
+        xhr.addEventListener('error', () => reject(toVideoApiError(0, { code: 'UPLOAD_FAILED' })));
+        xhr.addEventListener('timeout', () => reject(toVideoApiError(0, { code: 'UPLOAD_FAILED' })));
 
-    xhr.addEventListener('error', () => {
-      reject(new Error('Network error occurred'));
-    });
-
-    xhr.open('PUT', repApiUrl(`/profiles/${agentId}/video`));
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.send(formData);
-  });
+        xhr.open('PUT', repApiUrl(`/profiles/${agentId}/video`));
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+      })
+  );
 };
+
+// Message clair et traduit pour une erreur d'envoi de vidéo (jamais le texte brut du serveur).
+const uploadErrorMessage = (error: unknown): string =>
+  videoErrorMessage(isVideoApiError(error) ? error.code : 'UPLOAD_FAILED', i18n.language, { maxMinutes: 10 });
 
 // Add this near the top of the file with other imports
 const PROFILE_UPDATE_EVENT = 'PROFILE_UPDATED';
@@ -461,6 +475,19 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
       setIsLanguageDropdownOpen(true);
     }
   }, [activeTab]);
+
+  // Pays reçu sous forme d'identifiant ou de code : on retrouve son nom dans la liste chargée
+  // (jamais d'identifiant brut dans le champ).
+  useEffect(() => {
+    const raw = profile?.personalInfo?.country as unknown;
+    if (!raw || typeof raw === 'object' || countries.length === 0 || countrySearchTerm) return;
+    const ref = resolveGeoRef(raw, countries as any[]);
+    const name = resolveCountryName(raw, countries as any[]);
+    if (name) {
+      setCountrySearchTerm(name);
+      if (ref?.countryCode) setSelectedCountry(ref.countryCode);
+    }
+  }, [countries, profile?.personalInfo?.country]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load countries and all timezones on component mount
   useEffect(() => {
@@ -912,7 +939,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
             showToast('Video replaced successfully!', 'success');
           } catch (error) {
             console.error('❌ Error replacing video:', error);
-            showToast('Failed to replace video', 'error');
+            showToast(uploadErrorMessage(error), 'error'); // l'enregistrement reste à l'écran : réessayer ou refaire
             return;
           } finally {
             setUploadingVideo(false);
@@ -953,11 +980,7 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
             showToast('Video uploaded successfully!', 'success');
           } catch (error) {
             console.error('❌ Error uploading video:', error);
-            if (error instanceof Error && error.message === 'No authentication token found') {
-              showToast('Please log in again to upload video', 'error');
-            } else {
-              showToast('Failed to upload presentation video', 'error');
-            }
+            showToast(uploadErrorMessage(error), 'error'); // l'enregistrement reste à l'écran : réessayer ou refaire
             return;
           } finally {
             setUploadingVideo(false);
@@ -1551,7 +1574,8 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
   const startRecording = () => {
     if (!stream) return;
 
-    const recorder = new MediaRecorder(stream);
+    // Débits plafonnés (≈ 56 Mo pour 5 min) pour rester sous la limite d'envoi de 100 Mo.
+    const recorder = new MediaRecorder(stream, recorderOptions());
     const chunks: BlobPart[] = [];
 
     recorder.ondataavailable = (event) => {
@@ -1584,26 +1608,26 @@ export const ProfileEditView: React.FC<ProfileEditViewProps> = ({ profile: initi
     setHasShownCompletionToast(false); // Reset completion toast state
     setVideoUploaded(false); // Reset upload status for new recording
 
-    // Start timer (max 600 seconds)
+    // Start timer (max 300 seconds = 5 minutes, ≈ 56 Mo : sous la limite d'envoi de 100 Mo)
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime(prev => {
         const newTime = prev + 1;
 
-        // Show warning at 540 seconds (1 minute left)
-        if (newTime === 540) {
+        // Show warning 1 minute before the limit
+        if (newTime === PROFILE_RECORDING_MAX_SECONDS - 60) {
           setShowTimeWarning(true);
         }
 
-        // Stop at exactly 600 seconds - 10 minute limit reached
-        if (newTime === 600) {
+        // Stop at exactly the limit (5 minutes)
+        if (newTime === PROFILE_RECORDING_MAX_SECONDS) {
           stopRecordingAndHideCamera();
-          showToast('✅ Recording complete! 10-minute limit reached.', 'success');
-          return 600;
+          showToast('✅ Recording complete! 5-minute limit reached.', 'success');
+          return PROFILE_RECORDING_MAX_SECONDS;
         }
 
-        // Prevent going over 600 seconds
-        if (newTime > 600) {
-          return 600;
+        // Prevent going over the limit
+        if (newTime > PROFILE_RECORDING_MAX_SECONDS) {
+          return PROFILE_RECORDING_MAX_SECONDS;
         }
 
         return newTime;
