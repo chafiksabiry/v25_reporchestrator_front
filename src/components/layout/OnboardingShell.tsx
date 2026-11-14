@@ -8,6 +8,7 @@ import { NotificationsProvider } from '../../contexts/NotificationsContext';
 import { Sidebar } from '../dashboard/Sidebar';
 import { TopBar } from '../dashboard/TopBar';
 import { fetchProfileFromAPI, PROFILE_UPDATE_EVENT } from '../../utils/profileUtils';
+import { keepSavedPresentationVideo, PRESENTATION_VIDEO_SAVED_EVENT, withPresentationVideo } from '../../utils/introVideo';
 import { getAgentId } from '../../utils/authUtils';
 import api from '../../utils/client';
 import { HARX_NAVBAR_BG } from '../../utils/harxBrand';
@@ -21,6 +22,8 @@ import { buildRepPageTitle, resolveRepTabTitle } from '../../lib/repSections';
 import { usePageTitle } from '../../lib/tracking/usePageTitle';
 import { RepOnboardingHelpModal, type RepOnboardingGuideKey } from '../onboarding/RepOnboardingHelpModal';
 import { isSatisfactionPending } from '../onboarding/OnboardingSatisfactionModal';
+import { OnboardingStepper } from '../onboarding/OnboardingStepper';
+import { canRevisitStep } from '../../utils/repOnboardingProgress';
 
 /** Maps the current onboarding route to the matching on-demand help content. */
 function guideKeyForPath(pathname: string): RepOnboardingGuideKey | null {
@@ -61,6 +64,19 @@ function OnboardingShellContent() {
   // this effect's own load() causes, while still reacting to a genuine
   // PROFILE_UPDATE_EVENT dispatched elsewhere (e.g. a real save).
   const isSelfTriggeredUpdate = useRef(false);
+  // Vidéo de présentation tout juste enregistrée dans l'éditeur : le bandeau du parcours doit la voir
+  // immédiatement (même source que la liste « Avant de continuer »), sans attendre un rechargement.
+  const savedPresentationVideoRef = useRef<{ url?: string } | null>(null);
+
+  useEffect(() => {
+    const onVideoSaved = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: string }>).detail?.url;
+      savedPresentationVideoRef.current = { url };
+      setUserProfile((prev: any) => (prev ? withPresentationVideo(prev, url) : prev));
+    };
+    window.addEventListener(PRESENTATION_VIDEO_SAVED_EVENT, onVideoSaved);
+    return () => window.removeEventListener(PRESENTATION_VIDEO_SAVED_EVENT, onVideoSaved);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +86,8 @@ function OnboardingShellContent() {
       try {
         const profileData = await fetchProfileFromAPI();
         if (cancelled) return;
-        setUserProfile(profileData);
+        // Si le profil relu n'a pas encore la vidéo qu'on vient d'enregistrer, on la garde (pas de retour en arrière).
+        setUserProfile(keepSavedPresentationVideo(profileData, savedPresentationVideoRef.current));
 
         const agentId = profileData?._id || getAgentId();
         if (!agentId) return;
@@ -147,6 +164,15 @@ function OnboardingShellContent() {
     const target = next.path || '/profile-import';
 
     if (path === target) return;
+    // Retour volontaire (clic sur une étape déjà faite dans la barre de parcours) :
+    // on ne renvoie pas le rep en avant tant que le profil n'est pas publié. Rien n'est perdu.
+    if (
+      (location.state as { allowBack?: boolean } | null)?.allowBack === true &&
+      canRevisitStep(target, path) &&
+      !isRepProfilePublished(profileForStep)
+    ) {
+      return;
+    }
     if (target === '/subscription' && path.includes('subscription')) return;
     // Never bounce backwards to CV import once the editor (or later) is open.
     if (
@@ -176,7 +202,7 @@ function OnboardingShellContent() {
     }
 
     navigate(target, { replace: true });
-  }, [userProfile, location.pathname, navigate]);
+  }, [userProfile, location.pathname, location.state, navigate]);
 
   return (
     <div className="flex h-screen bg-[#E6188D] overflow-hidden">
@@ -199,8 +225,9 @@ function OnboardingShellContent() {
         style={{ backgroundImage: HARX_NAVBAR_BG }}
       >
         <TopBar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <main className="flex-1 overflow-y-auto" style={{ background: 'var(--rep-page-bg, #F8FAFC)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <OnboardingStepper userProfile={userProfile} onOpenHelp={guideKey ? () => setIsHelpOpen(true) : undefined} />
             <Outlet />
           </div>
         </main>

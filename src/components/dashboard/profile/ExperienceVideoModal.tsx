@@ -25,7 +25,11 @@ import {
   Clock,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { dashRepApiUrl } from '../../../utils/repApiUrl';
+import { dashRepApiUrl, repApiUrl } from '../../../utils/repApiUrl';
+import { INTRO_VIDEO_MAX_SECONDS, introAnalysisUi, INTRO_VIDEO_MIN_SECONDS } from '../../../utils/introVideo';
+import { buildDetectedGroups, detectedSkillCount, localizedText, normalizePresentationResult, type PresentationResult } from '../../../utils/presentationResult';
+import { checkVideoBeforeUpload, isVideoApiError, toVideoApiError, videoErrorFromResponse, videoErrorMessage, withRetryAfterOnce } from '../../../utils/videoErrors';
+import { recorderOptions } from '../../../utils/videoLimits';
 import { localizeTaxonomyEntity, type TaxonomyEntity } from '../../../utils/taxonomyI18n';
 import { getIndustries, getActivities, getSkillsGrouped } from '../../../lib/api/profiles';
 import { getAllLanguages } from '../../../lib/api/languages';
@@ -155,6 +159,7 @@ interface AnalysisResult {
   };
 }
 
+/** Réponse de POST /profiles/:id/presentation/analyze-video (analyse de la vidéo de présentation). */
 interface SavedVideoData {
   videoUrl?: string;
   videoDuration?: number;
@@ -180,12 +185,27 @@ interface ExperienceVideoModalProps {
   savedData?: SavedVideoData | null;
   onAnalysisComplete?: (data?: AnalysisResult) => void;
   referencePhotoUrl?: string | null;
+  /**
+   * 'experience' (défaut) : vidéo optionnelle d'une expérience.
+   * 'intro' : vidéo de présentation + parcours, obligatoire (une seule).
+   */
+  mode?: 'experience' | 'intro';
+  /** Mode 'intro' : appelé dès que la vidéo est enregistrée côté serveur (avant même l'analyse). */
+  onVideoSaved?: (info: { url?: string }) => void;
+  /**
+   * Mode 'intro' : appelé quand l'analyse en arrière-plan se termine (résultat, vidéo changée ou erreur),
+   * y compris si la fenêtre a été fermée entre-temps : le parent affiche alors une notification discrète.
+   */
+  onAnalysisSettled?: (info: { status: 'done' | 'stale' | 'error'; message?: string }) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MAX_DURATION = 120; // 2 minutes in seconds
-const MIN_DURATION = 30; // minimum required recording length in seconds
+const MAX_DURATION = 120; // 2 minutes in seconds (vidéo d'expérience)
+// Analyse automatique : nombre de tentatives supplémentaires avant d'afficher un message humain.
+const AUTO_ANALYZE_RETRIES = 2;
+const AUTO_ANALYZE_RETRY_DELAY_MS = 2500;
+const MIN_DURATION = 30; // minimum required recording length in seconds (INTRO_VIDEO_MIN_SECONDS en mode intro)
 // Face-absence escalation (counts of consecutive ~2s samples with no face):
 const ABSENCE_THREAT_TICKS = 2; // ~4s absent → strong "you'll be cut" warning
 const ABSENCE_CUT_TICKS = 4; // ~8s absent → auto-stop + block analysis
@@ -495,6 +515,67 @@ const STRINGS: Record<string, { en: string; fr: string }> = {
   stepActivities: { en: 'Activities', fr: 'Activités' },
   stepContactCenter: { en: 'Contact Center Skills', fr: 'Compétences centre de contact' },
   analysisFailed: { en: 'Analysis failed', fr: 'L’analyse a échoué' },
+  redoVideoHint: {
+    en: 'Use “Retake” (left) to record a new video.',
+    fr: 'Utilisez « Recommencer » (à gauche) pour refaire une vidéo.',
+  },
+  detectedTitle: { en: 'What the AI detected in your video', fr: 'Ce que l’IA a détecté dans votre vidéo' },
+  detectedSkills: { en: 'Skills', fr: 'Compétences' },
+  detectedIndustries: { en: 'Industries', fr: 'Secteurs' },
+  detectedActivities: { en: 'Activities', fr: 'Activités' },
+  detectedLanguages: { en: 'Languages', fr: 'Langues' },
+  detectedSkillsNote: {
+    en: 'Skills are suggestions: confirm them in Profile › Skills. Industries, activities and languages were added to your profile.',
+    fr: 'Les compétences sont des suggestions : confirmez-les dans Profil › Compétences. Les secteurs, activités et langues ont été ajoutés à votre profil.',
+  },
+  detectedEmpty: {
+    en: 'We could not detect enough usable speech. Record again, speaking clearly about who you are and your career path.',
+    fr: 'Nous n’avons pas détecté assez de parole exploitable. Refaites la vidéo en parlant clairement de qui vous êtes et de votre parcours.',
+  },
+  continueBackground: {
+    en: 'Continue — the analysis keeps running in the background',
+    fr: 'Continuer — l’analyse se poursuit en arrière-plan',
+  },
+  videoSavedChip: { en: 'Saved', fr: 'Enregistré' },
+  analysisSlow: {
+    en: 'The analysis is taking longer than expected. You can continue — it will finish in the background.',
+    fr: 'L’analyse prend plus de temps que prévu, vous pouvez continuer : elle se terminera en arrière-plan.',
+  },
+  detectedStale: {
+    en: 'Your video changed while it was being analysed, so nothing was added to your profile. Please try again.',
+    fr: 'La vidéo a changé pendant l’analyse, rien n’a été ajouté à votre profil. Réessayez.',
+  },
+  detectedNotSaved: {
+    en: 'The analysis was done but could not be saved automatically to your profile — your video itself is saved.',
+    fr: 'L’analyse est faite mais n’a pas pu être enregistrée automatiquement dans votre profil — votre vidéo, elle, est bien enregistrée.',
+  },
+  analysisFailedHuman: {
+    en: 'We could not finish the AI analysis of your video after several attempts. Your recording is not lost — please try again in a moment.',
+    fr: 'Nous n’avons pas pu terminer l’analyse IA de votre vidéo après plusieurs essais. Votre enregistrement n’est pas perdu — réessayez dans un instant.',
+  },
+  introUploadFailed: {
+    en: 'We could not save your video (connection problem?). Check your connection and try again — nothing is lost on your side.',
+    fr: 'Nous n’avons pas pu enregistrer votre vidéo (problème de connexion ?). Vérifiez votre connexion et réessayez — rien n’est perdu de votre côté.',
+  },
+  introHeaderTitle: { en: 'Your introduction video', fr: 'Votre vidéo de présentation' },
+  introHeaderSubtitle: { en: 'Introduce yourself and your career path', fr: 'Présentez-vous et présentez votre parcours' },
+  introRecordHint: {
+    en: 'Record between 30 seconds and {max} minutes: introduce yourself and walk us through your career path. The AI analysis starts automatically when you stop.',
+    fr: 'Enregistrez entre 30 secondes et {max} minutes : présentez-vous et présentez votre parcours. L’analyse IA démarre automatiquement dès que vous arrêtez.',
+  },
+  introEmptyTitle: { en: 'Introduce yourself', fr: 'Présentez-vous' },
+  introEmptyDesc: {
+    en: 'Tell us who you are, your career path and what you are good at. Only this one video is required — it takes a few minutes at most.',
+    fr: 'Dites-nous qui vous êtes, quel est votre parcours et vos points forts. Cette seule vidéo est obligatoire — quelques minutes suffisent.',
+  },
+  analyzingAuto: {
+    en: 'Analysis started automatically',
+    fr: 'Analyse lancée automatiquement',
+  },
+  analyzingRetry: {
+    en: 'Temporary hiccup — retrying automatically (attempt {n}/{total})…',
+    fr: 'Petit contretemps — nouvel essai automatique (essai {n}/{total})…',
+  },
   savedToProfile: { en: 'Analysis saved to your profile', fr: 'Analyse enregistrée dans votre profil' },
   aiSummary: { en: 'AI Summary', fr: 'Résumé IA' },
   relevance: { en: 'Relevance', fr: 'Pertinence' },
@@ -757,10 +838,15 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; count?: number; 
 
 export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   isOpen, onClose, experience, profileId, experienceIndex, savedData, onAnalysisComplete, referencePhotoUrl,
+  mode = 'experience', onVideoSaved, onAnalysisSettled,
 }) => {
   const { i18n } = useTranslation();
   const uiLang = (i18n.language || 'en').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en';
   const t = makeTr(uiLang);
+  const isIntro = mode === 'intro';
+  const maxDuration = isIntro ? INTRO_VIDEO_MAX_SECONDS : MAX_DURATION;
+  const minDuration = isIntro ? INTRO_VIDEO_MIN_SECONDS : MIN_DURATION;
+  const maxMinutesLabel = Math.round(maxDuration / 60);
 
   const [industryCatalog, setIndustryCatalog] = useState<TaxonomyCatalog>(() => new Map());
   const [activityCatalog, setActivityCatalog] = useState<TaxonomyCatalog>(() => new Map());
@@ -829,6 +915,13 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   // Set when the person left the frame for too long → recording is discarded and
   // cannot be analyzed (the user must record again).
   const [faceAbsenceInvalid, setFaceAbsenceInvalid] = useState(false);
+  // Analyse automatique : un enregistrement n'est analysé qu'une fois (réessais compris).
+  const autoAnalyzeStartedRef = useRef(false);
+  const [analyzeAttempt, setAnalyzeAttempt] = useState(0);
+  const [videoSavedOnServer, setVideoSavedOnServer] = useState(false);
+  const [presentation, setPresentation] = useState<PresentationResult | null>(null);
+  const [analyzeRetryable, setAnalyzeRetryable] = useState(true);
+  const presentationRouteMissingRef = useRef(false);
 
   // ── Camera init ─────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -873,6 +966,11 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     setSavedFlag(false);
     setFaceAbsenceInvalid(false);
     setElapsed(0);
+    autoAnalyzeStartedRef.current = false;
+    setAnalyzeAttempt(0);
+    setVideoSavedOnServer(false);
+    setPresentation(null);
+    setAnalyzeRetryable(true);
     if (videoRef.current) {
       videoRef.current.src = '';
       videoRef.current.controls = false;
@@ -948,7 +1046,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   const startRecording = () => {
     if (!stream) return;
     chunksRef.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    const recorder = new MediaRecorder(stream, recorderOptions('video/webm;codecs=vp8,opus'));
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
@@ -971,8 +1069,8 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     startTimeRef.current = Date.now();
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      if (secs >= MAX_DURATION) {
-        setElapsed(MAX_DURATION);
+      if (secs >= maxDuration) {
+        setElapsed(maxDuration);
         stopRecording();
         return;
       }
@@ -986,7 +1084,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
     }
     if (timerRef.current) clearInterval(timerRef.current);
     if (startTimeRef.current) {
-      const secs = Math.min(MAX_DURATION, Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const secs = Math.min(maxDuration, Math.floor((Date.now() - startTimeRef.current) / 1000));
       setElapsed(secs);
     }
     setIsRecording(false);
@@ -997,64 +1095,257 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
   };
 
   // ── Analysis ───────────────────────────────────────────────────────────────
-  const analyzeVideo = async () => {
-    if (!recordedBlob || !profileId) return;
-    setAnalyzing(true);
-    setAnalyzeError(null);
-    try {
-      const token = localStorage.getItem('token');
-      const formData = new FormData();
-      formData.append('video', new File([recordedBlob], 'experience-video.webm', { type: 'video/webm' }));
-      formData.append('title', experience.title);
-      formData.append('company', experience.company);
-      if (experience.description) {
-        formData.append('description', experience.description);
-      }
-      const responsibilities = Array.isArray(experience.responsibilities)
-        ? experience.responsibilities.map((r) => String(r || '').trim()).filter(Boolean)
-        : [];
-      if (responsibilities.length) {
-        formData.append('responsibilities', JSON.stringify(responsibilities));
-      }
-      if (experienceIndex !== undefined && experienceIndex >= 0) {
-        formData.append('experienceIndex', String(experienceIndex));
-      }
+  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-      const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
-        method: 'POST',
+  // Mode « intro » : la vidéo est d'abord enregistrée sur le profil (route existante
+  // PUT /profiles/:id/video). Ainsi l'obligation est remplie même si l'analyse IA échoue.
+  const uploadIntroVideo = async (blob: Blob, token: string | null): Promise<string | undefined> => {
+    // Trop volumineux (> 100 Mo) : message clair, RIEN n'est envoyé.
+    const tooLarge = checkVideoBeforeUpload(blob);
+    if (tooLarge) throw tooLarge;
+    return withRetryAfterOnce(() => uploadIntroVideoOnce(blob, token));
+  };
+
+  const uploadIntroVideoOnce = async (blob: Blob, token: string | null): Promise<string | undefined> => {
+    const formData = new FormData();
+    formData.append('video', new File([blob], 'presentation-video.webm', { type: 'video/webm' }));
+    let response: Response;
+    try {
+      response = await fetch(repApiUrl(`/profiles/${profileId}/video`), {
+        method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+    } catch {
+      throw toVideoApiError(0, { code: 'UPLOAD_FAILED' });
+    }
+    if (!response.ok) throw await videoErrorFromResponse(response);
+    const json = await response.json().catch(() => ({}));
+    return (
+      json?.data?.url || json?.url || json?.data?.videoUrl || json?.videoUrl ||
+      json?.data?.presentationVideo?.url || json?.presentationVideo?.url || undefined
+    );
+  };
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || `Server error ${response.status}`);
+  const runAnalysisOnce = async (blob: Blob): Promise<AnalysisResult> => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('video', new File([blob], isIntro ? 'presentation-video.webm' : 'experience-video.webm', { type: 'video/webm' }));
+    formData.append('title', experience.title);
+    formData.append('company', experience.company);
+    if (experience.description) {
+      formData.append('description', experience.description);
+    }
+    const responsibilities = Array.isArray(experience.responsibilities)
+      ? experience.responsibilities.map((r) => String(r || '').trim()).filter(Boolean)
+      : [];
+    if (responsibilities.length) {
+      formData.append('responsibilities', JSON.stringify(responsibilities));
+    }
+    if (!isIntro && experienceIndex !== undefined && experienceIndex >= 0) {
+      formData.append('experienceIndex', String(experienceIndex));
+    }
+
+    const response = await fetch(dashRepApiUrl(`/profiles/${profileId}/experience/analyze-video`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Server error ${response.status}`);
+    }
+    const json = await response.json();
+    const data = json.data;
+    if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
+    return data;
+  };
+
+  // Analyse de la vidéo de présentation : nouvelle route dédiée (fusionne secteurs, activités et
+  // langues dans le profil ; compétences en suggestions). Repli sur l'ancienne route si elle n'existe
+  // pas encore (404/405) : dans ce cas le résultat s'affiche comme une analyse d'expérience.
+  const runPresentationAnalysisOnce = async (blob: Blob): Promise<{ legacy: AnalysisResult } | { presentation: PresentationResult }> => {
+    if (!presentationRouteMissingRef.current) {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('video', new File([blob], 'presentation-video.webm', { type: 'video/webm' }));
+      let response: Response;
+      try {
+        response = await fetch(dashRepApiUrl(`/profiles/${profileId}/presentation/analyze-video`), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+      } catch {
+        throw toVideoApiError(0, { code: 'ANALYSIS_FAILED' });
+      }
+      // 404/405 SANS code d'erreur = la route n'existe pas encore (ancien serveur) → repli.
+      // Un 404 PROFILE_NOT_FOUND (avec code) est une vraie erreur : pas de repli.
+      let routeMissing = false;
+      if (response.status === 404 || response.status === 405) {
+        const body = await response.clone().json().catch(() => undefined);
+        routeMissing = !(body && typeof body.code === 'string');
+        if (routeMissing) presentationRouteMissingRef.current = true;
+      }
+      if (!routeMissing) {
+        if (!response.ok) throw await videoErrorFromResponse(response);
+        const json = await response.json();
+        return { presentation: normalizePresentationResult(json) };
+      }
+    }
+    try {
+      return { legacy: await runAnalysisOnce(blob) };
+    } catch (err: any) {
+      throw isVideoApiError(err) ? err : toVideoApiError(0, { code: 'ANALYSIS_FAILED' });
+    }
+  };
+
+  // Exécute `step` avec réessais automatiques sur les erreurs relançables ; une erreur de contenu
+  // (trop court, trop lourd…) est renvoyée tout de suite : il faut refaire la vidéo.
+  const withAutoRetry = async <T,>(step: () => Promise<T>): Promise<T> => {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt <= AUTO_ANALYZE_RETRIES; attempt += 1) {
+      setAnalyzeAttempt(attempt);
+      try {
+        return await step();
+      } catch (err) {
+        lastError = err;
+        if (isVideoApiError(err) && !err.retryable) break;
+        if (attempt < AUTO_ANALYZE_RETRIES) await sleep(AUTO_ANALYZE_RETRY_DELAY_MS);
+      }
+    }
+    throw lastError;
+  };
+
+  const runIntroFlow = async () => {
+    if (!recordedBlob) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeRetryable(true);
+    setAnalyzeAttempt(0);
+    try {
+      const token = localStorage.getItem('token');
+      if (!videoSavedOnServer) {
+        const url = await withAutoRetry(() => uploadIntroVideo(recordedBlob, token));
+        setVideoSavedOnServer(true);
+        onVideoSaved?.({ url });
+      }
+      const outcome = await withAutoRetry(() => runPresentationAnalysisOnce(recordedBlob));
+      if ('presentation' in outcome && outcome.presentation.stale) {
+        // La vidéo du wizard a changé pendant l'analyse : rien n'a été appliqué au profil.
+        // Pas de résultat affiché ni de rechargement ; on invite à réessayer (nouvel envoi puis analyse).
+        setVideoSavedOnServer(false);
+        setAnalyzeRetryable(true);
+        setAnalyzeError(t('detectedStale'));
+        onAnalysisSettled?.({ status: 'stale', message: t('detectedStale') });
+      } else if ('presentation' in outcome) {
+        setPresentation(outcome.presentation);
+        if (outcome.presentation.saved) setSavedFlag(true);
+        // Le parent recharge le profil (secteurs, activités, langues, compétences suggérées).
+        onAnalysisComplete?.(outcome.presentation as any);
+        onAnalysisSettled?.({ status: 'done' });
+      } else {
+        setResult(outcome.legacy);
+        if (outcome.legacy?.saved) setSavedFlag(true);
+        if (outcome.legacy?.videoUrl) showSavedVideo(outcome.legacy.videoUrl);
+        onAnalysisComplete?.(outcome.legacy);
+        onAnalysisSettled?.({ status: 'done' });
+      }
+    } catch (err) {
+      const apiErr = isVideoApiError(err) ? err : toVideoApiError(0, { code: 'UNKNOWN' });
+      const message = videoErrorMessage(apiErr.code, uiLang);
+      setAnalyzeRetryable(apiErr.retryable);
+      setAnalyzeError(message);
+      onAnalysisSettled?.({ status: 'error', message });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Lancée automatiquement à la fin de l'enregistrement (aucun bouton). Réessaie
+  // automatiquement, puis affiche un message humain avec un bouton de nouvel essai manuel.
+  const analyzeVideo = async () => {
+    if (!recordedBlob || !profileId) return;
+    if (isIntro) {
+      await runIntroFlow();
+      return;
+    }
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeAttempt(0);
+    try {
+      const token = localStorage.getItem('token');
+
+      if (isIntro && !videoSavedOnServer) {
+        const url = await uploadIntroVideo(recordedBlob, token);
+        setVideoSavedOnServer(true);
+        onVideoSaved?.({ url });
       }
 
-      const json = await response.json();
-      const data = json.data;
-      if (data?.fraudCheck) data.fraudCheck = presentFraudCheck(data.fraudCheck);
+      let data: AnalysisResult | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt <= AUTO_ANALYZE_RETRIES; attempt += 1) {
+        setAnalyzeAttempt(attempt);
+        try {
+          data = await runAnalysisOnce(recordedBlob);
+          lastError = null;
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (attempt < AUTO_ANALYZE_RETRIES) await sleep(AUTO_ANALYZE_RETRY_DELAY_MS);
+        }
+      }
+      if (lastError) throw lastError;
+
       setResult(data);
       if (data?.saved) {
         setSavedFlag(true);
         onAnalysisComplete?.(data);
-      } else {
+      } else if (!isIntro) {
         setAnalyzeError(t('saveFailedRetry'));
       }
       if (data?.videoUrl) {
         showSavedVideo(data.videoUrl);
       }
     } catch (err: any) {
-      setAnalyzeError(err.message || t('analysisFailedRetry'));
+      setAnalyzeError(
+        isIntro && !videoSavedOnServer && err?.message
+          ? t('introUploadFailed')
+          : t('analysisFailedHuman')
+      );
     } finally {
       setAnalyzing(false);
     }
   };
 
+  // Durée écoulée de l'analyse : au-delà de 3 min on prévient que c'est plus long que prévu.
+  const [analysisElapsedMs, setAnalysisElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!analyzing) {
+      setAnalysisElapsedMs(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => setAnalysisElapsedMs(Date.now() - startedAt), 5000);
+    return () => clearInterval(timer);
+  }, [analyzing]);
+
+  // Déclenchement automatique dès que l'enregistrement est terminé et valide.
+  useEffect(() => {
+    if (!isOpen || isRecording || !recordedBlob || faceAbsenceInvalid) return;
+    if (viewMode !== 'record' || result || presentation || analyzing) return;
+    if (elapsed < minDuration) return;
+    if (autoAnalyzeStartedRef.current) return;
+    autoAnalyzeStartedRef.current = true;
+    void analyzeVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isRecording, recordedBlob, faceAbsenceInvalid, viewMode, elapsed]);
+
   if (!isOpen) return null;
 
-  const timeRemaining = MAX_DURATION - elapsed;
-  const progressPct = (elapsed / MAX_DURATION) * 100;
+  const timeRemaining = maxDuration - elapsed;
+  const progressPct = (elapsed / maxDuration) * 100;
   const showVideoControls =
     viewMode === 'saved' || !!result?.videoUrl || (!!recordedBlob && !isRecording);
 
@@ -1092,9 +1383,9 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
               <Sparkles className="w-5 h-5 text-harx-300" />
             </div>
             <div className="min-w-0 flex-1 pr-2">
-              <h2 className="text-base font-black text-white">{t('headerTitle')}</h2>
+              <h2 className="text-base font-black text-white">{isIntro ? t('introHeaderTitle') : t('headerTitle')}</h2>
               <p className="text-xs text-slate-400 font-medium break-words whitespace-normal leading-relaxed">
-                {experience.title}{experience.company ? ` @ ${experience.company}` : ''}
+                {isIntro ? t('introHeaderSubtitle') : `${experience.title}${experience.company ? ` @ ${experience.company}` : ''}`}
               </p>
             </div>
           </div>
@@ -1234,7 +1525,7 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
               {viewMode === 'record' && !recordedBlob && !isRecording && (
                 <div className="text-center">
-                  <p className="text-xs text-slate-400 mb-3">{t('recordHint')}</p>
+                  <p className="text-xs text-slate-400 mb-3">{isIntro ? t('introRecordHint').replace('{max}', String(maxMinutesLabel)) : t('recordHint')}</p>
                   <button
                     onClick={startRecording}
                     disabled={!!cameraError || !stream}
@@ -1274,21 +1565,19 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                     </>
                   ) : (
                     <>
-                      {!result && elapsed < MIN_DURATION && (
+                      {!result && !presentation && elapsed < minDuration && (
                         <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400">
                           <AlertCircle className="w-3.5 h-3.5" />
                           {t('minDurationWarn')}
                         </p>
                       )}
-                      <button
-                        onClick={analyzeVideo}
-                        disabled={!!result || elapsed < MIN_DURATION}
-                        className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-harx-600 to-indigo-600 hover:from-harx-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-lg"
-                      >
-                        {result ? <CheckCircle className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                        {result ? t('analysisComplete') : t('analyzeWithAI')}
-                      </button>
-                      {result ? (
+                      {(result || presentation) && (
+                        <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-400">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {t('analysisComplete')}
+                        </p>
+                      )}
+                      {(result || presentation) ? (
                         <button
                           onClick={retake}
                           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-harx-500/40 bg-harx-500/10 hover:bg-harx-500/20 text-harx-300 rounded-2xl text-xs font-black transition-all active:scale-95"
@@ -1315,14 +1604,14 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
 
           {/* Right — Results */}
           <div className="flex-1 overflow-y-auto overscroll-contain p-5 pr-4 space-y-4 min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-track]:bg-transparent">
-            {!result && !analyzing && (
+            {!result && !presentation && !analyzing && (
               <div className="h-full flex flex-col items-center justify-center text-center py-16 gap-4">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-harx-100 to-indigo-100 flex items-center justify-center">
                   <Sparkles className="w-10 h-10 text-harx-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-800 mb-2">{t('emptyTitle')}</h3>
-                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{t('emptyDesc')}</p>
+                  <h3 className="text-lg font-black text-slate-800 mb-2">{isIntro ? t('introEmptyTitle') : t('emptyTitle')}</h3>
+                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed">{isIntro ? t('introEmptyDesc') : t('emptyDesc')}</p>
                 </div>
                 <div className="flex gap-3 flex-wrap justify-center">
                   {[t('tagSkills'), t('tagLanguages'), t('tagIndustries'), t('tagContactCenter')].map((tag) => (
@@ -1346,7 +1635,41 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 <div className="text-center space-y-1">
                   <p className="text-base font-black text-slate-800">{t('analyzingTitle')}</p>
                   <p className="text-sm text-slate-500">{t('analyzingSteps')}</p>
+                  <p className="text-xs font-bold text-harx-600">
+                    {analyzeAttempt > 0
+                      ? t('analyzingRetry').replace('{n}', String(analyzeAttempt + 1)).replace('{total}', String(AUTO_ANALYZE_RETRIES + 1))
+                      : t('analyzingAuto')}
+                  </p>
                 </div>
+                {(() => {
+                  const ui = introAnalysisUi({ videoSaved: isIntro && videoSavedOnServer, analyzing, elapsedMs: analysisElapsedMs });
+                  if (!isIntro) return null;
+                  return (
+                    <div className="flex flex-col items-center gap-3 max-w-sm text-center" data-testid="intro-analysis-exit">
+                      {videoSavedOnServer && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-black text-emerald-700">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {t('videoSavedChip')}
+                        </span>
+                      )}
+                      {ui.showSlowNotice && (
+                        <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" role="status">
+                          {t('analysisSlow')}
+                        </p>
+                      )}
+                      {ui.showContinue && (
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          data-testid="intro-continue-background"
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-harx-600 to-harx-alt-600 text-white text-sm font-black shadow-sm hover:opacity-95"
+                        >
+                          {t('continueBackground')}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2 flex-wrap justify-center max-w-xs">
                   {[t('stepTechnical'), t('stepLanguages'), t('stepIndustries'), t('stepActivities'), t('stepContactCenter')].map((step, i) => (
                     <span key={step} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-full">
@@ -1364,10 +1687,58 @@ export const ExperienceVideoModal: React.FC<ExperienceVideoModalProps> = ({
                 <div>
                   <p className="text-sm font-black text-red-700">{t('analysisFailed')}</p>
                   <p className="text-xs text-red-500 mt-1">{analyzeError}</p>
-                  <button onClick={analyzeVideo} className="mt-2 text-xs font-black text-red-600 underline">{t('retry')}</button>
+                  {analyzeRetryable ? (
+                    <button onClick={analyzeVideo} className="mt-2 text-xs font-black text-red-600 underline">{t('retry')}</button>
+                  ) : (
+                    <p className="mt-2 text-xs font-bold text-red-600">{t('redoVideoHint')}</p>
+                  )}
                 </div>
               </div>
             )}
+
+            {presentation && (() => {
+              const groups = buildDetectedGroups(presentation, uiLang);
+              const groupTitle = { skills: t('detectedSkills'), industries: t('detectedIndustries'), activities: t('detectedActivities'), languages: t('detectedLanguages') };
+              return (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="presentation-detected">
+                  <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
+                    <CheckCircle className="w-4 h-4" />
+                    {t('detectedTitle')}
+                  </div>
+                  {presentation.summary && (
+                    <p className="text-sm text-slate-700 leading-relaxed">{localizedText(presentation.summary, uiLang)}</p>
+                  )}
+                  {presentation.detected.isEmpty || groups.length === 0 ? (
+                    <p className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      {t('detectedEmpty')}
+                    </p>
+                  ) : (
+                    groups.map((g) => (
+                      <div key={g.key}>
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 mb-1.5">{groupTitle[g.key]}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {g.labels.map((label, i) => (
+                            <span key={`${g.key}-${i}`} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {detectedSkillCount(presentation) > 0 && <p className="text-xs text-slate-500 leading-relaxed">{t('detectedSkillsNote')}</p>}
+                  {presentation.relevance?.onTopic === false && (
+                    <p className="text-xs font-bold text-amber-700">
+                      {localizedText(presentation.relevance.reason, uiLang) || t('offTopicReasonFallback')}
+                    </p>
+                  )}
+                  {!presentation.saved && (
+                    <p className="text-xs font-bold text-amber-700">{t('detectedNotSaved')}</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {result && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">

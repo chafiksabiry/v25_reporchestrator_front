@@ -1,3 +1,4 @@
+import { buildProposedEntries } from '../../../../utils/proposedSkills';
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { fetchSkillsByType, Skill } from '../../../../services/api/skills';
@@ -18,6 +19,7 @@ interface SkillsTabProps {
   onAddSkill: (type: SkillType, skillId: string) => void;
   onConfirmProposedSkill?: (type: SkillType, skillId: string) => void;
   onDismissProposedSkill?: (type: SkillType, skillId: string) => void;
+  onConfirmAllProposedSkills?: (type: SkillType, skillIds: string[]) => void;
   onAddSpecializationItem?: (section: 'industries' | 'activities', value: string) => void;
   onDeleteSpecializationItem?: (section: 'industries' | 'activities' | 'notableCompanies', index: number) => void;
 }
@@ -47,6 +49,7 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
   onAddSkill,
   onConfirmProposedSkill,
   onDismissProposedSkill,
+  onConfirmAllProposedSkills,
   onAddSpecializationItem,
   onDeleteSpecializationItem
 }) => {
@@ -196,16 +199,10 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     return t('profile.common.unknown');
   };
 
-  const getProposedEntries = (type: SkillType) => {
-    const confirmedIds = getCurrentSkillIds(type);
-    return (profile?.proposedSkills?.[type] || [])
-      .map((entry: any) => {
-        const id = normalizeId(entry?.skill) || normalizeId(entry?._id);
-        if (!id || confirmedIds.has(id)) return null;
-        return { id, name: resolveSkillName(type, entry), level: entry?.level };
-      })
-      .filter(Boolean) as Array<{ id: string; name: string; level?: number }>;
-  };
+  const getProposedEntries = (type: SkillType) =>
+    buildProposedEntries(profile?.proposedSkills, type, getCurrentSkillIds(type), (entry: any) =>
+      resolveSkillName(type, entry)
+    );
 
   const totalProposedCount =
     getProposedEntries('technical').length +
@@ -309,9 +306,22 @@ export const SkillsTab: React.FC<SkillsTabProps> = ({
     if (proposed.length === 0) return null;
     return (
       <div className="mt-4 pt-4 border-t border-dashed border-amber-200/80">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800/80 mb-2">
-          {t('profile.skills.proposals')}
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800/80">
+            {t('profile.skills.proposals')}
+          </p>
+          {proposed.length > 1 && onConfirmAllProposedSkills && (
+            <button
+              type="button"
+              onClick={() => onConfirmAllProposedSkills(type, proposed.map((p) => p.id))}
+              data-testid={`confirm-all-proposed-${type}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition-colors"
+            >
+              <Check className="w-3 h-3" />
+              {t('profile.skills.confirmAll')}
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           {proposed.map((skill) => (
             <div

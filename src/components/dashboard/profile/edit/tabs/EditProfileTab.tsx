@@ -1,3 +1,4 @@
+import { SafeAvatar } from '../../../../common/SafeAvatar';
 import React from 'react';
 import { Trash2, Calendar, Info, MapPin, Mail, Phone, Camera, RefreshCw } from 'lucide-react';
 import { Industry, Activity } from '../../../../ProfileEditView';
@@ -98,17 +99,13 @@ export const EditProfileTab: React.FC<EditProfileTabProps> = ({
                 }
               }}
             >
-              {!isPhotoMarkedForDeletion && (imagePreview || profile.personalInfo?.photo?.url) ? (
-                <img 
-                  src={imagePreview || profile.personalInfo?.photo?.url} 
-                  alt="Profile" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-5xl font-black text-gray-200 bg-gray-50 uppercase tracking-tighter">
-                  {profile.personalInfo?.name?.charAt(0) || '?'}
-                </div>
-              )}
+              <SafeAvatar
+                url={isPhotoMarkedForDeletion ? undefined : (imagePreview || profile.personalInfo?.photo?.url)}
+                name={profile.personalInfo?.name}
+                alt="Profile"
+                imgClassName="w-full h-full object-cover"
+                fallbackClassName="w-full h-full flex items-center justify-center text-5xl font-black text-slate-400 bg-slate-100 uppercase tracking-tighter"
+              />
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
                 <Camera className="text-white w-10 h-10" />
               </div>

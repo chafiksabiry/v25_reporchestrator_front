@@ -1,3 +1,5 @@
+import { isIntroVideoRequirementMet } from './introVideo';
+
 export type RepOnboardingStepKind =
   | 'complete-profile'
   | 'continue-orchestrator'
@@ -43,23 +45,22 @@ export const hasRepProfileContent = (profile: any): boolean => {
   return false;
 };
 
-/** Phase 2 gate (mirrors SummaryEditorV2 canContinue): photo + videos + schedule. */
+/** Phase 2 gate (mirrors SummaryEditorV2 canContinue): photo + vidéo de présentation + schedule. */
 export const isRepPhase2Ready = (profile: any): boolean => {
   if (!profile || typeof profile !== 'object') return false;
 
   const hasPhoto = Boolean(profile?.personalInfo?.photo?.url);
   if (!hasPhoto) return false;
 
+  // Règle vidéo : une vidéo de présentation (ou, pour les anciens profils, au moins
+  // une vidéo d'expérience). Les vidéos par expérience sont optionnelles.
   const experiences = Array.isArray(profile.experience)
     ? profile.experience
     : Array.isArray(profile.experiences)
       ? profile.experiences
       : [];
   if (experiences.length === 0) return false;
-  const allVideos = experiences.every(
-    (exp: any) => exp && (exp.videoUrl || exp.videoAnalysis)
-  );
-  if (!allVideos) return false;
+  if (!isIntroVideoRequirementMet(profile)) return false;
 
   const schedule = profile?.availability?.schedule;
   const hasSchedule =
@@ -89,7 +90,7 @@ export function getRepOnboardingStep(profile: any): RepOnboardingStep {
     return { kind: 'complete-profile', path: '/profile-import' };
   }
 
-  // Never leave the editor until photo + experience videos + availability are done.
+  // Never leave the editor until photo + intro video + availability are done.
   if (!isRepPhase2Ready(profile)) {
     return { kind: 'complete-profile', path: '/profile-editor' };
   }

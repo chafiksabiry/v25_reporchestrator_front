@@ -372,11 +372,11 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                 src={mascotte}
                 alt=""
                 aria-hidden="true"
-                className="mb-3 w-[5.5rem] h-auto"
+                className="mb-2 h-auto w-14 [@media(max-height:700px)]:hidden"
               />
-              <div className="w-full rounded-2xl bg-[#E11D48] p-3.5 text-left shadow-inner">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-400/15">
+              <div className="w-full rounded-2xl bg-[#E11D48] p-3 text-left shadow-inner">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-400/15">
                     <Lock className="h-3.5 w-3.5 text-amber-300" strokeWidth={2.5} />
                   </span>
                   <h3 className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-300 leading-tight">
@@ -395,17 +395,17 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                         <span>{t('onboardingGuide.progress', { done: doneCount, total: steps.length })}</span>
                         <span className="tabular-nums">{pct}%</span>
                       </div>
-                      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-black/25" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-black/25" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                         <div className="h-full rounded-full bg-amber-300 transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
-                      <ol className="space-y-1.5">
+                      <ol className="space-y-1">
                         {steps.map((x) => {
                           const isCurrent = x.n === current && !x.done;
                           return (
                             <li
                               key={x.n}
                               aria-current={isCurrent ? 'step' : undefined}
-                              className={`flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-colors ${isCurrent ? 'bg-white/15 ring-1 ring-amber-300/60' : ''}`}
+                              className={`flex items-start gap-2 rounded-xl px-2 py-1 transition-colors ${isCurrent ? 'bg-white/15 ring-1 ring-amber-300/60' : ''}`}
                             >
                               <span
                                 className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
@@ -426,7 +426,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                           );
                         })}
                       </ol>
-                      <p className="mt-2.5 text-[10px] font-medium leading-snug text-white/80">{t('onboardingGuide.description')}</p>
+                      <p className="mt-2 text-[10px] font-medium leading-snug text-white/80 [@media(max-height:860px)]:hidden">{t('onboardingGuide.description')}</p>
                     </div>
                   );
                 })()}
@@ -457,7 +457,7 @@ export function Sidebar({ phases, isSidebarOpen, setIsSidebarOpen, isCollapsed, 
                     navigate(path);
                     setIsSidebarOpen(false);
                   }}
-                  className="mt-3 w-full rounded-xl bg-amber-400 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-900 shadow-md transition hover:bg-amber-300 active:scale-[0.98]"
+                  className="mt-2.5 w-full rounded-xl bg-amber-400 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-900 shadow-md transition hover:bg-amber-300 active:scale-[0.98]"
                 >
                   {t('onboardingGuide.cta')}
                 </button>

@@ -1,0 +1,25 @@
+{
+  "plan": {
+    "heroKicker": "Dernière étape de votre inscription",
+    "included": "Inclus",
+    "free": "Gratuit",
+    "afterTitle": "Ce qui se passe après votre choix",
+    "after1Title": "Votre formule est activée",
+    "after1Body": "Vous la retrouvez à tout moment dans votre espace.",
+    "after2Title": "Vous publiez votre profil",
+    "after2Body": "Il devient visible des entreprises.",
+    "after3Title": "Vous donnez votre avis",
+    "after3Body": "Puis la marketplace des missions s’ouvre.",
+    "securePayment": "Les formules payantes passent par un paiement sécurisé (Stripe).",
+    "chooseAria": "{{action}} — {{name}}",
+    "currentAria": "Formule actuelle : {{name}}",
+    "plansRegion": "Formules disponibles",
+    "details": "Voir le détail",
+    "detailsClose": "Fermer",
+    "detailsTitle": "Détail de la formule",
+    "afterShort1": "Formule activée",
+    "afterShort2": "Publication du profil",
+    "afterShort3": "Votre avis, puis les missions",
+    "backAria": "Retour à l’étape précédente de l’onboarding"
+  }
+}

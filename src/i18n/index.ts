@@ -3,6 +3,9 @@ import { initReactI18next } from 'react-i18next';
 
 import enTranslation from './locales/en.json';
 import frTranslation from './locales/fr.json';
+// Lot « refonte profil / formule » : textes isolés dans l'espace de noms `repsx` (évite les conflits entre lots).
+import enRepsx from './locales/repsx.en.json';
+import frRepsx from './locales/repsx.fr.json';
 
 /** Shared with registration / company MFs — keep language across microfrontends. */
 export const HARX_LANG_KEY = 'i18nextLng';
@@ -36,8 +39,8 @@ export function persistHarxLanguage(lang: string, opts?: { explicit?: boolean })
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: enTranslation },
-    fr: { translation: frTranslation },
+    en: { translation: enTranslation, repsx: enRepsx },
+    fr: { translation: frTranslation, repsx: frRepsx },
   },
   lng: readHarxLanguage(),
   fallbackLng: 'fr',
