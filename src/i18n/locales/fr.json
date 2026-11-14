@@ -1357,6 +1357,8 @@
     "expVideoOptional": "Vidéo facultative pour cette expérience.",
     "recordAnalyzeOptional": "Ajouter une vidéo (facultatif)",
     "introVideoDoneDesc": "Vidéo de présentation enregistrée. Vous pouvez la refaire à tout moment.",
+    "introAnalysisDoneToast": "Analyse de votre vidéo terminée : votre profil a été mis à jour.",
+    "introAnalysisFailedToast": "L’analyse de votre vidéo n’a pas pu aboutir. Votre vidéo est bien enregistrée : vous pouvez continuer ou réessayer plus tard.",
     "introVideoMissingDesc": "Présentez-vous et présentez votre parcours en vidéo ({{max}} minutes maximum). C'est la seule vidéo obligatoire ; celles par expérience sont facultatives.",
     "introVideoRedo": "Refaire ma vidéo",
     "availMissing": "Disponibilités non renseignées — cliquez sur Modifier pour ajouter vos horaires de travail.",

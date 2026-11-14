@@ -79,3 +79,48 @@ describe('critère d’avancement de l’onboarding (isRepPhase2Ready)', () => {
     expect(isRepPhase2Ready({ ...withVideo, personalInfo: { photo }, availability: { schedule: [] } })).toBe(false);
   });
 });
+
+import {
+  ANALYSIS_SLOW_AFTER_MS,
+  introAnalysisUi,
+  keepSavedPresentationVideo,
+  withPresentationVideo,
+} from './introVideo';
+
+describe('état local « vidéo enregistrée » (bandeau du parcours et liste de l’éditeur)', () => {
+  it('withPresentationVideo marque la vidéo enregistrée sans modifier l’original', () => {
+    const base = { _id: 'p1', personalInfo: { name: 'A' } };
+    const next = withPresentationVideo(base, 'https://v/1.webm');
+    expect(isIntroVideoRequirementMet(next)).toBe(true);
+    expect(next.personalInfo.name).toBe('A');
+    expect(isIntroVideoRequirementMet(base)).toBe(false);
+    expect(base.personalInfo).toEqual({ name: 'A' });
+  });
+
+  it('withPresentationVideo : profil vide ou url absente → toujours « enregistrée » (uploaded)', () => {
+    expect(isIntroVideoRequirementMet(withPresentationVideo(null))).toBe(true);
+    expect(isIntroVideoRequirementMet(withPresentationVideo({}, ''))).toBe(true);
+  });
+
+  it('keepSavedPresentationVideo : un profil relu sans trace de la vidéo la garde ; avec trace, il est inchangé', () => {
+    const server = { personalInfo: { name: 'A' } };
+    expect(isIntroVideoRequirementMet(keepSavedPresentationVideo(server, { url: 'u' }))).toBe(true);
+    expect(isIntroVideoRequirementMet(keepSavedPresentationVideo(server, null))).toBe(false);
+    const withVideo = { personalInfo: { presentationVideo: { url: 'srv' } } };
+    expect(keepSavedPresentationVideo(withVideo, { url: 'local' })).toBe(withVideo);
+    expect(keepSavedPresentationVideo(null, { url: 'u' })).toBeNull();
+  });
+
+  it('bouton « Continuer » dès que la vidéo est enregistrée pendant l’analyse (jamais avant, jamais hors analyse)', () => {
+    expect(introAnalysisUi({ videoSaved: true, analyzing: true, elapsedMs: 0 }).showContinue).toBe(true);
+    expect(introAnalysisUi({ videoSaved: false, analyzing: true, elapsedMs: 0 }).showContinue).toBe(false);
+    expect(introAnalysisUi({ videoSaved: true, analyzing: false, elapsedMs: 0 }).showContinue).toBe(false);
+  });
+
+  it('message « plus long que prévu » après 3 minutes d’analyse seulement', () => {
+    expect(ANALYSIS_SLOW_AFTER_MS).toBe(180000);
+    expect(introAnalysisUi({ videoSaved: true, analyzing: true, elapsedMs: ANALYSIS_SLOW_AFTER_MS - 1 }).showSlowNotice).toBe(false);
+    expect(introAnalysisUi({ videoSaved: true, analyzing: true, elapsedMs: ANALYSIS_SLOW_AFTER_MS }).showSlowNotice).toBe(true);
+    expect(introAnalysisUi({ videoSaved: true, analyzing: false, elapsedMs: ANALYSIS_SLOW_AFTER_MS }).showSlowNotice).toBe(false);
+  });
+});

@@ -13,7 +13,7 @@ import { ExperienceVideoModal } from '../dashboard/profile/ExperienceVideoModal'
 import { buildMissingLanguagesFromVideoAnalysis } from '../dashboard/profile/languageVideoUtils';
 import { flexibilityLabel, hasFlexibility, toggleFlexibility } from '../../utils/flexibilityOptions';
 import { formatCountryLabel, resolveCountryCode, resolveCountryName } from '../../utils/countryDisplay';
-import { INTRO_VIDEO_MAX_SECONDS, hasPresentationVideo, isIntroVideoRequirementMet } from '../../utils/introVideo';
+import { INTRO_VIDEO_MAX_SECONDS, PRESENTATION_VIDEO_SAVED_EVENT, hasPresentationVideo, isIntroVideoRequirementMet, withPresentationVideo } from '../../utils/introVideo';
 import { repApiUrl } from '../../utils/repApiUrl';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -554,6 +554,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
   const [videoModalExp, setVideoModalExp] = useState(null);
   // Vidéo de présentation (obligatoire, une seule) : fenêtre d'enregistrement + état local « enregistrée ».
   const [introModalOpen, setIntroModalOpen] = useState(false);
+  // Lu par les rappels asynchrones de la fenêtre (fermée pendant que l'analyse se poursuit en arrière-plan).
+  const introModalOpenRef = useRef(false);
+  introModalOpenRef.current = introModalOpen;
   // Barre « prochaine étape » : visible dès que la liste de contrôle n'est plus à l'écran, pour ne pas obliger à défiler jusqu'en bas.
   const [checklistEl, setChecklistEl] = useState(null);
   const [checklistVisible, setChecklistVisible] = useState(true);
@@ -1603,9 +1606,9 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
     }
   };
 
-  const showToast = (message, type = 'success') => {
+  const showToast = (message, type = 'success', durationMs = 3000) => {
     setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), durationMs);
   };
 
   const regenerateSummary = async () => {
@@ -2691,16 +2694,23 @@ function SummaryEditor({ profileData, generatedSummary, setGeneratedSummary, onP
               // même si l'analyse IA (non bloquante) échoue ensuite. `presentationVideo` est retiré
               // de personalInfo à l'enregistrement du profil (profileUtils), donc sans risque.
               setEditedProfile((prev) => {
-                const updated = {
-                  ...prev,
-                  personalInfo: {
-                    ...prev.personalInfo,
-                    presentationVideo: { url: url || '', uploaded: true },
-                  },
-                };
+                const updated = withPresentationVideo(prev, url);
                 if (onProfileUpdate) onProfileUpdate(updated);
                 return updated;
               });
+              // Le bandeau du parcours (en haut de page) lit le profil du « shell », pas cet état local :
+              // on l'informe tout de suite, sans attendre un rechargement ni la fin de l'analyse.
+              try {
+                window.dispatchEvent(new CustomEvent(PRESENTATION_VIDEO_SAVED_EVENT, { detail: { url: url || '' } }));
+              } catch {
+                /* environnement sans window.CustomEvent */
+              }
+            }}
+            onAnalysisSettled={({ status, message }) => {
+              // Fenêtre ouverte : elle affiche déjà le résultat ou l'erreur. Fermée : notification discrète.
+              if (introModalOpenRef.current) return;
+              if (status === 'done') showToast(t('introAnalysisDoneToast'), 'success', 6000);
+              else showToast(message || t('introAnalysisFailedToast'), 'error', 8000);
             }}
             onAnalysisComplete={async () => {
               // Le backend a écrit secteurs, activités, langues (et compétences en suggestions) :
