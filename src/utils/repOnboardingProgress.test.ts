@@ -5,7 +5,9 @@ import {
   getEditorChecklist,
   getEditorCompletion,
   getJourneyProgress,
+  JOURNEY_GUIDE_STORAGE_KEY,
   REP_JOURNEY_STEPS,
+  resolveGuideExpanded,
   resolveJourneyStepIndex,
 } from './repOnboardingProgress';
 import { isRepPhase2Ready } from './repOnboardingNextStep';
@@ -117,5 +119,22 @@ describe("messages d'erreur d'import humains", () => {
     expect(classifyImportError(new Error('Languages section is required'))).toBe('languages');
     expect(classifyImportError(new Error('boom'))).toBe('generic');
     expect(classifyImportError(undefined)).toBe('generic');
+  });
+});
+
+describe('bandeau de consigne : ouvert par défaut', () => {
+  it('ouvert sans préférence, avec valeur inconnue ou stockage indisponible', () => {
+    expect(resolveGuideExpanded(null)).toBe(true);
+    expect(resolveGuideExpanded(undefined)).toBe(true);
+    expect(resolveGuideExpanded('1')).toBe(true);
+    expect(resolveGuideExpanded('n’importe quoi')).toBe(true);
+  });
+  it('replié seulement après un choix explicite', () => {
+    expect(resolveGuideExpanded('0')).toBe(false);
+  });
+  it("utilise une clé versionnée distincte des anciennes (l'ancien « replié » n'est plus lu)", () => {
+    expect(JOURNEY_GUIDE_STORAGE_KEY).toBe('harx_rep_journey_guide_v2');
+    expect(JOURNEY_GUIDE_STORAGE_KEY).not.toBe('harx_rep_journey_guide_expanded');
+    expect(JOURNEY_GUIDE_STORAGE_KEY).not.toBe('harx_rep_journey_guide_collapsed');
   });
 });
