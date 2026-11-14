@@ -1,31 +1,4 @@
 {
-  "profile": {
-    "progress": {
-      "regionLabel": "Votre avancement",
-      "title": "Votre avancement",
-      "stateIncomplete": "Profil à compléter",
-      "stateReady": "Profil prêt",
-      "count": "{{done}} sur {{total}} éléments obligatoires terminés",
-      "nextStep": "Prochaine étape",
-      "itemsTitle": "Éléments obligatoires",
-      "itemDone": "Fait",
-      "itemTodo": "À faire",
-      "itemNext": "À faire maintenant",
-      "ctaComplete": "Compléter mon profil",
-      "ctaPlan": "Choisir ma formule",
-      "readyTitle": "Votre profil est complet",
-      "readyBody": "Cliquez sur une rubrique pour la relire si vous le souhaitez, puis choisissez votre formule.",
-      "saved": "Tout est enregistré automatiquement : vous pouvez reprendre plus tard."
-    },
-    "overview": {
-      "sectionsTitle": "Rubriques de votre profil",
-      "sectionsHint": "Cliquez sur une rubrique pour la consulter ou la modifier.",
-      "backToOverview": "Vue d’ensemble",
-      "editInfo": "Modifier mes informations",
-      "presentation": "Présentation",
-      "warn": "À vérifier"
-    }
-  },
   "plan": {
     "heroKicker": "Dernière étape de votre inscription",
     "included": "Inclus",

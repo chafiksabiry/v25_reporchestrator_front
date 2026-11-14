@@ -1,31 +1,4 @@
 {
-  "profile": {
-    "progress": {
-      "regionLabel": "Your progress",
-      "title": "Your progress",
-      "stateIncomplete": "Profile to complete",
-      "stateReady": "Profile ready",
-      "count": "{{done}} of {{total}} required items completed",
-      "nextStep": "Next step",
-      "itemsTitle": "Required items",
-      "itemDone": "Done",
-      "itemTodo": "To do",
-      "itemNext": "Do this now",
-      "ctaComplete": "Complete my profile",
-      "ctaPlan": "Choose my plan",
-      "readyTitle": "Your profile is complete",
-      "readyBody": "Click a section to review it if you like, then choose your plan.",
-      "saved": "Everything is saved automatically: you can come back later."
-    },
-    "overview": {
-      "sectionsTitle": "Your profile sections",
-      "sectionsHint": "Click a section to review or edit it.",
-      "backToOverview": "Overview",
-      "editInfo": "Edit my information",
-      "presentation": "Introduction",
-      "warn": "To check"
-    }
-  },
   "plan": {
     "heroKicker": "Last step of your sign-up",
     "included": "Included",
