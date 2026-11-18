@@ -171,8 +171,12 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       console.log("languages extracted :", skills.languages);
       console.log("🔍 analyzeSkills result:", skills);
       console.log("🔍 analyzeExperience result:", experience);
-      if (skills.languages.length === 0) {
-        throw new Error(t('profileImportDialog.errors.languagesRequired'));
+      // A CV that names no language must not dead-end the import: carry on with
+      // an empty list and let the rep add their languages from the profile
+      // afterwards. We never guess a language the CV doesn't state.
+      const extractedLanguages = Array.isArray(skills.languages) ? skills.languages : [];
+      if (extractedLanguages.length === 0) {
+        console.warn('No explicit language found in the CV: continuing without languages.');
       }
 
       // Match extracted languages with database languages
@@ -215,7 +219,7 @@ function ImportDialog({ isOpen, onClose, onImport }) {
       };
 
       const seenLanguageIds = new Set();
-      for (const extractedLang of skills.languages) {
+      for (const extractedLang of extractedLanguages) {
         let dbLanguage = null;
 
         if (extractedLang.iso639_1) {
@@ -249,7 +253,9 @@ function ImportDialog({ isOpen, onClose, onImport }) {
         console.log(`Matched language: ${extractedLang.language} (${extractedLang.iso639_1 || 'name'}) -> ${dbLanguage.name}`);
       }
 
-      if (matchedLanguages.length === 0) {
+      // Only an error when the CV did list languages but none exist in our
+      // catalogue; an empty CV list was already accepted above.
+      if (extractedLanguages.length > 0 && matchedLanguages.length === 0) {
         throw new Error(t('profileImportDialog.errors.languagesUnmatched'));
       }
 
