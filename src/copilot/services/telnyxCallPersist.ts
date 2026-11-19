@@ -52,11 +52,19 @@ export class TelnyxCallPersist {
     return data.login_token;
   }
 
-  static async startRecording(callControlId: string): Promise<void> {
+  /**
+   * Starts server-side recording. leadId / gigId are optional and let the
+   * calls server pick the language of the "this call is recorded" announcement.
+   */
+  static async startRecording(
+    callControlId: string,
+    context?: { leadId?: string | null; gigId?: string | null }
+  ): Promise<void> {
     if (!callControlId) return;
-    await axios.post(`${callsBase()}/api/calls/telnyx/record-start`, {
-      callControlId,
-    });
+    const body: { callControlId: string; leadId?: string; gigId?: string } = { callControlId };
+    if (context?.leadId) body.leadId = String(context.leadId);
+    if (context?.gigId) body.gigId = String(context.gigId);
+    await axios.post(`${callsBase()}/api/calls/telnyx/record-start`, body);
   }
 
   static async finalizeCall(payload: TelnyxStorePayload): Promise<any> {

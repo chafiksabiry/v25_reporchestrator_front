@@ -673,7 +673,16 @@ export function ContactInfo() {
           });
 
           if (callControlId) {
-            TelnyxCallPersist.startRecording(callControlId).catch((err) => {
+            const leadGig = (apiLead as { gigId?: string | { _id?: string } } | null | undefined)?.gigId;
+            const recordGigId =
+              (typeof leadGig === 'object' ? leadGig?._id : leadGig) ||
+              line?.gigId ||
+              activeLineRef.current?.gigId ||
+              null;
+            TelnyxCallPersist.startRecording(callControlId, {
+              leadId: contact.id || null,
+              gigId: recordGigId,
+            }).catch((err) => {
               console.warn('Telnyx record_start failed:', err?.response?.data || err?.message || err);
             });
           } else {
