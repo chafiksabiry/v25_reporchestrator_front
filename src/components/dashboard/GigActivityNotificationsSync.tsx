@@ -31,6 +31,12 @@ function kbApi(): string {
   return base.endsWith('/api') ? base : `${base}/api`;
 }
 
+/** Le service de connaissance exige le jeton de la session. */
+function kbAuth(): { headers: Record<string, string> } {
+  const token = getAuthToken();
+  return { headers: token ? { Authorization: `Bearer ${token}` } : {} };
+}
+
 function loadSeen(repId: string): SeenState {
   try {
     const raw = localStorage.getItem(`${SEEN_PREFIX}${repId}`);
@@ -395,7 +401,7 @@ export function GigActivityNotificationsSync() {
         await Promise.all(
           enrolled.map(async ({ gigId, title }) => {
             try {
-              const docsRes = await axios.get(`${kbApi()}/documents/gig/${encodeURIComponent(gigId)}`);
+              const docsRes = await axios.get(`${kbApi()}/documents/gig/${encodeURIComponent(gigId)}`, kbAuth());
               const docs = asList(docsRes.data) as Record<string, any>[];
               for (const doc of docs) {
                 const did = nid(doc?._id || doc?.id);
@@ -427,8 +433,8 @@ export function GigActivityNotificationsSync() {
 
             try {
               const [callScripts, ragScripts] = await Promise.all([
-                axios.get(`${kbApi()}/scripts/gig/${encodeURIComponent(gigId)}`).then((r) => asList(r.data)).catch(() => []),
-                axios.get(`${kbApi()}/rag/scripts`, { params: { gigId } }).then((r) => asList(r.data)).catch(() => []),
+                axios.get(`${kbApi()}/scripts/gig/${encodeURIComponent(gigId)}`, kbAuth()).then((r) => asList(r.data)).catch(() => []),
+                axios.get(`${kbApi()}/rag/scripts`, { ...kbAuth(), params: { gigId } }).then((r) => asList(r.data)).catch(() => []),
               ]);
               const scripts = [...callScripts, ...ragScripts] as Record<string, any>[];
               for (const script of scripts) {

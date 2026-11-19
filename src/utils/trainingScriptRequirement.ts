@@ -1,5 +1,7 @@
 /** Helpers partagés — module script obligatoire (formation / certification / cockpit). */
 
+import { getAuthToken } from './authUtils';
+
 export const SCRIPT_REQUIREMENT_MARKER = '__harx_script_requirement__';
 
 export type JourneyModuleRow = {
@@ -472,7 +474,11 @@ export async function fetchActiveScriptForGig(gigId: string): Promise<GigScriptP
   const api = knowledgeBaseApiRoot();
   if (!api) return null;
   try {
-    const res = await fetch(`${api}/scripts/gig/${encodeURIComponent(gid)}?active=true`);
+    // Le service de connaissance exige le jeton de la session (un rep lit le script de ses gigs).
+    const token = getAuthToken();
+    const res = await fetch(`${api}/scripts/gig/${encodeURIComponent(gid)}?active=true`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: GigScriptPayload[] };
     const scripts = Array.isArray(json.data) ? json.data : [];
